@@ -1,6 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
+/*
+//Temporary Firestore test function
+Future<void> testFirestore() async {
+  await FirebaseFirestore.instance
+      .collection('connection_test')
+      .doc('test')
+      .set({
+    'message': 'AccessTransit Firestore connected',
+    'createdAt': FieldValue.serverTimestamp(),
+  });
+
+  debugPrint('Firestore connection successful');
+}
+*/
+
+//Firebase initialization
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  //await testFirestore();
+
   runApp(const MyApp());
 }
 
