@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+import 'core/theme/app_colors.dart';
 import 'firebase_options.dart';
 import 'screens/auth/login_screen.dart';
 
@@ -20,6 +21,17 @@ class AccessTransitApp extends StatelessWidget {
     return MaterialApp(
       title: 'AccessTransit',
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primary,
+          primary: AppColors.primary,
+          onPrimary: AppColors.onPrimary,
+          surface: AppColors.surfaceBright,
+          error: AppColors.error,
+        ),
+        scaffoldBackgroundColor: AppColors.surfaceBright,
+      ),
       home: const LoginScreen(),
     );
   }
