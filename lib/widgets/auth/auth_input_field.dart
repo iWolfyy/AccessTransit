@@ -17,6 +17,7 @@ class AuthInputField extends StatelessWidget {
     this.suffixIcon,
     this.onFieldSubmitted,
     this.autofillHints,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final TextEditingController controller;
@@ -30,6 +31,7 @@ class AuthInputField extends StatelessWidget {
   final Widget? suffixIcon;
   final void Function(String)? onFieldSubmitted;
   final Iterable<String>? autofillHints;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +43,7 @@ class AuthInputField extends StatelessWidget {
           obscureText: obscureText,
           onFieldSubmitted: onFieldSubmitted,
           autofillHints: autofillHints,
+          textCapitalization: textCapitalization,
           style: const TextStyle(
             fontSize: 14,
             height: 20 / 14,
