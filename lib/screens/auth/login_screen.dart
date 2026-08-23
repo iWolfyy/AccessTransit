@@ -5,6 +5,7 @@ import '../../core/utils/validators.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth/auth_input_field.dart';
 import '../home/home_screen.dart';
+import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -66,30 +67,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _forgotPassword() async {
-    FocusScope.of(context).unfocus();
-
-    final email = _emailController.text.trim();
-    final emailError = Validators.email(email);
-
-    if (emailError != null) {
-      _showMessage(
-        'Enter a valid email address above, then tap Forgot Password again.',
-        isError: true,
-      );
-      return;
-    }
-
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (!mounted) return;
-      _showMessage('Password reset link sent to $email.');
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      _showMessage(_getForgotPasswordErrorMessage(e), isError: true);
-    }
-  }
-
   void _showComingSoon(String feature) {
     _showMessage('$feature will be available in a future update.');
   }
@@ -124,19 +101,6 @@ class _LoginScreenState extends State<LoginScreen> {
         return 'Network error. Please check your connection and try again.';
       default:
         return e.message ?? 'Unable to sign in. Please try again.';
-    }
-  }
-
-  String _getForgotPasswordErrorMessage(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'user-not-found':
-        return 'No account found with this email address.';
-      case 'invalid-email':
-        return 'Please enter a valid email address.';
-      case 'too-many-requests':
-        return 'Too many requests. Please try again later.';
-      default:
-        return e.message ?? 'Unable to send reset email. Please try again.';
     }
   }
 
@@ -270,7 +234,17 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             TextButton(
-              onPressed: _isLoading ? null : _forgotPassword,
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ForgotPasswordScreen(
+                            initialEmail: _emailController.text.trim(),
+                          ),
+                        ),
+                      );
+                    },
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 minimumSize: Size.zero,
