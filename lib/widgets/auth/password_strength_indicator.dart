@@ -8,15 +8,25 @@ class PasswordStrengthIndicator extends StatelessWidget {
   const PasswordStrengthIndicator({
     super.key,
     required this.strength,
+    this.showWhenEmpty = false,
   });
 
   final PasswordStrength strength;
+  final bool showWhenEmpty;
 
   @override
   Widget build(BuildContext context) {
-    if (strength == PasswordStrength.empty) {
+    if (strength == PasswordStrength.empty && !showWhenEmpty) {
       return const SizedBox.shrink();
     }
+
+    final filledBars = strength.filledBars;
+    final label = strength == PasswordStrength.empty
+        ? 'Password strength'
+        : strength.label;
+    final labelColor = strength == PasswordStrength.empty
+        ? AppColors.onSurfaceVariant
+        : strength.color;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -24,7 +34,7 @@ class PasswordStrengthIndicator extends StatelessWidget {
         const SizedBox(height: 8),
         Row(
           children: List.generate(3, (index) {
-            final isFilled = index < strength.filledBars;
+            final isFilled = index < filledBars;
             final isLast = index == 2;
 
             return Expanded(
@@ -34,9 +44,7 @@ class PasswordStrengthIndicator extends StatelessWidget {
                 height: 4,
                 margin: EdgeInsets.only(right: isLast ? 0 : 4),
                 decoration: BoxDecoration(
-                  color: isFilled
-                      ? strength.color
-                      : AppColors.outlineVariant,
+                  color: isFilled ? strength.color : AppColors.outlineVariant,
                   borderRadius: BorderRadius.horizontal(
                     left: index == 0 ? const Radius.circular(999) : Radius.zero,
                     right: isLast ? const Radius.circular(999) : Radius.zero,
@@ -60,15 +68,15 @@ class PasswordStrengthIndicator extends StatelessWidget {
             ),
           ),
           child: Align(
-            key: ValueKey(strength),
+            key: ValueKey(label),
             alignment: Alignment.centerRight,
             child: Text(
-              strength.label,
+              label,
               style: TextStyle(
                 fontSize: 12,
                 height: 16 / 12,
                 fontWeight: FontWeight.w500,
-                color: strength.color,
+                color: labelColor,
               ),
             ),
           ),
