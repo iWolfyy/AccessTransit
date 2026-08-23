@@ -6,11 +6,9 @@ import 'user_service.dart';
 
 /// Handles Firebase Authentication for AccessTransit.
 class AuthService {
-  AuthService({
-    FirebaseAuth? auth,
-    UserService? userService,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _userService = userService ?? UserService();
+  AuthService({FirebaseAuth? auth, UserService? userService})
+    : _auth = auth ?? FirebaseAuth.instance,
+      _userService = userService ?? UserService();
 
   final FirebaseAuth _auth;
   final UserService _userService;
@@ -61,10 +59,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    return _auth.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    return _auth.signInWithEmailAndPassword(email: email, password: password);
   }
 
   /// Logs out the currently authenticated user.
@@ -81,5 +76,24 @@ class AuthService {
     }
 
     return _userService.getUser(firebaseUser.uid);
+  }
+
+  /// Sends a password reset email to the specified address.
+  Future<void> sendPasswordResetEmail(String email) async {
+    await _auth.sendPasswordResetEmail(email: email.trim());
+  }
+
+  /// Changes the password of the currently signed-in user.
+  Future<void> changePassword(String newPassword) async {
+    final user = _auth.currentUser;
+
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'not-authenticated',
+        message: 'No user is currently signed in.',
+      );
+    }
+
+    await user.updatePassword(newPassword);
   }
 }
