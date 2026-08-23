@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/validators.dart';
+import '../../services/auth_service.dart';
 import '../../widgets/auth/auth_input_field.dart';
 import '../../widgets/auth/password_strength_indicator.dart';
 import 'login_screen.dart';
@@ -23,6 +24,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
   final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final AuthService _authService = AuthService();
 
   late final AnimationController _entranceController;
   late final AnimationController _buttonScaleController;
@@ -125,8 +127,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.verifyPasswordResetCode(code);
-      await FirebaseAuth.instance.confirmPasswordReset(
+      await _authService.verifyPasswordResetCode(code);
+      await _authService.confirmPasswordReset(
         code: code,
         newPassword: _passwordController.text,
       );
