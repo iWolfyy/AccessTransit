@@ -78,9 +78,31 @@ class AuthService {
     return _userService.getUser(firebaseUser.uid);
   }
 
-  /// Sends a password reset email to the specified address.
+  /// Sends a password reset email that opens the in-app reset flow.
   Future<void> sendPasswordResetEmail(String email) async {
-    await _auth.sendPasswordResetEmail(email: email.trim());
+    await _auth.sendPasswordResetEmail(
+      email: email.trim(),
+      actionCodeSettings: ActionCodeSettings(
+        url: 'https://accesstransit-b615b.firebaseapp.com',
+        handleCodeInApp: true,
+        androidPackageName: 'com.accesstransit.access_transit',
+        androidInstallApp: true,
+        androidMinimumVersion: '1',
+      ),
+    );
+  }
+
+  /// Verifies a password reset code from the email link.
+  Future<String> verifyPasswordResetCode(String code) async {
+    return _auth.verifyPasswordResetCode(code);
+  }
+
+  /// Confirms a new password using the reset code from the email link.
+  Future<void> confirmPasswordReset({
+    required String code,
+    required String newPassword,
+  }) async {
+    await _auth.confirmPasswordReset(code: code, newPassword: newPassword);
   }
 
   /// Changes the password of the currently signed-in user.
