@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'live_journey_screen.dart';
 import 'route_results_screen.dart';
 
 /// Journey Confirmation screen — final check before starting navigation.
@@ -65,9 +66,14 @@ class JourneyConfirmationScreen extends StatelessWidget {
                         const SizedBox(height: 24),
                         _FixedActions(
                           onConfirm: () {
-                            _showSnack(
-                              context,
-                              'Journey started — live tracking coming in Sprint 3.',
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (_) => LiveJourneyScreen(
+                                  origin: origin,
+                                  destination: destination,
+                                  route: route,
+                                ),
+                              ),
                             );
                           },
                           onSetAlert: () =>
