@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../auth/login_screen.dart';
+import 'community_reporting_page.dart';
 import 'navigate_with_confidence_page.dart';
 import 'tailored_for_you_page.dart';
 
@@ -11,7 +12,7 @@ class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
   static const int stepCount = 3;
-  static const int pageCount = 2;
+  static const int pageCount = 3;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -134,6 +135,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                   isActive: _index == 1,
                                   reduceMotion: _prefersReducedMotion,
                                 ),
+                                CommunityReportingPage(
+                                  isActive: _index == 2,
+                                  reduceMotion: _prefersReducedMotion,
+                                ),
                               ],
                             ),
                           ),
@@ -252,7 +257,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 letterSpacing: 0.1,
               ),
             ),
-            child: const Text('Next'),
+            child: AnimatedSwitcher(
+              duration: _prefersReducedMotion
+                  ? Duration.zero
+                  : const Duration(milliseconds: 220),
+              child: Text(
+                _index == OnboardingScreen.pageCount - 1
+                    ? 'Get Started'
+                    : 'Next',
+                key: ValueKey(_index == OnboardingScreen.pageCount - 1),
+              ),
+            ),
           ),
         ),
       ),

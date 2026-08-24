@@ -28,4 +28,6 @@ abstract final class AppColors {
   static const Color secondaryContainer = Color(0xFF8FF4E9);
   static const Color onSecondaryContainer = Color(0xFF007169);
   static const Color tertiary = Color(0xFF592400);
+  static const Color tertiaryContainer = Color(0xFF7D3500);
+  static const Color onTertiaryContainer = Color(0xFFFFA571);
 }
