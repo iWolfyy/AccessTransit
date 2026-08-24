@@ -68,6 +68,9 @@ class AuthService {
   }
 
   /// Gets the Firestore profile of the currently authenticated user.
+  ///
+  /// Falls back to Firebase Auth account fields when the Firestore document
+  /// is missing so the profile screen can still show identity details.
   Future<UserModel?> getCurrentUserProfile() async {
     final firebaseUser = _auth.currentUser;
 
@@ -75,7 +78,23 @@ class AuthService {
       return null;
     }
 
-    return _userService.getUser(firebaseUser.uid);
+    try {
+      final profile = await _userService.getUser(firebaseUser.uid);
+      if (profile != null) {
+        return profile;
+      }
+    } catch (_) {
+      // Fall through to Auth-based profile below.
+    }
+
+    return UserModel(
+      uid: firebaseUser.uid,
+      name: firebaseUser.displayName?.trim().isNotEmpty == true
+          ? firebaseUser.displayName!.trim()
+          : (firebaseUser.email?.split('@').first ?? 'Passenger'),
+      email: firebaseUser.email ?? '',
+      phone: firebaseUser.phoneNumber,
+    );
   }
 
   /// Sends a password reset email that opens the in-app reset flow.

@@ -37,7 +37,16 @@ class UserService {
     if (data == null) {
       return null;
     }
-    return UserModel.fromMap(data);
+
+    // Ensure the document always exposes a uid for parsing.
+    final mapped = Map<String, dynamic>.from(data);
+    mapped.putIfAbsent(FirestoreConstants.fieldUid, () => uid);
+    if (mapped[FirestoreConstants.fieldUid] == null ||
+        mapped[FirestoreConstants.fieldUid].toString().isEmpty) {
+      mapped[FirestoreConstants.fieldUid] = uid;
+    }
+
+    return UserModel.fromMap(mapped);
   }
 
   /// Reads raw user document data from Firestore.
