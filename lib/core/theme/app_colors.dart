@@ -5,6 +5,7 @@ abstract final class AppColors {
   static const Color primary = Color(0xFF003466);
   static const Color primaryContainer = Color(0xFF1A4B84);
   static const Color primaryFixed = Color(0xFFD5E3FF);
+  static const Color primaryFixedDim = Color(0xFFA6C8FF);
   static const Color onPrimary = Color(0xFFFFFFFF);
   static const Color onPrimaryContainer = Color(0xFF93BCFC);
 
