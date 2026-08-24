@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../community/community_screen.dart';
 import 'report_submitted_screen.dart';
 
 enum ReportCategory {
@@ -470,6 +471,14 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                 }
                 if (label == 'Plan' || label == 'Live') {
                   Navigator.of(context).maybePop();
+                  return;
+                }
+                if (label == 'Community') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CommunityScreen(),
+                    ),
+                  );
                   return;
                 }
                 _showSnack('$label will be available soon.');

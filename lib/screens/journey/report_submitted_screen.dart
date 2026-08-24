@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../community/community_screen.dart';
 
 /// Success state after submitting a condition report.
 class ReportSubmittedScreen extends StatelessWidget {
@@ -131,8 +132,12 @@ class ReportSubmittedScreen extends StatelessWidget {
                         height: 48,
                         child: FilledButton(
                           onPressed: () {
-                            // Community hub not built yet — return to previous flow.
-                            Navigator.of(context).maybePop();
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (_) => const CommunityScreen(),
+                              ),
+                              (route) => route.isFirst,
+                            );
                           },
                           style: FilledButton.styleFrom(
                             backgroundColor: AppColors.primaryContainer,
@@ -167,7 +172,12 @@ class ReportSubmittedScreen extends StatelessWidget {
                   return;
                 }
                 if (label == 'Community') {
-                  Navigator.of(context).maybePop();
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => const CommunityScreen(),
+                    ),
+                    (route) => route.isFirst,
+                  );
                   return;
                 }
                 if (label == 'Plan' || label == 'Live') {
