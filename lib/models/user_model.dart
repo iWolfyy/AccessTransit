@@ -40,11 +40,11 @@ class UserModel {
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
-      uid: map[FirestoreConstants.fieldUid] as String,
-      name: map[FirestoreConstants.fieldName] as String? ?? '',
-      email: map[FirestoreConstants.fieldEmail] as String? ?? '',
-      phone: map[FirestoreConstants.fieldPhone] as String?,
-      role: UserRole.fromString(map[FirestoreConstants.fieldRole] as String?),
+      uid: map[FirestoreConstants.fieldUid]?.toString() ?? '',
+      name: map[FirestoreConstants.fieldName]?.toString() ?? '',
+      email: map[FirestoreConstants.fieldEmail]?.toString() ?? '',
+      phone: map[FirestoreConstants.fieldPhone]?.toString(),
+      role: UserRole.fromString(map[FirestoreConstants.fieldRole]?.toString()),
       createdAt: _parseTimestamp(map[FirestoreConstants.fieldCreatedAt]),
     );
   }
