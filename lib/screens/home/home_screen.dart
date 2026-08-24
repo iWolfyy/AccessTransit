@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../auth/login_screen.dart';
+import '../journey/journey_search_screen.dart';
 import '../profile/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -76,9 +77,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openJourneySearch() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const JourneySearchScreen()),
+    );
+  }
+
   void _onBottomNavTap(String feature) {
     if (feature == 'Profile') {
       _openProfile();
+      return;
+    }
+    if (feature == 'Plan') {
+      _openJourneySearch();
       return;
     }
     _showComingSoon(feature);
@@ -114,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _DesktopTopNav(
                     initials: _initials,
                     onMenu: () => _scaffoldKey.currentState?.openDrawer(),
-                    onNavTap: _showComingSoon,
+                    onNavTap: _onBottomNavTap,
                     onProfileTap: () => _showProfileMenu(context),
                   )
                 else
@@ -140,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const _WhereToSearch(),
+                                  _WhereToSearch(onTap: _openJourneySearch),
                                   const SizedBox(height: 24),
                                   _FavoritesSection(
                                     isDesktop: isDesktop,
@@ -150,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const _AlertsSection(),
                                   const SizedBox(height: 24),
                                   _RecentJourneyCard(
-                                    onReplan: () => _showComingSoon('Re-plan'),
+                                    onReplan: _openJourneySearch,
                                   ),
                                 ],
                               ),
@@ -521,35 +532,50 @@ class _AvatarButton extends StatelessWidget {
 }
 
 class _WhereToSearch extends StatelessWidget {
-  const _WhereToSearch();
+  const _WhereToSearch({required this.onTap});
+
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      decoration: InputDecoration(
-        hintText: 'Where to?',
-        hintStyle: const TextStyle(
-          fontSize: 16,
-          height: 24 / 16,
-          color: AppColors.onSurfaceVariant,
+    return Material(
+      color: AppColors.surfaceContainerLowest,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            hintText: 'Where to?',
+            hintStyle: const TextStyle(
+              fontSize: 16,
+              height: 24 / 16,
+              color: AppColors.onSurfaceVariant,
+            ),
+            prefixIcon:
+                const Icon(Icons.search, color: AppColors.onSurfaceVariant),
+            filled: true,
+            fillColor: Colors.transparent,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.outline),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+            ),
+          ),
+          child: const Text(
+            'Where to?',
+            style: TextStyle(
+              fontSize: 16,
+              height: 24 / 16,
+              color: AppColors.onSurfaceVariant,
+            ),
+          ),
         ),
-        prefixIcon: const Icon(Icons.search, color: AppColors.onSurfaceVariant),
-        filled: true,
-        fillColor: AppColors.surfaceContainerLowest,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.outline),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
-        ),
-      ),
-      style: const TextStyle(
-        fontSize: 16,
-        height: 24 / 16,
-        color: AppColors.onSurface,
       ),
     );
   }
