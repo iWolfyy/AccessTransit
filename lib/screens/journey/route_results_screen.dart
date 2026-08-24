@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'route_details_screen.dart';
 
 /// Sample route result used for Sprint 2 UI (before Firebase connect).
 class RouteResultItem {
@@ -135,15 +136,15 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   }
 
   void _onSelectRoute(RouteResultItem route) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            '${route.title} selected — Route Details coming next',
-          ),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RouteDetailsScreen(
+          origin: widget.origin,
+          destination: widget.destination,
+          route: route,
         ),
-      );
+      ),
+    );
   }
 
   @override
