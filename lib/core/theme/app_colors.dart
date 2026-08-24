@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 abstract final class AppColors {
   static const Color primary = Color(0xFF003466);
   static const Color primaryContainer = Color(0xFF1A4B84);
+  static const Color primaryFixed = Color(0xFFD5E3FF);
   static const Color onPrimary = Color(0xFFFFFFFF);
   static const Color onPrimaryContainer = Color(0xFF93BCFC);
 
@@ -19,4 +20,7 @@ abstract final class AppColors {
   static const Color error = Color(0xFFBA1A1A);
   static const Color onError = Color(0xFFFFFFFF);
   static const Color errorContainer = Color(0xFFFFDAD6);
+
+  static const Color secondary = Color(0xFF006A63);
+  static const Color tertiary = Color(0xFF592400);
 }
