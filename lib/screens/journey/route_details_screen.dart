@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import 'journey_confirmation_screen.dart';
+import 'report_condition_screen.dart';
 import 'route_results_screen.dart';
 
 /// Route Details screen — journey steps, accessibility confirmation, actions.
@@ -83,15 +84,13 @@ class RouteDetailsScreen extends StatelessWidget {
                             );
                           },
                           onReport: () {
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Report a Condition will be available in Sprint 3.',
-                                  ),
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ReportConditionScreen(
+                                  initialLocation: destination,
                                 ),
-                              );
+                              ),
+                            );
                           },
                         ),
                       ],
