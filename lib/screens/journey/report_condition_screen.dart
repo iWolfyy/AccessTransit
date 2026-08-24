@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'report_submitted_screen.dart';
 
 enum ReportCategory {
   rampAccess,
@@ -62,22 +63,11 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       return;
     }
 
-    _showSnack(
-      'Report submitted: ${_categoryLabel(_category)} '
-      '(${_severity.name}) at $location.',
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => const ReportSubmittedScreen(),
+      ),
     );
-    Navigator.of(context).maybePop();
-  }
-
-  String _categoryLabel(ReportCategory category) {
-    return switch (category) {
-      ReportCategory.rampAccess => 'Ramp/Access',
-      ReportCategory.elevatorOut => 'Elevator Out',
-      ReportCategory.crowding => 'Crowding',
-      ReportCategory.cleanliness => 'Cleanliness',
-      ReportCategory.safetyHazard => 'Safety Hazard',
-      ReportCategory.other => 'Other',
-    };
   }
 
   @override

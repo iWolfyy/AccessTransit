@@ -31,4 +31,6 @@ abstract final class AppColors {
   static const Color primaryFixedDim = Color(0xFFA6C8FF);
   static const Color onErrorContainer = Color(0xFF93000A);
   static const Color tertiary = Color(0xFF592400);
+
+  static const Color success = Color(0xFF0B8A00);
 }
