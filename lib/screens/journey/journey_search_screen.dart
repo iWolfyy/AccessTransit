@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'route_results_screen.dart';
 
 /// Journey Search screen — origin/destination, time, accessibility filters,
 /// and recent destinations (Sprint 2 UI).
@@ -41,6 +42,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   }
 
   void _searchRoutes() {
+    final origin = _fromController.text.trim().isEmpty
+        ? 'Current Location'
+        : _fromController.text.trim();
     final destination = _toController.text.trim();
     if (destination.isEmpty) {
       ScaffoldMessenger.of(context)
@@ -51,15 +55,14 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            'Searching routes to $destination… (results screen coming next)',
-          ),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RouteResultsScreen(
+          origin: origin,
+          destination: destination,
         ),
-      );
+      ),
+    );
   }
 
   void _showComingSoon(String feature) {
