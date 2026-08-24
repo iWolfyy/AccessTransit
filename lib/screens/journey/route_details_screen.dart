@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'journey_confirmation_screen.dart';
 import 'route_results_screen.dart';
 
 /// Route Details screen — journey steps, accessibility confirmation, actions.
@@ -71,15 +72,15 @@ class RouteDetailsScreen extends StatelessWidget {
                         const SizedBox(height: 24),
                         _ActionButtons(
                           onStartNavigation: () {
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Live navigation will be available in a future sprint.',
-                                  ),
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => JourneyConfirmationScreen(
+                                  origin: origin,
+                                  destination: destination,
+                                  route: route,
                                 ),
-                              );
+                              ),
+                            );
                           },
                           onReport: () {
                             ScaffoldMessenger.of(context)
