@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'boarding_assistance_screen.dart';
 import 'route_results_screen.dart';
 
 /// Live Journey / Live Navigation screen (Sprint 2–3 UI).
@@ -54,10 +55,13 @@ class LiveJourneyScreen extends StatelessWidget {
                         const _LiveAccessibilitySection(),
                         const SizedBox(height: 24),
                         _AssistanceSection(
-                          onRequest: () => _showSnack(
-                            context,
-                            'Stop assistance request sent to driver.',
-                          ),
+                          onRequest: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const BoardingAssistanceScreen(),
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 24),
                         _EmergencyActions(
