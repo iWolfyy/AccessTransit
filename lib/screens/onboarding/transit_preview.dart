@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 
-/// Stylized live-map preview used on the first onboarding screen.
+/// Stylized live-map preview used on onboarding step 2.
 class TransitPreview extends StatelessWidget {
   const TransitPreview({
     super.key,

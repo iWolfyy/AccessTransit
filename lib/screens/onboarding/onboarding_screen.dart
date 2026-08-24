@@ -3,107 +3,51 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../auth/login_screen.dart';
-import 'transit_preview.dart';
+import 'navigate_with_confidence_page.dart';
+import 'tailored_for_you_page.dart';
 
-/// First onboarding step: live transit updates and boarding assistance.
+/// Multi-step onboarding shown after splash for signed-out users.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
   static const int stepCount = 3;
+  static const int pageCount = 2;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen>
-    with TickerProviderStateMixin {
-  static const _staggerDelay = 0.08;
-
-  late final AnimationController _entranceController;
-  late final AnimationController _routeController;
-  late final AnimationController _pulseController;
+    with SingleTickerProviderStateMixin {
+  late final PageController _pageController;
   late final AnimationController _buttonScaleController;
-
   late final Animation<double> _buttonScale;
-  late final Animation<double> _checkScale;
 
+  int _index = 0;
   bool _prefersReducedMotion = false;
 
   @override
   void initState() {
     super.initState();
-
-    _entranceController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    );
-    _routeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 5200),
-    );
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    );
+    _pageController = PageController();
     _buttonScaleController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 120),
     );
-
-    _buttonScale = Tween<double>(begin: 1, end: 0.98).animate(
+    _buttonScale = Tween<double>(begin: 1, end: 0.95).animate(
       CurvedAnimation(
         parent: _buttonScaleController,
         curve: Curves.easeInOut,
       ),
     );
-    _checkScale = Tween<double>(begin: 0.4, end: 1).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.48, 0.82, curve: Curves.elasticOut),
-      ),
-    );
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
-  }
-
-  void _start() {
-    if (!mounted) return;
-
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    if (reduceMotion) {
-      setState(() => _prefersReducedMotion = true);
-      _entranceController.value = 1;
-      _routeController.value = 0.55;
-      return;
-    }
-
-    _entranceController.forward();
-    _pulseController.repeat(reverse: true);
-    _routeController.repeat();
-  }
-
-  Animation<double> _fade(int index) {
-    final start = index * _staggerDelay;
-    final end = (start + 0.42).clamp(0.0, 1.0);
-    return CurvedAnimation(
-      parent: _entranceController,
-      curve: Interval(start, end, curve: Curves.easeOutCubic),
-    );
-  }
-
-  Animation<Offset> _slide(int index, {Offset begin = const Offset(0, 0.12)}) {
-    return Tween<Offset>(begin: begin, end: Offset.zero).animate(_fade(index));
-  }
-
-  Widget _staggered(
-    int index,
-    Widget child, {
-    Offset begin = const Offset(0, 0.12),
-  }) {
-    return FadeTransition(
-      opacity: _fade(index),
-      child: SlideTransition(position: _slide(index, begin: begin), child: child),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final reduceMotion = MediaQuery.disableAnimationsOf(context);
+      if (reduceMotion) {
+        setState(() => _prefersReducedMotion = true);
+      }
+    });
   }
 
   void _finish() {
@@ -132,15 +76,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  void _onNext() {
+  Future<void> _onNext() async {
+    if (_index < OnboardingScreen.pageCount - 1) {
+      await _pageController.nextPage(
+        duration: _prefersReducedMotion
+            ? Duration.zero
+            : const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+      );
+      return;
+    }
     _finish();
   }
 
   @override
   void dispose() {
-    _entranceController.dispose();
-    _routeController.dispose();
-    _pulseController.dispose();
+    _pageController.dispose();
     _buttonScaleController.dispose();
     super.dispose();
   }
@@ -167,25 +118,29 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
                       child: Column(
                         children: [
-                          Flexible(
-                            child: _staggered(
-                              1,
-                              FittedBox(
-                                fit: BoxFit.contain,
-                                child: SizedBox(
-                                  width: 400,
-                                  height: 300,
-                                  child: _buildPreview(),
+                          Expanded(
+                            child: PageView(
+                              controller: _pageController,
+                              physics: const BouncingScrollPhysics(),
+                              onPageChanged: (index) {
+                                setState(() => _index = index);
+                              },
+                              children: [
+                                TailoredForYouPage(
+                                  isActive: _index == 0,
+                                  reduceMotion: _prefersReducedMotion,
                                 ),
-                              ),
+                                NavigateWithConfidencePage(
+                                  isActive: _index == 1,
+                                  reduceMotion: _prefersReducedMotion,
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 32),
-                          _staggered(4, _buildCopy()),
-                          const Spacer(),
-                          _staggered(6, _buildProgress()),
-                          const SizedBox(height: 16),
-                          _staggered(7, _buildNextButton()),
+                          const SizedBox(height: 24),
+                          _buildProgress(),
+                          const SizedBox(height: 24),
+                          _buildNextButton(),
                         ],
                       ),
                     ),
@@ -206,51 +161,40 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            _staggered(
-              0,
-              const Row(
-                children: [
-                  Icon(
-                    Icons.accessible_forward_rounded,
-                    color: AppColors.primary,
-                    size: 24,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Access Transit',
-                    style: TextStyle(
-                      fontSize: 18,
-                      height: 24 / 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
+            const Icon(
+              Icons.blind,
+              color: AppColors.primary,
+              size: 24,
+            ),
+            const SizedBox(width: 4),
+            const Text(
+              'Access Transit',
+              style: TextStyle(
+                fontSize: 18,
+                height: 24 / 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
               ),
             ),
             const Spacer(),
-            _staggered(
-              0,
-              Tooltip(
-                message: 'Skip onboarding',
-                child: TextButton(
-                  onPressed: _finish,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.onSurfaceVariant,
-                    minimumSize: const Size(48, 48),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    shape: const StadiumBorder(),
-                    textStyle: const TextStyle(
-                      fontSize: 14,
-                      height: 20 / 14,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.1,
-                    ),
+            Tooltip(
+              message: 'Skip onboarding',
+              child: TextButton(
+                onPressed: _finish,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  shape: const StadiumBorder(),
+                  textStyle: const TextStyle(
+                    fontSize: 14,
+                    height: 20 / 14,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.1,
                   ),
-                  child: const Text('Skip'),
                 ),
+                child: const Text('Skip'),
               ),
-              begin: const Offset(0.08, 0),
             ),
           ],
         ),
@@ -258,77 +202,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  Widget _buildPreview() {
-    return AnimatedBuilder(
-      animation: Listenable.merge([
-        _routeController,
-        _pulseController,
-        _entranceController,
-      ]),
-      builder: (context, _) {
-        final routeProgress = _prefersReducedMotion
-            ? 0.55
-            : _routeController.value;
-        final drawProgress = _prefersReducedMotion
-            ? 1.0
-            : CurvedAnimation(
-                parent: _entranceController,
-                curve: const Interval(0.05, 0.72, curve: Curves.easeInOutCubic),
-              ).value;
-        final pulse = _prefersReducedMotion ? 0.4 : _pulseController.value;
-
-        return TransitPreview(
-          routeProgress: routeProgress,
-          drawProgress: drawProgress,
-          pulse: pulse,
-          busPill: _staggered(
-            2,
-            OnboardingBusPill(pulse: pulse),
-            begin: const Offset(-0.12, 0),
-          ),
-          assistanceCard: _staggered(
-            3,
-            OnboardingAssistanceCard(checkScale: _checkScale.value),
-            begin: const Offset(0, 0.18),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCopy() {
-    final wide = MediaQuery.sizeOf(context).width >= 400;
-    return Column(
-      children: [
-        Text(
-          'Navigate with Confidence',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: wide ? 24 : 22,
-            height: wide ? 32 / 24 : 28 / 22,
-            fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Get real-time updates and request boarding assistance directly from the app for a stress-free journey.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 16,
-            height: 24 / 16,
-            color: AppColors.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildProgress() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(OnboardingScreen.stepCount, (index) {
-        final isActive = index == 0;
+        final isActive = index == _index;
         return AnimatedContainer(
           duration: _prefersReducedMotion
               ? Duration.zero
@@ -336,7 +214,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           curve: Curves.easeOutCubic,
           width: isActive ? 32 : 8,
           height: 8,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
+          margin: EdgeInsets.only(
+            right: index == OnboardingScreen.stepCount - 1 ? 0 : 4,
+          ),
           decoration: BoxDecoration(
             color: isActive ? AppColors.primary : AppColors.surfaceVariant,
             borderRadius: BorderRadius.circular(999),
@@ -361,7 +241,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primaryContainer,
               foregroundColor: AppColors.onPrimary,
-              shape: const StadiumBorder(),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
               textStyle: const TextStyle(
                 fontSize: 14,
                 height: 20 / 14,
@@ -369,14 +252,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 letterSpacing: 0.1,
               ),
             ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Next'),
-                SizedBox(width: 8),
-                Icon(Icons.arrow_forward_rounded, size: 18),
-              ],
-            ),
+            child: const Text('Next'),
           ),
         ),
       ),
