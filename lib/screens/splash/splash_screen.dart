@@ -7,8 +7,8 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../services/auth_service.dart';
-import '../auth/login_screen.dart';
 import '../home/home_screen.dart';
+import '../onboarding/onboarding_screen.dart';
 
 /// Branded launch screen shown while the app settles and auth state is resolved.
 class SplashScreen extends StatefulWidget {
@@ -151,7 +151,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     final next = _authService.currentUser != null
         ? const HomeScreen()
-        : const LoginScreen();
+        : const OnboardingScreen();
 
     Navigator.of(context).pushReplacement(_fadeRoute(next));
   }
