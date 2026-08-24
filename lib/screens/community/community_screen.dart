@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../journey/journey_search_screen.dart';
 import '../journey/report_condition_screen.dart';
 import '../profile/profile_screen.dart';
+import 'report_details_screen.dart';
 
 enum _CommunityTab { liveUpdates, myReports }
 
@@ -93,6 +94,36 @@ class _CommunityScreenState extends State<CommunityScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const ReportConditionScreen(),
+      ),
+    );
+  }
+
+  void _openReportDetails(_FeedItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ReportDetailsScreen(
+          title: item.title,
+          reportedAgo: item.timeLabel,
+          vehicleLabel: item.subtitle.contains('Bus')
+              ? item.subtitle
+              : 'Bus 138',
+          routeLabel: item.subtitle.contains('Bus')
+              ? 'Route: Local Service'
+              : 'Location: ${item.subtitle}',
+          crowdLevel: item.title.toLowerCase().contains('crowd')
+              ? 'High'
+              : 'Moderate',
+          accessibilityLabel: item.badge == _ReportBadge.verified
+              ? 'Available'
+              : 'Limited',
+          quote: item.badge == _ReportBadge.verified
+              ? '"Ramp is working and confirmed by multiple riders." - User report'
+              : '"${item.title} reported at ${item.subtitle}." - User report',
+          mapLocationLabel: item.subtitle,
+          communityVerified: item.badge == _ReportBadge.verified ||
+              item.verifyCount != null ||
+              item.verifiedByUsers != null,
+        ),
       ),
     );
   }
@@ -188,12 +219,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 item: items[i],
                                 minorBg: _minorBg,
                                 minorFg: _minorFg,
-                                onTap: () => _showSnack(
-                                  '${items[i].title} details coming soon.',
-                                ),
-                                onComment: () => _showSnack(
-                                  'Comments will be available soon.',
-                                ),
+                                onTap: () => _openReportDetails(items[i]),
+                                onComment: () => _openReportDetails(items[i]),
                               ),
                             ],
                           ],
