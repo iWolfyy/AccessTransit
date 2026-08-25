@@ -109,6 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Expanded(child: _buildBody(context)),
         ],
       ),
+      // Keep existing bottom nav unchanged.
       bottomNavigationBar: _ProfileBottomNav(
         onHomeTap: widget.onHomeTap ?? () => Navigator.of(context).pop(),
         onNavTap: (feature) {
@@ -166,9 +167,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             initials: _initials,
             name: _displayName,
             subtitle: _roleLabel,
+            email: user.email,
+            phone: user.phone,
           ),
-          const SizedBox(height: 24),
-          _ProfileDetailsCard(user: user),
           const SizedBox(height: 24),
           const _StatsSection(),
           const SizedBox(height: 24),
@@ -209,114 +210,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ..showSnackBar(
         SnackBar(content: Text('$feature will be available in a future update.')),
       );
-  }
-}
-
-class _ProfileDetailsCard extends StatelessWidget {
-  const _ProfileDetailsCard({required this.user});
-
-  final UserModel user;
-
-  String get _roleText {
-    switch (user.role) {
-      case UserRole.contributor:
-        return 'Contributor';
-      case UserRole.passenger:
-        return 'Passenger';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.outlineVariant.withValues(alpha: 0.20),
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 4,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _DetailRow(
-            icon: Icons.email_outlined,
-            label: 'Email',
-            value: user.email.isEmpty ? 'Not set' : user.email,
-          ),
-          if (user.phone != null && user.phone!.trim().isNotEmpty) ...[
-            const Divider(height: 24),
-            _DetailRow(
-              icon: Icons.phone_outlined,
-              label: 'Phone',
-              value: user.phone!.trim(),
-            ),
-          ],
-          const Divider(height: 24),
-          _DetailRow(
-            icon: Icons.badge_outlined,
-            label: 'Role',
-            value: _roleText,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: AppColors.onSurfaceVariant, size: 22),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  height: 16 / 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  height: 24 / 16,
-                  color: AppColors.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
   }
 }
 
@@ -392,11 +285,15 @@ class _ProfileHeader extends StatelessWidget {
     required this.initials,
     required this.name,
     required this.subtitle,
+    required this.email,
+    this.phone,
   });
 
   final String initials;
   final String name;
   final String subtitle;
+  final String email;
+  final String? phone;
 
   @override
   Widget build(BuildContext context) {
@@ -472,6 +369,28 @@ class _ProfileHeader extends StatelessWidget {
             color: AppColors.onSurfaceVariant,
           ),
         ),
+        if (email.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            email,
+            style: const TextStyle(
+              fontSize: 14,
+              height: 20 / 14,
+              color: AppColors.onSurfaceVariant,
+            ),
+          ),
+        ],
+        if (phone != null && phone!.trim().isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            phone!.trim(),
+            style: const TextStyle(
+              fontSize: 14,
+              height: 20 / 14,
+              color: AppColors.onSurfaceVariant,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -889,7 +808,7 @@ class _AccountSection extends StatelessWidget {
     const items = [
       (Icons.settings_accessibility, 'Accessibility Preferences'),
       (Icons.history, 'Route History'),
-      (Icons.bookmark_outline, 'Saved Places'),
+      (Icons.bookmark, 'Saved Places'),
       (Icons.help_outline, 'Help & Support'),
     ];
 
@@ -933,30 +852,33 @@ class _AccountSection extends StatelessWidget {
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: () => onItemTap(items[i].$2),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(items[i].$1, color: AppColors.onSurfaceVariant),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Text(
-                              items[i].$2,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                height: 24 / 16,
-                                color: AppColors.onSurface,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 64),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(items[i].$1, color: AppColors.onSurfaceVariant),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                items[i].$2,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  height: 24 / 16,
+                                  color: AppColors.onSurface,
+                                ),
                               ),
                             ),
-                          ),
-                          const Icon(
-                            Icons.chevron_right,
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                        ],
+                            const Icon(
+                              Icons.chevron_right,
+                              color: AppColors.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

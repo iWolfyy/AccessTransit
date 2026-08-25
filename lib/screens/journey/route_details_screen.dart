@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import 'journey_confirmation_screen.dart';
 import 'report_condition_screen.dart';
@@ -112,6 +113,10 @@ class RouteDetailsScreen extends StatelessWidget {
                 }
                 if (label == 'Plan') {
                   Navigator.of(context).maybePop();
+                  return;
+                }
+                if (label == 'Profile') {
+                  AppNavigation.openProfile(context);
                   return;
                 }
                 ScaffoldMessenger.of(context)

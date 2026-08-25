@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../journey/journey_search_screen.dart';
-import '../profile/profile_screen.dart';
 
 /// Community report details — status, vehicle, conditions, map, actions.
 class ReportDetailsScreen extends StatelessWidget {
@@ -58,9 +58,7 @@ class ReportDetailsScreen extends StatelessWidget {
       return;
     }
     if (label == 'Profile') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ProfileScreen()),
-      );
+      AppNavigation.openProfile(context);
       return;
     }
     _showSnack(context, '$label will be available soon.');

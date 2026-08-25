@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/user_model.dart';
 import '../home/home_screen.dart';
@@ -32,6 +33,10 @@ class _AccessibilityPreferencesScreenState
   bool _boardingAssistance = false;
   bool _quietRoutes = false;
 
+  void _openProfile() {
+    AppNavigation.openProfile(context, initialUser: widget.initialUser);
+  }
+
   void _save() {
     if (widget.continueToHome) {
       Navigator.of(context).pushReplacement(
@@ -53,7 +58,10 @@ class _AccessibilityPreferencesScreenState
       backgroundColor: AppColors.surface,
       body: Column(
         children: [
-          if (isDesktop) const _DesktopTopBar() else const _MobileTopBar(),
+          if (isDesktop)
+            const _DesktopTopBar()
+          else
+            _MobileTopBar(onProfile: _openProfile),
           Expanded(
             child: ListView(
               padding: EdgeInsets.fromLTRB(
@@ -205,16 +213,16 @@ class _AccessibilityPreferencesScreenState
                       );
                     }
                   : () => Navigator.of(context).pop(),
-              onProfileTap: widget.continueToHome
-                  ? null
-                  : () => Navigator.of(context).pop(),
+              onProfileTap: _openProfile,
             ),
     );
   }
 }
 
 class _MobileTopBar extends StatelessWidget {
-  const _MobileTopBar();
+  const _MobileTopBar({required this.onProfile});
+
+  final VoidCallback onProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -250,10 +258,16 @@ class _MobileTopBar extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(
+                SizedBox(
                   width: 48,
                   height: 48,
-                  child: Icon(Icons.account_circle, color: AppColors.onSurfaceVariant),
+                  child: IconButton(
+                    onPressed: onProfile,
+                    icon: const Icon(
+                      Icons.account_circle,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
                 ),
               ],
             ),

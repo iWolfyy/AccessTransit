@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../community/community_screen.dart';
 import 'report_submitted_screen.dart';
@@ -479,6 +480,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       builder: (_) => const CommunityScreen(),
                     ),
                   );
+                  return;
+                }
+                if (label == 'Profile') {
+                  AppNavigation.openProfile(context);
                   return;
                 }
                 _showSnack('$label will be available soon.');

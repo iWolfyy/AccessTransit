@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../community/community_screen.dart';
 
@@ -182,6 +183,10 @@ class ReportSubmittedScreen extends StatelessWidget {
                 }
                 if (label == 'Plan' || label == 'Live') {
                   Navigator.of(context).maybePop();
+                  return;
+                }
+                if (label == 'Profile') {
+                  AppNavigation.openProfile(context);
                   return;
                 }
                 _showSnack(context, '$label will be available soon.');

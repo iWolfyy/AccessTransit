@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Boarding Assistance request screen — ramp, extra time, boarding help.
@@ -64,7 +65,7 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
         children: [
           _TopBar(
             onBack: () => Navigator.of(context).maybePop(),
-            onMenu: () => _showSnack('Menu will be available soon.'),
+            onMenu: () => AppNavigation.openProfile(context),
           ),
           Expanded(
             child: ListView(
@@ -214,6 +215,10 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                 }
                 if (label == 'Live') {
                   Navigator.of(context).maybePop();
+                  return;
+                }
+                if (label == 'Profile') {
+                  AppNavigation.openProfile(context);
                   return;
                 }
                 _showSnack('$label will be available soon.');

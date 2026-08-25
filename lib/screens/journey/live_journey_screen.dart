@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import 'boarding_assistance_screen.dart';
 import 'report_condition_screen.dart';
@@ -99,6 +100,10 @@ class LiveJourneyScreen extends StatelessWidget {
                   return;
                 }
                 if (label == 'Live') return;
+                if (label == 'Profile') {
+                  AppNavigation.openProfile(context);
+                  return;
+                }
                 _showSnack(context, '$label will be available soon.');
               },
             ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import 'live_journey_screen.dart';
 import 'route_results_screen.dart';
@@ -101,6 +102,10 @@ class JourneyConfirmationScreen extends StatelessWidget {
                 }
                 if (label == 'Plan') {
                   Navigator.of(context).maybePop();
+                  return;
+                }
+                if (label == 'Profile') {
+                  AppNavigation.openProfile(context);
                   return;
                 }
                 _showSnack(context, '$label will be available soon.');

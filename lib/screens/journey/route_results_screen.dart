@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import 'route_details_screen.dart';
 
@@ -215,6 +216,10 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                 }
                 if (label == 'Plan') {
                   Navigator.of(context).maybePop();
+                  return;
+                }
+                if (label == 'Profile') {
+                  AppNavigation.openProfile(context);
                   return;
                 }
                 _showComingSoon(label);

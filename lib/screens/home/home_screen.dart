@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../auth/login_screen.dart';
 import '../community/community_screen.dart';
 import '../journey/journey_search_screen.dart';
-import '../profile/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.initialUser});
@@ -71,11 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openProfile() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ProfileScreen(initialUser: _user),
-      ),
-    );
+    AppNavigation.openProfile(context, initialUser: _user);
   }
 
   void _openJourneySearch() {
@@ -127,6 +123,10 @@ class _HomeScreenState extends State<HomeScreen> {
         user: _user,
         initials: _initials,
         onLogout: _logout,
+        onProfile: () {
+          Navigator.of(context).pop();
+          _openProfile();
+        },
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -137,13 +137,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     initials: _initials,
                     onMenu: () => _scaffoldKey.currentState?.openDrawer(),
                     onNavTap: _onBottomNavTap,
-                    onProfileTap: () => _showProfileMenu(context),
+                    onProfileTap: _openProfile,
                   )
                 else
                   _MobileTopBar(
                     initials: _initials,
                     onMenu: () => _scaffoldKey.currentState?.openDrawer(),
-                    onProfileTap: () => _showProfileMenu(context),
+                    onProfileTap: _openProfile,
                   ),
                 Expanded(
                   child: CustomScrollView(
@@ -198,41 +198,6 @@ class _HomeScreenState extends State<HomeScreen> {
           : _MobileBottomNav(onNavTap: _onBottomNavTap),
     );
   }
-
-  Future<void> _showProfileMenu(BuildContext context) async {
-    final result = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.primaryContainer,
-                  foregroundColor: AppColors.onPrimaryContainer,
-                  child: Text(_initials),
-                ),
-                title: Text(_user?.name.isNotEmpty == true ? _user!.name : 'Passenger'),
-                subtitle: Text(_user?.email ?? ''),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.logout),
-                title: const Text('Log out'),
-                onTap: () => Navigator.pop(context, 'logout'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (result == 'logout') {
-      await _logout();
-    }
-  }
 }
 
 class _HomeDrawer extends StatelessWidget {
@@ -240,11 +205,13 @@ class _HomeDrawer extends StatelessWidget {
     required this.user,
     required this.initials,
     required this.onLogout,
+    required this.onProfile,
   });
 
   final UserModel? user;
   final String initials;
   final VoidCallback onLogout;
+  final VoidCallback onProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -288,6 +255,11 @@ class _HomeDrawer extends StatelessWidget {
               title: const Text('Home'),
               selected: true,
               onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_outline, color: AppColors.primary),
+              title: const Text('Profile'),
+              onTap: onProfile,
             ),
             const Spacer(),
             ListTile(
