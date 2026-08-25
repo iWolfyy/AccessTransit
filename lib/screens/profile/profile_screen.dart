@@ -4,6 +4,8 @@ import '../../core/theme/app_colors.dart';
 import '../../models/enums/user_role.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../community/community_screen.dart';
+import '../journey/journey_search_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import 'rewards_contributions_screen.dart';
 
@@ -116,9 +118,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onNavTap: (feature) {
           if (widget.onNavTap != null) {
             widget.onNavTap!(feature);
-          } else {
-            _showComingSoon(context, feature);
+            return;
           }
+          if (feature == 'Plan') {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const JourneySearchScreen()),
+            );
+            return;
+          }
+          if (feature == 'Community') {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CommunityScreen()),
+            );
+            return;
+          }
+          _showComingSoon(context, feature);
         },
       ),
     );
@@ -954,46 +968,38 @@ class _ProfileBottomNav extends StatelessWidget {
     return Material(
       color: AppColors.surface,
       elevation: 8,
+      shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: SizedBox(
+          height: 72,
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.home_outlined,
-                  label: 'Home',
-                  onTap: onHomeTap,
-                ),
+              _NavItem(
+                icon: Icons.home_outlined,
+                label: 'Home',
+                onTap: onHomeTap,
               ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.directions_transit,
-                  label: 'Journey',
-                  onTap: () => onNavTap('Journey'),
-                ),
+              _NavItem(
+                icon: Icons.directions_bus_outlined,
+                label: 'Plan',
+                onTap: () => onNavTap('Plan'),
               ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.explore_outlined,
-                  label: 'Live',
-                  onTap: () => onNavTap('Live'),
-                ),
+              _NavItem(
+                icon: Icons.sensors,
+                label: 'Live',
+                onTap: () => onNavTap('Live'),
               ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.campaign_outlined,
-                  label: 'Reports',
-                  onTap: () => onNavTap('Reports'),
-                ),
+              _NavItem(
+                icon: Icons.group_outlined,
+                label: 'Community',
+                onTap: () => onNavTap('Community'),
               ),
-              const Expanded(
-                child: _NavItem(
-                  icon: Icons.person,
-                  label: 'Profile',
-                  selected: true,
-                ),
+              const _NavItem(
+                icon: Icons.person_outline,
+                label: 'Profile',
+                selected: true,
               ),
             ],
           ),
@@ -1018,49 +1024,41 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final child = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: selected
-                ? AppColors.onPrimaryContainer
-                : AppColors.onSurfaceVariant,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              height: 1.2,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 64,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: selected
+            ? BoxDecoration(
+                color: AppColors.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              )
+            : null,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
               color: selected
                   ? AppColors.onPrimaryContainer
                   : AppColors.onSurfaceVariant,
             ),
-          ),
-        ],
-      ),
-    );
-
-    if (selected) {
-      return Center(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: AppColors.primaryContainer.withValues(alpha: 0.80),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: child,
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                height: 16 / 12,
+                color: selected
+                    ? AppColors.onPrimaryContainer
+                    : AppColors.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
-      );
-    }
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: child,
+      ),
     );
   }
 }

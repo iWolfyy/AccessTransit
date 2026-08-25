@@ -1182,41 +1182,45 @@ class _BottomNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = Padding(
-      padding: selected
-          ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4)
-          : const EdgeInsets.all(8),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: selected ? AppColors.onPrimaryContainer : AppColors.onSurfaceVariant,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              height: 20 / 14,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.1,
-              color: selected ? AppColors.onPrimaryContainer : AppColors.onSurfaceVariant,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: selected
+            ? BoxDecoration(
+                color: AppColors.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              )
+            : null,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: selected
+                  ? AppColors.onPrimaryContainer
+                  : AppColors.onSurfaceVariant,
             ),
-          ),
-        ],
-      ),
-    );
-
-    if (!selected) {
-      return InkWell(onTap: onTap, child: content);
-    }
-
-    return Center(
-      child: Material(
-        color: AppColors.primaryContainer,
-        borderRadius: BorderRadius.circular(12),
-        child: content,
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                height: 14 / 11,
+                fontWeight: FontWeight.w600,
+                color: selected
+                    ? AppColors.onPrimaryContainer
+                    : AppColors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

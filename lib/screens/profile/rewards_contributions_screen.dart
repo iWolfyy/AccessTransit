@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../community/community_screen.dart';
 import '../journey/journey_search_screen.dart';
+import 'membership_card_screen.dart';
 
 /// Rewards & Contributions — points, level, and contribution stats.
 class RewardsContributionsScreen extends StatelessWidget {
@@ -110,10 +111,18 @@ class RewardsContributionsScreen extends StatelessWidget {
                 SizedBox(
                   height: 48,
                   child: FilledButton.icon(
-                    onPressed: () => _showSnack(
-                      context,
-                      'Membership Card will be available soon.',
-                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => MembershipCardScreen(
+                            points: totalPoints,
+                            memberTier: levelLabel.contains('Gold')
+                                ? 'Gold Member'
+                                : levelLabel,
+                          ),
+                        ),
+                      );
+                    },
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.primaryContainer,
                       foregroundColor: AppColors.onPrimary,
