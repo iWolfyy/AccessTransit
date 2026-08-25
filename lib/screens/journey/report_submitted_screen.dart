@@ -168,28 +168,12 @@ class ReportSubmittedScreen extends StatelessWidget {
           ? null
           : _SubmittedBottomNav(
               onNavTap: (label) {
-                if (label == 'Home') {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                  return;
-                }
-                if (label == 'Community') {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (_) => const CommunityScreen(),
-                    ),
-                    (route) => route.isFirst,
-                  );
-                  return;
-                }
-                if (label == 'Plan' || label == 'Live') {
-                  Navigator.of(context).maybePop();
-                  return;
-                }
-                if (label == 'Profile') {
-                  AppNavigation.openProfile(context);
-                  return;
-                }
-                _showSnack(context, '$label will be available soon.');
+                AppNavigation.handleBottomNav(
+                  context,
+                  label,
+                  currentTab: 'Community',
+                  onUnsupported: (message) => _showSnack(context, message),
+                );
               },
             ),
     );

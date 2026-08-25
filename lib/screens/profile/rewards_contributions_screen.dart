@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
-import '../community/community_screen.dart';
-import '../journey/journey_search_screen.dart';
 import 'membership_card_screen.dart';
 
 /// Rewards & Contributions — points, level, and contribution stats.
@@ -29,27 +28,11 @@ class RewardsContributionsScreen extends StatelessWidget {
   }
 
   void _onNavTap(BuildContext context, String label) {
-    if (label == 'Home') {
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      return;
-    }
-    if (label == 'Profile') {
-      Navigator.of(context).maybePop();
-      return;
-    }
-    if (label == 'Plan') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const JourneySearchScreen()),
-      );
-      return;
-    }
-    if (label == 'Community') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const CommunityScreen()),
-      );
-      return;
-    }
-    _showSnack(context, '$label will be available soon.');
+    AppNavigation.handleBottomNav(
+      context,
+      label,
+      onUnsupported: (message) => _showSnack(context, message),
+    );
   }
 
   @override

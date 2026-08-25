@@ -149,9 +149,9 @@ class _TailoredForYouPageState extends State<TailoredForYouPage>
                   ),
                 ),
                 const SizedBox(height: 8),
-                const ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: 320),
-                  child: Text(
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: const Text(
                     'Set your accessibility preferences to find the best routes for your specific needs, from wheelchair ramps to low-floor buses.',
                     textAlign: TextAlign.center,
                     style: TextStyle(

@@ -210,19 +210,12 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
           ? null
           : _ResultsBottomNav(
               onNavTap: (label) {
-                if (label == 'Home') {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                  return;
-                }
-                if (label == 'Plan') {
-                  Navigator.of(context).maybePop();
-                  return;
-                }
-                if (label == 'Profile') {
-                  AppNavigation.openProfile(context);
-                  return;
-                }
-                _showComingSoon(label);
+                AppNavigation.handleBottomNav(
+                  context,
+                  label,
+                  currentTab: 'Plan',
+                  onUnsupported: _showComingSoon,
+                );
               },
             ),
     );

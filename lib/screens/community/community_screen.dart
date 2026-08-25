@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
-import '../journey/journey_search_screen.dart';
 import '../journey/report_condition_screen.dart';
 import 'report_details_screen.dart';
 
@@ -129,22 +128,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   void _onNavTap(String label) {
-    if (label == 'Home') {
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      return;
-    }
-    if (label == 'Community') return;
-    if (label == 'Plan') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const JourneySearchScreen()),
-      );
-      return;
-    }
-    if (label == 'Profile') {
-      AppNavigation.openProfile(context);
-      return;
-    }
-    _showSnack('$label will be available soon.');
+    AppNavigation.handleBottomNav(
+      context,
+      label,
+      currentTab: 'Community',
+      onUnsupported: _showSnack,
+    );
   }
 
   @override

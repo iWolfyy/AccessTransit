@@ -96,19 +96,12 @@ class JourneyConfirmationScreen extends StatelessWidget {
           ? null
           : _ConfirmBottomNav(
               onNavTap: (label) {
-                if (label == 'Home') {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                  return;
-                }
-                if (label == 'Plan') {
-                  Navigator.of(context).maybePop();
-                  return;
-                }
-                if (label == 'Profile') {
-                  AppNavigation.openProfile(context);
-                  return;
-                }
-                _showSnack(context, '$label will be available soon.');
+                AppNavigation.handleBottomNav(
+                  context,
+                  label,
+                  currentTab: 'Plan',
+                  onUnsupported: (message) => _showSnack(context, message),
+                );
               },
             ),
     );

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/enums/user_role.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
-import '../community/community_screen.dart';
-import '../journey/journey_search_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import 'rewards_contributions_screen.dart';
 
@@ -114,25 +113,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       // Keep existing bottom nav unchanged.
       bottomNavigationBar: _ProfileBottomNav(
-        onHomeTap: widget.onHomeTap ?? () => Navigator.of(context).pop(),
+        onHomeTap: widget.onHomeTap ?? () => AppNavigation.goHome(context),
         onNavTap: (feature) {
           if (widget.onNavTap != null) {
             widget.onNavTap!(feature);
             return;
           }
-          if (feature == 'Plan') {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const JourneySearchScreen()),
-            );
-            return;
-          }
-          if (feature == 'Community') {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const CommunityScreen()),
-            );
-            return;
-          }
-          _showComingSoon(context, feature);
+          AppNavigation.handleBottomNav(
+            context,
+            feature,
+            currentTab: 'Profile',
+            profileUser: _user,
+            onUnsupported: (message) => _showComingSoon(context, message),
+          );
         },
       ),
     );
