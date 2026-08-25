@@ -95,16 +95,12 @@ class LiveJourneyScreen extends StatelessWidget {
           ? null
           : _LiveBottomNav(
               onNavTap: (label) {
-                if (label == 'Home') {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                  return;
-                }
-                if (label == 'Live') return;
-                if (label == 'Profile') {
-                  AppNavigation.openProfile(context);
-                  return;
-                }
-                _showSnack(context, '$label will be available soon.');
+                AppNavigation.handleBottomNav(
+                  context,
+                  label,
+                  currentTab: 'Live',
+                  onUnsupported: (message) => _showSnack(context, message),
+                );
               },
             ),
     );

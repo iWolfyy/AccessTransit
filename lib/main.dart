@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 import 'core/routing/password_reset_link_handler.dart';
 import 'core/theme/app_colors.dart';
 import 'firebase_options.dart';
-import 'screens/auth/login_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
+import 'screens/splash/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -86,7 +86,7 @@ class _AccessTransitAppState extends State<AccessTransitApp> {
         ),
         scaffoldBackgroundColor: AppColors.surfaceBright,
       ),
-      home: const LoginScreen(),
+      home: const SplashScreen(),
     );
   }
 }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
-import '../community/community_screen.dart';
 import 'route_results_screen.dart';
 
 /// Journey Search screen — origin/destination, time, accessibility filters,
@@ -166,24 +165,12 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
           ? null
           : _JourneyBottomNav(
               onNavTap: (label) {
-                if (label == 'Home') {
-                  Navigator.of(context).pop();
-                  return;
-                }
-                if (label == 'Plan') return;
-                if (label == 'Community') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const CommunityScreen(),
-                    ),
-                  );
-                  return;
-                }
-                if (label == 'Profile') {
-                  AppNavigation.openProfile(context);
-                  return;
-                }
-                _showComingSoon(label);
+                AppNavigation.handleBottomNav(
+                  context,
+                  label,
+                  currentTab: 'Plan',
+                  onUnsupported: _showComingSoon,
+                );
               },
             ),
     );

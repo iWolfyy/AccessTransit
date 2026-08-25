@@ -5,7 +5,6 @@ import '../../core/theme/app_colors.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../auth/login_screen.dart';
-import '../community/community_screen.dart';
 import '../journey/journey_search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -80,26 +79,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openCommunity() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CommunityScreen()),
-    );
-  }
-
   void _onBottomNavTap(String feature) {
-    if (feature == 'Profile') {
-      _openProfile();
-      return;
-    }
-    if (feature == 'Plan') {
-      _openJourneySearch();
-      return;
-    }
-    if (feature == 'Community') {
-      _openCommunity();
-      return;
-    }
-    _showComingSoon(feature);
+    AppNavigation.handleBottomNav(
+      context,
+      feature,
+      currentTab: 'Home',
+      profileUser: _user,
+      onUnsupported: _showComingSoon,
+    );
   }
 
   String get _initials {

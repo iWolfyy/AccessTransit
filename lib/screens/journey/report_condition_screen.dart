@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
-import '../community/community_screen.dart';
 import 'report_submitted_screen.dart';
 
 enum ReportCategory {
@@ -466,27 +465,12 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
           ? null
           : _ReportBottomNav(
               onNavTap: (label) {
-                if (label == 'Home') {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                  return;
-                }
-                if (label == 'Plan' || label == 'Live') {
-                  Navigator.of(context).maybePop();
-                  return;
-                }
-                if (label == 'Community') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const CommunityScreen(),
-                    ),
-                  );
-                  return;
-                }
-                if (label == 'Profile') {
-                  AppNavigation.openProfile(context);
-                  return;
-                }
-                _showSnack('$label will be available soon.');
+                AppNavigation.handleBottomNav(
+                  context,
+                  label,
+                  currentTab: 'Community',
+                  onUnsupported: _showSnack,
+                );
               },
             ),
     );

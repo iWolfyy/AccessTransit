@@ -184,17 +184,25 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: const BoxDecoration(
-            color: AppColors.primaryContainer,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.accessible_forward_rounded,
-            color: AppColors.onPrimaryContainer,
-            size: 36,
+        const Hero(
+          tag: 'access-transit-logo',
+          child: Material(
+            color: Colors.transparent,
+            child: SizedBox(
+              width: 64,
+              height: 64,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.accessible_forward_rounded,
+                  color: AppColors.onPrimaryContainer,
+                  size: 36,
+                ),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 16),

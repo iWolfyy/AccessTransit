@@ -209,19 +209,12 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
           ? null
           : _AssistanceBottomNav(
               onNavTap: (label) {
-                if (label == 'Home') {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                  return;
-                }
-                if (label == 'Live') {
-                  Navigator.of(context).maybePop();
-                  return;
-                }
-                if (label == 'Profile') {
-                  AppNavigation.openProfile(context);
-                  return;
-                }
-                _showSnack('$label will be available soon.');
+                AppNavigation.handleBottomNav(
+                  context,
+                  label,
+                  currentTab: 'Live',
+                  onUnsupported: _showSnack,
+                );
               },
             ),
     );

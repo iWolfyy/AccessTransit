@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import 'boarding_assistance_screen.dart';
 import 'journey_confirmation_screen.dart';
 import 'report_condition_screen.dart';
 import 'route_results_screen.dart';
@@ -107,23 +108,16 @@ class RouteDetailsScreen extends StatelessWidget {
           ? null
           : _DetailsBottomNav(
               onNavTap: (label) {
-                if (label == 'Home') {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                  return;
-                }
-                if (label == 'Plan') {
-                  Navigator.of(context).maybePop();
-                  return;
-                }
-                if (label == 'Profile') {
-                  AppNavigation.openProfile(context);
-                  return;
-                }
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    SnackBar(content: Text('$label will be available soon.')),
-                  );
+                AppNavigation.handleBottomNav(
+                  context,
+                  label,
+                  currentTab: 'Plan',
+                  onUnsupported: (message) {
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(SnackBar(content: Text(message)));
+                  },
+                );
               },
             ),
     );
@@ -507,15 +501,11 @@ class _BoardStep extends StatelessWidget {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: () {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Boarding assistance will be available in Sprint 4.',
-                        ),
-                      ),
-                    );
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const BoardingAssistanceScreen(),
+                    ),
+                  );
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primaryContainer,
