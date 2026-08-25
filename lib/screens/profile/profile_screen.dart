@@ -5,6 +5,7 @@ import '../../models/enums/user_role.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../preferences/accessibility_preferences_screen.dart';
+import 'rewards_contributions_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -173,9 +174,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 24),
           const _StatsSection(),
           const SizedBox(height: 24),
-          const _ImpactCard(),
+          _ImpactCard(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const RewardsContributionsScreen(),
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 24),
-          const _BadgesSection(),
+          _BadgesSection(
+            onSeeAll: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const RewardsContributionsScreen(),
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 24),
           const _RecentActivitySection(),
           const SizedBox(height: 24),
@@ -187,6 +204,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     builder: (_) => AccessibilityPreferencesScreen(
                       initialUser: _user,
                     ),
+                  ),
+                );
+                return;
+              }
+              if (label == 'Rewards & Contributions') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const RewardsContributionsScreen(),
                   ),
                 );
                 return;
@@ -492,82 +517,93 @@ class _StatCard extends StatelessWidget {
 }
 
 class _ImpactCard extends StatelessWidget {
-  const _ImpactCard();
+  const _ImpactCard({this.onTap});
+
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.primaryContainer,
+    return Material(
+      color: AppColors.primaryContainer,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 4,
-            offset: Offset(0, 1),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                blurRadius: 4,
+                offset: Offset(0, 1),
+              ),
+            ],
           ),
-        ],
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Stack(
-        children: [
-          Positioned(
-            right: -32,
-            top: -32,
-            child: Icon(
-              Icons.diversity_3,
-              size: 120,
-              color: AppColors.onPrimaryContainer.withValues(alpha: 0.20),
-            ),
-          ),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          clipBehavior: Clip.hardEdge,
+          child: Stack(
             children: [
-              Row(
+              Positioned(
+                right: -32,
+                top: -32,
+                child: Icon(
+                  Icons.diversity_3,
+                  size: 120,
+                  color: AppColors.onPrimaryContainer.withValues(alpha: 0.20),
+                ),
+              ),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.favorite, color: AppColors.onPrimaryContainer),
-                  SizedBox(width: 8),
-                  Text(
-                    'Your Impact',
-                    style: TextStyle(
-                      fontSize: 18,
-                      height: 24 / 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.onPrimaryContainer,
+                  Row(
+                    children: [
+                      Icon(Icons.favorite, color: AppColors.onPrimaryContainer),
+                      SizedBox(width: 8),
+                      Text(
+                        'Your Impact',
+                        style: TextStyle(
+                          fontSize: 18,
+                          height: 24 / 18,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onPrimaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Text.rich(
+                    TextSpan(
+                      style: TextStyle(
+                        fontSize: 16,
+                        height: 24 / 16,
+                        color: AppColors.onPrimaryContainer,
+                      ),
+                      children: [
+                        TextSpan(text: 'Your reports have helped '),
+                        TextSpan(
+                          text: '1,200+',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        TextSpan(text: ' commuters this month.'),
+                      ],
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: 8),
-              Text.rich(
-                TextSpan(
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 24 / 16,
-                    color: AppColors.onPrimaryContainer,
-                  ),
-                  children: [
-                    TextSpan(text: 'Your reports have helped '),
-                    TextSpan(
-                      text: '1,200+',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    TextSpan(text: ' commuters this month.'),
-                  ],
-                ),
-              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _BadgesSection extends StatelessWidget {
-  const _BadgesSection();
+  const _BadgesSection({this.onSeeAll});
+
+  final VoidCallback? onSeeAll;
 
   @override
   Widget build(BuildContext context) {
@@ -597,16 +633,27 @@ class _BadgesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Badges & Achievements',
-          style: TextStyle(
-            fontSize: 18,
-            height: 24 / 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurface,
-          ),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Badges & Achievements',
+                style: TextStyle(
+                  fontSize: 18,
+                  height: 24 / 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.onSurface,
+                ),
+              ),
+            ),
+            if (onSeeAll != null)
+              TextButton(
+                onPressed: onSeeAll,
+                child: const Text('See all'),
+              ),
+          ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         SizedBox(
           height: 128,
           child: ListView.separated(
@@ -806,6 +853,7 @@ class _AccountSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const items = [
+      (Icons.stars, 'Rewards & Contributions'),
       (Icons.settings_accessibility, 'Accessibility Preferences'),
       (Icons.history, 'Route History'),
       (Icons.bookmark, 'Saved Places'),
