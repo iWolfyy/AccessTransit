@@ -7,7 +7,7 @@ import '../../models/enums/user_role.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth/auth_input_field.dart';
 import '../../widgets/auth/password_strength_indicator.dart';
-import '../home/home_screen.dart';
+import '../preferences/accessibility_preferences_screen.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -133,7 +133,12 @@ class _RegisterScreenState extends State<RegisterScreen>
 
       _showMessage('Welcome aboard, ${user.name}! Your account is ready.');
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(
+          builder: (_) => AccessibilityPreferencesScreen(
+            initialUser: user,
+            continueToHome: true,
+          ),
+        ),
         (route) => false,
       );
     } on FirebaseAuthException catch (e) {

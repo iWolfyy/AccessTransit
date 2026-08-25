@@ -4,7 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/validators.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth/auth_input_field.dart';
-import '../home/home_screen.dart';
+import '../preferences/accessibility_preferences_screen.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
@@ -51,9 +51,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      // Open preferences immediately after auth succeeds.
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const AccessibilityPreferencesScreen(
+            continueToHome: true,
+          ),
+        ),
+        (route) => false,
       );
+
+      // Warm the profile in the background for Home/Profile screens.
+      _authService.getCurrentUserProfile().ignore();
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       _showMessage(_getAuthErrorMessage(e), isError: true);
