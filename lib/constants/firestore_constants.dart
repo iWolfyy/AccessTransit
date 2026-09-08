@@ -24,14 +24,18 @@ class FirestoreConstants {
   // --- active_buses/{busId} document fields ---
 
   static const String fieldBusId = 'busId';
+  static const String fieldRouteId = 'routeId';
   static const String fieldRouteNumber = 'routeNumber';
   static const String fieldRouteName = 'routeName';
+  static const String fieldDriverId = 'driverId';
   static const String fieldOperatorId = 'operatorId';
   static const String fieldOperatorName = 'operatorName';
   static const String fieldLatitude = 'latitude';
   static const String fieldLongitude = 'longitude';
   static const String fieldHeading = 'heading';
   static const String fieldSpeed = 'speed';
+  static const String fieldTimestamp = 'timestamp';
+  static const String fieldStatus = 'status';
   static const String fieldNextStop = 'nextStop';
   static const String fieldEtaMinutes = 'etaMinutes';
   static const String fieldRampOperational = 'rampOperational';
