@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -11,7 +12,8 @@ class OperatorDashboardScreen extends StatefulWidget {
   const OperatorDashboardScreen({super.key});
 
   @override
-  State<OperatorDashboardScreen> createState() => _OperatorDashboardScreenState();
+  State<OperatorDashboardScreen> createState() =>
+      _OperatorDashboardScreenState();
 }
 
 class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
@@ -37,12 +39,32 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   int _simStep = 0;
 
   static const List<Map<String, String>> _routes = [
-    {'busId': 'bus_42', 'number': '42', 'name': 'Express Downtown', 'nextStop': 'Central Station'},
-    {'busId': 'bus_101', 'number': '101', 'name': 'Coastal Route', 'nextStop': 'South Terminal'},
-    {'busId': 'bus_15', 'number': '15', 'name': 'Airport Link', 'nextStop': 'City Hospital'},
+    {
+      'busId': 'bus_42',
+      'number': '42',
+      'name': 'Express Downtown',
+      'nextStop': 'Central Station',
+    },
+    {
+      'busId': 'bus_101',
+      'number': '101',
+      'name': 'Coastal Route',
+      'nextStop': 'South Terminal',
+    },
+    {
+      'busId': 'bus_15',
+      'number': '15',
+      'name': 'Airport Link',
+      'nextStop': 'City Hospital',
+    },
   ];
 
-  static const List<String> _occupancyOptions = ['Low', 'Moderate', 'High', 'Full'];
+  static const List<String> _occupancyOptions = [
+    'Low',
+    'Moderate',
+    'High',
+    'Full',
+  ];
 
   @override
   void dispose() {
@@ -172,7 +194,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             Icon(
               _isBroadcasting ? Icons.sensors : Icons.sensors_off,
               size: 48,
-              color: _isBroadcasting ? AppColors.onPrimary : AppColors.onSurfaceVariant,
+              color: _isBroadcasting
+                  ? AppColors.onPrimary
+                  : AppColors.onSurfaceVariant,
             ),
             const SizedBox(height: 12),
             Text(
@@ -183,7 +207,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: _isBroadcasting ? AppColors.onPrimary : AppColors.onSurface,
+                color: _isBroadcasting
+                    ? AppColors.onPrimary
+                    : AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 4),
@@ -206,14 +232,25 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               child: FilledButton.icon(
                 onPressed: _toggleBroadcasting,
                 style: FilledButton.styleFrom(
-                  backgroundColor: _isBroadcasting ? AppColors.error : AppColors.secondary,
+                  backgroundColor: _isBroadcasting
+                      ? AppColors.error
+                      : AppColors.secondary,
                   foregroundColor: AppColors.onPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                icon: Icon(_isBroadcasting ? Icons.stop_circle : Icons.play_circle_fill),
+                icon: Icon(
+                  _isBroadcasting ? Icons.stop_circle : Icons.play_circle_fill,
+                ),
                 label: Text(
-                  _isBroadcasting ? 'Stop Broadcasting' : 'Start Live GPS Broadcasting',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  _isBroadcasting
+                      ? 'Stop Broadcasting'
+                      : 'Start Live GPS Broadcasting',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -241,8 +278,13 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             DropdownButtonFormField<String>(
               initialValue: _selectedBusId,
               decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
               ),
               items: _routes.map((r) {
                 return DropdownMenuItem<String>(
@@ -254,7 +296,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   ? null
                   : (val) {
                       if (val == null) return;
-                      final route = _routes.firstWhere((r) => r['busId'] == val);
+                      final route = _routes.firstWhere(
+                        (r) => r['busId'] == val,
+                      );
                       setState(() {
                         _selectedBusId = val;
                         _selectedRouteNumber = route['number']!;
@@ -310,7 +354,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  const Text('Occupancy Level:', style: TextStyle(fontWeight: FontWeight.w500)),
+                  const Text(
+                    'Occupancy Level:',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
                   const Spacer(),
                   DropdownButton<String>(
                     value: _occupancyLevel,
@@ -342,7 +389,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Live Telemetry Data', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const Text(
+              'Live Telemetry Data',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 8),
             Text('Latitude: ${_currentLat.toStringAsFixed(5)}'),
             Text('Longitude: ${_currentLng.toStringAsFixed(5)}'),
