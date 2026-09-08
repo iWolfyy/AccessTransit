@@ -2,24 +2,35 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/bus_location_model.dart';
+import '../../services/bus_tracking_service.dart';
 import 'boarding_assistance_screen.dart';
 import 'report_condition_screen.dart';
 import 'route_results_screen.dart';
 
 /// Live Journey / Live Navigation screen (Sprint 2–3 UI).
-class LiveJourneyScreen extends StatelessWidget {
+class LiveJourneyScreen extends StatefulWidget {
   const LiveJourneyScreen({
     super.key,
     this.origin = 'Current Location',
     this.destination = 'City Library',
+    this.busId = 'bus_42',
     this.route,
   });
 
   final String origin;
   final String destination;
+  final String busId;
   final RouteResultItem? route;
 
   static const double _desktopBreakpoint = 768;
+
+  @override
+  State<LiveJourneyScreen> createState() => _LiveJourneyScreenState();
+}
+
+class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
+  final BusTrackingService _trackingService = BusTrackingService();
 
   void _showSnack(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -29,67 +40,89 @@ class LiveJourneyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+    final isDesktop = MediaQuery.sizeOf(context).width >= LiveJourneyScreen._desktopBreakpoint;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      body: Column(
-        children: [
-          _TopBar(
-            onClose: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            },
-          ),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                const _MapSection(),
-                Transform.translate(
-                  offset: const Offset(0, -16),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const _StatusCard(),
-                        const SizedBox(height: 24),
-                        const _LiveAccessibilitySection(),
-                        const SizedBox(height: 24),
-                        _AssistanceSection(
-                          onRequest: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const BoardingAssistanceScreen(),
+      body: StreamBuilder<BusLocationModel?>(
+        stream: _trackingService.watchBusLocation(widget.busId),
+        builder: (context, snapshot) {
+          final liveBus = snapshot.data;
+          final busName = liveBus != null ? 'Bus ${liveBus.routeNumber}' : 'Bus 42';
+          final nextStop = liveBus?.nextStop ?? 'Central Station';
+          final etaMins = liveBus?.etaMinutes ?? 2;
+          final isBroadcasting = liveBus?.isBroadcasting ?? true;
+          final rampWorking = liveBus?.rampOperational ?? true;
+          final elevatorWorking = liveBus?.elevatorWorking ?? true;
+
+          return Column(
+            children: [
+              _TopBar(
+                onClose: () {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+              ),
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    _MapSection(busName: busName, liveBus: liveBus),
+                    Transform.translate(
+                      offset: const Offset(0, -16),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _StatusCard(
+                              nextStop: nextStop,
+                              etaMinutes: etaMins,
+                              isBroadcasting: isBroadcasting,
+                              speed: liveBus?.speed ?? 24.0,
+                            ),
+                            const SizedBox(height: 24),
+                            _LiveAccessibilitySection(
+                              rampOperational: rampWorking,
+                              elevatorWorking: elevatorWorking,
+                              occupancyLevel: liveBus?.occupancyLevel ?? 'Moderate',
+                            ),
+                            const SizedBox(height: 24),
+                            _AssistanceSection(
+                              onRequest: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const BoardingAssistanceScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            _EmergencyActions(
+                              onEmergency: () => _showSnack(
+                                context,
+                                'Emergency contacts will be available soon.',
                               ),
-                            );
-                          },
+                              onReport: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ReportConditionScreen(
+                                      initialLocation: widget.destination,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            SizedBox(height: isDesktop ? 24 : 16),
+                          ],
                         ),
-                        const SizedBox(height: 24),
-                        _EmergencyActions(
-                          onEmergency: () => _showSnack(
-                            context,
-                            'Emergency contacts will be available soon.',
-                          ),
-                          onReport: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ReportConditionScreen(
-                                  initialLocation: destination,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        SizedBox(height: isDesktop ? 24 : 16),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
       bottomNavigationBar: isDesktop
           ? null
@@ -155,7 +188,13 @@ class _TopBar extends StatelessWidget {
 }
 
 class _MapSection extends StatelessWidget {
-  const _MapSection();
+  const _MapSection({
+    required this.busName,
+    this.liveBus,
+  });
+
+  final String busName;
+  final BusLocationModel? liveBus;
 
   @override
   Widget build(BuildContext context) {
@@ -167,15 +206,17 @@ class _MapSection extends StatelessWidget {
         children: [
           Container(
             color: AppColors.surfaceVariant,
-            child: const Center(
+            child: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.map_outlined, size: 40, color: AppColors.outline),
-                  SizedBox(height: 8),
+                  const Icon(Icons.map_outlined, size: 40, color: AppColors.outline),
+                  const SizedBox(height: 8),
                   Text(
-                    'Live map',
-                    style: TextStyle(
+                    liveBus != null
+                        ? 'Live GPS: ${liveBus!.latitude.toStringAsFixed(4)}, ${liveBus!.longitude.toStringAsFixed(4)}'
+                        : 'Live map',
+                    style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.onSurfaceVariant,
                     ),
@@ -196,9 +237,9 @@ class _MapSection extends StatelessWidget {
                   color: AppColors.outlineVariant.withValues(alpha: 0.3),
                 ),
               ),
-              child: const Text(
-                'Bus 42',
-                style: TextStyle(
+              child: Text(
+                busName,
+                style: const TextStyle(
                   fontSize: 14,
                   height: 20 / 14,
                   fontWeight: FontWeight.w700,
@@ -299,7 +340,17 @@ class _PulseMarkerState extends State<_PulseMarker>
 }
 
 class _StatusCard extends StatelessWidget {
-  const _StatusCard();
+  const _StatusCard({
+    required this.nextStop,
+    required this.etaMinutes,
+    required this.isBroadcasting,
+    required this.speed,
+  });
+
+  final String nextStop;
+  final int etaMinutes;
+  final bool isBroadcasting;
+  final double speed;
 
   @override
   Widget build(BuildContext context) {
@@ -322,31 +373,31 @@ class _StatusCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Next Stop: Central Station',
-                      style: TextStyle(
+                      'Next Stop: $nextStop',
+                      style: const TextStyle(
                         fontSize: 18,
                         height: 24 / 18,
                         fontWeight: FontWeight.w600,
                         color: AppColors.onSurface,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.schedule,
                           size: 16,
                           color: AppColors.onSurfaceVariant,
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text(
-                          'Arriving in 2 mins',
-                          style: TextStyle(
+                          'Arriving in $etaMinutes mins • ${speed.toStringAsFixed(0)} km/h',
+                          style: const TextStyle(
                             fontSize: 14,
                             height: 20 / 14,
                             color: AppColors.onSurfaceVariant,
@@ -360,16 +411,20 @@ class _StatusCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
+                  color: isBroadcasting
+                      ? AppColors.surfaceContainer
+                      : AppColors.errorContainer,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Text(
-                  'On Time',
+                child: Text(
+                  isBroadcasting ? 'Live GPS' : 'Offline',
                   style: TextStyle(
                     fontSize: 12,
                     height: 16 / 12,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primaryContainer,
+                    color: isBroadcasting
+                        ? AppColors.primaryContainer
+                        : AppColors.onErrorContainer,
                   ),
                 ),
               ),
@@ -546,7 +601,15 @@ class _TimelineDot extends StatelessWidget {
 }
 
 class _LiveAccessibilitySection extends StatelessWidget {
-  const _LiveAccessibilitySection();
+  const _LiveAccessibilitySection({
+    required this.rampOperational,
+    required this.elevatorWorking,
+    required this.occupancyLevel,
+  });
+
+  final bool rampOperational;
+  final bool elevatorWorking;
+  final String occupancyLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -566,26 +629,48 @@ class _LiveAccessibilitySection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Live Accessibility',
-            style: TextStyle(
-              fontSize: 18,
-              height: 24 / 18,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onSurface,
-            ),
+          Row(
+            children: [
+              const Text(
+                'Live Accessibility',
+                style: TextStyle(
+                  fontSize: 18,
+                  height: 24 / 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.onSurface,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Seats: $occupancyLevel',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryContainer,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          const _A11yItem(
-            title: 'Ramp Operational',
-            subtitle: 'Verified on this vehicle',
+          _A11yItem(
+            title: rampOperational ? 'Ramp Operational' : 'Ramp Out of Service',
+            subtitle: rampOperational ? 'Verified on this vehicle' : 'Driver flagged maintenance needed',
             trailingIcon: Icons.accessible,
+            isWorking: rampOperational,
           ),
           const SizedBox(height: 8),
-          const _A11yItem(
-            title: 'Elevator Working',
-            subtitle: 'At Central Station',
+          _A11yItem(
+            title: elevatorWorking ? 'Elevator Working' : 'Elevator Under Maintenance',
+            subtitle: elevatorWorking ? 'Verified at stop' : 'Alternative ramp available',
             trailingIcon: Icons.elevator_outlined,
+            isWorking: elevatorWorking,
           ),
         ],
       ),
@@ -598,11 +683,13 @@ class _A11yItem extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.trailingIcon,
+    this.isWorking = true,
   });
 
   final String title;
   final String subtitle;
   final IconData trailingIcon;
+  final bool isWorking;
 
   @override
   Widget build(BuildContext context) {
@@ -617,12 +704,12 @@ class _A11yItem extends StatelessWidget {
           Container(
             width: 40,
             height: 40,
-            decoration: const BoxDecoration(
-              color: AppColors.secondary,
+            decoration: BoxDecoration(
+              color: isWorking ? AppColors.secondary : AppColors.error,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.check_circle,
+            child: Icon(
+              isWorking ? Icons.check_circle : Icons.warning_amber_rounded,
               color: AppColors.onPrimary,
               size: 22,
             ),
@@ -643,10 +730,10 @@ class _A11yItem extends StatelessWidget {
                 ),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     height: 20 / 14,
-                    color: AppColors.secondary,
+                    color: isWorking ? AppColors.secondary : AppColors.error,
                   ),
                 ),
               ],

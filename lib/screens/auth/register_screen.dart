@@ -517,17 +517,29 @@ class _RegisterScreenState extends State<RegisterScreen>
                     : () => setState(() => _selectedRole = UserRole.passenger),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(
               child: _RoleCard(
                 title: 'Contributor',
-                subtitle: 'Report transport conditions',
+                subtitle: 'Report conditions',
                 icon: Icons.report_outlined,
                 isSelected: _selectedRole == UserRole.contributor,
                 onTap: _isLoading
                     ? null
                     : () =>
                         setState(() => _selectedRole = UserRole.contributor),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _RoleCard(
+                title: 'Bus Operator',
+                subtitle: 'Broadcast live GPS',
+                icon: Icons.directions_bus,
+                isSelected: _selectedRole == UserRole.operator,
+                onTap: _isLoading
+                    ? null
+                    : () => setState(() => _selectedRole = UserRole.operator),
               ),
             ),
           ],
