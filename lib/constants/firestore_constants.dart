@@ -12,6 +12,9 @@ class FirestoreConstants {
   /// Live bus tracking telemetry documents keyed by bus ID.
   static const String busesCollection = 'active_buses';
 
+  /// Live bus locations documents keyed by bus ID.
+  static const String liveLocationsCollection = 'live_locations';
+
   // --- users/{userId} document fields ---
 
   static const String fieldUid = 'uid';
