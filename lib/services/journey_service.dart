@@ -66,17 +66,28 @@ class JourneyService {
           FirestoreConstants.fieldPassengerId,
           isEqualTo: passengerId,
         )
-        .where(
-          FirestoreConstants.fieldJourneyStatus,
-          whereIn: [JourneyStatus.confirmed.value, JourneyStatus.active.value],
-        )
-        .orderBy(FirestoreConstants.fieldJourneyCreatedAt, descending: true)
-        .limit(1)
         .get();
 
     if (snapshot.docs.isEmpty) return null;
-    final doc = snapshot.docs.first;
-    return JourneyModel.fromMap(doc.data(), documentId: doc.id);
+
+    final activeJourneys = snapshot.docs
+        .map((doc) => JourneyModel.fromMap(doc.data(), documentId: doc.id))
+        .where(
+          (j) =>
+              j.status == JourneyStatus.confirmed ||
+              j.status == JourneyStatus.active,
+        )
+        .toList();
+
+    if (activeJourneys.isEmpty) return null;
+
+    activeJourneys.sort((a, b) {
+      final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
+    });
+
+    return activeJourneys.first;
   }
 
   // ---------------------------------------------------------------------------
@@ -93,17 +104,28 @@ class JourneyService {
           FirestoreConstants.fieldPassengerId,
           isEqualTo: passengerId,
         )
-        .where(
-          FirestoreConstants.fieldJourneyStatus,
-          whereIn: [JourneyStatus.confirmed.value, JourneyStatus.active.value],
-        )
-        .orderBy(FirestoreConstants.fieldJourneyCreatedAt, descending: true)
-        .limit(1)
         .snapshots()
         .map((snapshot) {
       if (snapshot.docs.isEmpty) return null;
-      final doc = snapshot.docs.first;
-      return JourneyModel.fromMap(doc.data(), documentId: doc.id);
+
+      final activeJourneys = snapshot.docs
+          .map((doc) => JourneyModel.fromMap(doc.data(), documentId: doc.id))
+          .where(
+            (j) =>
+                j.status == JourneyStatus.confirmed ||
+                j.status == JourneyStatus.active,
+          )
+          .toList();
+
+      if (activeJourneys.isEmpty) return null;
+
+      activeJourneys.sort((a, b) {
+        final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bTime.compareTo(aTime);
+      });
+
+      return activeJourneys.first;
     });
   }
 }

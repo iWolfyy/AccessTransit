@@ -24,7 +24,7 @@ class LiveJourneyScreen extends StatefulWidget {
     super.key,
     this.origin = 'Current Location',
     this.destination = 'City Library',
-    this.busId = 'bus_42',
+    this.busId = 'bus_01',
     this.passengerId = '',
     this.route,
   });
@@ -127,12 +127,6 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
         final isStale =
             liveBus == null ? false : _liveBusService.isBusStale(liveBus);
 
-        // State: bus not currently active (offline/stale/null)
-        final bool busIsInactive = liveBus == null ||
-            !liveBus.isBroadcasting ||
-            liveBus.status == BusStatus.offline ||
-            liveBus.status == BusStatus.completed;
-
         final busNumber = liveBus != null && liveBus.routeNumber.isNotEmpty
             ? liveBus.routeNumber
             : resolvedBusId.replaceAll('bus_', '');
@@ -161,20 +155,14 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  if (busIsInactive)
-                    _BusInactiveBanner(
-                      busId: resolvedBusId,
-                      routeTitle: routeName,
-                    )
-                  else
-                    _MapSection(
-                      busName: busName,
-                      routeName: routeName,
-                      liveBus: liveBus,
-                      isStale: isStale,
-                      mapController: _mapController,
-                      busId: resolvedBusId,
-                    ),
+                  _MapSection(
+                    busName: busName,
+                    routeName: routeName,
+                    liveBus: liveBus,
+                    isStale: isStale,
+                    mapController: _mapController,
+                    busId: resolvedBusId,
+                  ),
                   Transform.translate(
                     offset: const Offset(0, -16),
                     child: Padding(
@@ -568,67 +556,7 @@ class _NoJourneyBody extends StatelessWidget {
   }
 }
 
-class _BusInactiveBanner extends StatelessWidget {
-  const _BusInactiveBanner({required this.busId, this.routeTitle});
-  final String busId;
-  final String? routeTitle;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 260,
-      width: double.infinity,
-      color: AppColors.surfaceVariant,
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Semantics(
-          liveRegion: true,
-          label:
-              'Bus is not currently active. The bus operator has not started this trip yet.',
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(
-                  color: AppColors.surfaceContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.sensors_off_rounded,
-                  size: 36,
-                  color: AppColors.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Bus is not currently active.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                routeTitle != null
-                    ? '$routeTitle — waiting for operator to start trip.'
-                    : 'The bus operator has not started this trip yet.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: AppColors.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _TopBar extends StatelessWidget {
   const _TopBar({required this.onClose, this.journeyInfo});
@@ -719,7 +647,22 @@ class _MapSection extends StatelessWidget {
   final MapController mapController;
   final String busId;
 
-  static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
+  static LatLng _getRouteDefaultLocation(String busId) {
+    switch (busId) {
+      case 'bus_01':
+        return const LatLng(7.2513, 80.3464); // Route 01 (Colombo -> Kandy / Hettimulla)
+      case 'bus_02':
+        return const LatLng(6.4000, 79.9800); // Route 02 (Colombo -> Galle)
+      case 'bus_87':
+        return const LatLng(8.3114, 80.4037); // Route 87 (Colombo -> Jaffna)
+      case 'bus_49':
+        return const LatLng(7.8731, 80.7718); // Route 49 (Colombo -> Trincomalee)
+      case 'bus_99':
+        return const LatLng(6.8833, 80.6000); // Route 99 (Colombo -> Badulla)
+      default:
+        return const LatLng(6.9271, 79.8612); // Colombo Central
+    }
+  }
 
   bool get _hasValidLocation =>
       liveBus != null &&
@@ -727,11 +670,14 @@ class _MapSection extends StatelessWidget {
 
   LatLng get _busLatLng => _hasValidLocation
       ? LatLng(liveBus!.latitude, liveBus!.longitude)
-      : _defaultCenter;
+      : _getRouteDefaultLocation(busId);
 
   @override
   Widget build(BuildContext context) {
     final centerLatLng = _busLatLng;
+    final busNumStr = liveBus?.routeNumber.isNotEmpty == true
+        ? liveBus!.routeNumber
+        : busId.replaceAll('bus_', '');
 
     return SizedBox(
       height: 270,
@@ -743,7 +689,7 @@ class _MapSection extends StatelessWidget {
             mapController: mapController,
             options: MapOptions(
               initialCenter: centerLatLng,
-              initialZoom: 15.0,
+              initialZoom: 14.5,
             ),
             children: [
               TileLayer(
@@ -751,24 +697,23 @@ class _MapSection extends StatelessWidget {
                     'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.access_transit',
               ),
-              if (_hasValidLocation)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: centerLatLng,
-                      width: 64,
-                      height: 64,
-                      child: Semantics(
-                        label: 'Current bus location marker for $busName',
-                        child: _LiveBusMarker(
-                          heading: liveBus?.heading ?? 0.0,
-                          routeNumber: liveBus?.routeNumber ?? '42',
-                          isStale: isStale,
-                        ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: centerLatLng,
+                    width: 64,
+                    height: 64,
+                    child: Semantics(
+                      label: 'Current bus location marker for $busName',
+                      child: _LiveBusMarker(
+                        heading: liveBus?.heading ?? 45.0,
+                        routeNumber: busNumStr,
+                        isStale: isStale,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
             ],
           ),
 
@@ -1924,7 +1869,7 @@ class _LiveBottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 72,
+          height: 76,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [

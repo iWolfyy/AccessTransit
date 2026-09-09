@@ -32,11 +32,11 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   bool _isTripActive = false;
   bool _isInitializing = false;
 
-  String _selectedBusId = 'bus_42';
-  String _selectedRouteId = 'route_42';
-  String _selectedRouteNumber = '42';
-  String _selectedRouteName = 'Express Downtown';
-  String _nextStop = 'Central Station';
+  String _selectedBusId = 'bus_01';
+  String _selectedRouteId = 'route_01';
+  String _selectedRouteNumber = '01';
+  String _selectedRouteName = 'Route 01: Colombo → Kandy';
+  String _nextStop = 'Kandy Bus Stand';
 
   bool _rampOperational = true;
   bool _elevatorWorking = true;

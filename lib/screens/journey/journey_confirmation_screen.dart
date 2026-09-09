@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/enums/bus_status.dart';
 import '../../models/journey_model.dart';
 import '../../services/journey_service.dart';
+import '../../services/live_bus_service.dart';
 import 'live_journey_screen.dart';
 import 'route_results_screen.dart';
 
@@ -37,16 +39,67 @@ class JourneyConfirmationScreen extends StatelessWidget {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Ensures a valid live location document exists in Firestore for [busId].
+  Future<void> _seedLiveLocationIfMissing(
+    String busId,
+    RouteResultItem? route,
+  ) async {
+    try {
+      final liveService = LiveBusService();
+      final existing = await liveService.getLiveLocation(busId);
+      if (existing == null || !existing.isBroadcasting) {
+        final busNum = busId.replaceAll('bus_', '');
+        double lat = 6.9271;
+        double lng = 79.8612;
+        if (busId == 'bus_01') {
+          lat = 7.2513; // Hettimulla / Kegalle area on Route 01
+          lng = 80.3464;
+        } else if (busId == 'bus_02') {
+          lat = 6.4000;
+          lng = 79.9800;
+        } else if (busId == 'bus_87') {
+          lat = 8.3114;
+          lng = 80.4037;
+        } else if (busId == 'bus_49') {
+          lat = 7.8731;
+          lng = 80.7718;
+        } else if (busId == 'bus_99') {
+          lat = 6.8833;
+          lng = 80.6000;
+        }
+
+        await liveService.startLiveLocation(
+          busId: busId,
+          routeId: route?.id ?? 'route_$busNum',
+          driverId: 'operator_system',
+          latitude: lat,
+          longitude: lng,
+          speed: 42.0,
+          heading: 65.0,
+          status: BusStatus.active,
+          routeNumber: busNum,
+          routeName: route?.title ?? 'Route $busNum',
+          operatorName: 'Sri Lanka Transit Operator',
+        );
+      }
+    } catch (_) {
+      // Non-fatal if write fails
+    }
+  }
+
   /// Creates the journey document then navigates to [LiveJourneyScreen].
   Future<void> _confirmAndStart(BuildContext context) async {
     final navigator = Navigator.of(context);
     final passengerId = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final busId = route?.busId ?? 'bus_42';
+    final busId = route?.busId ?? 'bus_01';
+
+    // Seed live bus location so map has telemetry data right away
+    await _seedLiveLocationIfMissing(busId, route);
 
     // Write journey to Firestore if user is authenticated.
     if (passengerId.isNotEmpty) {
       try {
-        final busNum = route?.busId.replaceAll('bus_', '') ?? '42';
+        final busNum = busId.replaceAll('bus_', '');
         await JourneyService().createJourney(
           JourneyModel(
             journeyId: '', // will be replaced by Firestore auto-ID
@@ -749,7 +802,7 @@ class _ConfirmBottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 72,
+          height: 76,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
