@@ -65,6 +65,7 @@ class RouteDetailsScreen extends StatelessWidget {
                         const SizedBox(height: 24),
                         _JourneyStepsCard(
                           destination: destination,
+                          route: route,
                           crowdLevel: route?.crowdLevel ?? 'Low',
                           wheelchairAvailable:
                               route?.accessibilityStatus !=
@@ -290,11 +291,13 @@ class _JourneyStepsCard extends StatelessWidget {
     required this.destination,
     required this.crowdLevel,
     required this.wheelchairAvailable,
+    this.route,
   });
 
   final String destination;
   final String crowdLevel;
   final bool wheelchairAvailable;
+  final RouteResultItem? route;
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +342,7 @@ class _JourneyStepsCard extends StatelessWidget {
                 children: [
                   _WalkStep(),
                   const SizedBox(height: 24),
-                  _BoardStep(),
+                  _BoardStep(route: route),
                   const SizedBox(height: 24),
                   _OnBoardStep(
                     crowdLevel: crowdLevel,
@@ -424,8 +427,15 @@ class _WalkStep extends StatelessWidget {
 }
 
 class _BoardStep extends StatelessWidget {
+  const _BoardStep({this.route});
+
+  final RouteResultItem? route;
+
   @override
   Widget build(BuildContext context) {
+    final busNum = route?.busId.replaceAll('bus_', '') ?? '42';
+    final busTitle = route?.title ?? 'Bus $busNum';
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -460,9 +470,9 @@ class _BoardStep extends StatelessWidget {
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
-                      '42',
-                      style: TextStyle(
+                    child: Text(
+                      busNum,
+                      style: const TextStyle(
                         fontSize: 12,
                         height: 16 / 12,
                         fontWeight: FontWeight.w500,
@@ -471,20 +481,20 @@ class _BoardStep extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Bus 42 towards Downtown Transit Center',
-                          style: TextStyle(
+                          busTitle,
+                          style: const TextStyle(
                             fontSize: 14,
                             height: 20 / 14,
                             fontWeight: FontWeight.w600,
                             color: AppColors.onSurface,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           'Board at Stop B',
                           style: TextStyle(

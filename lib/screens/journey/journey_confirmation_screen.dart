@@ -1,7 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/journey_model.dart';
+import '../../services/journey_service.dart';
 import 'live_journey_screen.dart';
 import 'route_results_screen.dart';
 
@@ -34,6 +37,47 @@ class JourneyConfirmationScreen extends StatelessWidget {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Creates the journey document then navigates to [LiveJourneyScreen].
+  Future<void> _confirmAndStart(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final passengerId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final busId = route?.busId ?? 'bus_42';
+
+    // Write journey to Firestore if user is authenticated.
+    if (passengerId.isNotEmpty) {
+      try {
+        final busNum = route?.busId.replaceAll('bus_', '') ?? '42';
+        await JourneyService().createJourney(
+          JourneyModel(
+            journeyId: '', // will be replaced by Firestore auto-ID
+            passengerId: passengerId,
+            routeId: route?.id ?? 'route_$busNum',
+            routeNumber: busNum,
+            routeTitle: route?.title ?? 'Bus $busNum',
+            busId: busId,
+            origin: origin,
+            destination: destination,
+            status: JourneyStatus.confirmed,
+          ),
+        );
+      } catch (_) {
+        // Non-fatal: if write fails, still open Live Journey with busId fallback.
+      }
+    }
+
+    navigator.pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => LiveJourneyScreen(
+          origin: origin,
+          destination: destination,
+          route: route,
+          busId: busId,
+          passengerId: passengerId,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 768;
@@ -63,20 +107,13 @@ class JourneyConfirmationScreen extends StatelessWidget {
                         const SizedBox(height: 24),
                         const _AccessibilityVerifiedSection(),
                         const SizedBox(height: 24),
-                        _DepartureDetailsSection(origin: origin),
+                        _DepartureDetailsSection(
+                          origin: origin,
+                          route: route,
+                        ),
                         const SizedBox(height: 24),
                         _FixedActions(
-                          onConfirm: () {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => LiveJourneyScreen(
-                                  origin: origin,
-                                  destination: destination,
-                                  route: route,
-                                ),
-                              ),
-                            );
-                          },
+                          onConfirm: () => _confirmAndStart(context),
                           onSetAlert: () =>
                               _showSnack(context, 'Departure alert set.'),
                           onShare: () =>
@@ -420,12 +457,19 @@ class _AccessibilityVerifiedSection extends StatelessWidget {
 }
 
 class _DepartureDetailsSection extends StatelessWidget {
-  const _DepartureDetailsSection({required this.origin});
+  const _DepartureDetailsSection({
+    required this.origin,
+    this.route,
+  });
 
   final String origin;
+  final RouteResultItem? route;
 
   @override
   Widget build(BuildContext context) {
+    final busTitle = route?.title ?? 'Bus 42';
+    final etaLabel = route?.etaLabel ?? 'In 4 mins';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -545,10 +589,10 @@ class _DepartureDetailsSection extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Expanded(
+                              Expanded(
                                 child: Text(
-                                  'Bus 42',
-                                  style: TextStyle(
+                                  busTitle,
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     height: 24 / 18,
                                     fontWeight: FontWeight.w600,
@@ -565,9 +609,9 @@ class _DepartureDetailsSection extends StatelessWidget {
                                   color: AppColors.errorContainer,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text(
-                                  'In 4 mins',
-                                  style: TextStyle(
+                                child: Text(
+                                  etaLabel,
+                                  style: const TextStyle(
                                     fontSize: 12,
                                     height: 16 / 12,
                                     fontWeight: FontWeight.w700,

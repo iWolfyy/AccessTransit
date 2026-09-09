@@ -6,9 +6,11 @@ import 'package:flutter/services.dart';
 
 
 import '../../core/theme/app_colors.dart';
+import '../../models/enums/user_role.dart';
 import '../../services/auth_service.dart';
 import '../home/home_screen.dart';
 import '../onboarding/onboarding_screen.dart';
+import '../operator/operator_dashboard_screen.dart';
 
 /// Branded launch screen shown while the app settles and auth state is resolved.
 class SplashScreen extends StatefulWidget {
@@ -143,15 +145,24 @@ class _SplashScreenState extends State<SplashScreen>
     _goNext();
   }
 
-  void _goNext() {
+  Future<void> _goNext() async {
     final route = ModalRoute.of(context);
     if (route == null || !route.isCurrent) {
       return;
     }
 
-    final next = _authService.currentUser != null
-        ? const HomeScreen()
-        : const OnboardingScreen();
+    Widget next;
+    if (_authService.currentUser != null) {
+      final profile = await _authService.getCurrentUserProfile();
+      if (!mounted) return;
+      if (profile?.role == UserRole.operator) {
+        next = const OperatorDashboardScreen();
+      } else {
+        next = const HomeScreen();
+      }
+    } else {
+      next = const OnboardingScreen();
+    }
 
     Navigator.of(context).pushReplacement(_fadeRoute(next));
   }
