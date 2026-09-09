@@ -13,7 +13,7 @@ import 'boarding_assistance_screen.dart';
 import 'report_condition_screen.dart';
 import 'route_results_screen.dart';
 
-/// Live Journey / Live Navigation screen (Sprint 2–3 UI).
+/// Live Journey / Live Navigation screen with full Material 3 accessibility.
 ///
 /// Resolves the correct [busId] in priority order:
 /// 1. Real-time stream from `journeys/{passengerId}` Firestore document.
@@ -80,17 +80,23 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
         final isStale =
             liveBus == null ? false : _liveBusService.isBusStale(liveBus);
 
-        // ── State: bus not currently active (offline/stale/null) ─────────────
+        // State: bus not currently active (offline/stale/null)
         final bool busIsInactive = liveBus == null ||
             !liveBus.isBroadcasting ||
             liveBus.status == BusStatus.offline ||
             liveBus.status == BusStatus.completed;
 
-        final busName = liveBus != null && liveBus.routeNumber.isNotEmpty
-            ? 'Bus ${liveBus.routeNumber}'
-            : 'Bus ${resolvedBusId.replaceAll('bus_', '')}';
+        final busNumber = liveBus != null && liveBus.routeNumber.isNotEmpty
+            ? liveBus.routeNumber
+            : resolvedBusId.replaceAll('bus_', '');
+        final busName = 'Bus $busNumber';
+        final routeName = journey?.routeTitle.isNotEmpty == true
+            ? journey!.routeTitle
+            : (liveBus?.routeName.isNotEmpty == true
+                ? liveBus!.routeName
+                : 'Route $busNumber');
         final nextStop = liveBus?.nextStop ?? 'Central Station';
-        final etaMins = liveBus?.etaMinutes ?? 2;
+        final passengerStop = journey?.destination ?? widget.destination;
         final isBroadcasting =
             liveBus != null && liveBus.isBroadcasting && !isStale;
         final rampWorking = liveBus?.rampOperational ?? true;
@@ -102,9 +108,7 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
               onClose: () {
                 Navigator.of(context).popUntil((route) => route.isFirst);
               },
-              journeyInfo: journey != null
-                  ? '${journey.routeTitle} · ${journey.destination}'
-                  : null,
+              journeyInfo: '$routeName · Destination: $passengerStop',
             ),
             Expanded(
               child: ListView(
@@ -113,11 +117,12 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                   if (busIsInactive)
                     _BusInactiveBanner(
                       busId: resolvedBusId,
-                      routeTitle: journey?.routeTitle,
+                      routeTitle: routeName,
                     )
                   else
                     _MapSection(
                       busName: busName,
+                      routeName: routeName,
                       liveBus: liveBus,
                       isStale: isStale,
                       mapController: _mapController,
@@ -131,8 +136,10 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _StatusCard(
+                            busName: busName,
+                            routeName: routeName,
                             nextStop: nextStop,
-                            etaMinutes: etaMins,
+                            passengerStop: passengerStop,
                             isBroadcasting: isBroadcasting,
                             isStale: isStale,
                             speed: liveBus?.speed ?? 0.0,
@@ -147,6 +154,7 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                           ),
                           const SizedBox(height: 24),
                           _AssistanceSection(
+                            destination: passengerStop,
                             onRequest: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -160,13 +168,13 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                           _EmergencyActions(
                             onEmergency: () => _showSnack(
                               context,
-                              'Emergency contacts will be available soon.',
+                              'Emergency services contacted.',
                             ),
                             onReport: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => ReportConditionScreen(
-                                    initialLocation: widget.destination,
+                                    initialLocation: passengerStop,
                                   ),
                                 ),
                               );
@@ -204,7 +212,6 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
 
             // ── State: no active journey / no busId assigned ───────────────
             if (!hasJourney) {
-              // Still loading first emission
               if (journeySnapshot.connectionState ==
                   ConnectionState.waiting) {
                 return _LoadingBody(
@@ -220,7 +227,6 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                 );
               }
 
-              // No confirmed journey: show "Bus not assigned" state.
               return _NoJourneyBody(
                 isDesktop: isDesktop,
                 onClose: () =>
@@ -316,21 +322,26 @@ class _LoadingBody extends StatelessWidget {
     return Column(
       children: [
         _TopBar(onClose: onClose),
-        const Expanded(
+        Expanded(
           child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text(
-                  'Loading your journey…',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppColors.onSurfaceVariant,
+            child: Semantics(
+              label: 'Loading live journey details from server',
+              liveRegion: true,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading your journey…',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurfaceVariant,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -357,56 +368,73 @@ class _NoJourneyBody extends StatelessWidget {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.directions_bus_outlined,
-                    size: 40,
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Bus has not been assigned yet.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Your booking is confirmed. The operator will assign a bus before departure. Check back shortly.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    height: 1.5,
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                OutlinedButton.icon(
-                  onPressed: onClose,
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  label: const Text('Back to Home'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primaryContainer),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
+            child: Semantics(
+              container: true,
+              label:
+                  'Bus has not been assigned yet. Your booking is confirmed and waiting for bus assignment.',
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 84,
+                    height: 84,
+                    decoration: const BoxDecoration(
+                      color: AppColors.surfaceContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.directions_bus_outlined,
+                      size: 44,
+                      color: AppColors.onSurfaceVariant,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Bus has not been assigned yet.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Your booking is confirmed. The operator will assign a bus before departure. Check back shortly.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.5,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Semantics(
+                    button: true,
+                    label: 'Return to Home screen',
+                    child: OutlinedButton.icon(
+                      onPressed: onClose,
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      label: const Text('Back to Home'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(
+                          color: AppColors.primaryContainer,
+                          width: 2,
+                        ),
+                        minimumSize: const Size(200, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -428,44 +456,49 @@ class _BusInactiveBanner extends StatelessWidget {
       color: AppColors.surfaceVariant,
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainer,
-                shape: BoxShape.circle,
+        child: Semantics(
+          liveRegion: true,
+          label:
+              'Bus is not currently active. The bus operator has not started this trip yet.',
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: const BoxDecoration(
+                  color: AppColors.surfaceContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.sensors_off_rounded,
+                  size: 36,
+                  color: AppColors.onSurfaceVariant,
+                ),
               ),
-              child: const Icon(
-                Icons.sensors_off_rounded,
-                size: 36,
-                color: AppColors.onSurfaceVariant,
+              const SizedBox(height: 16),
+              const Text(
+                'Bus is not currently active.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.onSurface,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Bus is not currently active.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
+              const SizedBox(height: 8),
+              Text(
+                routeTitle != null
+                    ? '$routeTitle — waiting for operator to start trip.'
+                    : 'The bus operator has not started this trip yet.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: AppColors.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              routeTitle != null
-                  ? '$routeTitle — waiting for operator to start trip.'
-                  : 'The bus operator has not started this trip yet.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -482,34 +515,41 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: AppColors.surface,
-      elevation: 1,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
+      elevation: 2,
+      shadowColor: AppColors.onSurface.withValues(alpha: 0.1),
       child: SafeArea(
         bottom: false,
         child: SizedBox(
-          height: journeyInfo != null ? 60 : 48,
+          height: journeyInfo != null ? 64 : 52,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
-                IconButton(
-                  onPressed: onClose,
-                  icon: const Icon(Icons.close_rounded),
-                  color: AppColors.onSurfaceVariant,
-                  tooltip: 'Close Live Journey',
+                Semantics(
+                  button: true,
+                  label: 'Close Live Navigation',
+                  child: IconButton(
+                    onPressed: onClose,
+                    icon: const Icon(Icons.close_rounded, size: 28),
+                    color: AppColors.onSurface,
+                    tooltip: 'Close Live Navigation',
+                  ),
                 ),
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        'Live Navigation',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 20,
-                          height: 28 / 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
+                      Semantics(
+                        header: true,
+                        child: const Text(
+                          'Live Navigation',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 20,
+                            height: 28 / 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
                       if (journeyInfo != null)
@@ -519,7 +559,8 @@ class _TopBar extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                             color: AppColors.onSurfaceVariant,
                           ),
                         ),
@@ -539,6 +580,7 @@ class _TopBar extends StatelessWidget {
 class _MapSection extends StatelessWidget {
   const _MapSection({
     required this.busName,
+    required this.routeName,
     required this.liveBus,
     required this.isStale,
     required this.mapController,
@@ -546,6 +588,7 @@ class _MapSection extends StatelessWidget {
   });
 
   final String busName;
+  final String routeName;
   final BusLocationModel? liveBus;
   final bool isStale;
   final MapController mapController;
@@ -566,7 +609,7 @@ class _MapSection extends StatelessWidget {
     final centerLatLng = _busLatLng;
 
     return SizedBox(
-      height: 260,
+      height: 270,
       width: double.infinity,
       child: Stack(
         fit: StackFit.expand,
@@ -588,12 +631,15 @@ class _MapSection extends StatelessWidget {
                   markers: [
                     Marker(
                       point: centerLatLng,
-                      width: 60,
-                      height: 60,
-                      child: _LiveBusMarker(
-                        heading: liveBus?.heading ?? 0.0,
-                        routeNumber: liveBus?.routeNumber ?? '42',
-                        isStale: isStale,
+                      width: 64,
+                      height: 64,
+                      child: Semantics(
+                        label: 'Current bus location marker for $busName',
+                        child: _LiveBusMarker(
+                          heading: liveBus?.heading ?? 0.0,
+                          routeNumber: liveBus?.routeNumber ?? '42',
+                          isStale: isStale,
+                        ),
                       ),
                     ),
                   ],
@@ -601,41 +647,51 @@ class _MapSection extends StatelessWidget {
             ],
           ),
 
-          // Stale / Missing telemetry overlay banner
+          // ── Stale / Missing telemetry overlay banner ────────────────────────
           if (liveBus == null)
             Positioned(
               left: 16,
               right: 16,
               bottom: 24,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.surface.withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: AppColors.outlineVariant.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+              child: Semantics(
+                liveRegion: true,
+                label: 'Connecting to live GPS stream for $busName',
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppColors.outlineVariant.withValues(alpha: 0.5),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Connecting to live stream for $busId...',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.onSurface,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.onSurface.withValues(alpha: 0.1),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Connecting to live GPS for $busName...',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.onSurface,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             )
@@ -644,92 +700,129 @@ class _MapSection extends StatelessWidget {
               left: 16,
               right: 16,
               bottom: 24,
+              child: Semantics(
+                liveRegion: true,
+                label:
+                    'Location unavailable. Signal lost or telemetry is stale.',
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.errorContainer.withValues(alpha: 0.98),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.error, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.onSurface.withValues(alpha: 0.15),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.sensors_off_rounded,
+                        size: 22,
+                        color: AppColors.onErrorContainer,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Location unavailable',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.onErrorContainer,
+                              ),
+                            ),
+                            Text(
+                              'Signal lost — location updates delayed',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.onErrorContainer,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Top right bus status badge ──────────────────────────────────────
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Semantics(
+              label:
+                  '$busName tracking status: ${isStale ? "Location unavailable" : "Live GPS active"}',
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.errorContainer.withValues(alpha: 0.95),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.surface.withValues(alpha: 0.96),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isStale ? AppColors.error : AppColors.secondary,
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.onSurface.withValues(alpha: 0.15),
+                      blurRadius: 6,
+                    ),
+                  ],
                 ),
-                child: const Row(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.warning_amber_rounded,
+                      isStale
+                          ? Icons.sensors_off_rounded
+                          : Icons.sensors_rounded,
                       size: 18,
-                      color: AppColors.onErrorContainer,
+                      color: isStale ? AppColors.error : AppColors.secondary,
                     ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Signal Lost / Stale Telemetry — Bus location may be delayed',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.onErrorContainer,
-                        ),
+                    const SizedBox(width: 8),
+                    Text(
+                      busName,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.onSurface,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-
-          // Top right bus status badge
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.95),
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.onSurface.withValues(alpha: 0.12),
-                    blurRadius: 4,
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: isStale ? AppColors.error : Colors.green,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    busName,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primaryContainer,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
 
-          // Re-center button
+          // ── Re-center button ────────────────────────────────────────────────
           if (_hasValidLocation)
             Positioned(
               top: 16,
               left: 16,
-              child: FloatingActionButton.small(
-                heroTag: 're_center_bus_btn',
-                onPressed: () {
-                  mapController.move(centerLatLng, 15.0);
-                },
-                backgroundColor: AppColors.surface.withValues(alpha: 0.95),
-                foregroundColor: AppColors.primary,
-                tooltip: 'Center on Bus',
-                child: const Icon(Icons.my_location),
+              child: Semantics(
+                button: true,
+                label: 'Re-center map on $busName current position',
+                child: FloatingActionButton.small(
+                  heroTag: 're_center_bus_btn',
+                  onPressed: () {
+                    mapController.move(centerLatLng, 15.0);
+                  },
+                  backgroundColor: AppColors.surface.withValues(alpha: 0.96),
+                  foregroundColor: AppColors.primary,
+                  tooltip: 'Center on Bus',
+                  child: const Icon(Icons.my_location, size: 22),
+                ),
               ),
             ),
         ],
@@ -763,25 +856,25 @@ class _LiveBusMarker extends StatelessWidget {
         Transform.rotate(
           angle: heading * (3.141592653589793 / 180),
           child: Container(
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: AppColors.surface,
               shape: BoxShape.circle,
-              border: Border.all(color: statusColor, width: 3),
+              border: Border.all(color: statusColor, width: 3.5),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.onSurface.withValues(alpha: 0.25),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
+                  color: AppColors.onSurface.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
             child: Center(
               child: Icon(
-                Icons.directions_bus_filled,
+                Icons.directions_bus_filled_rounded,
                 color: statusColor,
-                size: 24,
+                size: 26,
               ),
             ),
           ),
@@ -828,8 +921,8 @@ class _PulseMarkerState extends State<_PulseMarker>
           child: Opacity(
             opacity: (1 - t).clamp(0.0, 0.7),
             child: Container(
-              width: 54,
-              height: 54,
+              width: 58,
+              height: 58,
               decoration: const BoxDecoration(
                 color: AppColors.primaryContainer,
                 shape: BoxShape.circle,
@@ -842,25 +935,33 @@ class _PulseMarkerState extends State<_PulseMarker>
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Status Card: Bus info, Live badge, Last updated, Next stop, Route name
+// ──────────────────────────────────────────────────────────────────────────────
+
 class _StatusCard extends StatelessWidget {
   const _StatusCard({
+    required this.busName,
+    required this.routeName,
     required this.nextStop,
-    required this.etaMinutes,
+    required this.passengerStop,
     required this.isBroadcasting,
     required this.isStale,
     required this.speed,
     required this.liveBus,
   });
 
+  final String busName;
+  final String routeName;
   final String nextStop;
-  final int etaMinutes;
+  final String passengerStop;
   final bool isBroadcasting;
   final bool isStale;
   final double speed;
   final BusLocationModel? liveBus;
 
   String _formatTimestamp(DateTime? timestamp) {
-    if (timestamp == null) return 'No signal';
+    if (timestamp == null) return 'No GPS signal';
     final diff = DateTime.now().difference(timestamp);
     if (diff.inSeconds < 15) return 'Just now';
     if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
@@ -871,237 +972,228 @@ class _StatusCard extends StatelessWidget {
     return '$hour:$min $period';
   }
 
+  String _getBusStatusText(BusStatus? status, bool isStale) {
+    if (isStale) return 'Signal Lost';
+    switch (status) {
+      case BusStatus.active:
+        return 'En Route';
+      case BusStatus.stopped:
+        return 'Stopped';
+      case BusStatus.completed:
+        return 'Trip Completed';
+      case BusStatus.offline:
+      case null:
+        return 'Offline';
+    }
+  }
+
+  IconData _getBusStatusIcon(BusStatus? status, bool isStale) {
+    if (isStale) return Icons.warning_amber_rounded;
+    switch (status) {
+      case BusStatus.active:
+        return Icons.navigation_rounded;
+      case BusStatus.stopped:
+        return Icons.pause_circle_filled_rounded;
+      case BusStatus.completed:
+        return Icons.task_alt_rounded;
+      case BusStatus.offline:
+      case null:
+        return Icons.cloud_off_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final updatedText = _formatTimestamp(liveBus?.timestamp ?? liveBus?.lastUpdated);
+    final updatedText =
+        _formatTimestamp(liveBus?.timestamp ?? liveBus?.lastUpdated);
+    final busStatusText = _getBusStatusText(liveBus?.status, isStale);
+    final busStatusIcon = _getBusStatusIcon(liveBus?.status, isStale);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.outlineVariant.withValues(alpha: 0.3),
+        ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: AppColors.onSurface.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Header Row: Bus Name + Route + Live / Offline Indicator ──────
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.directions_bus_filled_rounded,
+                  color: AppColors.onPrimaryContainer,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Next Stop: $nextStop',
+                      busName,
                       style: const TextStyle(
-                        fontSize: 18,
-                        height: 24 / 18,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 22,
+                        height: 28 / 22,
+                        fontWeight: FontWeight.w800,
                         color: AppColors.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.schedule,
-                          size: 16,
-                          color: AppColors.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Arriving in $etaMinutes mins • ${speed.toStringAsFixed(0)} km/h',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            height: 20 / 14,
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.access_time_outlined,
-                          size: 14,
-                          color: AppColors.outline,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Last updated: $updatedText',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isStale
-                                ? AppColors.error
-                                : AppColors.onSurfaceVariant,
-                            fontWeight:
-                                isStale ? FontWeight.w600 : FontWeight.w400,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 2),
+                    Text(
+                      routeName,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 20 / 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isBroadcasting
-                      ? AppColors.surfaceContainer
-                      : AppColors.errorContainer,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  isBroadcasting ? 'Live GPS' : (isStale ? 'Stale' : 'Offline'),
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 16 / 12,
-                    fontWeight: FontWeight.w700,
+
+              // ── Live indicator pill (Icon + Text) ──────────────────────────
+              Semantics(
+                liveRegion: true,
+                label: isBroadcasting
+                    ? 'Status: Live GPS updates receiving'
+                    : 'Status: Location unavailable',
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
                     color: isBroadcasting
                         ? AppColors.primaryContainer
-                        : AppColors.onErrorContainer,
+                        : AppColors.errorContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isBroadcasting
+                            ? Icons.sensors_rounded
+                            : Icons.sensors_off_rounded,
+                        size: 16,
+                        color: isBroadcasting
+                            ? AppColors.onPrimaryContainer
+                            : AppColors.onErrorContainer,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isBroadcasting ? 'LIVE GPS' : 'Unavailable',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                          color: isBroadcasting
+                              ? AppColors.onPrimaryContainer
+                              : AppColors.onErrorContainer,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          const _TimelineProgress(),
-        ],
-      ),
-    );
-  }
-}
 
-class _TimelineProgress extends StatelessWidget {
-  const _TimelineProgress();
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(height: 1, thickness: 1),
+          ),
 
-  @override
-  Widget build(BuildContext context) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 40,
-            child: Stack(
-              alignment: Alignment.center,
+          // ── Status & Telemetry details grid ────────────────────────────────
+          Semantics(
+            container: true,
+            label:
+                'Bus status: $busStatusText. Last updated: $updatedText. Next stop: $nextStop. Passenger stop: $passengerStop.',
+            child: Column(
               children: [
-                Positioned(
-                  top: 20,
-                  bottom: 20,
-                  child: Container(
-                    width: 4,
-                    color: AppColors.surfaceVariant,
-                  ),
-                ),
-                Positioned(
-                  top: 20,
-                  child: Container(
-                    width: 4,
-                    height: 48,
-                    color: AppColors.primaryContainer,
-                  ),
-                ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Row(
                   children: [
-                    _TimelineDot(
-                      borderColor: AppColors.outlineVariant,
-                      fillColor: AppColors.outlineVariant,
-                      fillSize: 12,
-                    ),
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.onSurface.withValues(alpha: 0.1),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.directions_bus,
-                        color: AppColors.primaryContainer,
-                        size: 22,
+                    Expanded(
+                      child: _InfoTile(
+                        icon: busStatusIcon,
+                        iconColor: isStale
+                            ? AppColors.error
+                            : AppColors.primaryContainer,
+                        label: 'Current Status',
+                        value: busStatusText,
+                        valueColor: isStale
+                            ? AppColors.error
+                            : AppColors.onSurface,
                       ),
                     ),
-                    _TimelineDot(
-                      borderColor: AppColors.primaryContainer,
-                      fillColor: AppColors.primaryContainer,
-                      fillSize: 16,
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.access_time_rounded,
+                        iconColor: isStale
+                            ? AppColors.error
+                            : AppColors.onSurfaceVariant,
+                        label: 'Last Updated',
+                        value: updatedText,
+                        valueColor: isStale
+                            ? AppColors.error
+                            : AppColors.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.place_rounded,
+                        iconColor: AppColors.primary,
+                        label: 'Next Stop',
+                        value: nextStop,
+                        valueColor: AppColors.onSurface,
+                      ),
+                    ),
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.flag_rounded,
+                        iconColor: AppColors.secondary,
+                        label: 'Your Destination',
+                        value: passengerStop,
+                        valueColor: AppColors.onSurface,
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 16),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                SizedBox(
-                  height: 40,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Main St & 4th Ave',
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 20 / 14,
-                        decoration: TextDecoration.lineThrough,
-                        color: AppColors.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 40,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'You are here',
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 16 / 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.primaryContainer,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 40,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Central Station',
-                      style: TextStyle(
-                        fontSize: 18,
-                        height: 24 / 18,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+
+          const SizedBox(height: 20),
+
+          // ── Visual Journey Timeline ────────────────────────────────────────
+          _TimelineProgress(
+            nextStop: nextStop,
+            destination: passengerStop,
           ),
         ],
       ),
@@ -1109,40 +1201,153 @@ class _TimelineProgress extends StatelessWidget {
   }
 }
 
-class _TimelineDot extends StatelessWidget {
-  const _TimelineDot({
-    required this.borderColor,
-    required this.fillColor,
-    required this.fillSize,
+class _InfoTile extends StatelessWidget {
+  const _InfoTile({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+    this.valueColor = AppColors.onSurface,
   });
 
-  final Color borderColor;
-  final Color fillColor;
-  final double fillSize;
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+  final Color valueColor;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        shape: BoxShape.circle,
-        border: Border.all(color: borderColor, width: 2),
-      ),
-      child: Center(
-        child: Container(
-          width: fillSize,
-          height: fillSize,
-          decoration: BoxDecoration(
-            color: fillColor,
-            shape: BoxShape.circle,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: iconColor),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: valueColor,
+                ),
+              ),
+            ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TimelineProgress extends StatelessWidget {
+  const _TimelineProgress({
+    required this.nextStop,
+    required this.destination,
+  });
+
+  final String nextStop;
+  final String destination;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'Journey progress: Bus approaching next stop $nextStop towards destination $destination',
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.route_rounded,
+              color: AppColors.primaryContainer,
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'Next: ',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          nextStop,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Text(
+                        'Final: ',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          destination,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Live Accessibility Features Section
+// ──────────────────────────────────────────────────────────────────────────────
 
 class _LiveAccessibilitySection extends StatelessWidget {
   const _LiveAccessibilitySection({
@@ -1158,14 +1363,17 @@ class _LiveAccessibilitySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.outlineVariant.withValues(alpha: 0.3),
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 4,
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
@@ -1179,25 +1387,27 @@ class _LiveAccessibilitySection extends StatelessWidget {
                 'Live Accessibility',
                 style: TextStyle(
                   fontSize: 18,
-                  height: 24 / 18,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.onSurface,
                 ),
               ),
               const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'Seats: $occupancyLevel',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryContainer,
+              Semantics(
+                label: 'Wheelchair seats occupancy level: $occupancyLevel',
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Seats: $occupancyLevel',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryContainer,
+                    ),
                   ),
                 ),
               ),
@@ -1206,23 +1416,23 @@ class _LiveAccessibilitySection extends StatelessWidget {
           const SizedBox(height: 16),
           _A11yItem(
             title: rampOperational
-                ? 'Ramp Operational'
+                ? 'Wheelchair Ramp Operational'
                 : 'Ramp Out of Service',
             subtitle: rampOperational
-                ? 'Verified on this vehicle'
-                : 'Driver flagged maintenance needed',
-            trailingIcon: Icons.accessible,
+                ? 'Verified active on this vehicle'
+                : 'Driver reported maintenance required',
+            icon: Icons.accessible_rounded,
             isWorking: rampOperational,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           _A11yItem(
             title: elevatorWorking
-                ? 'Elevator Working'
+                ? 'Station Elevator Working'
                 : 'Elevator Under Maintenance',
             subtitle: elevatorWorking
-                ? 'Verified at stop'
-                : 'Alternative ramp available',
-            trailingIcon: Icons.elevator_outlined,
+                ? 'Operational at stop'
+                : 'Alternative ramp accessible at ground level',
+            icon: Icons.elevator_outlined,
             isWorking: elevatorWorking,
           ),
         ],
@@ -1235,107 +1445,131 @@ class _A11yItem extends StatelessWidget {
   const _A11yItem({
     required this.title,
     required this.subtitle,
-    required this.trailingIcon,
+    required this.icon,
     this.isWorking = true,
   });
 
   final String title;
   final String subtitle;
-  final IconData trailingIcon;
+  final IconData icon;
   final bool isWorking;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: isWorking ? AppColors.secondary : AppColors.error,
-              shape: BoxShape.circle,
+    return Semantics(
+      container: true,
+      label: '$title: $subtitle',
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: isWorking
+                    ? AppColors.secondary
+                    : AppColors.errorContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isWorking
+                    ? Icons.check_circle_rounded
+                    : Icons.warning_amber_rounded,
+                color: isWorking
+                    ? AppColors.onPrimary
+                    : AppColors.onErrorContainer,
+                size: 24,
+              ),
             ),
-            child: Icon(
-              isWorking ? Icons.check_circle : Icons.warning_amber_rounded,
-              color: AppColors.onPrimary,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    height: 20 / 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onSurface,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.onSurface,
+                    ),
                   ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 20 / 14,
-                    color: isWorking ? AppColors.secondary : AppColors.error,
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: isWorking
+                          ? AppColors.secondary
+                          : AppColors.error,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Icon(trailingIcon, color: AppColors.onSurfaceVariant),
-        ],
+            Icon(icon, color: AppColors.onSurfaceVariant, size: 24),
+          ],
+        ),
       ),
     );
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Assistance Request & Emergency Actions
+// ──────────────────────────────────────────────────────────────────────────────
+
 class _AssistanceSection extends StatelessWidget {
-  const _AssistanceSection({required this.onRequest});
+  const _AssistanceSection({
+    required this.onRequest,
+    required this.destination,
+  });
 
   final VoidCallback onRequest;
+  final String destination;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        SizedBox(
-          height: 56,
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: onRequest,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primaryContainer,
-              side: const BorderSide(
-                color: AppColors.primaryContainer,
-                width: 2,
+        Semantics(
+          button: true,
+          label: 'Request boarding or stop assistance from driver',
+          child: SizedBox(
+            height: 56,
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onRequest,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryContainer,
+                side: const BorderSide(
+                  color: AppColors.primaryContainer,
+                  width: 2,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              textStyle: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+              icon: const Icon(Icons.waving_hand_rounded, size: 24),
+              label: const Text('Request Stop Assistance'),
             ),
-            icon: const Icon(Icons.waving_hand_outlined, size: 22),
-            label: const Text('Request Stop Assistance'),
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Notify driver you need extra time or ramp deployment at Central Station.',
+        Text(
+          'Notify driver you need extra time or ramp deployment at $destination.',
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 14,
             height: 20 / 14,
             color: AppColors.onSurfaceVariant,
@@ -1360,45 +1594,53 @@ class _EmergencyActions extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: SizedBox(
-            height: 56,
-            child: FilledButton.icon(
-              onPressed: onEmergency,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: AppColors.onError,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          child: Semantics(
+            button: true,
+            label: 'Emergency help button',
+            child: SizedBox(
+              height: 56,
+              child: FilledButton.icon(
+                onPressed: onEmergency,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                  foregroundColor: AppColors.onError,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                textStyle: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                icon: const Icon(Icons.emergency_rounded, size: 22),
+                label: const Text('Emergency'),
               ),
-              icon: const Icon(Icons.emergency, size: 20),
-              label: const Text('Emergency'),
             ),
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 14),
         Expanded(
-          child: SizedBox(
-            height: 56,
-            child: OutlinedButton.icon(
-              onPressed: onReport,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.onSurface,
-                side: const BorderSide(color: AppColors.outline),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          child: Semantics(
+            button: true,
+            label: 'Report accessibility issue or vehicle condition',
+            child: SizedBox(
+              height: 56,
+              child: OutlinedButton.icon(
+                onPressed: onReport,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.onSurface,
+                  side: const BorderSide(color: AppColors.outline, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                textStyle: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                icon: const Icon(Icons.report_problem_outlined, size: 22),
+                label: const Text('Report Issue'),
               ),
-              icon: const Icon(Icons.report_outlined, size: 20),
-              label: const Text('Report Issue'),
             ),
           ),
         ),
@@ -1436,7 +1678,7 @@ class _LiveBottomNav extends StatelessWidget {
                 onTap: () => onNavTap('Plan'),
               ),
               _NavItem(
-                icon: Icons.sensors,
+                icon: Icons.sensors_rounded,
                 label: 'Live',
                 selected: true,
                 onTap: () => onNavTap('Live'),
@@ -1474,39 +1716,45 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 64,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: selected
-            ? BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                height: 16 / 12,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$label tab',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 64,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: selected
+              ? BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                )
+              : null,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
                 color: selected
                     ? AppColors.onPrimaryContainer
                     : AppColors.onSurfaceVariant,
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 16 / 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected
+                      ? AppColors.onPrimaryContainer
+                      : AppColors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
