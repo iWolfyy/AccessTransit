@@ -1,7 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/journey_model.dart';
+import '../../services/journey_service.dart';
 import 'live_journey_screen.dart';
 import 'route_results_screen.dart';
 
@@ -32,6 +35,46 @@ class JourneyConfirmationScreen extends StatelessWidget {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Creates the journey document then navigates to [LiveJourneyScreen].
+  Future<void> _confirmAndStart(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final passengerId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final busId = route?.busId ?? 'bus_42';
+
+    // Write journey to Firestore if user is authenticated.
+    if (passengerId.isNotEmpty) {
+      try {
+        await JourneyService().createJourney(
+          JourneyModel(
+            journeyId: '', // will be replaced by Firestore auto-ID
+            passengerId: passengerId,
+            routeId: route?.id ?? '',
+            routeNumber: route?.busId ?? busId,
+            routeTitle: route?.title ?? busId,
+            busId: busId,
+            origin: origin,
+            destination: destination,
+            status: JourneyStatus.confirmed,
+          ),
+        );
+      } catch (_) {
+        // Non-fatal: if write fails, still open Live Journey with busId fallback.
+      }
+    }
+
+    navigator.pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => LiveJourneyScreen(
+          origin: origin,
+          destination: destination,
+          route: route,
+          busId: busId,
+          passengerId: passengerId,
+        ),
+      ),
+    );
   }
 
   @override
@@ -66,18 +109,7 @@ class JourneyConfirmationScreen extends StatelessWidget {
                         _DepartureDetailsSection(origin: origin),
                         const SizedBox(height: 24),
                         _FixedActions(
-                          onConfirm: () {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => LiveJourneyScreen(
-                                  origin: origin,
-                                  destination: destination,
-                                  route: route,
-                                  busId: route?.busId ?? 'bus_42',
-                                ),
-                              ),
-                            );
-                          },
+                          onConfirm: () => _confirmAndStart(context),
                           onSetAlert: () =>
                               _showSnack(context, 'Departure alert set.'),
                           onShare: () =>

@@ -5,24 +5,39 @@ import 'package:latlong2/latlong.dart';
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/bus_location_model.dart';
+import '../../models/enums/bus_status.dart';
+import '../../models/journey_model.dart';
+import '../../services/journey_service.dart';
 import '../../services/live_bus_service.dart';
 import 'boarding_assistance_screen.dart';
 import 'report_condition_screen.dart';
 import 'route_results_screen.dart';
 
 /// Live Journey / Live Navigation screen (Sprint 2–3 UI).
+///
+/// Resolves the correct [busId] in priority order:
+/// 1. Real-time stream from `journeys/{passengerId}` Firestore document.
+/// 2. [busId] constructor fallback (direct launch or unauthenticated).
 class LiveJourneyScreen extends StatefulWidget {
   const LiveJourneyScreen({
     super.key,
     this.origin = 'Current Location',
     this.destination = 'City Library',
     this.busId = 'bus_42',
+    this.passengerId = '',
     this.route,
   });
 
   final String origin;
   final String destination;
+
+  /// Fallback bus ID used when [passengerId] is empty or has no active journey.
   final String busId;
+
+  /// Firebase Auth UID of the passenger. When non-empty, the screen subscribes
+  /// to `journeys` collection to resolve the real [busId] dynamically.
+  final String passengerId;
+
   final RouteResultItem? route;
 
   static const double _desktopBreakpoint = 768;
@@ -33,6 +48,7 @@ class LiveJourneyScreen extends StatefulWidget {
 
 class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
   final LiveBusService _liveBusService = LiveBusService();
+  final JourneyService _journeyService = JourneyService();
   final MapController _mapController = MapController();
 
   void _showSnack(BuildContext context, String message) {
@@ -47,108 +63,223 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isDesktop =
-        MediaQuery.sizeOf(context).width >= LiveJourneyScreen._desktopBreakpoint;
+  // ---------------------------------------------------------------------------
+  // Shared body builder used by both journey-aware and fallback paths.
+  // ---------------------------------------------------------------------------
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      body: StreamBuilder<BusLocationModel?>(
-        stream: _liveBusService.listenToLiveLocation(widget.busId),
-        builder: (context, snapshot) {
-          final liveBus = snapshot.data;
-          final isStale =
-              liveBus == null ? true : _liveBusService.isBusStale(liveBus);
-          final busName =
-              liveBus != null && liveBus.routeNumber.isNotEmpty
-                  ? 'Bus ${liveBus.routeNumber}'
-                  : 'Bus 42';
-          final nextStop = liveBus?.nextStop ?? 'Central Station';
-          final etaMins = liveBus?.etaMinutes ?? 2;
-          final isBroadcasting =
-              liveBus != null && liveBus.isBroadcasting && !isStale;
-          final rampWorking = liveBus?.rampOperational ?? true;
-          final elevatorWorking = liveBus?.elevatorWorking ?? true;
+  Widget _buildBody(
+    BuildContext context, {
+    required bool isDesktop,
+    required String resolvedBusId,
+    JourneyModel? journey,
+  }) {
+    return StreamBuilder<BusLocationModel?>(
+      stream: _liveBusService.listenToLiveLocation(resolvedBusId),
+      builder: (context, snapshot) {
+        final liveBus = snapshot.data;
+        final isStale =
+            liveBus == null ? false : _liveBusService.isBusStale(liveBus);
 
-          return Column(
-            children: [
-              _TopBar(
-                onClose: () {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                },
-              ),
-              Expanded(
-                child: ListView(
-                  padding: EdgeInsets.zero,
-                  children: [
+        // ── State: bus not currently active (offline/stale/null) ─────────────
+        final bool busIsInactive = liveBus == null ||
+            !liveBus.isBroadcasting ||
+            liveBus.status == BusStatus.offline ||
+            liveBus.status == BusStatus.completed;
+
+        final busName = liveBus != null && liveBus.routeNumber.isNotEmpty
+            ? 'Bus ${liveBus.routeNumber}'
+            : 'Bus ${resolvedBusId.replaceAll('bus_', '')}';
+        final nextStop = liveBus?.nextStop ?? 'Central Station';
+        final etaMins = liveBus?.etaMinutes ?? 2;
+        final isBroadcasting =
+            liveBus != null && liveBus.isBroadcasting && !isStale;
+        final rampWorking = liveBus?.rampOperational ?? true;
+        final elevatorWorking = liveBus?.elevatorWorking ?? true;
+
+        return Column(
+          children: [
+            _TopBar(
+              onClose: () {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              },
+              journeyInfo: journey != null
+                  ? '${journey.routeTitle} · ${journey.destination}'
+                  : null,
+            ),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  if (busIsInactive)
+                    _BusInactiveBanner(
+                      busId: resolvedBusId,
+                      routeTitle: journey?.routeTitle,
+                    )
+                  else
                     _MapSection(
                       busName: busName,
                       liveBus: liveBus,
                       isStale: isStale,
                       mapController: _mapController,
-                      busId: widget.busId,
+                      busId: resolvedBusId,
                     ),
-                    Transform.translate(
-                      offset: const Offset(0, -16),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _StatusCard(
-                              nextStop: nextStop,
-                              etaMinutes: etaMins,
-                              isBroadcasting: isBroadcasting,
-                              isStale: isStale,
-                              speed: liveBus?.speed ?? 0.0,
-                              liveBus: liveBus,
+                  Transform.translate(
+                    offset: const Offset(0, -16),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _StatusCard(
+                            nextStop: nextStop,
+                            etaMinutes: etaMins,
+                            isBroadcasting: isBroadcasting,
+                            isStale: isStale,
+                            speed: liveBus?.speed ?? 0.0,
+                            liveBus: liveBus,
+                          ),
+                          const SizedBox(height: 24),
+                          _LiveAccessibilitySection(
+                            rampOperational: rampWorking,
+                            elevatorWorking: elevatorWorking,
+                            occupancyLevel:
+                                liveBus?.occupancyLevel ?? 'Moderate',
+                          ),
+                          const SizedBox(height: 24),
+                          _AssistanceSection(
+                            onRequest: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const BoardingAssistanceScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          _EmergencyActions(
+                            onEmergency: () => _showSnack(
+                              context,
+                              'Emergency contacts will be available soon.',
                             ),
-                            const SizedBox(height: 24),
-                            _LiveAccessibilitySection(
-                              rampOperational: rampWorking,
-                              elevatorWorking: elevatorWorking,
-                              occupancyLevel:
-                                  liveBus?.occupancyLevel ?? 'Moderate',
-                            ),
-                            const SizedBox(height: 24),
-                            _AssistanceSection(
-                              onRequest: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const BoardingAssistanceScreen(),
+                            onReport: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => ReportConditionScreen(
+                                    initialLocation: widget.destination,
                                   ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 24),
-                            _EmergencyActions(
-                              onEmergency: () => _showSnack(
-                                context,
-                                'Emergency contacts will be available soon.',
-                              ),
-                              onReport: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => ReportConditionScreen(
-                                      initialLocation: widget.destination,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            SizedBox(height: isDesktop ? 24 : 16),
-                          ],
-                        ),
+                                ),
+                              );
+                            },
+                          ),
+                          SizedBox(height: isDesktop ? 24 : 16),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          );
-        },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop =
+        MediaQuery.sizeOf(context).width >= LiveJourneyScreen._desktopBreakpoint;
+
+    // ── Path A: passenger has authenticated UID → read from journeys collection
+    if (widget.passengerId.isNotEmpty) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        body: StreamBuilder<JourneyModel?>(
+          stream: _journeyService.watchActiveJourney(widget.passengerId),
+          builder: (context, journeySnapshot) {
+            final journey = journeySnapshot.data;
+            final hasJourney =
+                journey != null && journey.busId.isNotEmpty;
+
+            // ── State: no active journey / no busId assigned ───────────────
+            if (!hasJourney) {
+              // Still loading first emission
+              if (journeySnapshot.connectionState ==
+                  ConnectionState.waiting) {
+                return _LoadingBody(
+                  isDesktop: isDesktop,
+                  onClose: () => Navigator.of(context)
+                      .popUntil((r) => r.isFirst),
+                  onNavTap: (label) => AppNavigation.handleBottomNav(
+                    context,
+                    label,
+                    currentTab: 'Live',
+                    onUnsupported: (m) => _showSnack(context, m),
+                  ),
+                );
+              }
+
+              // No confirmed journey: show "Bus not assigned" state.
+              return _NoJourneyBody(
+                isDesktop: isDesktop,
+                onClose: () =>
+                    Navigator.of(context).popUntil((r) => r.isFirst),
+                onNavTap: (label) => AppNavigation.handleBottomNav(
+                  context,
+                  label,
+                  currentTab: 'Live',
+                  onUnsupported: (m) => _showSnack(context, m),
+                ),
+              );
+            }
+
+            // ── State: journey found with busId → subscribe to live location
+            return Scaffold(
+              backgroundColor: AppColors.surface,
+              body: _buildBody(
+                context,
+                isDesktop: isDesktop,
+                resolvedBusId: journey.busId,
+                journey: journey,
+              ),
+              bottomNavigationBar: isDesktop
+                  ? null
+                  : _LiveBottomNav(
+                      onNavTap: (label) {
+                        AppNavigation.handleBottomNav(
+                          context,
+                          label,
+                          currentTab: 'Live',
+                          onUnsupported: (m) => _showSnack(context, m),
+                        );
+                      },
+                    ),
+            );
+          },
+        ),
+        bottomNavigationBar: isDesktop
+            ? null
+            : _LiveBottomNav(
+                onNavTap: (label) {
+                  AppNavigation.handleBottomNav(
+                    context,
+                    label,
+                    currentTab: 'Live',
+                    onUnsupported: (m) => _showSnack(context, m),
+                  );
+                },
+              ),
+      );
+    }
+
+    // ── Path B: no passengerId (direct nav / unauthenticated) → busId fallback
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: _buildBody(
+        context,
+        isDesktop: isDesktop,
+        resolvedBusId: widget.busId,
       ),
       bottomNavigationBar: isDesktop
           ? null
@@ -166,10 +297,186 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// State widgets: loading, no journey, bus inactive
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _LoadingBody extends StatelessWidget {
+  const _LoadingBody({
+    required this.isDesktop,
+    required this.onClose,
+    required this.onNavTap,
+  });
+  final bool isDesktop;
+  final VoidCallback onClose;
+  final ValueChanged<String> onNavTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _TopBar(onClose: onClose),
+        const Expanded(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text(
+                  'Loading your journey…',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NoJourneyBody extends StatelessWidget {
+  const _NoJourneyBody({
+    required this.isDesktop,
+    required this.onClose,
+    required this.onNavTap,
+  });
+  final bool isDesktop;
+  final VoidCallback onClose;
+  final ValueChanged<String> onNavTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _TopBar(onClose: onClose),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.directions_bus_outlined,
+                    size: 40,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Bus has not been assigned yet.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Your booking is confirmed. The operator will assign a bus before departure. Check back shortly.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.5,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                OutlinedButton.icon(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: const Text('Back to Home'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primaryContainer),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BusInactiveBanner extends StatelessWidget {
+  const _BusInactiveBanner({required this.busId, this.routeTitle});
+  final String busId;
+  final String? routeTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 260,
+      width: double.infinity,
+      color: AppColors.surfaceVariant,
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainer,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.sensors_off_rounded,
+                size: 36,
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Bus is not currently active.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              routeTitle != null
+                  ? '$routeTitle — waiting for operator to start trip.'
+                  : 'The bus operator has not started this trip yet.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onClose});
+  const _TopBar({required this.onClose, this.journeyInfo});
 
   final VoidCallback onClose;
+  final String? journeyInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +487,7 @@ class _TopBar extends StatelessWidget {
       child: SafeArea(
         bottom: false,
         child: SizedBox(
-          height: 48,
+          height: journeyInfo != null ? 60 : 48,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
@@ -191,16 +498,32 @@ class _TopBar extends StatelessWidget {
                   color: AppColors.onSurfaceVariant,
                   tooltip: 'Close Live Journey',
                 ),
-                const Expanded(
-                  child: Text(
-                    'Live Navigation',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      height: 28 / 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Live Navigation',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20,
+                          height: 28 / 20,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      if (journeyInfo != null)
+                        Text(
+                          journeyInfo!,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 48),
