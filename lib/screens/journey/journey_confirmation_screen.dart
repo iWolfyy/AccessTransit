@@ -46,13 +46,14 @@ class JourneyConfirmationScreen extends StatelessWidget {
     // Write journey to Firestore if user is authenticated.
     if (passengerId.isNotEmpty) {
       try {
+        final busNum = route?.busId.replaceAll('bus_', '') ?? '42';
         await JourneyService().createJourney(
           JourneyModel(
             journeyId: '', // will be replaced by Firestore auto-ID
             passengerId: passengerId,
-            routeId: route?.id ?? '',
-            routeNumber: route?.busId ?? busId,
-            routeTitle: route?.title ?? busId,
+            routeId: route?.id ?? 'route_$busNum',
+            routeNumber: busNum,
+            routeTitle: route?.title ?? 'Bus $busNum',
             busId: busId,
             origin: origin,
             destination: destination,
@@ -106,7 +107,10 @@ class JourneyConfirmationScreen extends StatelessWidget {
                         const SizedBox(height: 24),
                         const _AccessibilityVerifiedSection(),
                         const SizedBox(height: 24),
-                        _DepartureDetailsSection(origin: origin),
+                        _DepartureDetailsSection(
+                          origin: origin,
+                          route: route,
+                        ),
                         const SizedBox(height: 24),
                         _FixedActions(
                           onConfirm: () => _confirmAndStart(context),
@@ -453,12 +457,19 @@ class _AccessibilityVerifiedSection extends StatelessWidget {
 }
 
 class _DepartureDetailsSection extends StatelessWidget {
-  const _DepartureDetailsSection({required this.origin});
+  const _DepartureDetailsSection({
+    required this.origin,
+    this.route,
+  });
 
   final String origin;
+  final RouteResultItem? route;
 
   @override
   Widget build(BuildContext context) {
+    final busTitle = route?.title ?? 'Bus 42';
+    final etaLabel = route?.etaLabel ?? 'In 4 mins';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -578,10 +589,10 @@ class _DepartureDetailsSection extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Expanded(
+                              Expanded(
                                 child: Text(
-                                  'Bus 42',
-                                  style: TextStyle(
+                                  busTitle,
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     height: 24 / 18,
                                     fontWeight: FontWeight.w600,
@@ -598,9 +609,9 @@ class _DepartureDetailsSection extends StatelessWidget {
                                   color: AppColors.errorContainer,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text(
-                                  'In 4 mins',
-                                  style: TextStyle(
+                                child: Text(
+                                  etaLabel,
+                                  style: const TextStyle(
                                     fontSize: 12,
                                     height: 16 / 12,
                                     fontWeight: FontWeight.w700,

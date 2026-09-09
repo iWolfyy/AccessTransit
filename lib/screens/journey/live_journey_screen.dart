@@ -77,6 +77,52 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
     return StreamBuilder<BusLocationModel?>(
       stream: _liveBusService.listenToLiveLocation(resolvedBusId),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Column(
+            children: [
+              _TopBar(
+                onClose: () =>
+                    Navigator.of(context).popUntil((r) => r.isFirst),
+              ),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: AppColors.error,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Telemetry Connection Error',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
         final liveBus = snapshot.data;
         final isStale =
             liveBus == null ? false : _liveBusService.isBusStale(liveBus);
@@ -207,6 +253,14 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
         body: StreamBuilder<JourneyModel?>(
           stream: _journeyService.watchActiveJourney(widget.passengerId),
           builder: (context, journeySnapshot) {
+            if (journeySnapshot.hasError) {
+              return _ErrorBody(
+                error: journeySnapshot.error.toString(),
+                onClose: () =>
+                    Navigator.of(context).popUntil((r) => r.isFirst),
+              );
+            }
+
             final journey = journeySnapshot.data;
             final hasJourney =
                 journey != null && journey.busId.isNotEmpty;
@@ -305,8 +359,78 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// State widgets: loading, no journey, bus inactive
+// State widgets: loading, error, no journey, bus inactive
 // ──────────────────────────────────────────────────────────────────────────────
+
+class _ErrorBody extends StatelessWidget {
+  const _ErrorBody({
+    required this.error,
+    required this.onClose,
+  });
+
+  final String error;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _TopBar(onClose: onClose),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 56,
+                  color: AppColors.error,
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Unable to Load Journey',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  error,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                OutlinedButton.icon(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: const Text('Back to Home'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(
+                      color: AppColors.primaryContainer,
+                      width: 2,
+                    ),
+                    minimumSize: const Size(200, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _LoadingBody extends StatelessWidget {
   const _LoadingBody({

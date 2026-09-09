@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/bus_location_model.dart';
+import '../../models/enums/bus_status.dart';
+import '../../services/live_bus_service.dart';
 import 'route_details_screen.dart';
 
-/// Sample route result used for Sprint 2 UI (before Firebase connect).
+/// Sample route result used for passenger route selection.
 class RouteResultItem {
   const RouteResultItem({
     required this.id,
@@ -60,21 +63,21 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   static const _sampleRoutes = [
     RouteResultItem(
       id: '1',
-      title: 'Bus 138 → Bus 177',
+      title: 'Bus 42 Express',
       durationMinutes: 42,
       etaLabel: 'Leave in 6 min',
-      transfers: 1,
+      transfers: 0,
       crowdLevel: 'Low',
       accessibilityStatus: AccessibilityStatus.accessible,
       accessibilityLabel: 'Accessible',
       safetyLabel: 'Well lit stops',
       summary: 'Step-free boarding · Ramp available',
-      busId: 'bus_138',
+      busId: 'bus_42',
       recommended: true,
     ),
     RouteResultItem(
       id: '2',
-      title: 'Bus 100 Direct',
+      title: 'Bus 101 Coastal Direct',
       durationMinutes: 55,
       etaLabel: 'Leave in 12 min',
       transfers: 0,
@@ -83,20 +86,20 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       accessibilityLabel: 'Partially Accessible',
       safetyLabel: 'Busy waiting area',
       summary: '1 stop with steps · Assistance available',
-      busId: 'bus_100',
+      busId: 'bus_101',
     ),
     RouteResultItem(
       id: '3',
-      title: 'Bus 120 → Walk',
+      title: 'Bus 15 Airport Link',
       durationMinutes: 38,
       etaLabel: 'Leave in 3 min',
       transfers: 0,
       crowdLevel: 'High',
-      accessibilityStatus: AccessibilityStatus.notAccessible,
-      accessibilityLabel: 'Not Accessible',
-      safetyLabel: 'Crowded evening route',
-      summary: 'Faster but limited accessibility',
-      busId: 'bus_120',
+      accessibilityStatus: AccessibilityStatus.accessible,
+      accessibilityLabel: 'Accessible',
+      safetyLabel: 'Express route',
+      summary: 'Low-floor elevator · Ramp available',
+      busId: 'bus_15',
     ),
   ];
 
@@ -547,6 +550,7 @@ class _RouteCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  _LiveTrackingBadge(busId: route.busId),
                   _InfoChip(
                     icon: Icons.transfer_within_a_station,
                     label: route.transfers == 0
@@ -789,6 +793,60 @@ class _NavItem extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LiveTrackingBadge extends StatelessWidget {
+  const _LiveTrackingBadge({required this.busId});
+
+  final String busId;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<BusLocationModel?>(
+      stream: LiveBusService().listenToLiveLocation(busId),
+      builder: (context, snapshot) {
+        final bus = snapshot.data;
+        final isBroadcasting =
+            bus != null && bus.isBroadcasting && bus.status == BusStatus.active;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isBroadcasting
+                ? AppColors.secondaryContainer
+                : AppColors.surfaceContainer,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isBroadcasting
+                    ? Icons.sensors_rounded
+                    : Icons.schedule_rounded,
+                size: 16,
+                color: isBroadcasting
+                    ? AppColors.onSecondaryContainer
+                    : AppColors.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isBroadcasting ? 'Live GPS Active' : 'Scheduled',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 16 / 12,
+                  fontWeight: FontWeight.w600,
+                  color: isBroadcasting
+                      ? AppColors.onSecondaryContainer
+                      : AppColors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
