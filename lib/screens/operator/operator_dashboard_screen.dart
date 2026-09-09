@@ -148,12 +148,16 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
 
       await _liveBusService.startOrUpdateLiveLocation(initialBusModel);
 
-      // 4. Listen to live GPS location stream
+      // 4. Listen to live GPS location stream with background tracking enabled
       await _positionSubscription?.cancel();
       _positionSubscription = _locationService
           .getPositionStream(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 2,
+        distanceFilter: 5,
+        enableBackground: true,
+        notificationTitle: 'AccessTransit Live Bus Tracking',
+        notificationText:
+            'Broadcasting live location for Bus $_selectedRouteNumber to passengers',
       )
           .listen(
         _onLocationUpdate,
@@ -422,8 +426,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             const SizedBox(height: 8),
             Text(
               _isTripActive
-                  ? 'Live GPS location is currently streaming to commuters.\nDuration: ${_formatDuration(_tripDuration)}'
-                  : 'Press Start Trip to activate real-time GPS location streaming for Bus $_selectedRouteNumber.',
+                  ? 'Background GPS tracking active. System notification visible in status bar.\nDuration: ${_formatDuration(_tripDuration)}'
+                  : 'Press Start Trip to activate background GPS tracking for Bus $_selectedRouteNumber.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,

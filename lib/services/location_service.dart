@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 /// Reusable GPS Location Service for AccessTransit using geolocator.
@@ -62,18 +63,53 @@ class LocationService {
 
   /// Provides a continuous real-time location stream for live tracking.
   ///
-  /// [accuracy] defaults to high for precise vehicle/user positioning.
-  /// [distanceFilter] specifies minimum displacement (in meters) before emitting updates.
+  /// Set [enableBackground] to true (e.g. for bus operators during active trips)
+  /// to run a persistent Android Foreground Service with notification details,
+  /// keeping GPS tracking active even when the app is minimized or screen is locked.
   Stream<Position> getPositionStream({
     LocationAccuracy accuracy = LocationAccuracy.high,
     int distanceFilter = 5,
+    bool enableBackground = false,
+    String notificationTitle = 'AccessTransit Live Bus Tracking',
+    String notificationText = 'Broadcasting real-time bus location to passengers',
+    String notificationIconName = 'ic_launcher',
   }) async* {
     await verifyPermission();
 
-    final locationSettings = LocationSettings(
-      accuracy: accuracy,
-      distanceFilter: distanceFilter,
-    );
+    late final LocationSettings locationSettings;
+
+    if (enableBackground && defaultTargetPlatform == TargetPlatform.android) {
+      locationSettings = AndroidSettings(
+        accuracy: accuracy,
+        distanceFilter: distanceFilter,
+        forceLocationManager: false,
+        intervalDuration: const Duration(seconds: 5),
+        foregroundNotificationConfig: ForegroundNotificationConfig(
+          notificationTitle: notificationTitle,
+          notificationText: notificationText,
+          notificationIcon: AndroidResource(
+            name: notificationIconName,
+            defType: 'mipmap',
+          ),
+          enableWakeLock: true,
+        ),
+      );
+    } else if (enableBackground &&
+        (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.macOS)) {
+      locationSettings = AppleSettings(
+        accuracy: accuracy,
+        activityType: ActivityType.automotiveNavigation,
+        distanceFilter: distanceFilter,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+      );
+    } else {
+      locationSettings = LocationSettings(
+        accuracy: accuracy,
+        distanceFilter: distanceFilter,
+      );
+    }
 
     yield* Geolocator.getPositionStream(locationSettings: locationSettings);
   }

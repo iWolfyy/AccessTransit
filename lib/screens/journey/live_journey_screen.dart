@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../models/bus_location_model.dart';
 import '../../models/enums/bus_status.dart';
 import '../../models/journey_model.dart';
+import '../../services/eta_service.dart';
 import '../../services/journey_service.dart';
 import '../../services/live_bus_service.dart';
 import 'boarding_assistance_screen.dart';
@@ -1124,6 +1125,17 @@ class _StatusCard extends StatelessWidget {
             child: Divider(height: 1, thickness: 1),
           ),
 
+          // ── Dynamic Bus ETA Banner Card ────────────────────────────────────
+          _EtaBannerCard(
+            etaResult: EtaService().calculateEta(
+              liveBus: liveBus,
+              stopName: passengerStop,
+              isStale: isStale,
+            ),
+            targetStop: passengerStop,
+          ),
+          const SizedBox(height: 16),
+
           // ── Status & Telemetry details grid ────────────────────────────────
           Semantics(
             container: true,
@@ -1250,6 +1262,131 @@ class _InfoTile extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _EtaBannerCard extends StatelessWidget {
+  const _EtaBannerCard({
+    required this.etaResult,
+    required this.targetStop,
+  });
+
+  final EtaResult etaResult;
+  final String targetStop;
+
+  @override
+  Widget build(BuildContext context) {
+    if (etaResult.isReliable) {
+      final distanceKm = (etaResult.distanceMeters / 1000).toStringAsFixed(1);
+
+      return Semantics(
+        liveRegion: true,
+        label: '${etaResult.displayText} to $targetStop',
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.primaryContainer.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.primaryContainer.withValues(alpha: 0.4),
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.schedule_rounded,
+                  color: AppColors.onPrimaryContainer,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      etaResult.displayText,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Distance: $distanceKm km to $targetStop',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Unreliable / Stale fallback (Do not invent a fake ETA)
+    return Semantics(
+      liveRegion: true,
+      label: etaResult.displayText,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.outlineVariant.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.schedule_outlined,
+              size: 22,
+              color: AppColors.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    etaResult.displayText,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  Text(
+                    etaResult.reason,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
