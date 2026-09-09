@@ -17,6 +17,7 @@ class RouteResultItem {
     required this.accessibilityLabel,
     required this.safetyLabel,
     required this.summary,
+    this.busId = 'bus_42',
     this.recommended = false,
   });
 
@@ -30,6 +31,7 @@ class RouteResultItem {
   final String accessibilityLabel;
   final String safetyLabel;
   final String summary;
+  final String busId;
   final bool recommended;
 }
 
@@ -67,6 +69,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       accessibilityLabel: 'Accessible',
       safetyLabel: 'Well lit stops',
       summary: 'Step-free boarding · Ramp available',
+      busId: 'bus_138',
       recommended: true,
     ),
     RouteResultItem(
@@ -80,6 +83,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       accessibilityLabel: 'Partially Accessible',
       safetyLabel: 'Busy waiting area',
       summary: '1 stop with steps · Assistance available',
+      busId: 'bus_100',
     ),
     RouteResultItem(
       id: '3',
@@ -92,6 +96,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       accessibilityLabel: 'Not Accessible',
       safetyLabel: 'Crowded evening route',
       summary: 'Faster but limited accessibility',
+      busId: 'bus_120',
     ),
   ];
 

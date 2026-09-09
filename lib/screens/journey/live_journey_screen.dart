@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/bus_location_model.dart';
-import '../../services/bus_tracking_service.dart';
+import '../../services/live_bus_service.dart';
 import 'boarding_assistance_screen.dart';
 import 'report_condition_screen.dart';
 import 'route_results_screen.dart';
@@ -30,7 +32,8 @@ class LiveJourneyScreen extends StatefulWidget {
 }
 
 class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
-  final BusTrackingService _trackingService = BusTrackingService();
+  final LiveBusService _liveBusService = LiveBusService();
+  final MapController _mapController = MapController();
 
   void _showSnack(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -39,19 +42,32 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
   }
 
   @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width >= LiveJourneyScreen._desktopBreakpoint;
+    final isDesktop =
+        MediaQuery.sizeOf(context).width >= LiveJourneyScreen._desktopBreakpoint;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: StreamBuilder<BusLocationModel?>(
-        stream: _trackingService.watchBusLocation(widget.busId),
+        stream: _liveBusService.listenToLiveLocation(widget.busId),
         builder: (context, snapshot) {
           final liveBus = snapshot.data;
-          final busName = liveBus != null ? 'Bus ${liveBus.routeNumber}' : 'Bus 42';
+          final isStale =
+              liveBus == null ? true : _liveBusService.isBusStale(liveBus);
+          final busName =
+              liveBus != null && liveBus.routeNumber.isNotEmpty
+                  ? 'Bus ${liveBus.routeNumber}'
+                  : 'Bus 42';
           final nextStop = liveBus?.nextStop ?? 'Central Station';
           final etaMins = liveBus?.etaMinutes ?? 2;
-          final isBroadcasting = liveBus?.isBroadcasting ?? true;
+          final isBroadcasting =
+              liveBus != null && liveBus.isBroadcasting && !isStale;
           final rampWorking = liveBus?.rampOperational ?? true;
           final elevatorWorking = liveBus?.elevatorWorking ?? true;
 
@@ -66,7 +82,13 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                 child: ListView(
                   padding: EdgeInsets.zero,
                   children: [
-                    _MapSection(busName: busName, liveBus: liveBus),
+                    _MapSection(
+                      busName: busName,
+                      liveBus: liveBus,
+                      isStale: isStale,
+                      mapController: _mapController,
+                      busId: widget.busId,
+                    ),
                     Transform.translate(
                       offset: const Offset(0, -16),
                       child: Padding(
@@ -78,20 +100,24 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                               nextStop: nextStop,
                               etaMinutes: etaMins,
                               isBroadcasting: isBroadcasting,
-                              speed: liveBus?.speed ?? 24.0,
+                              isStale: isStale,
+                              speed: liveBus?.speed ?? 0.0,
+                              liveBus: liveBus,
                             ),
                             const SizedBox(height: 24),
                             _LiveAccessibilitySection(
                               rampOperational: rampWorking,
                               elevatorWorking: elevatorWorking,
-                              occupancyLevel: liveBus?.occupancyLevel ?? 'Moderate',
+                              occupancyLevel:
+                                  liveBus?.occupancyLevel ?? 'Moderate',
                             ),
                             const SizedBox(height: 24),
                             _AssistanceSection(
                               onRequest: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (_) => const BoardingAssistanceScreen(),
+                                    builder: (_) =>
+                                        const BoardingAssistanceScreen(),
                                   ),
                                 );
                               },
@@ -190,67 +216,254 @@ class _TopBar extends StatelessWidget {
 class _MapSection extends StatelessWidget {
   const _MapSection({
     required this.busName,
-    this.liveBus,
+    required this.liveBus,
+    required this.isStale,
+    required this.mapController,
+    required this.busId,
   });
 
   final String busName;
   final BusLocationModel? liveBus;
+  final bool isStale;
+  final MapController mapController;
+  final String busId;
+
+  static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
+
+  bool get _hasValidLocation =>
+      liveBus != null &&
+      (liveBus!.latitude != 0.0 || liveBus!.longitude != 0.0);
+
+  LatLng get _busLatLng => _hasValidLocation
+      ? LatLng(liveBus!.latitude, liveBus!.longitude)
+      : _defaultCenter;
 
   @override
   Widget build(BuildContext context) {
+    final centerLatLng = _busLatLng;
+
     return SizedBox(
-      height: 240,
+      height: 260,
       width: double.infinity,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Container(
-            color: AppColors.surfaceVariant,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+          FlutterMap(
+            mapController: mapController,
+            options: MapOptions(
+              initialCenter: centerLatLng,
+              initialZoom: 15.0,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.access_transit',
+              ),
+              if (_hasValidLocation)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: centerLatLng,
+                      width: 60,
+                      height: 60,
+                      child: _LiveBusMarker(
+                        heading: liveBus?.heading ?? 0.0,
+                        routeNumber: liveBus?.routeNumber ?? '42',
+                        isStale: isStale,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+
+          // Stale / Missing telemetry overlay banner
+          if (liveBus == null)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 24,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.surface.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.outlineVariant.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Connecting to live stream for $busId...',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (isStale)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 24,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.errorContainer.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 18,
+                      color: AppColors.onErrorContainer,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Signal Lost / Stale Telemetry — Bus location may be delayed',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Top right bus status badge
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.onSurface.withValues(alpha: 0.12),
+                    blurRadius: 4,
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.map_outlined, size: 40, color: AppColors.outline),
-                  const SizedBox(height: 8),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: isStale ? AppColors.error : Colors.green,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
                   Text(
-                    liveBus != null
-                        ? 'Live GPS: ${liveBus!.latitude.toStringAsFixed(4)}, ${liveBus!.longitude.toStringAsFixed(4)}'
-                        : 'Live map',
+                    busName,
                     style: const TextStyle(
                       fontSize: 14,
-                      color: AppColors.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryContainer,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.surface.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.outlineVariant.withValues(alpha: 0.3),
-                ),
+
+          // Re-center button
+          if (_hasValidLocation)
+            Positioned(
+              top: 16,
+              left: 16,
+              child: FloatingActionButton.small(
+                heroTag: 're_center_bus_btn',
+                onPressed: () {
+                  mapController.move(centerLatLng, 15.0);
+                },
+                backgroundColor: AppColors.surface.withValues(alpha: 0.95),
+                foregroundColor: AppColors.primary,
+                tooltip: 'Center on Bus',
+                child: const Icon(Icons.my_location),
               ),
-              child: Text(
-                busName,
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 20 / 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primaryContainer,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LiveBusMarker extends StatelessWidget {
+  const _LiveBusMarker({
+    required this.heading,
+    required this.routeNumber,
+    required this.isStale,
+  });
+
+  final double heading;
+  final String routeNumber;
+  final bool isStale;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = isStale ? AppColors.error : AppColors.primaryContainer;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Pulse ring
+        if (!isStale) const _PulseMarker(),
+
+        // Rotated marker pin
+        Transform.rotate(
+          angle: heading * (3.141592653589793 / 180),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
+              border: Border.all(color: statusColor, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.onSurface.withValues(alpha: 0.25),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
+              ],
+            ),
+            child: Center(
+              child: Icon(
+                Icons.directions_bus_filled,
+                color: statusColor,
+                size: 24,
               ),
             ),
           ),
-          const Center(child: _PulseMarker()),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -283,58 +496,25 @@ class _PulseMarkerState extends State<_PulseMarker>
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 48,
-      height: 48,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              final t = _controller.value;
-              return Transform.scale(
-                scale: 0.8 + (t * 1.7),
-                child: Opacity(
-                  opacity: (1 - t).clamp(0.0, 0.8),
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primaryContainer,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.onSurface.withValues(alpha: 0.15),
-                  blurRadius: 4,
-                ),
-              ],
-            ),
-            child: Center(
-              child: Container(
-                width: 16,
-                height: 16,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        return Transform.scale(
+          scale: 0.9 + (t * 1.5),
+          child: Opacity(
+            opacity: (1 - t).clamp(0.0, 0.7),
+            child: Container(
+              width: 54,
+              height: 54,
+              decoration: const BoxDecoration(
+                color: AppColors.primaryContainer,
+                shape: BoxShape.circle,
               ),
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -344,16 +524,34 @@ class _StatusCard extends StatelessWidget {
     required this.nextStop,
     required this.etaMinutes,
     required this.isBroadcasting,
+    required this.isStale,
     required this.speed,
+    required this.liveBus,
   });
 
   final String nextStop;
   final int etaMinutes;
   final bool isBroadcasting;
+  final bool isStale;
   final double speed;
+  final BusLocationModel? liveBus;
+
+  String _formatTimestamp(DateTime? timestamp) {
+    if (timestamp == null) return 'No signal';
+    final diff = DateTime.now().difference(timestamp);
+    if (diff.inSeconds < 15) return 'Just now';
+    if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    final hour = timestamp.hour % 12 == 0 ? 12 : timestamp.hour % 12;
+    final min = timestamp.minute.toString().padLeft(2, '0');
+    final period = timestamp.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$min $period';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final updatedText = _formatTimestamp(liveBus?.timestamp ?? liveBus?.lastUpdated);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -405,11 +603,34 @@ class _StatusCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.access_time_outlined,
+                          size: 14,
+                          color: AppColors.outline,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Last updated: $updatedText',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isStale
+                                ? AppColors.error
+                                : AppColors.onSurfaceVariant,
+                            fontWeight:
+                                isStale ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: isBroadcasting
                       ? AppColors.surfaceContainer
@@ -417,7 +638,7 @@ class _StatusCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  isBroadcasting ? 'Live GPS' : 'Offline',
+                  isBroadcasting ? 'Live GPS' : (isStale ? 'Stale' : 'Offline'),
                   style: TextStyle(
                     fontSize: 12,
                     height: 16 / 12,
@@ -642,7 +863,8 @@ class _LiveAccessibilitySection extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainer,
                   borderRadius: BorderRadius.circular(6),
@@ -660,15 +882,23 @@ class _LiveAccessibilitySection extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _A11yItem(
-            title: rampOperational ? 'Ramp Operational' : 'Ramp Out of Service',
-            subtitle: rampOperational ? 'Verified on this vehicle' : 'Driver flagged maintenance needed',
+            title: rampOperational
+                ? 'Ramp Operational'
+                : 'Ramp Out of Service',
+            subtitle: rampOperational
+                ? 'Verified on this vehicle'
+                : 'Driver flagged maintenance needed',
             trailingIcon: Icons.accessible,
             isWorking: rampOperational,
           ),
           const SizedBox(height: 8),
           _A11yItem(
-            title: elevatorWorking ? 'Elevator Working' : 'Elevator Under Maintenance',
-            subtitle: elevatorWorking ? 'Verified at stop' : 'Alternative ramp available',
+            title: elevatorWorking
+                ? 'Elevator Working'
+                : 'Elevator Under Maintenance',
+            subtitle: elevatorWorking
+                ? 'Verified at stop'
+                : 'Alternative ramp available',
             trailingIcon: Icons.elevator_outlined,
             isWorking: elevatorWorking,
           ),

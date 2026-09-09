@@ -73,6 +73,7 @@ class JourneyConfirmationScreen extends StatelessWidget {
                                   origin: origin,
                                   destination: destination,
                                   route: route,
+                                  busId: route?.busId ?? 'bus_42',
                                 ),
                               ),
                             );
