@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/journey_model.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/journey_service.dart';
 import '../auth/login_screen.dart';
 import '../journey/journey_search_screen.dart';
+import '../journey/live_journey_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.initialUser});
@@ -20,9 +23,11 @@ class _HomeScreenState extends State<HomeScreen> {
   static const double _desktopBreakpoint = 768;
 
   final AuthService _authService = AuthService();
+  final JourneyService _journeyService = JourneyService();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   UserModel? _user;
+  JourneyModel? _activeJourney;
   bool _isLoading = true;
 
   @override
@@ -41,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _user = user ?? _user;
         _isLoading = false;
       });
+      _checkActiveJourney();
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -50,6 +56,28 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     }
+  }
+
+  /// Checks Firestore for an active/confirmed journey for the current user.
+  Future<void> _checkActiveJourney() async {
+    final uid = _authService.currentUser?.uid;
+    if (uid == null || uid.isEmpty) return;
+    try {
+      final journey = await _journeyService.getActiveJourney(uid);
+      if (!mounted) return;
+      setState(() => _activeJourney = journey);
+    } catch (_) {
+      // Non-fatal — journey recovery is best-effort.
+    }
+  }
+
+  void _resumeJourney() {
+    final uid = _authService.currentUser?.uid ?? '';
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LiveJourneyScreen(passengerId: uid),
+      ),
+    );
   }
 
   Future<void> _logout() async {
@@ -150,6 +178,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _WhereToSearch(onTap: _openJourneySearch),
+                                  if (_activeJourney != null) ...[
+                                    const SizedBox(height: 16),
+                                    _ActiveJourneyBanner(
+                                      journey: _activeJourney!,
+                                      onResume: _resumeJourney,
+                                    ),
+                                  ],
                                   const SizedBox(height: 24),
                                   _FavoritesSection(
                                     isDesktop: isDesktop,
@@ -931,6 +966,119 @@ class _StatusCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiveJourneyBanner extends StatelessWidget {
+  const _ActiveJourneyBanner({
+    required this.journey,
+    required this.onResume,
+  });
+
+  final JourneyModel journey;
+  final VoidCallback onResume;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primaryContainer.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onResume,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.directions_bus_rounded,
+                  color: AppColors.onPrimaryContainer,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            journey.routeTitle.isNotEmpty
+                                ? journey.routeTitle
+                                : 'Active Journey',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text(
+                            'LIVE',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.onPrimary,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${journey.origin} → ${journey.destination}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Tap to resume live tracking →',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
