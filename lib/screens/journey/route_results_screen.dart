@@ -23,6 +23,7 @@ class RouteResultItem {
     this.busId = 'bus_01',
     this.origin = 'Colombo',
     this.destination = 'Kandy',
+    this.intermediateStops = const [],
     this.recommended = false,
   });
 
@@ -39,6 +40,7 @@ class RouteResultItem {
   final String busId;
   final String origin;
   final String destination;
+  final List<String> intermediateStops;
   final bool recommended;
 }
 
@@ -66,7 +68,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 
   static const _sampleRoutes = [
     RouteResultItem(
-      id: 'r01',
+      id: 'route_01',
       title: 'Route 01: Colombo → Kandy',
       durationMinutes: 195,
       etaLabel: 'Departs in 10 min',
@@ -79,10 +81,23 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       busId: 'bus_01',
       origin: 'Colombo',
       destination: 'Kandy',
+      intermediateStops: [
+        'colombo',
+        'kadawatha',
+        'gampaha',
+        'nittambuwa',
+        'warakapola',
+        'ambepussa',
+        'hettimulla',
+        'kegalle',
+        'mawanella',
+        'peradeniya',
+        'kandy'
+      ],
       recommended: true,
     ),
     RouteResultItem(
-      id: 'r02',
+      id: 'route_02',
       title: 'Route 02: Colombo → Galle',
       durationMinutes: 135,
       etaLabel: 'Departs in 15 min',
@@ -95,10 +110,21 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       busId: 'bus_02',
       origin: 'Colombo',
       destination: 'Galle',
+      intermediateStops: [
+        'colombo',
+        'moratuwa',
+        'panadura',
+        'kalutara',
+        'beruwala',
+        'aluthgama',
+        'ambalangoda',
+        'hikkaduwa',
+        'galle'
+      ],
       recommended: true,
     ),
     RouteResultItem(
-      id: 'r87',
+      id: 'route_87',
       title: 'Route 87: Colombo → Jaffna',
       durationMinutes: 410,
       etaLabel: 'Departs in 30 min',
@@ -111,9 +137,19 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       busId: 'bus_87',
       origin: 'Colombo',
       destination: 'Jaffna',
+      intermediateStops: [
+        'colombo',
+        'negombo',
+        'chilaw',
+        'puttalam',
+        'anuradhapura',
+        'vavuniya',
+        'kilinochchi',
+        'jaffna'
+      ],
     ),
     RouteResultItem(
-      id: 'r49',
+      id: 'route_49',
       title: 'Route 49: Colombo → Trincomalee',
       durationMinutes: 340,
       etaLabel: 'Departs in 20 min',
@@ -126,9 +162,17 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       busId: 'bus_49',
       origin: 'Colombo',
       destination: 'Trincomalee',
+      intermediateStops: [
+        'colombo',
+        'kurunegala',
+        'dambulla',
+        'habarana',
+        'kantale',
+        'trincomalee'
+      ],
     ),
     RouteResultItem(
-      id: 'r99',
+      id: 'route_99',
       title: 'Route 99: Colombo → Badulla',
       durationMinutes: 360,
       etaLabel: 'Departs in 25 min',
@@ -141,51 +185,16 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       busId: 'bus_99',
       origin: 'Colombo',
       destination: 'Badulla',
-    ),
-    RouteResultItem(
-      id: '1',
-      title: 'Bus 42 Express',
-      durationMinutes: 42,
-      etaLabel: 'Leave in 6 min',
-      transfers: 0,
-      crowdLevel: 'Low',
-      accessibilityStatus: AccessibilityStatus.accessible,
-      accessibilityLabel: 'Accessible',
-      safetyLabel: 'Well lit stops',
-      summary: 'Step-free boarding · Ramp available',
-      busId: 'bus_42',
-      origin: 'Colombo',
-      destination: 'Downtown',
-    ),
-    RouteResultItem(
-      id: '2',
-      title: 'Bus 101 Coastal Direct',
-      durationMinutes: 55,
-      etaLabel: 'Leave in 12 min',
-      transfers: 0,
-      crowdLevel: 'Medium',
-      accessibilityStatus: AccessibilityStatus.partial,
-      accessibilityLabel: 'Partially Accessible',
-      safetyLabel: 'Busy waiting area',
-      summary: '1 stop with steps · Assistance available',
-      busId: 'bus_101',
-      origin: 'Colombo',
-      destination: 'South Terminal',
-    ),
-    RouteResultItem(
-      id: '3',
-      title: 'Bus 15 Airport Link',
-      durationMinutes: 38,
-      etaLabel: 'Leave in 3 min',
-      transfers: 0,
-      crowdLevel: 'High',
-      accessibilityStatus: AccessibilityStatus.accessible,
-      accessibilityLabel: 'Accessible',
-      safetyLabel: 'Express route',
-      summary: 'Low-floor elevator · Ramp available',
-      busId: 'bus_15',
-      origin: 'Colombo',
-      destination: 'Airport',
+      intermediateStops: [
+        'colombo',
+        'avissawella',
+        'ratnapura',
+        'balangoda',
+        'beragala',
+        'haputale',
+        'bandarawela',
+        'badulla'
+      ],
     ),
   ];
 
@@ -194,16 +203,36 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
     final queryDest = widget.destination.trim().toLowerCase();
     final queryOrig = widget.origin.trim().toLowerCase();
 
-    routes.sort((a, b) {
-      final aMatches = (queryDest.isNotEmpty && a.destination.toLowerCase().contains(queryDest)) ||
-          (queryOrig.isNotEmpty && a.origin.toLowerCase().contains(queryOrig)) ||
-          (queryDest.isNotEmpty && a.title.toLowerCase().contains(queryDest));
-      final bMatches = (queryDest.isNotEmpty && b.destination.toLowerCase().contains(queryDest)) ||
-          (queryOrig.isNotEmpty && b.origin.toLowerCase().contains(queryOrig)) ||
-          (queryDest.isNotEmpty && b.title.toLowerCase().contains(queryDest));
+    /// Returns true if the route serves this query term (origin, destination,
+    /// title, or any intermediate stop).
+    bool servedBy(RouteResultItem r, String term) {
+      if (term.isEmpty || term == 'current location' || term == 'destination') {
+        return false;
+      }
+      if (r.origin.toLowerCase().contains(term) ||
+          r.destination.toLowerCase().contains(term) ||
+          r.title.toLowerCase().contains(term)) {
+        return true;
+      }
+      return r.intermediateStops
+          .any((stop) => stop.contains(term) || term.contains(stop));
+    }
 
-      if (aMatches && !bMatches) return -1;
-      if (!aMatches && bMatches) return 1;
+    /// Match score:
+    ///   2 = route serves BOTH the origin and destination query (exact match)
+    ///   1 = route serves only ONE of the two (partial)
+    ///   0 = no match
+    int matchScore(RouteResultItem r) {
+      final origMatch = servedBy(r, queryOrig);
+      final destMatch = servedBy(r, queryDest);
+      if (origMatch && destMatch) return 2;
+      if (origMatch || destMatch) return 1;
+      return 0;
+    }
+
+    routes.sort((a, b) {
+      final scoreDiff = matchScore(b).compareTo(matchScore(a)); // higher score first
+      if (scoreDiff != 0) return scoreDiff;
 
       switch (_sortBy) {
         case 'Fastest':
@@ -253,10 +282,39 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
     );
   }
 
+  /// Computes the match score for a single route against the current query.
+  int _matchScore(RouteResultItem r) {
+    final queryDest = widget.destination.trim().toLowerCase();
+    final queryOrig = widget.origin.trim().toLowerCase();
+
+    bool servedBy(RouteResultItem r, String term) {
+      if (term.isEmpty ||
+          term == 'current location' ||
+          term == 'destination') {
+        return false;
+      }
+      if (r.origin.toLowerCase().contains(term) ||
+          r.destination.toLowerCase().contains(term) ||
+          r.title.toLowerCase().contains(term)) {
+        return true;
+      }
+      return r.intermediateStops
+          .any((stop) => stop.contains(term) || term.contains(stop));
+    }
+
+    final origMatch = servedBy(r, queryOrig);
+    final destMatch = servedBy(r, queryDest);
+    if (origMatch && destMatch) return 2;
+    if (origMatch || destMatch) return 1;
+    return 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
     final routes = _sortedRoutes;
+    final matchedCount = routes.where((r) => _matchScore(r) == 2).length;
+    final hasPartials = routes.any((r) => _matchScore(r) == 1);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -268,12 +326,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
           ),
           Expanded(
             child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                isDesktop ? 24 : 112,
-              ),
+              padding: EdgeInsets.fromLTRB(16, 16, 16, isDesktop ? 24 : 112),
               children: [
                 Center(
                   child: ConstrainedBox(
@@ -284,7 +337,8 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                         _TripSummaryCard(
                           origin: widget.origin,
                           destination: widget.destination,
-                          resultCount: routes.length,
+                          matchedCount: matchedCount,
+                          totalCount: routes.length,
                         ),
                         const SizedBox(height: 16),
                         _SortChips(
@@ -293,15 +347,60 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                               setState(() => _sortBy = value),
                         ),
                         const SizedBox(height: 16),
-                        ...routes.map(
-                          (route) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _RouteCard(
-                              route: route,
-                              onTap: () => _onSelectRoute(route),
+                        // ── Fully-matching routes ───────────────────────────
+                        if (matchedCount > 0) ...[
+                          _SectionLabel(
+                            label:
+                                'Serving your route ($matchedCount)',
+                            icon: Icons.check_circle_outline,
+                            color: AppColors.secondary,
+                          ),
+                          const SizedBox(height: 8),
+                          ...routes
+                              .where((r) => _matchScore(r) == 2)
+                              .map(
+                                (route) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _RouteCard(
+                                    route: route,
+                                    onTap: () => _onSelectRoute(route),
+                                  ),
+                                ),
+                              ),
+                        ],
+                        // ── Other available routes ──────────────────────────
+                        if (hasPartials) ...[
+                          const SizedBox(height: 4),
+                          _SectionLabel(
+                            label: 'Other available routes',
+                            icon: Icons.directions_bus_outlined,
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 8),
+                          ...routes
+                              .where((r) => _matchScore(r) < 2)
+                              .map(
+                                (route) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _RouteCard(
+                                    route: route,
+                                    onTap: () => _onSelectRoute(route),
+                                    dimmed: true,
+                                  ),
+                                ),
+                              ),
+                        ],
+                        // ── Fallback: no queries at all ─────────────────────
+                        if (matchedCount == 0 && !hasPartials)
+                          ...routes.map(
+                            (route) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _RouteCard(
+                                route: route,
+                                onTap: () => _onSelectRoute(route),
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -383,15 +482,21 @@ class _TripSummaryCard extends StatelessWidget {
   const _TripSummaryCard({
     required this.origin,
     required this.destination,
-    required this.resultCount,
+    required this.matchedCount,
+    required this.totalCount,
   });
 
   final String origin;
   final String destination;
-  final int resultCount;
+  final int matchedCount;
+  final int totalCount;
 
   @override
   Widget build(BuildContext context) {
+    final summaryText = matchedCount > 0
+        ? '$matchedCount route${matchedCount == 1 ? '' : 's'} serve your journey · Depart now'
+        : 'No exact matches — showing all $totalCount routes';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -444,11 +549,7 @@ class _TripSummaryCard extends StatelessWidget {
           ),
           Row(
             children: [
-              const Icon(
-                Icons.location_on,
-                size: 18,
-                color: AppColors.error,
-              ),
+              const Icon(Icons.location_on, size: 18, color: AppColors.error),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -467,11 +568,15 @@ class _TripSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '$resultCount routes found · Depart now',
-            style: const TextStyle(
+            summaryText,
+            style: TextStyle(
               fontSize: 14,
               height: 20 / 14,
-              color: AppColors.onSurfaceVariant,
+              color: matchedCount > 0
+                  ? AppColors.secondary
+                  : AppColors.onSurfaceVariant,
+              fontWeight:
+                  matchedCount > 0 ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
         ],
@@ -481,10 +586,7 @@ class _TripSummaryCard extends StatelessWidget {
 }
 
 class _SortChips extends StatelessWidget {
-  const _SortChips({
-    required this.selected,
-    required this.onSelected,
-  });
+  const _SortChips({required this.selected, required this.onSelected});
 
   final String selected;
   final ValueChanged<String> onSelected;
@@ -529,18 +631,51 @@ class _SortChips extends StatelessWidget {
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            height: 20 / 13,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _RouteCard extends StatelessWidget {
   const _RouteCard({
     required this.route,
     required this.onTap,
+    this.dimmed = false,
   });
 
   final RouteResultItem route;
   final VoidCallback onTap;
+  final bool dimmed;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final card = Material(
       color: AppColors.surfaceContainerLowest,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
@@ -696,6 +831,7 @@ class _RouteCard extends StatelessWidget {
         ),
       ),
     );
+    return dimmed ? Opacity(opacity: 0.55, child: card) : card;
   }
 }
 
@@ -734,10 +870,7 @@ class _InfoChip extends StatelessWidget {
 }
 
 class _AccessibilityChip extends StatelessWidget {
-  const _AccessibilityChip({
-    required this.status,
-    required this.label,
-  });
+  const _AccessibilityChip({required this.status, required this.label});
 
   final AccessibilityStatus status;
   final String label;
@@ -746,20 +879,20 @@ class _AccessibilityChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, bg, fg) = switch (status) {
       AccessibilityStatus.accessible => (
-          Icons.check_circle,
-          AppColors.secondaryContainer,
-          AppColors.onSecondaryContainer,
-        ),
+        Icons.check_circle,
+        AppColors.secondaryContainer,
+        AppColors.onSecondaryContainer,
+      ),
       AccessibilityStatus.partial => (
-          Icons.warning_amber_rounded,
-          const Color(0xFFFFDBCA),
-          AppColors.tertiary,
-        ),
+        Icons.warning_amber_rounded,
+        const Color(0xFFFFDBCA),
+        AppColors.tertiary,
+      ),
       AccessibilityStatus.notAccessible => (
-          Icons.cancel,
-          AppColors.errorContainer,
-          AppColors.onErrorContainer,
-        ),
+        Icons.cancel,
+        AppColors.errorContainer,
+        AppColors.onErrorContainer,
+      ),
     };
 
     return Container(
@@ -920,9 +1053,7 @@ class _LiveTrackingBadge extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                isBroadcasting
-                    ? Icons.sensors_rounded
-                    : Icons.schedule_rounded,
+                isBroadcasting ? Icons.sensors_rounded : Icons.schedule_rounded,
                 size: 16,
                 color: isBroadcasting
                     ? AppColors.onSecondaryContainer

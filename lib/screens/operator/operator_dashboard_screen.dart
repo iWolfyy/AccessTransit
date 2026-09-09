@@ -142,7 +142,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
 
       final currentUser = _authService.currentUser;
       final driverId = currentUser?.uid ?? 'operator_dev';
-      final operatorName = (currentUser?.displayName != null &&
+      final operatorName =
+          (currentUser?.displayName != null &&
               currentUser!.displayName!.isNotEmpty)
           ? currentUser.displayName!
           : (currentUser?.email ?? 'Transit Operator');
@@ -187,19 +188,19 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       await _positionSubscription?.cancel();
       _positionSubscription = _locationService
           .getPositionStream(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
-        enableBackground: true,
-        notificationTitle: 'AccessTransit Live Bus Tracking',
-        notificationText:
-            'Broadcasting live location for Bus $_selectedRouteNumber to passengers',
-      )
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 5,
+            enableBackground: true,
+            notificationTitle: 'AccessTransit Live Bus Tracking',
+            notificationText:
+                'Broadcasting live location for Bus $_selectedRouteNumber to passengers',
+          )
           .listen(
-        _onLocationUpdate,
-        onError: (dynamic error) {
-          _showSnack('GPS Stream Error: $error', isError: true);
-        },
-      );
+            _onLocationUpdate,
+            onError: (dynamic error) {
+              _showSnack('GPS Stream Error: $error', isError: true);
+            },
+          );
 
       // 5. Start duration timer
       _tripDuration = Duration.zero;
@@ -216,7 +217,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         _isInitializing = false;
       });
 
-      _showSnack('Trip Started! Broadcasting live GPS for Bus $_selectedRouteNumber');
+      _showSnack(
+        'Trip Started! Broadcasting live GPS for Bus $_selectedRouteNumber',
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -323,8 +326,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       ..showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor:
-              isError ? AppColors.error : AppColors.primaryContainer,
+          backgroundColor: isError
+              ? AppColors.error
+              : AppColors.primaryContainer,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -426,7 +430,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  _isTripActive ? Icons.sensors_rounded : Icons.sensors_off_rounded,
+                  _isTripActive
+                      ? Icons.sensors_rounded
+                      : Icons.sensors_off_rounded,
                   size: 36,
                   color: _isTripActive
                       ? AppColors.onPrimary
@@ -445,9 +451,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   const SizedBox(width: 8),
                 ],
                 Text(
-                  _isTripActive
-                      ? 'TRIP IN PROGRESS'
-                      : 'TRIP INACTIVE',
+                  _isTripActive ? 'TRIP IN PROGRESS' : 'TRIP INACTIVE',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -530,7 +534,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                 if (_isTripActive) ...[
                   const Spacer(),
                   const Chip(
-                    label: Text('Locked during trip', style: TextStyle(fontSize: 11)),
+                    label: Text(
+                      'Locked during trip',
+                      style: TextStyle(fontSize: 11),
+                    ),
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
@@ -680,7 +687,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             const SizedBox(height: 12),
             SwitchListTile(
               title: const Text('Wheelchair Ramp Operational'),
-              subtitle: const Text('Confirm ramp mechanism is fully functional'),
+              subtitle: const Text(
+                'Confirm ramp mechanism is fully functional',
+              ),
               value: _rampOperational,
               activeThumbColor: AppColors.primaryContainer,
               onChanged: (val) {

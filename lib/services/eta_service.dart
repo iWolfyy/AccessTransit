@@ -121,7 +121,9 @@ class EtaService {
 
     // 4. Resolve target stop coordinates
     final targetLocation =
-        customStopLocation ?? getStopCoordinates(stopName) ?? getStopCoordinates(liveBus.nextStop);
+        customStopLocation ??
+        getStopCoordinates(stopName) ??
+        getStopCoordinates(liveBus.nextStop);
 
     if (targetLocation == null) {
       return const EtaResult(
@@ -134,7 +136,10 @@ class EtaService {
 
     // 5. Calculate geodesic distance in meters
     final busLocation = LatLng(liveBus.latitude, liveBus.longitude);
-    final distanceMeters = _distanceCalculator.distance(busLocation, targetLocation);
+    final distanceMeters = _distanceCalculator.distance(
+      busLocation,
+      targetLocation,
+    );
 
     // 6. Proximity check (< 50 meters)
     if (distanceMeters <= 50) {
@@ -148,8 +153,9 @@ class EtaService {
     }
 
     // 7. Calculate ETA using current speed or urban transit fallback (20 km/h)
-    final double effectiveSpeedKmH =
-        (liveBus.speed >= 5.0) ? liveBus.speed : 20.0;
+    final double effectiveSpeedKmH = (liveBus.speed >= 5.0)
+        ? liveBus.speed
+        : 20.0;
     final double distanceKm = distanceMeters / 1000.0;
     final double rawMinutes = (distanceKm / effectiveSpeedKmH) * 60.0;
     final int etaMinutes = rawMinutes.round().clamp(1, 180);
