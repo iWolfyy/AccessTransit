@@ -20,7 +20,9 @@ class RouteResultItem {
     required this.accessibilityLabel,
     required this.safetyLabel,
     required this.summary,
-    this.busId = 'bus_42',
+    this.busId = 'bus_01',
+    this.origin = 'Colombo',
+    this.destination = 'Kandy',
     this.recommended = false,
   });
 
@@ -35,6 +37,8 @@ class RouteResultItem {
   final String safetyLabel;
   final String summary;
   final String busId;
+  final String origin;
+  final String destination;
   final bool recommended;
 }
 
@@ -62,6 +66,83 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 
   static const _sampleRoutes = [
     RouteResultItem(
+      id: 'r01',
+      title: 'Route 01: Colombo → Kandy',
+      durationMinutes: 195,
+      etaLabel: 'Departs in 10 min',
+      transfers: 0,
+      crowdLevel: 'Medium',
+      accessibilityStatus: AccessibilityStatus.accessible,
+      accessibilityLabel: 'Accessible',
+      safetyLabel: 'Highway Express',
+      summary: 'Step-free boarding · Ramp available',
+      busId: 'bus_01',
+      origin: 'Colombo',
+      destination: 'Kandy',
+      recommended: true,
+    ),
+    RouteResultItem(
+      id: 'r02',
+      title: 'Route 02: Colombo → Galle',
+      durationMinutes: 135,
+      etaLabel: 'Departs in 15 min',
+      transfers: 0,
+      crowdLevel: 'Low',
+      accessibilityStatus: AccessibilityStatus.accessible,
+      accessibilityLabel: 'Accessible',
+      safetyLabel: 'Southern Expressway',
+      summary: 'Low-floor elevator · Air-conditioned',
+      busId: 'bus_02',
+      origin: 'Colombo',
+      destination: 'Galle',
+      recommended: true,
+    ),
+    RouteResultItem(
+      id: 'r87',
+      title: 'Route 87: Colombo → Jaffna',
+      durationMinutes: 410,
+      etaLabel: 'Departs in 30 min',
+      transfers: 0,
+      crowdLevel: 'Medium',
+      accessibilityStatus: AccessibilityStatus.partial,
+      accessibilityLabel: 'Partially Accessible',
+      safetyLabel: 'A9 Highway Direct',
+      summary: 'Long distance · Assistance available',
+      busId: 'bus_87',
+      origin: 'Colombo',
+      destination: 'Jaffna',
+    ),
+    RouteResultItem(
+      id: 'r49',
+      title: 'Route 49: Colombo → Trincomalee',
+      durationMinutes: 340,
+      etaLabel: 'Departs in 20 min',
+      transfers: 0,
+      crowdLevel: 'Low',
+      accessibilityStatus: AccessibilityStatus.accessible,
+      accessibilityLabel: 'Accessible',
+      safetyLabel: 'Eastern Express',
+      summary: 'Step-free boarding · Ramp available',
+      busId: 'bus_49',
+      origin: 'Colombo',
+      destination: 'Trincomalee',
+    ),
+    RouteResultItem(
+      id: 'r99',
+      title: 'Route 99: Colombo → Badulla',
+      durationMinutes: 360,
+      etaLabel: 'Departs in 25 min',
+      transfers: 0,
+      crowdLevel: 'High',
+      accessibilityStatus: AccessibilityStatus.accessible,
+      accessibilityLabel: 'Accessible',
+      safetyLabel: 'Scenic Mountain Route',
+      summary: 'Low-floor elevator · Ramp available',
+      busId: 'bus_99',
+      origin: 'Colombo',
+      destination: 'Badulla',
+    ),
+    RouteResultItem(
       id: '1',
       title: 'Bus 42 Express',
       durationMinutes: 42,
@@ -73,7 +154,8 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       safetyLabel: 'Well lit stops',
       summary: 'Step-free boarding · Ramp available',
       busId: 'bus_42',
-      recommended: true,
+      origin: 'Colombo',
+      destination: 'Downtown',
     ),
     RouteResultItem(
       id: '2',
@@ -87,6 +169,8 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       safetyLabel: 'Busy waiting area',
       summary: '1 stop with steps · Assistance available',
       busId: 'bus_101',
+      origin: 'Colombo',
+      destination: 'South Terminal',
     ),
     RouteResultItem(
       id: '3',
@@ -100,28 +184,41 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       safetyLabel: 'Express route',
       summary: 'Low-floor elevator · Ramp available',
       busId: 'bus_15',
+      origin: 'Colombo',
+      destination: 'Airport',
     ),
   ];
 
   List<RouteResultItem> get _sortedRoutes {
     final routes = List<RouteResultItem>.from(_sampleRoutes);
-    switch (_sortBy) {
-      case 'Fastest':
-        routes.sort((a, b) => a.durationMinutes.compareTo(b.durationMinutes));
-      case 'Least crowded':
-        routes.sort(
-          (a, b) =>
-              _crowdRank(a.crowdLevel).compareTo(_crowdRank(b.crowdLevel)),
-        );
-      case 'Best':
-      default:
-        routes.sort((a, b) {
+    final queryDest = widget.destination.trim().toLowerCase();
+    final queryOrig = widget.origin.trim().toLowerCase();
+
+    routes.sort((a, b) {
+      final aMatches = (queryDest.isNotEmpty && a.destination.toLowerCase().contains(queryDest)) ||
+          (queryOrig.isNotEmpty && a.origin.toLowerCase().contains(queryOrig)) ||
+          (queryDest.isNotEmpty && a.title.toLowerCase().contains(queryDest));
+      final bMatches = (queryDest.isNotEmpty && b.destination.toLowerCase().contains(queryDest)) ||
+          (queryOrig.isNotEmpty && b.origin.toLowerCase().contains(queryOrig)) ||
+          (queryDest.isNotEmpty && b.title.toLowerCase().contains(queryDest));
+
+      if (aMatches && !bMatches) return -1;
+      if (!aMatches && bMatches) return 1;
+
+      switch (_sortBy) {
+        case 'Fastest':
+          return a.durationMinutes.compareTo(b.durationMinutes);
+        case 'Least crowded':
+          return _crowdRank(a.crowdLevel).compareTo(_crowdRank(b.crowdLevel));
+        case 'Best':
+        default:
           if (a.recommended == b.recommended) {
             return a.durationMinutes.compareTo(b.durationMinutes);
           }
           return a.recommended ? -1 : 1;
-        });
-    }
+      }
+    });
+
     return routes;
   }
 

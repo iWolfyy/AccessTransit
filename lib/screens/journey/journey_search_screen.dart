@@ -616,9 +616,11 @@ class _RecentSavedSection extends StatelessWidget {
   final ValueChanged<String> onSelect;
 
   static const _items = [
-    (Icons.home, 'Home', '123 Accessible Ave'),
-    (Icons.work, 'City Library', 'Central Square'),
-    (Icons.history, 'General Hospital', 'North Wing Clinic'),
+    (Icons.directions_bus, 'Kandy', 'Route 01 • Central Province'),
+    (Icons.directions_bus, 'Galle', 'Route 02 • Southern Province'),
+    (Icons.directions_bus, 'Jaffna', 'Route 87 • Northern Province'),
+    (Icons.directions_bus, 'Trincomalee', 'Route 49 • Eastern Province'),
+    (Icons.directions_bus, 'Badulla', 'Route 99 • Uva Province'),
   ];
 
   @override

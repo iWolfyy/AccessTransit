@@ -44,6 +44,12 @@ class EtaService {
 
   /// Registry mapping known transit stops to geographic coordinates.
   static final Map<String, LatLng> _stopCoordinates = {
+    'colombo': const LatLng(6.9271, 79.8612),
+    'kandy': const LatLng(7.2906, 80.6337),
+    'galle': const LatLng(6.0535, 80.2210),
+    'jaffna': const LatLng(9.6615, 80.0255),
+    'trincomalee': const LatLng(8.5874, 81.2152),
+    'badulla': const LatLng(6.9934, 81.0550),
     'central station': const LatLng(6.9271, 79.8612),
     'city library': const LatLng(6.9042, 79.8607),
     'town hall': const LatLng(6.9147, 79.8640),

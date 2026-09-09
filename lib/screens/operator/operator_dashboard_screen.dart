@@ -50,6 +50,41 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
 
   static const List<Map<String, String>> _routes = [
     {
+      'busId': 'bus_01',
+      'routeId': 'route_01',
+      'number': '01',
+      'name': 'Route 01: Colombo → Kandy',
+      'nextStop': 'Kandy Bus Stand',
+    },
+    {
+      'busId': 'bus_02',
+      'routeId': 'route_02',
+      'number': '02',
+      'name': 'Route 02: Colombo → Galle',
+      'nextStop': 'Galle Bus Stand',
+    },
+    {
+      'busId': 'bus_87',
+      'routeId': 'route_87',
+      'number': '87',
+      'name': 'Route 87: Colombo → Jaffna',
+      'nextStop': 'Jaffna Station',
+    },
+    {
+      'busId': 'bus_49',
+      'routeId': 'route_49',
+      'number': '49',
+      'name': 'Route 49: Colombo → Trincomalee',
+      'nextStop': 'Trincomalee Bus Stand',
+    },
+    {
+      'busId': 'bus_99',
+      'routeId': 'route_99',
+      'number': '99',
+      'name': 'Route 99: Colombo → Badulla',
+      'nextStop': 'Badulla Main Terminal',
+    },
+    {
       'busId': 'bus_42',
       'routeId': 'route_42',
       'number': '42',
