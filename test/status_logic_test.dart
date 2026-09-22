@@ -92,6 +92,53 @@ void main() {
       expect(StatusLogic.isReportActive(resolvedReport, currentTime: now), isFalse);
     });
 
+    test('isReportActive (AC-81): report confirmed 1 hour ago = active', () {
+      final reportConfirmed1hAgo = Report(
+        id: 'r4',
+        targetType: 'station',
+        targetId: 'st_fort',
+        problemType: 'Elevator jammed',
+        status: 'active',
+        createdAt: now.subtract(const Duration(hours: 15)),
+        lastConfirmedAt: now.subtract(const Duration(hours: 1)),
+        confirmCount: 2,
+        userId: 'user_1',
+      );
+
+      expect(StatusLogic.isReportActive(reportConfirmed1hAgo, currentTime: now), isTrue);
+    });
+
+    test('isReportActive (AC-81): report confirmed 13 hours ago = expired/inactive', () {
+      final reportConfirmed13hAgo = Report(
+        id: 'r5',
+        targetType: 'station',
+        targetId: 'st_fort',
+        problemType: 'Elevator jammed',
+        status: 'active',
+        createdAt: now.subtract(const Duration(hours: 20)),
+        lastConfirmedAt: now.subtract(const Duration(hours: 13)),
+        confirmCount: 1,
+        userId: 'user_1',
+      );
+
+      expect(StatusLogic.isReportActive(reportConfirmed13hAgo, currentTime: now), isFalse);
+    });
+
+    test('isReportActive (AC-81/AC-83): hidden report (falseCount >= 3) = inactive', () {
+      final hiddenReport = Report(
+        id: 'r6',
+        targetType: 'station',
+        targetId: 'st_fort',
+        problemType: 'Elevator jammed',
+        status: 'hidden',
+        createdAt: now.subtract(const Duration(hours: 1)),
+        falseCount: 3,
+        userId: 'user_1',
+      );
+
+      expect(StatusLogic.isReportActive(hiddenReport, currentTime: now), isFalse);
+    });
+
     test('getBusStatus evaluates Not Accessible branch when no ramp and no low floor', () {
       final result = StatusLogic.getBusStatus(
         nonAccessibleBus,

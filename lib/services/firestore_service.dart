@@ -53,14 +53,24 @@ class FirestoreService {
 
   /// 3. Returns a real-time stream of accessibility reports (`reports`).
   ///
-  /// Optionally filters by [status] (e.g. "active" or "resolved").
-  Stream<List<Report>> streamReports({String? status}) {
+  /// Excludes reports with status 'hidden'.
+  /// Optionally filters by [status] (e.g. "active" or "resolved") and [userId].
+  Stream<List<Report>> streamReports({String? status, String? userId}) {
     Query<Map<String, dynamic>> query = _reportsRef;
     if (status != null && status.isNotEmpty) {
       query = query.where(FirestoreConstants.fieldStatus, isEqualTo: status);
     }
+    if (userId != null && userId.isNotEmpty) {
+      query = query.where(FirestoreConstants.fieldUserId, isEqualTo: userId);
+    }
     return query.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => Report.fromFirestore(doc)).toList();
+      final reports = snapshot.docs
+          .map((doc) => Report.fromFirestore(doc))
+          .where((r) => r.status.toLowerCase() != 'hidden')
+          .toList();
+      // Sort newest first by createdAt
+      reports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return reports;
     });
   }
 
@@ -69,6 +79,96 @@ class FirestoreService {
     final docRef = report.id.isNotEmpty
         ? _reportsRef.doc(report.id)
         : _reportsRef.doc();
-    await docRef.set(report.toMap(isServerTimestamp: true));
+    final data = report.toMap(isServerTimestamp: true);
+    await docRef.set(data);
+  }
+
+  /// Checks if a user has created a report for the same target in the last [thresholdMinutes] (AC-77).
+  Future<bool> checkRateLimit(
+    String userId,
+    String targetId, {
+    int thresholdMinutes = 15,
+  }) async {
+    if (userId.isEmpty || targetId.isEmpty) return false;
+    final cutoff = DateTime.now().subtract(Duration(minutes: thresholdMinutes));
+    final snapshot = await _reportsRef
+        .where(FirestoreConstants.fieldUserId, isEqualTo: userId)
+        .where(FirestoreConstants.fieldTargetId, isEqualTo: targetId)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      final report = Report.fromFirestore(doc);
+      if (report.createdAt.isAfter(cutoff)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Confirms a report as "Still broken" (AC-79).
+  ///
+  /// Uses a Firestore transaction to atomically add [userId] to `confirmedBy`,
+  /// increment `confirmCount`, and reset `lastConfirmedAt` to current timestamp.
+  Future<void> confirmReport(String reportId, String userId) async {
+    await _db.runTransaction((transaction) async {
+      final docRef = _reportsRef.doc(reportId);
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists) {
+        throw Exception('Report not found.');
+      }
+      final report = Report.fromFirestore(snapshot);
+
+      if (report.confirmedBy.contains(userId)) {
+        throw Exception('You already confirmed this report.');
+      }
+
+      final updatedConfirmedBy = [...report.confirmedBy, userId];
+      transaction.update(docRef, {
+        FirestoreConstants.fieldConfirmedBy: updatedConfirmedBy,
+        FirestoreConstants.fieldConfirmCount: FieldValue.increment(1),
+        FirestoreConstants.fieldLastConfirmedAt: FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  /// Marks a report as resolved / "Fixed now" (AC-80).
+  Future<void> resolveReport(String reportId) async {
+    final docRef = _reportsRef.doc(reportId);
+    await docRef.update({
+      FirestoreConstants.fieldStatus: 'resolved',
+    });
+  }
+
+  /// Flags a report as false (AC-83).
+  ///
+  /// Uses a Firestore transaction to atomically add [userId] to `flaggedBy` and increment `falseCount`.
+  /// If `falseCount` reaches 3, sets status to 'hidden'.
+  Future<void> flagReport(String reportId, String userId) async {
+    await _db.runTransaction((transaction) async {
+      final docRef = _reportsRef.doc(reportId);
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists) {
+        throw Exception('Report not found.');
+      }
+      final report = Report.fromFirestore(snapshot);
+
+      if (report.flaggedBy.contains(userId)) {
+        throw Exception('You already flagged this report.');
+      }
+
+      final updatedFlaggedBy = [...report.flaggedBy, userId];
+      final newFalseCount = report.falseCount + 1;
+      final Map<String, dynamic> updates = {
+        FirestoreConstants.fieldFlaggedBy: updatedFlaggedBy,
+        FirestoreConstants.fieldFalseCount: newFalseCount,
+      };
+
+      if (newFalseCount >= 3) {
+        updates[FirestoreConstants.fieldStatus] = 'hidden';
+      }
+
+      transaction.update(docRef, updates);
+    });
   }
 }
+
