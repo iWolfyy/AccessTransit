@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../data/seed_data.dart';
 import '../../models/bus_location_model.dart';
 import '../../models/enums/bus_status.dart';
 import '../../services/auth_service.dart';
@@ -379,6 +381,21 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         backgroundColor: AppColors.primaryContainer,
         foregroundColor: AppColors.onPrimary,
         actions: [
+          if (kDebugMode)
+            IconButton(
+              icon: const Icon(Icons.cloud_upload_outlined),
+              tooltip: 'Seed Firestore Data (Debug)',
+              onPressed: () async {
+                try {
+                  await SeedData().seedAll();
+                  _showSnack(
+                    'Successfully seeded 15 stations, 10 buses, and 3 reports!',
+                  );
+                } catch (e) {
+                  _showSnack('Seeding failed: $e', isError: true);
+                }
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {

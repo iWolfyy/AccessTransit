@@ -18,6 +18,15 @@ class FirestoreConstants {
   /// Passenger journey/booking documents keyed by auto-generated ID.
   static const String journeysCollection = 'journeys';
 
+  /// Station documents keyed by station ID (`stations/{id}`).
+  static const String stationsCollection = 'stations';
+
+  /// Static bus route & accessibility documents keyed by bus ID (`buses/{id}`).
+  static const String staticBusesCollection = 'buses';
+
+  /// Accessibility condition reports keyed by report ID (`reports/{id}`).
+  static const String reportsCollection = 'reports';
+
   // --- users/{userId} document fields ---
 
   static const String fieldUid = 'uid';
@@ -26,6 +35,33 @@ class FirestoreConstants {
   static const String fieldPhone = 'phone';
   static const String fieldRole = 'role';
   static const String fieldCreatedAt = 'createdAt';
+
+  // --- stations/{stationId} document fields ---
+
+  static const String fieldHasElevator = 'hasElevator';
+  static const String fieldHasRamp = 'hasRamp';
+  static const String fieldLat = 'lat';
+  static const String fieldLng = 'lng';
+
+  // --- buses/{busId} static document fields ---
+
+  static const String fieldRouteNo = 'routeNo';
+  static const String fieldStops = 'stops';
+  static const String fieldLowFloor = 'lowFloor';
+  static const String fieldRampOk = 'rampOk';
+  static const String fieldOccupancy = 'occupancy';
+
+  // --- reports/{reportId} document fields ---
+
+  static const String fieldTargetType = 'targetType';
+  static const String fieldTargetId = 'targetId';
+  static const String fieldProblemType = 'problemType';
+  static const String fieldLastConfirmedAt = 'lastConfirmedAt';
+  static const String fieldConfirmCount = 'confirmCount';
+  static const String fieldFalseCount = 'falseCount';
+  static const String fieldUserId = 'userId';
+  static const String fieldConfirmedBy = 'confirmedBy';
+  static const String fieldFlaggedBy = 'flaggedBy';
 
   // --- active_buses/{busId} document fields ---
 
