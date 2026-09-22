@@ -2,12 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/seed_data.dart';
+import '../../logic/bus_matcher.dart';
+import '../../logic/status_logic.dart';
+import '../../models/bus.dart';
 import '../../models/bus_location_model.dart';
 import '../../models/enums/bus_status.dart';
+import '../../models/report.dart';
+import '../../models/station.dart';
+import '../../services/firestore_service.dart';
 import '../../services/live_bus_service.dart';
 import 'route_details_screen.dart';
 
-/// Sample route result used for passenger route selection.
+/// Route result item used for passenger route selection.
 class RouteResultItem {
   const RouteResultItem({
     required this.id,
@@ -25,6 +32,8 @@ class RouteResultItem {
     this.destination = 'Kandy',
     this.intermediateStops = const [],
     this.recommended = false,
+    this.rawBus,
+    this.statusResult,
   });
 
   final String id;
@@ -42,6 +51,8 @@ class RouteResultItem {
   final String destination;
   final List<String> intermediateStops;
   final bool recommended;
+  final Bus? rawBus;
+  final BusStatusResult? statusResult;
 }
 
 enum AccessibilityStatus { accessible, partial, notAccessible }
@@ -50,10 +61,14 @@ enum AccessibilityStatus { accessible, partial, notAccessible }
 class RouteResultsScreen extends StatefulWidget {
   const RouteResultsScreen({
     super.key,
-    this.origin = 'Current Location',
-    this.destination = 'Destination',
+    this.fromStationId = 'st_fort',
+    this.toStationId = 'st_kottawa',
+    this.origin = 'Colombo Fort Station',
+    this.destination = 'Kottawa Highway Bus Station',
   });
 
+  final String fromStationId;
+  final String toStationId;
   final String origin;
   final String destination;
 
@@ -63,202 +78,46 @@ class RouteResultsScreen extends StatefulWidget {
 
 class _RouteResultsScreenState extends State<RouteResultsScreen> {
   static const double _desktopBreakpoint = 768;
+  final FirestoreService _firestoreService = FirestoreService();
 
+  List<Bus> _allBuses = [];
+  Map<String, Station> _stationsMap = {};
+  bool _isLoadingData = true;
   String _sortBy = 'Best';
 
-  static const _sampleRoutes = [
-    RouteResultItem(
-      id: 'route_01',
-      title: 'Route 01: Colombo → Kandy',
-      durationMinutes: 195,
-      etaLabel: 'Departs in 10 min',
-      transfers: 0,
-      crowdLevel: 'Medium',
-      accessibilityStatus: AccessibilityStatus.accessible,
-      accessibilityLabel: 'Accessible',
-      safetyLabel: 'Highway Express',
-      summary: 'Step-free boarding · Ramp available',
-      busId: 'bus_01',
-      origin: 'Colombo',
-      destination: 'Kandy',
-      intermediateStops: [
-        'colombo',
-        'kadawatha',
-        'gampaha',
-        'nittambuwa',
-        'warakapola',
-        'ambepussa',
-        'hettimulla',
-        'kegalle',
-        'mawanella',
-        'peradeniya',
-        'kandy'
-      ],
-      recommended: true,
-    ),
-    RouteResultItem(
-      id: 'route_02',
-      title: 'Route 02: Colombo → Galle',
-      durationMinutes: 135,
-      etaLabel: 'Departs in 15 min',
-      transfers: 0,
-      crowdLevel: 'Low',
-      accessibilityStatus: AccessibilityStatus.accessible,
-      accessibilityLabel: 'Accessible',
-      safetyLabel: 'Southern Expressway',
-      summary: 'Low-floor elevator · Air-conditioned',
-      busId: 'bus_02',
-      origin: 'Colombo',
-      destination: 'Galle',
-      intermediateStops: [
-        'colombo',
-        'moratuwa',
-        'panadura',
-        'kalutara',
-        'beruwala',
-        'aluthgama',
-        'ambalangoda',
-        'hikkaduwa',
-        'galle'
-      ],
-      recommended: true,
-    ),
-    RouteResultItem(
-      id: 'route_87',
-      title: 'Route 87: Colombo → Jaffna',
-      durationMinutes: 410,
-      etaLabel: 'Departs in 30 min',
-      transfers: 0,
-      crowdLevel: 'Medium',
-      accessibilityStatus: AccessibilityStatus.partial,
-      accessibilityLabel: 'Partially Accessible',
-      safetyLabel: 'A9 Highway Direct',
-      summary: 'Long distance · Assistance available',
-      busId: 'bus_87',
-      origin: 'Colombo',
-      destination: 'Jaffna',
-      intermediateStops: [
-        'colombo',
-        'negombo',
-        'chilaw',
-        'puttalam',
-        'anuradhapura',
-        'vavuniya',
-        'kilinochchi',
-        'jaffna'
-      ],
-    ),
-    RouteResultItem(
-      id: 'route_49',
-      title: 'Route 49: Colombo → Trincomalee',
-      durationMinutes: 340,
-      etaLabel: 'Departs in 20 min',
-      transfers: 0,
-      crowdLevel: 'Low',
-      accessibilityStatus: AccessibilityStatus.accessible,
-      accessibilityLabel: 'Accessible',
-      safetyLabel: 'Eastern Express',
-      summary: 'Step-free boarding · Ramp available',
-      busId: 'bus_49',
-      origin: 'Colombo',
-      destination: 'Trincomalee',
-      intermediateStops: [
-        'colombo',
-        'kurunegala',
-        'dambulla',
-        'habarana',
-        'kantale',
-        'trincomalee'
-      ],
-    ),
-    RouteResultItem(
-      id: 'route_99',
-      title: 'Route 99: Colombo → Badulla',
-      durationMinutes: 360,
-      etaLabel: 'Departs in 25 min',
-      transfers: 0,
-      crowdLevel: 'High',
-      accessibilityStatus: AccessibilityStatus.accessible,
-      accessibilityLabel: 'Accessible',
-      safetyLabel: 'Scenic Mountain Route',
-      summary: 'Low-floor elevator · Ramp available',
-      busId: 'bus_99',
-      origin: 'Colombo',
-      destination: 'Badulla',
-      intermediateStops: [
-        'colombo',
-        'avissawella',
-        'ratnapura',
-        'balangoda',
-        'beragala',
-        'haputale',
-        'bandarawela',
-        'badulla'
-      ],
-    ),
-  ];
-
-  List<RouteResultItem> get _sortedRoutes {
-    final routes = List<RouteResultItem>.from(_sampleRoutes);
-    final queryDest = widget.destination.trim().toLowerCase();
-    final queryOrig = widget.origin.trim().toLowerCase();
-
-    /// Returns true if the route serves this query term (origin, destination,
-    /// title, or any intermediate stop).
-    bool servedBy(RouteResultItem r, String term) {
-      if (term.isEmpty || term == 'current location' || term == 'destination') {
-        return false;
-      }
-      if (r.origin.toLowerCase().contains(term) ||
-          r.destination.toLowerCase().contains(term) ||
-          r.title.toLowerCase().contains(term)) {
-        return true;
-      }
-      return r.intermediateStops
-          .any((stop) => stop.contains(term) || term.contains(stop));
-    }
-
-    /// Match score:
-    ///   2 = route serves BOTH the origin and destination query (exact match)
-    ///   1 = route serves only ONE of the two (partial)
-    ///   0 = no match
-    int matchScore(RouteResultItem r) {
-      final origMatch = servedBy(r, queryOrig);
-      final destMatch = servedBy(r, queryDest);
-      if (origMatch && destMatch) return 2;
-      if (origMatch || destMatch) return 1;
-      return 0;
-    }
-
-    routes.sort((a, b) {
-      final scoreDiff = matchScore(b).compareTo(matchScore(a)); // higher score first
-      if (scoreDiff != 0) return scoreDiff;
-
-      switch (_sortBy) {
-        case 'Fastest':
-          return a.durationMinutes.compareTo(b.durationMinutes);
-        case 'Least crowded':
-          return _crowdRank(a.crowdLevel).compareTo(_crowdRank(b.crowdLevel));
-        case 'Best':
-        default:
-          if (a.recommended == b.recommended) {
-            return a.durationMinutes.compareTo(b.durationMinutes);
-          }
-          return a.recommended ? -1 : 1;
-      }
-    });
-
-    return routes;
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
   }
 
-  int _crowdRank(String level) {
-    switch (level.toLowerCase()) {
-      case 'low':
-        return 0;
-      case 'medium':
-        return 1;
-      default:
-        return 2;
+  Future<void> _loadInitialData() async {
+    try {
+      final fetchedBuses = await _firestoreService.getBuses();
+      final fetchedStations = await _firestoreService.getStations();
+
+      final buses = fetchedBuses.isNotEmpty ? fetchedBuses : SeedData.sampleBuses;
+      final stationsList = fetchedStations.isNotEmpty
+          ? fetchedStations
+          : SeedData.colomboStations;
+
+      final stationsMap = {for (final s in stationsList) s.id: s};
+
+      if (mounted) {
+        setState(() {
+          _allBuses = buses;
+          _stationsMap = stationsMap;
+          _isLoadingData = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _allBuses = SeedData.sampleBuses;
+          _stationsMap = {for (final s in SeedData.colomboStations) s.id: s};
+          _isLoadingData = false;
+        });
+      }
     }
   }
 
@@ -277,44 +136,110 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
           origin: widget.origin,
           destination: widget.destination,
           route: route,
+          bus: route.rawBus,
+          statusResult: route.statusResult,
         ),
       ),
     );
   }
 
-  /// Computes the match score for a single route against the current query.
-  int _matchScore(RouteResultItem r) {
-    final queryDest = widget.destination.trim().toLowerCase();
-    final queryOrig = widget.origin.trim().toLowerCase();
-
-    bool servedBy(RouteResultItem r, String term) {
-      if (term.isEmpty ||
-          term == 'current location' ||
-          term == 'destination') {
-        return false;
-      }
-      if (r.origin.toLowerCase().contains(term) ||
-          r.destination.toLowerCase().contains(term) ||
-          r.title.toLowerCase().contains(term)) {
-        return true;
-      }
-      return r.intermediateStops
-          .any((stop) => stop.contains(term) || term.contains(stop));
+  int _statusRank(AccessibilityStatus status) {
+    switch (status) {
+      case AccessibilityStatus.accessible:
+        return 0; // Safe first
+      case AccessibilityStatus.partial:
+        return 1; // Warning second
+      case AccessibilityStatus.notAccessible:
+        return 2; // Not accessible third
     }
+  }
 
-    final origMatch = servedBy(r, queryOrig);
-    final destMatch = servedBy(r, queryDest);
-    if (origMatch && destMatch) return 2;
-    if (origMatch || destMatch) return 1;
-    return 0;
+  int _crowdRank(String level) {
+    switch (level.toLowerCase()) {
+      case 'low':
+        return 0;
+      case 'medium':
+        return 1;
+      default:
+        return 2;
+    }
+  }
+
+  List<RouteResultItem> _buildAndSortRouteItems(List<Report> activeReports) {
+    // 1. Direct bus matching (AC-72)
+    final matchedBuses = BusMatcher.findDirectBuses(
+      _allBuses,
+      widget.fromStationId,
+      widget.toStationId,
+    );
+
+    // 2. Compute status & reasons (AC-74)
+    final List<RouteResultItem> items = matchedBuses.map((bus) {
+      final statusResult = StatusLogic.getBusStatus(
+        bus,
+        activeReports,
+        stationsMap: _stationsMap,
+      );
+
+      final summaryText = statusResult.reasons.isNotEmpty
+          ? statusResult.reasons.first
+          : (bus.hasRamp
+              ? 'Step-free boarding · Ramp operational'
+              : 'Standard bus service');
+
+      String crowdLabel = 'Low';
+      if (bus.occupancy.toLowerCase() == 'medium') crowdLabel = 'Medium';
+      if (bus.occupancy.toLowerCase() == 'high') crowdLabel = 'High';
+
+      final fromName = _stationsMap[widget.fromStationId]?.name ?? widget.origin;
+      final toName = _stationsMap[widget.toStationId]?.name ?? widget.destination;
+
+      return RouteResultItem(
+        id: bus.id,
+        title: 'Route ${bus.routeNo}: ${bus.id.replaceAll('bus_', '').replaceAll('_outbound', '').replaceAll('_inbound', '')}',
+        durationMinutes: (bus.stops.length * 6).clamp(10, 120),
+        etaLabel: 'Departs in 5 min',
+        transfers: 0,
+        crowdLevel: crowdLabel,
+        accessibilityStatus: statusResult.status,
+        accessibilityLabel: statusResult.statusLabel,
+        safetyLabel: bus.hasRamp && bus.rampOk ? 'Accessible Bus' : 'Standard Bus',
+        summary: summaryText,
+        busId: bus.id,
+        origin: fromName,
+        destination: toName,
+        intermediateStops: bus.stops,
+        recommended: statusResult.status == AccessibilityStatus.accessible,
+        rawBus: bus,
+        statusResult: statusResult,
+      );
+    }).toList();
+
+    // 3. Sort: Safe first, then Warning, then Not accessible (AC-73)
+    items.sort((a, b) {
+      final rankA = _statusRank(a.accessibilityStatus);
+      final rankB = _statusRank(b.accessibilityStatus);
+      if (rankA != rankB) {
+        return rankA.compareTo(rankB);
+      }
+
+      switch (_sortBy) {
+        case 'Fastest':
+          return a.durationMinutes.compareTo(b.durationMinutes);
+        case 'Least crowded':
+          return _crowdRank(a.crowdLevel).compareTo(_crowdRank(b.crowdLevel));
+        case 'Best':
+        default:
+          return a.durationMinutes.compareTo(b.durationMinutes);
+      }
+    });
+
+    return items;
   }
 
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
-    final routes = _sortedRoutes;
-    final matchedCount = routes.where((r) => _matchScore(r) == 2).length;
-    final hasPartials = routes.any((r) => _matchScore(r) == 1);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -325,88 +250,70 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
             onFilter: () => _showComingSoon('Filters'),
           ),
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, isDesktop ? 24 : 112),
-              children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 768),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _TripSummaryCard(
-                          origin: widget.origin,
-                          destination: widget.destination,
-                          matchedCount: matchedCount,
-                          totalCount: routes.length,
+            child: _isLoadingData
+                ? const Center(child: CircularProgressIndicator())
+                : StreamBuilder<List<Report>>(
+                    stream: _firestoreService.streamReports(),
+                    builder: (context, snapshot) {
+                      final reports = snapshot.data ?? SeedData.getSampleReports();
+                      final routes = _buildAndSortRouteItems(reports);
+
+                      return ListView(
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          16,
+                          16,
+                          isDesktop ? 24 : 112,
                         ),
-                        const SizedBox(height: 16),
-                        _SortChips(
-                          selected: _sortBy,
-                          onSelected: (value) =>
-                              setState(() => _sortBy = value),
-                        ),
-                        const SizedBox(height: 16),
-                        // ── Fully-matching routes ───────────────────────────
-                        if (matchedCount > 0) ...[
-                          _SectionLabel(
-                            label:
-                                'Serving your route ($matchedCount)',
-                            icon: Icons.check_circle_outline,
-                            color: AppColors.secondary,
-                          ),
-                          const SizedBox(height: 8),
-                          ...routes
-                              .where((r) => _matchScore(r) == 2)
-                              .map(
-                                (route) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _RouteCard(
-                                    route: route,
-                                    onTap: () => _onSelectRoute(route),
+                        children: [
+                          Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 768),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _TripSummaryCard(
+                                    origin: widget.origin,
+                                    destination: widget.destination,
+                                    matchedCount: routes.length,
+                                    totalCount: routes.length,
                                   ),
-                                ),
-                              ),
-                        ],
-                        // ── Other available routes ──────────────────────────
-                        if (hasPartials) ...[
-                          const SizedBox(height: 4),
-                          _SectionLabel(
-                            label: 'Other available routes',
-                            icon: Icons.directions_bus_outlined,
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                          const SizedBox(height: 8),
-                          ...routes
-                              .where((r) => _matchScore(r) < 2)
-                              .map(
-                                (route) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _RouteCard(
-                                    route: route,
-                                    onTap: () => _onSelectRoute(route),
-                                    dimmed: true,
+                                  const SizedBox(height: 16),
+                                  _SortChips(
+                                    selected: _sortBy,
+                                    onSelected: (value) =>
+                                        setState(() => _sortBy = value),
                                   ),
-                                ),
-                              ),
-                        ],
-                        // ── Fallback: no queries at all ─────────────────────
-                        if (matchedCount == 0 && !hasPartials)
-                          ...routes.map(
-                            (route) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _RouteCard(
-                                route: route,
-                                onTap: () => _onSelectRoute(route),
+                                  const SizedBox(height: 16),
+
+                                  if (routes.isEmpty) ...[
+                                    _buildEmptyState(),
+                                  ] else ...[
+                                    _SectionLabel(
+                                      label:
+                                          'Direct Routes Found (${routes.length})',
+                                      icon: Icons.check_circle_outline,
+                                      color: AppColors.secondary,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ...routes.map(
+                                      (route) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 12),
+                                        child: _RouteCard(
+                                          route: route,
+                                          onTap: () => _onSelectRoute(route),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           ),
-                      ],
-                    ),
+                        ],
+                      );
+                    },
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -422,6 +329,44 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                 );
               },
             ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: AppColors.surfaceContainerLowest,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.directions_bus_outlined,
+              size: 56,
+              color: AppColors.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No Direct Buses Found',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'There are currently no direct bus routes connecting ${widget.origin} to ${widget.destination}.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

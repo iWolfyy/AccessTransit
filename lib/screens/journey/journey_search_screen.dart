@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/seed_data.dart';
+import '../../models/station.dart';
+import '../../services/firestore_service.dart';
 import 'route_results_screen.dart';
 
 /// Journey Search screen — origin/destination, time, accessibility filters,
-/// and recent destinations (Sprint 2 UI).
+/// and recent destinations (Sprint 3 Data Wired & Searchable Pickers).
 class JourneySearchScreen extends StatefulWidget {
   const JourneySearchScreen({super.key});
 
@@ -15,43 +18,124 @@ class JourneySearchScreen extends StatefulWidget {
 
 class _JourneySearchScreenState extends State<JourneySearchScreen> {
   static const double _desktopBreakpoint = 768;
+  final FirestoreService _firestoreService = FirestoreService();
 
-  final TextEditingController _fromController =
-      TextEditingController(text: 'Current Location');
-  final TextEditingController _toController = TextEditingController();
+  List<Station> _stations = [];
+  Station? _selectedFromStation;
+  Station? _selectedToStation;
+  bool _isLoadingStations = true;
 
   bool _wheelchairAccess = true;
   bool _stepFreeOnly = false;
   bool _minimizeWalking = true;
 
   @override
-  void dispose() {
-    _fromController.dispose();
-    _toController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _loadStations();
+  }
+
+  Future<void> _loadStations() async {
+    try {
+      var fetched = await _firestoreService.getStations();
+      if (fetched.isEmpty) {
+        // Auto-seed Firestore if empty so realistic stations exist!
+        await SeedData().seedAll();
+        fetched = await _firestoreService.getStations();
+      }
+      final list = fetched.isNotEmpty ? fetched : SeedData.colomboStations;
+      if (mounted) {
+        setState(() {
+          _stations = list;
+          // Default: Pettah (st_pettah) to Mount Lavinia (st_mt_lavinia) for Route 100!
+          _selectedFromStation = list.firstWhere(
+            (s) => s.id == 'st_pettah',
+            orElse: () => list.firstWhere((s) => s.id == 'st_fort', orElse: () => list.first),
+          );
+          _selectedToStation = list.firstWhere(
+            (s) => s.id == 'st_mt_lavinia',
+            orElse: () => list.firstWhere((s) => s.id == 'st_kottawa', orElse: () => list.last),
+          );
+          _isLoadingStations = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _stations = SeedData.colomboStations;
+          _selectedFromStation = SeedData.colomboStations[1]; // st_pettah
+          _selectedToStation = SeedData.colomboStations[7]; // st_mt_lavinia
+          _isLoadingStations = false;
+        });
+      }
+    }
   }
 
   void _swapLocations() {
-    final from = _fromController.text;
-    _fromController.text = _toController.text;
-    _toController.text = from;
-    setState(() {});
+    if (_selectedFromStation == null || _selectedToStation == null) return;
+    setState(() {
+      final temp = _selectedFromStation;
+      _selectedFromStation = _selectedToStation;
+      _selectedToStation = temp;
+    });
   }
 
-  void _fillDestination(String title) {
-    setState(() => _toController.text = title);
+  void _selectDestinationById(String stationId) {
+    if (_stations.isEmpty) return;
+    final match = _stations.firstWhere(
+      (s) => s.id == stationId,
+      orElse: () => _stations.last,
+    );
+    setState(() => _selectedToStation = match);
+  }
+
+  void _showStationPicker(BuildContext context, bool isFrom) {
+    if (_stations.isEmpty) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return _StationSearchModal(
+          title: isFrom ? 'Select Origin Station' : 'Select Destination Station',
+          stations: _stations,
+          selectedStationId: isFrom ? _selectedFromStation?.id : _selectedToStation?.id,
+          onSelect: (station) {
+            Navigator.of(context).pop();
+            setState(() {
+              if (isFrom) {
+                _selectedFromStation = station;
+              } else {
+                _selectedToStation = station;
+              }
+            });
+          },
+        );
+      },
+    );
   }
 
   void _searchRoutes() {
-    final origin = _fromController.text.trim().isEmpty
-        ? 'Current Location'
-        : _fromController.text.trim();
-    final destination = _toController.text.trim();
-    if (destination.isEmpty) {
+    if (_selectedFromStation == null || _selectedToStation == null) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Please enter a destination.')),
+          const SnackBar(content: Text('Please select origin and destination stations.')),
+        );
+      return;
+    }
+
+    if (_selectedFromStation!.id == _selectedToStation!.id) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Origin and destination stations cannot be the same.'),
+            backgroundColor: AppColors.error,
+          ),
         );
       return;
     }
@@ -59,8 +143,10 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => RouteResultsScreen(
-          origin: origin,
-          destination: destination,
+          fromStationId: _selectedFromStation!.id,
+          toStationId: _selectedToStation!.id,
+          origin: _selectedFromStation!.name,
+          destination: _selectedToStation!.name,
         ),
       ),
     );
@@ -103,9 +189,12 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _SearchInputsCard(
-                          fromController: _fromController,
-                          toController: _toController,
+                          fromStation: _selectedFromStation,
+                          toStation: _selectedToStation,
+                          onTapFrom: () => _showStationPicker(context, true),
+                          onTapTo: () => _showStationPicker(context, false),
                           onSwap: _swapLocations,
+                          isLoading: _isLoadingStations,
                         ),
                         const SizedBox(height: 24),
                         _DepartNowCard(
@@ -124,7 +213,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                               setState(() => _minimizeWalking = v),
                         ),
                         const SizedBox(height: 24),
-                        _RecentSavedSection(onSelect: _fillDestination),
+                        _RecentSavedSection(
+                          onSelectStation: _selectDestinationById,
+                        ),
                         const SizedBox(height: 24),
                         SizedBox(
                           height: 56,
@@ -245,14 +336,20 @@ class _TopBar extends StatelessWidget {
 
 class _SearchInputsCard extends StatelessWidget {
   const _SearchInputsCard({
-    required this.fromController,
-    required this.toController,
+    required this.fromStation,
+    required this.toStation,
+    required this.onTapFrom,
+    required this.onTapTo,
     required this.onSwap,
+    required this.isLoading,
   });
 
-  final TextEditingController fromController;
-  final TextEditingController toController;
+  final Station? fromStation;
+  final Station? toStation;
+  final VoidCallback onTapFrom;
+  final VoidCallback onTapTo;
   final VoidCallback onSwap;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -270,125 +367,295 @@ class _SearchInputsCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(top: 12),
-                child: Column(
+      child: isLoading
+          ? const SizedBox(
+              height: 120,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : Stack(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.my_location,
-                      size: 20,
-                      color: AppColors.primaryContainer,
-                    ),
-                    SizedBox(
-                      height: 32,
-                      child: VerticalDivider(
-                        width: 20,
-                        thickness: 1,
-                        color: AppColors.outlineVariant,
+                    const Padding(
+                      padding: EdgeInsets.only(top: 14),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.my_location,
+                            size: 20,
+                            color: AppColors.primaryContainer,
+                          ),
+                          SizedBox(
+                            height: 38,
+                            child: VerticalDivider(
+                              width: 20,
+                              thickness: 1,
+                              color: AppColors.outlineVariant,
+                            ),
+                          ),
+                          Icon(
+                            Icons.location_on,
+                            size: 20,
+                            color: AppColors.error,
+                          ),
+                        ],
                       ),
                     ),
-                    Icon(
-                      Icons.location_on,
-                      size: 20,
-                      color: AppColors.error,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _StationSelectButton(
+                            label: fromStation?.name ?? 'Select Origin Station',
+                            hint: 'From Station',
+                            icon: Icons.my_location,
+                            onTap: onTapFrom,
+                          ),
+                          const SizedBox(height: 12),
+                          _StationSelectButton(
+                            label: toStation?.name ?? 'Select Destination Station',
+                            hint: 'Destination Station',
+                            icon: Icons.location_on,
+                            onTap: onTapTo,
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 48),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  children: [
-                    _LocationField(
-                      controller: fromController,
-                      hint: 'From',
-                    ),
-                    const SizedBox(height: 8),
-                    _LocationField(
-                      controller: toController,
-                      hint: 'Where to?',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 40),
-            ],
-          ),
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: Material(
-                color: AppColors.surfaceContainer,
-                shape: const CircleBorder(
-                  side: BorderSide(color: AppColors.surfaceVariant),
-                ),
-                elevation: 1,
-                shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
-                child: InkWell(
-                  onTap: onSwap,
-                  customBorder: const CircleBorder(),
-                  child: const SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Icon(
-                      Icons.swap_vert,
-                      color: AppColors.onSurface,
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Material(
+                      color: AppColors.surfaceContainer,
+                      shape: const CircleBorder(
+                        side: BorderSide(color: AppColors.surfaceVariant),
+                      ),
+                      elevation: 1,
+                      shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
+                      child: InkWell(
+                        onTap: onSwap,
+                        customBorder: const CircleBorder(),
+                        child: const SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Icon(
+                            Icons.swap_vert,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
+              ],
+            ),
+    );
+  }
+}
+
+class _StationSelectButton extends StatelessWidget {
+  const _StationSelectButton({
+    required this.label,
+    required this.hint,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final String hint;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ),
-        ],
+            const Icon(Icons.arrow_drop_down, color: AppColors.onSurfaceVariant),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _LocationField extends StatelessWidget {
-  const _LocationField({
-    required this.controller,
-    required this.hint,
+class _StationSearchModal extends StatefulWidget {
+  const _StationSearchModal({
+    required this.title,
+    required this.stations,
+    required this.selectedStationId,
+    required this.onSelect,
   });
 
-  final TextEditingController controller;
-  final String hint;
+  final String title;
+  final List<Station> stations;
+  final String? selectedStationId;
+  final ValueChanged<Station> onSelect;
+
+  @override
+  State<_StationSearchModal> createState() => _StationSearchModalState();
+}
+
+class _StationSearchModalState extends State<_StationSearchModal> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      style: const TextStyle(
-        fontSize: 16,
-        height: 24 / 16,
-        color: AppColors.onSurface,
+    final filtered = widget.stations.where((s) {
+      final q = _query.trim().toLowerCase();
+      if (q.isEmpty) return true;
+      return s.name.toLowerCase().contains(q) || s.id.toLowerCase().contains(q);
+    }).toList();
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.onSurfaceVariant),
-        filled: true,
-        fillColor: AppColors.surfaceContainerLowest,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 14,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.outlineVariant),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(
-            color: AppColors.primaryContainer,
-            width: 2,
-          ),
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _searchController,
+              autofocus: true,
+              onChanged: (val) => setState(() => _query = val),
+              decoration: InputDecoration(
+                hintText: 'Search Colombo station name or ID...',
+                prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+                suffixIcon: _query.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _query = '');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: AppColors.surfaceContainerLowest,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.outlineVariant),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No matching stations found.',
+                        style: TextStyle(color: AppColors.onSurfaceVariant),
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final s = filtered[index];
+                        final isSelected = s.id == widget.selectedStationId;
+
+                        return ListTile(
+                          selected: isSelected,
+                          selectedTileColor: AppColors.primaryContainer.withValues(alpha: 0.1),
+                          leading: CircleAvatar(
+                            backgroundColor: isSelected
+                                ? AppColors.primaryContainer
+                                : AppColors.surfaceContainer,
+                            child: Icon(
+                              Icons.location_on,
+                              color: isSelected
+                                  ? AppColors.onPrimary
+                                  : AppColors.primary,
+                              size: 20,
+                            ),
+                          ),
+                          title: Text(
+                            s.name,
+                            style: TextStyle(
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                          subtitle: Row(
+                            children: [
+                              if (s.hasRamp) ...[
+                                const Icon(Icons.accessible, size: 14, color: AppColors.secondary),
+                                const SizedBox(width: 4),
+                                const Text('Ramp  ', style: TextStyle(fontSize: 12)),
+                              ],
+                              if (s.hasElevator) ...[
+                                const Icon(Icons.elevator_outlined, size: 14, color: AppColors.primary),
+                                const SizedBox(width: 4),
+                                const Text('Elevator', style: TextStyle(fontSize: 12)),
+                              ],
+                              if (!s.hasRamp && !s.hasElevator)
+                                const Text('Standard Stop', style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant)),
+                            ],
+                          ),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_circle, color: AppColors.primaryContainer)
+                              : null,
+                          onTap: () => widget.onSelect(s),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );
@@ -611,16 +878,16 @@ class _FilterTile extends StatelessWidget {
 }
 
 class _RecentSavedSection extends StatelessWidget {
-  const _RecentSavedSection({required this.onSelect});
+  const _RecentSavedSection({required this.onSelectStation});
 
-  final ValueChanged<String> onSelect;
+  final ValueChanged<String> onSelectStation;
 
   static const _items = [
-    (Icons.directions_bus, 'Kandy', 'Route 01 • Central Province'),
-    (Icons.directions_bus, 'Galle', 'Route 02 • Southern Province'),
-    (Icons.directions_bus, 'Jaffna', 'Route 87 • Northern Province'),
-    (Icons.directions_bus, 'Trincomalee', 'Route 49 • Eastern Province'),
-    (Icons.directions_bus, 'Badulla', 'Route 99 • Uva Province'),
+    (Icons.directions_bus, 'st_mt_lavinia', 'Mount Lavinia Station', 'Route 100 • Galle Road Corridor (Safe)'),
+    (Icons.directions_bus, 'st_kottawa', 'Kottawa Highway Station', 'Route 138 • High-Level Road Corridor (Safe)'),
+    (Icons.directions_bus, 'st_dehiwala', 'Dehiwala Station', 'Route 101 • Coastal Route (Warning: Broken Ramp)'),
+    (Icons.directions_bus, 'st_maharagama', 'Maharagama Bus Complex', 'Route 120 • Horana Route (Not Accessible)'),
+    (Icons.directions_bus, 'st_bambalapitiya', 'Bambalapitiya Station', 'Route 154 • Cross-town Link'),
   ];
 
   @override
@@ -629,7 +896,7 @@ class _RecentSavedSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Recent & Saved',
+          'Popular & Saved Corridors',
           style: TextStyle(
             fontSize: 16,
             height: 24 / 16,
@@ -666,30 +933,27 @@ class _RecentSavedSection extends StatelessWidget {
                     backgroundColor: AppColors.surfaceContainer,
                     child: Icon(
                       _items[i].$1,
-                      color: i == 2
-                          ? AppColors.onSurfaceVariant
-                          : AppColors.primaryContainer,
+                      color: AppColors.primaryContainer,
                     ),
                   ),
                   title: Text(
-                    _items[i].$2,
-                    style: TextStyle(
+                    _items[i].$3,
+                    style: const TextStyle(
                       fontSize: 16,
                       height: 24 / 16,
-                      fontWeight:
-                          i == 2 ? FontWeight.w500 : FontWeight.w600,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.onSurface,
                     ),
                   ),
                   subtitle: Text(
-                    _items[i].$3,
+                    _items[i].$4,
                     style: const TextStyle(
                       fontSize: 14,
                       height: 20 / 14,
                       color: AppColors.onSurfaceVariant,
                     ),
                   ),
-                  onTap: () => onSelect(_items[i].$2),
+                  onTap: () => onSelectStation(_items[i].$2),
                 ),
               ],
             ],
@@ -780,7 +1044,7 @@ class _NavItem extends StatelessWidget {
               )
             : null,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: Checkbox.width == 0 ? MainAxisAlignment.center : MainAxisAlignment.center,
           children: [
             Icon(
               icon,
