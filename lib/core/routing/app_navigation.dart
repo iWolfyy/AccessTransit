@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/user_model.dart';
@@ -20,10 +21,14 @@ abstract final class AppNavigation {
     );
   }
 
-  /// Opens Live Journey with sample defaults (UI flow).
-  static Future<void> openLive(BuildContext context) {
+  /// Opens Live Journey, passing the current user's UID so the screen can
+  /// resolve the active journey from Firestore.
+  static Future<void> openLive(BuildContext context, {String? passengerId}) {
+    final uid = passengerId ?? FirebaseAuth.instance.currentUser?.uid ?? '';
     return Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const LiveJourneyScreen()),
+      MaterialPageRoute(
+        builder: (_) => LiveJourneyScreen(passengerId: uid),
+      ),
     );
   }
 

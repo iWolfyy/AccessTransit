@@ -1,12 +1,22 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../constants/firestore_constants.dart';
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/time_utils.dart';
+import '../../logic/status_logic.dart';
+import '../../models/report.dart';
+import '../../services/firestore_service.dart';
 
 /// Community report details — status, vehicle, conditions, map, actions.
-class ReportDetailsScreen extends StatelessWidget {
+class ReportDetailsScreen extends StatefulWidget {
   const ReportDetailsScreen({
     super.key,
+    this.report,
+    this.reportId,
+    this.targetTitle = 'Central Station',
     this.title = 'Crowded Bus',
     this.reportedAgo = 'Reported 10 min ago',
     this.vehicleLabel = 'Bus 138',
@@ -21,6 +31,9 @@ class ReportDetailsScreen extends StatelessWidget {
         'https://lh3.googleusercontent.com/aida-public/AB6AXuAOMMcLufr5bpq0EgIxEjqEV1LLclBgoIANV1g531KV4Zys1O3GHBI_pr_mgZ2otnxPhD2Eaae8tKy0R23GOFc7CPANsZxaAnGPObXTw92waN1G_9v-1maG4whOGa-BcLo2mimewhM-r-F4zDN1zAGyRZpXrvTu9GDEJAIFNY3_0yFb32q3xsG1Knafg-ipok7lYOiu-IpV3g6OBm2YTwAZC_QRWqnGN-FtO5QnEuTX3jVQD-r7iw-_KA',
   });
 
+  final Report? report;
+  final String? reportId;
+  final String targetTitle;
   final String title;
   final String reportedAgo;
   final String vehicleLabel;
@@ -32,27 +45,154 @@ class ReportDetailsScreen extends StatelessWidget {
   final bool communityVerified;
   final String mapImageUrl;
 
+  @override
+  State<ReportDetailsScreen> createState() => _ReportDetailsScreenState();
+}
+
+class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   static const double _desktopBreakpoint = 768;
   static const Color _tertiaryContainer = Color(0xFF7D3500);
 
-  void _showSnack(BuildContext context, String message) {
+  bool _isLoadingAction = false;
+
+  void _showSnack(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _onNavTap(BuildContext context, String label) {
+  void _onNavTap(String label) {
     AppNavigation.handleBottomNav(
       context,
       label,
       currentTab: 'Community',
-      onUnsupported: (message) => _showSnack(context, message),
+      onUnsupported: _showSnack,
     );
+  }
+
+  Future<void> _handleConfirm(Report report) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'user_anon';
+    if (report.confirmedBy.contains(userId)) {
+      _showSnack('You already confirmed this report.');
+      return;
+    }
+
+    setState(() => _isLoadingAction = true);
+    try {
+      await FirestoreService().confirmReport(report.id, userId);
+      if (mounted) {
+        _showSnack('Confirmed report! Expiry timer reset.');
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Action failed: ${e.toString().replaceAll('Exception: ', '')}');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingAction = false);
+    }
+  }
+
+  Future<void> _handleResolve(Report report) async {
+    setState(() => _isLoadingAction = true);
+    try {
+      await FirestoreService().resolveReport(report.id);
+      if (mounted) {
+        _showSnack('Report marked as resolved!');
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Action failed: ${e.toString().replaceAll('Exception: ', '')}');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingAction = false);
+    }
+  }
+
+  Future<void> _handleFlag(Report report) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'user_anon';
+    if (report.flaggedBy.contains(userId)) {
+      _showSnack('You already flagged this report.');
+      return;
+    }
+
+    setState(() => _isLoadingAction = true);
+    try {
+      await FirestoreService().flagReport(report.id, userId);
+      if (mounted) {
+        _showSnack('Report flagged as false.');
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Action failed: ${e.toString().replaceAll('Exception: ', '')}');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingAction = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+    final targetReportId = widget.report?.id ?? widget.reportId ?? '';
+
+    if (targetReportId.isNotEmpty) {
+      return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection(FirestoreConstants.reportsCollection)
+            .doc(targetReportId)
+            .snapshots(),
+        builder: (context, snapshot) {
+          Report currentReport = widget.report ??
+              Report(
+                id: targetReportId,
+                targetType: 'station',
+                targetId: '',
+                problemType: widget.title,
+                status: 'active',
+                createdAt: DateTime.now(),
+                userId: '',
+              );
+
+          if (snapshot.hasData && snapshot.data!.exists) {
+            currentReport = Report.fromFirestore(snapshot.data!);
+          }
+
+          return _buildContent(context, isDesktop, currentReport);
+        },
+      );
+    }
+
+    return _buildContent(context, isDesktop, widget.report);
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    bool isDesktop,
+    Report? report,
+  ) {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'user_anon';
+    final isReportActive =
+        report != null ? StatusLogic.isReportActive(report) : true;
+    final isResolved = report?.status.toLowerCase() == 'resolved';
+    final isHidden = report?.status.toLowerCase() == 'hidden';
+    final hasConfirmed = report?.confirmedBy.contains(userId) ?? false;
+    final hasFlagged = report?.flaggedBy.contains(userId) ?? false;
+
+    final displayTitle = report?.problemType ?? widget.title;
+    final timeAgoText = report != null
+        ? 'Reported ${TimeUtils.formatRelativeTime(report.createdAt)}'
+        : widget.reportedAgo;
+    final lastConfirmedAgoText = report?.lastConfirmedAt != null
+        ? TimeUtils.formatRelativeTime(report!.lastConfirmedAt!)
+        : TimeUtils.formatRelativeTime(report?.createdAt ?? DateTime.now());
+
+    final trustLine = report != null
+        ? (report.confirmCount > 0
+            ? 'Confirmed by ${report.confirmCount} ${report.confirmCount == 1 ? 'rider' : 'riders'}, $lastConfirmedAgoText'
+            : 'Reported $timeAgoText')
+        : 'Confirmed by riders';
+
+    final targetNameLabel = widget.targetTitle;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -60,9 +200,7 @@ class ReportDetailsScreen extends StatelessWidget {
         children: [
           _TopBar(
             onBack: () => Navigator.of(context).maybePop(),
-            onProfile: isDesktop
-                ? () => _onNavTap(context, 'Profile')
-                : null,
+            onProfile: isDesktop ? () => _onNavTap('Profile') : null,
           ),
           Expanded(
             child: ListView(
@@ -80,28 +218,62 @@ class ReportDetailsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _StatusCard(
-                          title: title,
-                          reportedAgo: reportedAgo,
-                          vehicleLabel: vehicleLabel,
-                          routeLabel: routeLabel,
-                          crowdLevel: crowdLevel,
-                          accessibilityLabel: accessibilityLabel,
-                          quote: quote,
-                          communityVerified: communityVerified,
+                          title: displayTitle,
+                          reportedAgo: trustLine,
+                          vehicleLabel: targetNameLabel,
+                          routeLabel: report != null
+                              ? 'Target: ${report.targetType.toUpperCase()} (${report.targetId})'
+                              : widget.routeLabel,
+                          crowdLevel: widget.crowdLevel,
+                          accessibilityLabel: isResolved
+                              ? 'Resolved / Fixed'
+                              : (isReportActive ? 'Warning / Issue' : 'Expired'),
+                          quote: widget.quote,
+                          communityVerified: (report?.confirmCount ?? 0) > 0,
+                          isResolved: isResolved,
+                          isExpired: !isReportActive && !isResolved,
                           tertiaryContainer: _tertiaryContainer,
                         ),
                         const SizedBox(height: 24),
                         _MapSection(
-                          imageUrl: mapImageUrl,
-                          locationLabel: mapLocationLabel,
+                          imageUrl: widget.mapImageUrl,
+                          locationLabel: targetNameLabel,
                         ),
                         const SizedBox(height: 24),
-                        _ActionButtons(
-                          onShare: () =>
-                              _showSnack(context, 'Share Alert coming soon.'),
-                          onAddUpdate: () =>
-                              _showSnack(context, 'Add Update coming soon.'),
-                        ),
+                        if (report != null && !isHidden) ...[
+                          _ReportActionPanel(
+                            report: report,
+                            isReportActive: isReportActive,
+                            isResolved: isResolved,
+                            hasConfirmed: hasConfirmed,
+                            hasFlagged: hasFlagged,
+                            isLoading: _isLoadingAction,
+                            onConfirm: () => _handleConfirm(report),
+                            onResolve: () => _handleResolve(report),
+                            onFlag: () => _handleFlag(report),
+                          ),
+                        ] else if (isHidden) ...[
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.errorContainer.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'This report has been hidden due to multiple false flags.',
+                              style: TextStyle(
+                                color: AppColors.error,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          _ActionButtons(
+                            onShare: () => _showSnack('Share Alert coming soon.'),
+                            onAddUpdate: () =>
+                                _showSnack('Add Update coming soon.'),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -114,7 +286,7 @@ class ReportDetailsScreen extends StatelessWidget {
       bottomNavigationBar: isDesktop
           ? null
           : _DetailsBottomNav(
-              onNavTap: (label) => _onNavTap(context, label),
+              onNavTap: _onNavTap,
             ),
     );
   }
@@ -191,6 +363,8 @@ class _StatusCard extends StatelessWidget {
     required this.accessibilityLabel,
     required this.quote,
     required this.communityVerified,
+    required this.isResolved,
+    required this.isExpired,
     required this.tertiaryContainer,
   });
 
@@ -202,10 +376,21 @@ class _StatusCard extends StatelessWidget {
   final String accessibilityLabel;
   final String quote;
   final bool communityVerified;
+  final bool isResolved;
+  final bool isExpired;
   final Color tertiaryContainer;
 
   @override
   Widget build(BuildContext context) {
+    final Color topBarColor;
+    if (isResolved) {
+      topBarColor = AppColors.success;
+    } else if (isExpired) {
+      topBarColor = AppColors.outline;
+    } else {
+      topBarColor = AppColors.error;
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
@@ -225,7 +410,7 @@ class _StatusCard extends StatelessWidget {
             top: 0,
             left: 0,
             right: 0,
-            child: Container(height: 4, color: AppColors.error),
+            child: Container(height: 4, color: topBarColor),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
@@ -242,13 +427,17 @@ class _StatusCard extends StatelessWidget {
                           Container(
                             width: 48,
                             height: 48,
-                            decoration: const BoxDecoration(
-                              color: AppColors.errorContainer,
+                            decoration: BoxDecoration(
+                              color: isResolved
+                                  ? AppColors.success.withValues(alpha: 0.2)
+                                  : AppColors.errorContainer,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
-                              Icons.warning,
-                              color: AppColors.onErrorContainer,
+                            child: Icon(
+                              isResolved ? Icons.check_circle : Icons.warning,
+                              color: isResolved
+                                  ? AppColors.success
+                                  : AppColors.onErrorContainer,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -292,7 +481,39 @@ class _StatusCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (communityVerified) ...[
+                    if (isResolved) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.success,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Resolved',
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 16 / 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (communityVerified) ...[
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -367,30 +588,6 @@ class _StatusCard extends StatelessWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: const BoxDecoration(
-                    border: Border(
-                      left: BorderSide(
-                        color: AppColors.surfaceVariant,
-                        width: 4,
-                      ),
-                    ),
-                  ),
-                  child: Text(
-                    quote,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 20 / 14,
-                      fontStyle: FontStyle.italic,
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -415,7 +612,7 @@ class _VehicleInfo extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Vehicle Information',
+          'Target Location',
           style: TextStyle(
             fontSize: 14,
             height: 20 / 14,
@@ -427,7 +624,7 @@ class _VehicleInfo extends StatelessWidget {
         const SizedBox(height: 8),
         Row(
           children: [
-            const Icon(Icons.directions_bus, color: AppColors.primary),
+            const Icon(Icons.location_on, color: AppColors.primary),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -477,7 +674,7 @@ class _ConditionsInfo extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Current Conditions',
+          'Current Status',
           style: TextStyle(
             fontSize: 14,
             height: 20 / 14,
@@ -491,18 +688,9 @@ class _ConditionsInfo extends StatelessWidget {
           children: [
             Expanded(
               child: _MetricBadge(
-                icon: Icons.groups,
-                iconColor: AppColors.error,
-                label: 'Crowd Level',
-                value: crowdLevel,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _MetricBadge(
                 icon: Icons.accessible,
                 iconColor: tertiaryContainer,
-                label: 'Accessibility',
+                label: 'Status',
                 value: accessibilityLabel,
               ),
             ),
@@ -634,6 +822,145 @@ class _MapSection extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Action panel for real report operations (AC-79, AC-80, AC-83).
+class _ReportActionPanel extends StatelessWidget {
+  const _ReportActionPanel({
+    required this.report,
+    required this.isReportActive,
+    required this.isResolved,
+    required this.hasConfirmed,
+    required this.hasFlagged,
+    required this.isLoading,
+    required this.onConfirm,
+    required this.onResolve,
+    required this.onFlag,
+  });
+
+  final Report report;
+  final bool isReportActive;
+  final bool isResolved;
+  final bool hasConfirmed;
+  final bool hasFlagged;
+  final bool isLoading;
+  final VoidCallback onConfirm;
+  final VoidCallback onResolve;
+  final VoidCallback onFlag;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Community Verification & Actions',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (hasConfirmed)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'You already confirmed this report.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          if (hasFlagged)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'You already flagged this report.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: FilledButton.icon(
+                    onPressed: (hasConfirmed || isLoading || isResolved)
+                        ? null
+                        : onConfirm,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primaryContainer,
+                      foregroundColor: AppColors.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.thumb_up, size: 18),
+                    label: Text(
+                      hasConfirmed ? 'Confirmed' : 'Still broken',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    onPressed: (isResolved || isLoading) ? null : onResolve,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.success,
+                      side: BorderSide(
+                        color: isResolved ? AppColors.outline : AppColors.success,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: Text(
+                      isResolved ? 'Resolved' : 'Fixed now',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: (hasFlagged || isLoading) ? null : onFlag,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.error,
+              ),
+              icon: const Icon(Icons.flag_outlined, size: 16),
+              label: Text(
+                hasFlagged ? 'Flagged as false' : 'Report as false',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

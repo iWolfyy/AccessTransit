@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../logic/status_logic.dart';
+import '../../models/bus.dart';
+import '../../services/eta_service.dart';
 import 'boarding_assistance_screen.dart';
 import 'journey_confirmation_screen.dart';
 import 'report_condition_screen.dart';
@@ -14,11 +17,15 @@ class RouteDetailsScreen extends StatelessWidget {
     required this.origin,
     required this.destination,
     this.route,
+    this.bus,
+    this.statusResult,
   });
 
   final String origin;
   final String destination;
   final RouteResultItem? route;
+  final Bus? bus;
+  final BusStatusResult? statusResult;
 
   static const double _desktopBreakpoint = 768;
 
@@ -35,6 +42,12 @@ class RouteDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+
+    // ETA Service integration (AC-76)
+    final etaResult = EtaService().calculateEta(
+      liveBus: null,
+      stopName: destination,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -61,17 +74,22 @@ class RouteDetailsScreen extends StatelessWidget {
                           destination: destination,
                           durationMinutes: _durationMinutes,
                           arriveLabel: _arriveLabel,
+                          etaDisplayText: etaResult.displayText,
                         ),
                         const SizedBox(height: 24),
                         _JourneyStepsCard(
                           destination: destination,
+                          route: route,
                           crowdLevel: route?.crowdLevel ?? 'Low',
                           wheelchairAvailable:
-                              route?.accessibilityStatus !=
+                              (statusResult?.status ?? route?.accessibilityStatus) !=
                               AccessibilityStatus.notAccessible,
                         ),
                         const SizedBox(height: 24),
-                        const _CommunityVerifiedCard(),
+                        _AccessibilityStatusNoticeCard(
+                          statusResult: statusResult,
+                          route: route,
+                        ),
                         const SizedBox(height: 24),
                         _ActionButtons(
                           onStartNavigation: () {
@@ -177,12 +195,14 @@ class _SummaryCard extends StatelessWidget {
     required this.destination,
     required this.durationMinutes,
     required this.arriveLabel,
+    this.etaDisplayText = '',
   });
 
   final String origin;
   final String destination;
   final int durationMinutes;
   final String arriveLabel;
+  final String etaDisplayText;
 
   @override
   Widget build(BuildContext context) {
@@ -255,6 +275,32 @@ class _SummaryCard extends StatelessWidget {
               ),
             ],
           ),
+          if (etaDisplayText.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.timer_outlined, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      etaDisplayText,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Container(
             height: 128,
@@ -290,11 +336,13 @@ class _JourneyStepsCard extends StatelessWidget {
     required this.destination,
     required this.crowdLevel,
     required this.wheelchairAvailable,
+    this.route,
   });
 
   final String destination;
   final String crowdLevel;
   final bool wheelchairAvailable;
+  final RouteResultItem? route;
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +387,7 @@ class _JourneyStepsCard extends StatelessWidget {
                 children: [
                   _WalkStep(),
                   const SizedBox(height: 24),
-                  _BoardStep(),
+                  _BoardStep(route: route),
                   const SizedBox(height: 24),
                   _OnBoardStep(
                     crowdLevel: crowdLevel,
@@ -424,8 +472,15 @@ class _WalkStep extends StatelessWidget {
 }
 
 class _BoardStep extends StatelessWidget {
+  const _BoardStep({this.route});
+
+  final RouteResultItem? route;
+
   @override
   Widget build(BuildContext context) {
+    final busNum = route?.busId.replaceAll('bus_', '') ?? '42';
+    final busTitle = route?.title ?? 'Bus $busNum';
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -460,9 +515,9 @@ class _BoardStep extends StatelessWidget {
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
-                      '42',
-                      style: TextStyle(
+                    child: Text(
+                      busNum,
+                      style: const TextStyle(
                         fontSize: 12,
                         height: 16 / 12,
                         fontWeight: FontWeight.w500,
@@ -471,20 +526,20 @@ class _BoardStep extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Bus 42 towards Downtown Transit Center',
-                          style: TextStyle(
+                          busTitle,
+                          style: const TextStyle(
                             fontSize: 14,
                             height: 20 / 14,
                             fontWeight: FontWeight.w600,
                             color: AppColors.onSurface,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           'Board at Stop B',
                           style: TextStyle(
@@ -679,19 +734,102 @@ class _Pill extends StatelessWidget {
   }
 }
 
-class _CommunityVerifiedCard extends StatelessWidget {
-  const _CommunityVerifiedCard();
+class _AccessibilityStatusNoticeCard extends StatelessWidget {
+  const _AccessibilityStatusNoticeCard({
+    required this.statusResult,
+    required this.route,
+  });
+
+  final BusStatusResult? statusResult;
+  final RouteResultItem? route;
 
   @override
   Widget build(BuildContext context) {
+    final status = statusResult?.status ??
+        route?.accessibilityStatus ??
+        AccessibilityStatus.accessible;
+    final reasons = statusResult?.reasons ??
+        [route?.summary ?? 'Accessibility information verified.'];
+
+    if (status == AccessibilityStatus.accessible) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.outlineVariant.withValues(alpha: 0.3),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.onSurface.withValues(alpha: 0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: AppColors.secondary,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle,
+                color: AppColors.onSecondary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Safe — Community Verified Accessible',
+                    style: TextStyle(
+                      fontSize: 17,
+                      height: 22 / 17,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.secondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    reasons.isNotEmpty
+                        ? reasons.join(' · ')
+                        : 'Step-free boarding & operational wheelchair ramp.',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 20 / 14,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final isNotAcc = status == AccessibilityStatus.notAccessible;
+    final headerColor = isNotAcc ? AppColors.error : Colors.amber.shade900;
+    final bgColor = isNotAcc
+        ? AppColors.error.withValues(alpha: 0.1)
+        : Colors.amber.shade50;
+    final iconData =
+        isNotAcc ? Icons.cancel_outlined : Icons.warning_amber_rounded;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: bgColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.outlineVariant.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: headerColor.withValues(alpha: 0.4)),
         boxShadow: [
           BoxShadow(
             color: AppColors.onSurface.withValues(alpha: 0.04),
@@ -700,45 +838,54 @@ class _CommunityVerifiedCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              color: AppColors.secondary,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.check_circle,
-              color: AppColors.onSecondary,
-            ),
+          Row(
+            children: [
+              Icon(iconData, color: headerColor, size: 26),
+              const SizedBox(width: 10),
+              Text(
+                isNotAcc
+                    ? 'Not Accessible Notice'
+                    : 'Accessibility Warning Notice',
+                style: TextStyle(
+                  fontSize: 17,
+                  height: 22 / 17,
+                  fontWeight: FontWeight.bold,
+                  color: headerColor,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Community Verified',
-                  style: TextStyle(
-                    fontSize: 18,
-                    height: 24 / 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.secondary,
+          const SizedBox(height: 12),
+          ...reasons.map(
+            (reason) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '• ',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: headerColor,
+                    ),
                   ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Ramp working today (15 mins ago)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 20 / 14,
-                    color: AppColors.onSurfaceVariant,
+                  Expanded(
+                    child: Text(
+                      reason,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 20 / 14,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

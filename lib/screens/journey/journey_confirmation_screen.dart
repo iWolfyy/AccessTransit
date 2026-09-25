@@ -1,7 +1,12 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/enums/bus_status.dart';
+import '../../models/journey_model.dart';
+import '../../services/journey_service.dart';
+import '../../services/live_bus_service.dart';
 import 'live_journey_screen.dart';
 import 'route_results_screen.dart';
 
@@ -34,6 +39,98 @@ class JourneyConfirmationScreen extends StatelessWidget {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Ensures a valid live location document exists in Firestore for [busId].
+  Future<void> _seedLiveLocationIfMissing(
+    String busId,
+    RouteResultItem? route,
+  ) async {
+    try {
+      final liveService = LiveBusService();
+      final existing = await liveService.getLiveLocation(busId);
+      if (existing == null || !existing.isBroadcasting) {
+        final busNum = busId.replaceAll('bus_', '');
+        double lat = 6.9271;
+        double lng = 79.8612;
+        if (busId == 'bus_01') {
+          lat = 7.2513; // Hettimulla / Kegalle area on Route 01
+          lng = 80.3464;
+        } else if (busId == 'bus_02') {
+          lat = 6.4000;
+          lng = 79.9800;
+        } else if (busId == 'bus_87') {
+          lat = 8.3114;
+          lng = 80.4037;
+        } else if (busId == 'bus_49') {
+          lat = 7.8731;
+          lng = 80.7718;
+        } else if (busId == 'bus_99') {
+          lat = 6.8833;
+          lng = 80.6000;
+        }
+
+        await liveService.startLiveLocation(
+          busId: busId,
+          routeId: route?.id ?? 'route_$busNum',
+          driverId: 'operator_system',
+          latitude: lat,
+          longitude: lng,
+          speed: 42.0,
+          heading: 65.0,
+          status: BusStatus.active,
+          routeNumber: busNum,
+          routeName: route?.title ?? 'Route $busNum',
+          operatorName: 'Sri Lanka Transit Operator',
+        );
+      }
+    } catch (_) {
+      // Non-fatal if write fails
+    }
+  }
+
+  /// Creates the journey document then navigates to [LiveJourneyScreen].
+  Future<void> _confirmAndStart(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final passengerId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final busId = route?.busId ?? 'bus_01';
+
+    // Seed live bus location so map has telemetry data right away
+    await _seedLiveLocationIfMissing(busId, route);
+
+    // Write journey to Firestore if user is authenticated.
+    if (passengerId.isNotEmpty) {
+      try {
+        final busNum = busId.replaceAll('bus_', '');
+        await JourneyService().createJourney(
+          JourneyModel(
+            journeyId: '', // will be replaced by Firestore auto-ID
+            passengerId: passengerId,
+            routeId: route?.id ?? 'route_$busNum',
+            routeNumber: busNum,
+            routeTitle: route?.title ?? 'Bus $busNum',
+            busId: busId,
+            origin: origin,
+            destination: destination,
+            status: JourneyStatus.confirmed,
+          ),
+        );
+      } catch (_) {
+        // Non-fatal: if write fails, still open Live Journey with busId fallback.
+      }
+    }
+
+    navigator.pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => LiveJourneyScreen(
+          origin: origin,
+          destination: destination,
+          route: route,
+          busId: busId,
+          passengerId: passengerId,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 768;
@@ -63,20 +160,13 @@ class JourneyConfirmationScreen extends StatelessWidget {
                         const SizedBox(height: 24),
                         const _AccessibilityVerifiedSection(),
                         const SizedBox(height: 24),
-                        _DepartureDetailsSection(origin: origin),
+                        _DepartureDetailsSection(
+                          origin: origin,
+                          route: route,
+                        ),
                         const SizedBox(height: 24),
                         _FixedActions(
-                          onConfirm: () {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => LiveJourneyScreen(
-                                  origin: origin,
-                                  destination: destination,
-                                  route: route,
-                                ),
-                              ),
-                            );
-                          },
+                          onConfirm: () => _confirmAndStart(context),
                           onSetAlert: () =>
                               _showSnack(context, 'Departure alert set.'),
                           onShare: () =>
@@ -420,12 +510,19 @@ class _AccessibilityVerifiedSection extends StatelessWidget {
 }
 
 class _DepartureDetailsSection extends StatelessWidget {
-  const _DepartureDetailsSection({required this.origin});
+  const _DepartureDetailsSection({
+    required this.origin,
+    this.route,
+  });
 
   final String origin;
+  final RouteResultItem? route;
 
   @override
   Widget build(BuildContext context) {
+    final busTitle = route?.title ?? 'Bus 42';
+    final etaLabel = route?.etaLabel ?? 'In 4 mins';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -545,10 +642,10 @@ class _DepartureDetailsSection extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Expanded(
+                              Expanded(
                                 child: Text(
-                                  'Bus 42',
-                                  style: TextStyle(
+                                  busTitle,
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     height: 24 / 18,
                                     fontWeight: FontWeight.w600,
@@ -565,9 +662,9 @@ class _DepartureDetailsSection extends StatelessWidget {
                                   color: AppColors.errorContainer,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text(
-                                  'In 4 mins',
-                                  style: TextStyle(
+                                child: Text(
+                                  etaLabel,
+                                  style: const TextStyle(
                                     fontSize: 12,
                                     height: 16 / 12,
                                     fontWeight: FontWeight.w700,
@@ -705,7 +802,7 @@ class _ConfirmBottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 72,
+          height: 76,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [

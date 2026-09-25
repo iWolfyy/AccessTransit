@@ -82,6 +82,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     switch (_user?.role) {
       case UserRole.contributor:
         return 'Community Contributor';
+      case UserRole.operator:
+        return 'Transit Bus Operator';
+      case UserRole.admin:
+        return 'System Administrator';
       case UserRole.passenger:
       case null:
         return 'Inclusive Commuter';

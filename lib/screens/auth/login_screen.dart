@@ -2,8 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/validators.dart';
+import '../../models/enums/user_role.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth/auth_input_field.dart';
+import '../operator/operator_dashboard_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
@@ -49,20 +51,26 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
+      final profile = await _authService.getCurrentUserProfile();
       if (!mounted) return;
 
-      // Open preferences immediately after auth succeeds.
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const AccessibilityPreferencesScreen(
-            continueToHome: true,
+      if (profile?.role == UserRole.operator) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const OperatorDashboardScreen(),
           ),
-        ),
-        (route) => false,
-      );
-
-      // Warm the profile in the background for Home/Profile screens.
-      _authService.getCurrentUserProfile().ignore();
+          (route) => false,
+        );
+      } else {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const AccessibilityPreferencesScreen(
+              continueToHome: true,
+            ),
+          ),
+          (route) => false,
+        );
+      }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       _showMessage(_getAuthErrorMessage(e), isError: true);
