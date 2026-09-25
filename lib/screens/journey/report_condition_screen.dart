@@ -1,7 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/report.dart';
+import '../../services/firestore_service.dart';
 import 'report_submitted_screen.dart';
 
 enum ReportCategory {
@@ -19,9 +22,13 @@ enum ReportSeverity { minor, moderate, major }
 class ReportConditionScreen extends StatefulWidget {
   const ReportConditionScreen({
     super.key,
+    this.targetType = 'station',
+    this.targetId = 'st_01',
     this.initialLocation = 'Central Station - Main Entrance',
   });
 
+  final String targetType;
+  final String targetId;
   final String initialLocation;
 
   @override
@@ -36,6 +43,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
   ReportCategory _category = ReportCategory.rampAccess;
   ReportSeverity _severity = ReportSeverity.moderate;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -57,18 +65,82 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final location = _locationController.text.trim();
     if (location.isEmpty) {
       _showSnack('Please enter a location or vehicle.');
       return;
     }
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => const ReportSubmittedScreen(),
-      ),
-    );
+    setState(() => _isSubmitting = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final userId = user?.uid ?? 'user_anon';
+      final targetId = widget.targetId.isNotEmpty ? widget.targetId : location;
+
+      // Rate limit check: 15 minutes window (AC-77)
+      final isRateLimited = await FirestoreService().checkRateLimit(
+        userId,
+        targetId,
+        thresholdMinutes: 15,
+      );
+
+      if (isRateLimited && mounted) {
+        _showSnack(
+          'You already submitted a report for this target recently. Please wait 15 minutes before reporting again.',
+        );
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
+      final problemLabel = switch (_category) {
+        ReportCategory.rampAccess => 'Ramp broken',
+        ReportCategory.elevatorOut => 'Elevator broken',
+        ReportCategory.crowding => 'Ramp stuck',
+        ReportCategory.cleanliness => 'Cleanliness issue',
+        ReportCategory.safetyHazard => 'Safety Hazard',
+        ReportCategory.other => _detailsController.text.trim().isNotEmpty
+            ? _detailsController.text.trim()
+            : 'Other issue',
+      };
+
+      final report = Report(
+        id: '',
+        targetType: widget.targetType,
+        targetId: targetId,
+        problemType: problemLabel,
+        status: 'active',
+        createdAt: DateTime.now(),
+        lastConfirmedAt: DateTime.now(),
+        confirmCount: 0,
+        falseCount: 0,
+        userId: userId,
+        confirmedBy: const [],
+        flaggedBy: const [],
+      );
+
+      await FirestoreService().createReport(report);
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ReportSubmittedScreen(
+              report: report,
+              targetName: location,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Error submitting report: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -436,7 +508,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                         SizedBox(
                           height: 56,
                           child: FilledButton.icon(
-                            onPressed: _submit,
+                            onPressed: _isSubmitting ? null : _submit,
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.primaryContainer,
                               foregroundColor: AppColors.onPrimary,
@@ -448,8 +520,19 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            icon: const Icon(Icons.send, size: 20),
-                            label: const Text('Submit Report'),
+                            icon: _isSubmitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.onPrimary,
+                                    ),
+                                  )
+                                : const Icon(Icons.send, size: 20),
+                            label: Text(
+                              _isSubmitting ? 'Submitting...' : 'Submit Report',
+                            ),
                           ),
                         ),
                       ],
