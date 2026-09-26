@@ -75,8 +75,14 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      final userId = user?.uid ?? 'user_anon';
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        try {
+          final anonCred = await FirebaseAuth.instance.signInAnonymously();
+          user = anonCred.user;
+        } catch (_) {}
+      }
+      final userId = user?.uid ?? 'user_anon_${DateTime.now().millisecondsSinceEpoch}';
       final targetId = widget.targetId.isNotEmpty ? widget.targetId : location;
 
       // Rate limit check: 15 minutes window (AC-77)

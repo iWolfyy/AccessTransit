@@ -71,7 +71,14 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   }
 
   Future<void> _handleConfirm(Report report) async {
-    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'user_anon';
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      try {
+        final cred = await FirebaseAuth.instance.signInAnonymously();
+        user = cred.user;
+      } catch (_) {}
+    }
+    final userId = user?.uid ?? 'user_anon_${DateTime.now().millisecondsSinceEpoch}';
     if (report.confirmedBy.contains(userId)) {
       _showSnack('You already confirmed this report.');
       return;
