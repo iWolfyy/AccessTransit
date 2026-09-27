@@ -2,14 +2,39 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // AC-48: Users collection — profiles linked to Firebase Auth UID.
+    // Global rule for all collections & documents (AC-68 / AC-77)
+    match /{document=**} {
+      allow read, write: if true;
+    }
+
+    // Users collection
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null
-        && request.auth.uid == userId
-        && request.resource.data.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if true;
+    }
+
+    // Journeys
+    match /journeys/{journeyId} {
+      allow read, write: if true;
+    }
+
+    // Live bus locations
+    match /live_locations/{busId} {
+      allow read, write: if true;
+    }
+
+    // Stations
+    match /stations/{stationId} {
+      allow read, write: if true;
+    }
+
+    // Buses
+    match /buses/{busId} {
+      allow read, write: if true;
+    }
+
+    // AC-68 / AC-77: Reports — readable and writable by signed-in & guest users
+    match /reports/{reportId} {
+      allow read, write: if true;
     }
   }
 }

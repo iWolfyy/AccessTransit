@@ -1,7 +1,9 @@
 /// Application roles stored on the Firestore user profile.
 enum UserRole {
   passenger('passenger'),
-  contributor('contributor');
+  contributor('contributor'),
+  operator('operator'),
+  admin('admin');
 
   const UserRole(this.value);
 

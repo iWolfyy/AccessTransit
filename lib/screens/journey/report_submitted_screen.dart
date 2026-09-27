@@ -2,14 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/time_utils.dart';
+import '../../models/report.dart';
 import '../community/community_screen.dart';
 
 /// Success state after submitting a condition report.
 class ReportSubmittedScreen extends StatelessWidget {
-  const ReportSubmittedScreen({super.key});
+  const ReportSubmittedScreen({
+    super.key,
+    this.report,
+    this.targetName = 'Central Station',
+  });
+
+  final Report? report;
+  final String targetName;
 
   static const double _desktopBreakpoint = 768;
-  static const Color _statusAmber = Color(0xFFFFC107);
 
   void _showSnack(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -88,37 +96,48 @@ class ReportSubmittedScreen extends StatelessWidget {
                             ),
                           ],
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            CircleAvatar(
+                            const CircleAvatar(
                               radius: 24,
-                              backgroundColor: _statusAmber,
+                              backgroundColor: AppColors.primaryContainer,
                               child: Icon(
-                                Icons.info,
-                                color: AppColors.onSurface,
+                                Icons.accessible_forward,
+                                color: AppColors.onPrimaryContainer,
                               ),
                             ),
-                            SizedBox(width: 16),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Status: Under Review',
-                                    style: TextStyle(
+                                    report != null
+                                        ? report!.problemType
+                                        : 'Report Active',
+                                    style: const TextStyle(
                                       fontSize: 18,
                                       height: 24 / 18,
                                       fontWeight: FontWeight.w600,
                                       color: AppColors.onSurface,
                                     ),
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Text(
-                                    'Our team is verifying your report.',
-                                    style: TextStyle(
+                                    '$targetName • ${report != null ? TimeUtils.formatRelativeTime(report!.createdAt) : 'Just now'}',
+                                    style: const TextStyle(
                                       fontSize: 14,
                                       height: 20 / 14,
                                       color: AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Status: Active • Visible in Community Hub',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primary,
                                     ),
                                   ),
                                 ],
