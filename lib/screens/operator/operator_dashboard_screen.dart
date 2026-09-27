@@ -5,10 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/time_utils.dart';
 import '../../data/seed_data.dart';
+import '../../models/boarding_request.dart';
+import '../../models/bus.dart';
 import '../../models/bus_location_model.dart';
 import '../../models/enums/bus_status.dart';
 import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 import '../../services/live_bus_service.dart';
 import '../../services/location_service.dart';
 import '../auth/login_screen.dart';
@@ -26,23 +30,31 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   final LiveBusService _liveBusService = LiveBusService();
   final LocationService _locationService = LocationService();
   final AuthService _authService = AuthService();
+  final FirestoreService _firestoreService = FirestoreService();
 
   StreamSubscription<Position>? _positionSubscription;
+  StreamSubscription<List<Bus>>? _busesSubscription;
+  StreamSubscription<Bus?>? _busDocSubscription;
+
   Timer? _tripTimer;
   Duration _tripDuration = Duration.zero;
 
   bool _isTripActive = false;
   bool _isInitializing = false;
+  bool _userManuallySelectedBus = false;
 
-  String _selectedBusId = 'bus_01';
-  String _selectedRouteId = 'route_01';
-  String _selectedRouteNumber = '01';
-  String _selectedRouteName = 'Route 01: Colombo → Kandy';
-  String _nextStop = 'Kandy Bus Stand';
+  List<Bus> _availableBuses = SeedData.sampleBuses;
+  Bus? _currentBus;
+
+  String _selectedBusId = 'bus_138_outbound';
+  String _selectedRouteId = 'route_138';
+  String _selectedRouteNumber = '138';
+  String _selectedRouteName = 'Route 138: Pettah → Kottawa';
+  String _nextStop = 'Kottawa Highway Bus Station';
 
   bool _rampOperational = true;
   bool _elevatorWorking = true;
-  String _occupancyLevel = 'Moderate';
+  String _occupancyLevel = 'Medium';
 
   double? _currentLat;
   double? _currentLng;
@@ -50,74 +62,144 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   double _heading = 0.0;
   DateTime? _lastUpdateTimestamp;
 
-  static const List<Map<String, String>> _routes = [
-    {
-      'busId': 'bus_01',
-      'routeId': 'route_01',
-      'number': '01',
-      'name': 'Route 01: Colombo → Kandy',
-      'nextStop': 'Kandy Bus Stand',
-    },
-    {
-      'busId': 'bus_02',
-      'routeId': 'route_02',
-      'number': '02',
-      'name': 'Route 02: Colombo → Galle',
-      'nextStop': 'Galle Bus Stand',
-    },
-    {
-      'busId': 'bus_87',
-      'routeId': 'route_87',
-      'number': '87',
-      'name': 'Route 87: Colombo → Jaffna',
-      'nextStop': 'Jaffna Station',
-    },
-    {
-      'busId': 'bus_49',
-      'routeId': 'route_49',
-      'number': '49',
-      'name': 'Route 49: Colombo → Trincomalee',
-      'nextStop': 'Trincomalee Bus Stand',
-    },
-    {
-      'busId': 'bus_99',
-      'routeId': 'route_99',
-      'number': '99',
-      'name': 'Route 99: Colombo → Badulla',
-      'nextStop': 'Badulla Main Terminal',
-    },
-    {
-      'busId': 'bus_42',
-      'routeId': 'route_42',
-      'number': '42',
-      'name': 'Express Downtown',
-      'nextStop': 'Central Station',
-    },
-    {
-      'busId': 'bus_101',
-      'routeId': 'route_101',
-      'number': '101',
-      'name': 'Coastal Route',
-      'nextStop': 'South Terminal',
-    },
-    {
-      'busId': 'bus_15',
-      'routeId': 'route_15',
-      'number': '15',
-      'name': 'Airport Link',
-      'nextStop': 'City Hospital',
-    },
-  ];
-
   static const List<String> _occupancyOptions = [
     'Low',
-    'Moderate',
+    'Medium',
     'High',
-    'Full',
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _subscribeToBuses();
+  }
+
+  void _subscribeToBuses() {
+    _busesSubscription?.cancel();
+    _busesSubscription = _firestoreService.streamBuses().listen((buses) {
+      if (!mounted) return;
+      final currentUserId = _authService.currentUser?.uid;
+      final list = buses.isNotEmpty ? buses : SeedData.sampleBuses;
+
+      setState(() {
+        _availableBuses = list;
+        if (!_userManuallySelectedBus) {
+          final myBus = list.cast<Bus?>().firstWhere(
+                (b) => b?.driverId != null && b?.driverId == currentUserId,
+                orElse: () => null,
+              );
+          if (myBus != null) {
+            _selectedBusId = myBus.id;
+          } else if (!_availableBuses.any((b) => b.id == _selectedBusId)) {
+            _selectedBusId = _availableBuses.first.id;
+          }
+        }
+      });
+      _listenToSelectedBus(_selectedBusId);
+    });
+  }
+
+  void _listenToSelectedBus(String busId) {
+    _busDocSubscription?.cancel();
+    _busDocSubscription = _firestoreService.streamBusById(busId).listen((bus) {
+      if (!mounted || bus == null) return;
+      setState(() {
+        _currentBus = bus;
+        _rampOperational = bus.rampOk;
+        final occ = bus.occupancy.toLowerCase();
+        if (occ == 'low') {
+          _occupancyLevel = 'Low';
+        } else if (occ == 'high') {
+          _occupancyLevel = 'High';
+        } else {
+          _occupancyLevel = 'Medium';
+        }
+
+        _selectedRouteNumber = bus.routeNo;
+        _selectedRouteId = 'route_${bus.routeNo}';
+        _selectedRouteName = 'Route ${bus.routeNo}';
+        if (bus.stops.isNotEmpty) {
+          _nextStop = bus.stops.last;
+        }
+      });
+    });
+  }
+
+  Future<void> _claimBusAssignment() async {
+    final currentUserId = _authService.currentUser?.uid ?? 'operator_dev';
+    try {
+      await _firestoreService.assignBusDriver(_selectedBusId, currentUserId);
+      _showSnack('Bus $_selectedRouteNumber is now assigned to you!');
+    } catch (e) {
+      _showSnack('Failed to assign bus: $e', isError: true);
+    }
+  }
+
+  Future<void> _onRampToggled(bool val) async {
+    final currentUserId = _authService.currentUser?.uid ?? 'operator_dev';
+    final isAssignedDriver = _currentBus == null ||
+        _currentBus?.driverId == null ||
+        _currentBus?.driverId == currentUserId;
+
+    if (!isAssignedDriver) {
+      _showSnack(
+        'Only the assigned driver can update this bus.',
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() => _rampOperational = val);
+    try {
+      await _firestoreService.updateBusAccessibility(
+        _selectedBusId,
+        rampOk: val,
+        driverId: currentUserId,
+      );
+      _pushAccessibilityUpdate();
+      _showSnack(
+        val
+            ? 'Ramp marked Working (Riders will see Safe)'
+            : 'Ramp marked Broken (Riders will see Warning)',
+      );
+    } catch (e) {
+      _showSnack('Failed to update ramp status: $e', isError: true);
+    }
+  }
+
+  Future<void> _onOccupancyChanged(String? val) async {
+    if (val == null) return;
+    final currentUserId = _authService.currentUser?.uid ?? 'operator_dev';
+    final isAssignedDriver = _currentBus == null ||
+        _currentBus?.driverId == null ||
+        _currentBus?.driverId == currentUserId;
+
+    if (!isAssignedDriver) {
+      _showSnack(
+        'Only the assigned driver can update this bus.',
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() => _occupancyLevel = val);
+    try {
+      await _firestoreService.updateBusAccessibility(
+        _selectedBusId,
+        occupancy: val.toLowerCase(),
+        driverId: currentUserId,
+      );
+      _pushAccessibilityUpdate();
+      _showSnack('Occupancy updated to $val');
+    } catch (e) {
+      _showSnack('Failed to update occupancy: $e', isError: true);
+    }
+  }
+
+  @override
   void dispose() {
+    _busesSubscription?.cancel();
+    _busDocSubscription?.cancel();
     _positionSubscription?.cancel();
     _tripTimer?.cancel();
     if (_isTripActive) {
@@ -426,6 +508,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             _buildLiveTelemetryCard(),
             const SizedBox(height: 16),
             _buildAccessibilityControlsCard(),
+            const SizedBox(height: 16),
+            _buildBoardingRequestsCard(),
           ],
         ),
       ),
@@ -531,6 +615,13 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   }
 
   Widget _buildRouteSelectorCard() {
+    final currentUserId = _authService.currentUser?.uid ?? 'operator_dev';
+    final isAssignedToMe =
+        _currentBus != null && _currentBus!.driverId == currentUserId;
+    final isUnassigned = _currentBus == null ||
+        _currentBus!.driverId == null ||
+        _currentBus!.driverId!.isEmpty;
+
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -548,21 +639,69 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   'Assigned Bus & Route',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-                if (_isTripActive) ...[
-                  const Spacer(),
-                  const Chip(
-                    label: Text(
-                      'Locked during trip',
-                      style: TextStyle(fontSize: 11),
+                const Spacer(),
+                if (isAssignedToMe)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.green.shade600),
                     ),
-                    visualDensity: VisualDensity.compact,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified,
+                            size: 14, color: Colors.green.shade700),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Assigned to You',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (isUnassigned)
+                  TextButton.icon(
+                    onPressed: _claimBusAssignment,
+                    icon: const Icon(Icons.person_add, size: 16),
+                    label: const Text('Assign to Me',
+                        style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact),
+                  )
+                else
+                  TextButton.icon(
+                    onPressed: _claimBusAssignment,
+                    icon: const Icon(Icons.swap_horiz, size: 16),
+                    label: Text(
+                      'Reassign to Me',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.amber.shade900,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: Colors.amber.withValues(alpha: 0.15),
+                    ),
                   ),
-                ],
               ],
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _selectedBusId,
+              key: ValueKey(_selectedBusId),
+              initialValue: _availableBuses.any((b) => b.id == _selectedBusId)
+                  ? _selectedBusId
+                  : (_availableBuses.isNotEmpty
+                      ? _availableBuses.first.id
+                      : null),
               decoration: InputDecoration(
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -572,26 +711,27 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   vertical: 12,
                 ),
               ),
-              items: _routes.map((r) {
+              items: _availableBuses.map((b) {
+                final isMyBus = b.driverId == currentUserId;
+                final cleanName =
+                    b.id.replaceAll('bus_', '').replaceAll('_', ' ');
                 return DropdownMenuItem<String>(
-                  value: r['busId'],
-                  child: Text('Bus ${r['number']} — ${r['name']}'),
+                  value: b.id,
+                  child: Text(
+                    'Bus ${b.routeNo} — $cleanName${isMyBus ? ' ★ (My Bus)' : ''}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 );
               }).toList(),
               onChanged: _isTripActive
                   ? null
                   : (val) {
                       if (val == null) return;
-                      final route = _routes.firstWhere(
-                        (r) => r['busId'] == val,
-                      );
+                      _userManuallySelectedBus = true;
                       setState(() {
                         _selectedBusId = val;
-                        _selectedRouteId = route['routeId']!;
-                        _selectedRouteNumber = route['number']!;
-                        _selectedRouteName = route['name']!;
-                        _nextStop = route['nextStop']!;
                       });
+                      _listenToSelectedBus(val);
                     },
             ),
           ],
@@ -688,6 +828,11 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   }
 
   Widget _buildAccessibilityControlsCard() {
+    final currentUserId = _authService.currentUser?.uid ?? 'operator_dev';
+    final isAssignedDriver = _currentBus == null ||
+        _currentBus!.driverId == null ||
+        _currentBus!.driverId == currentUserId;
+
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -697,22 +842,35 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Vehicle Accessibility Status',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                const Text(
+                  'Vehicle Accessibility Status',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                if (!isAssignedDriver)
+                  const Text(
+                    'Read-only (Not assigned)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.error,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
             SwitchListTile(
               title: const Text('Wheelchair Ramp Operational'),
-              subtitle: const Text(
-                'Confirm ramp mechanism is fully functional',
+              subtitle: Text(
+                _rampOperational
+                    ? 'Ramp operational & verified (Rider status: Safe)'
+                    : 'Ramp reported broken (Rider status: Warning)',
               ),
               value: _rampOperational,
               activeThumbColor: AppColors.primaryContainer,
-              onChanged: (val) {
-                setState(() => _rampOperational = val);
-                _pushAccessibilityUpdate();
-              },
+              onChanged: isAssignedDriver ? _onRampToggled : null,
             ),
             const Divider(),
             SwitchListTile(
@@ -720,10 +878,12 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               subtitle: const Text('Boarding lift available at stops'),
               value: _elevatorWorking,
               activeThumbColor: AppColors.primaryContainer,
-              onChanged: (val) {
-                setState(() => _elevatorWorking = val);
-                _pushAccessibilityUpdate();
-              },
+              onChanged: isAssignedDriver
+                  ? (val) {
+                      setState(() => _elevatorWorking = val);
+                      _pushAccessibilityUpdate();
+                    }
+                  : null,
             ),
             const Divider(),
             Padding(
@@ -740,17 +900,287 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                     items: _occupancyOptions.map((opt) {
                       return DropdownMenuItem(value: opt, child: Text(opt));
                     }).toList(),
-                    onChanged: (val) {
-                      if (val == null) return;
-                      setState(() => _occupancyLevel = val);
-                      _pushAccessibilityUpdate();
-                    },
+                    onChanged: isAssignedDriver ? _onOccupancyChanged : null,
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBoardingRequestsCard() {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: AppColors.surfaceContainerLowest,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: StreamBuilder<List<BoardingRequest>>(
+          stream:
+              _firestoreService.streamBoardingRequestsForBus(_selectedBusId),
+          builder: (context, snapshot) {
+            final allRequests = snapshot.data ?? [];
+            final pendingRequests = allRequests
+                .where((r) => r.status.toLowerCase() == 'pending')
+                .toList();
+            final completedRequests = allRequests
+                .where((r) => r.status.toLowerCase() != 'pending')
+                .toList();
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.assist_walker_rounded,
+                        color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Boarding Assistance Requests',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: pendingRequests.isNotEmpty
+                            ? AppColors.primaryContainer
+                            : AppColors.outlineVariant.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${pendingRequests.length} Pending',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: pendingRequests.isNotEmpty
+                              ? AppColors.onPrimary
+                              : AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (pendingRequests.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            size: 36,
+                            color: Colors.green.shade600,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'No pending boarding requests for this bus.',
+                            style: TextStyle(color: AppColors.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: pendingRequests.length,
+                    separatorBuilder: (context, index) =>
+                        const Divider(height: 16),
+                    itemBuilder: (context, index) {
+                      final req = pendingRequests[index];
+                      return _buildRequestItem(req);
+                    },
+                  ),
+                if (completedRequests.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Theme(
+                    data: Theme.of(context)
+                        .copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: Text(
+                        'Completed / Acknowledged (${completedRequests.length})',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                      children: completedRequests.map((req) {
+                        final isCompleted =
+                            req.status.toLowerCase() == 'completed';
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isCompleted ? Icons.task_alt : Icons.done,
+                                size: 16,
+                                color: isCompleted
+                                    ? Colors.green
+                                    : Colors.orange,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${req.riderName} at ${req.stopName} (${req.assistanceTypes.join(', ')})',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isCompleted
+                                      ? Colors.green.withValues(alpha: 0.15)
+                                      : Colors.orange.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  req.status.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isCompleted
+                                        ? Colors.green.shade800
+                                        : Colors.orange.shade800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRequestItem(BoardingRequest req) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+        border:
+            Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.person, size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Text(
+                req.riderName,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const Spacer(),
+              Text(
+                TimeUtils.formatRelativeTime(req.createdAt),
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.onSurfaceVariant),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.location_on,
+                  size: 16, color: AppColors.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Stop: ${req.stopName}',
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: req.assistanceTypes.map((type) {
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  type,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              OutlinedButton(
+                onPressed: () async {
+                  await _firestoreService.updateBoardingRequestStatus(
+                    req.id,
+                    'acknowledged',
+                  );
+                  _showSnack('Request acknowledged');
+                },
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: const Text('Acknowledge'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: () async {
+                  await _firestoreService.updateBoardingRequestStatus(
+                    req.id,
+                    'completed',
+                  );
+                  _showSnack('Request marked completed');
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                icon: const Icon(Icons.check, size: 16),
+                label: const Text('Complete'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
