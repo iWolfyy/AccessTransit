@@ -84,7 +84,7 @@ class StatusLogic {
     // 2a. Vehicle ramp marked broken
     if (!bus.rampOk) {
       isWarning = true;
-      reasons.add('Vehicle wheelchair ramp is reported out of service or broken.');
+      reasons.add('Ramp reported broken: Vehicle wheelchair ramp is reported out of service.');
     }
 
     // 2b. Active report on the bus itself
