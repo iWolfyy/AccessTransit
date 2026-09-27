@@ -36,5 +36,10 @@ service cloud.firestore {
     match /reports/{reportId} {
       allow read, write: if true;
     }
+
+    // AC-86: Boarding assistance requests
+    match /boarding_requests/{requestId} {
+      allow read, write: if true;
+    }
   }
 }
