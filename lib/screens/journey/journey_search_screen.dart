@@ -604,7 +604,7 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                     )
                   : ListView.separated(
                       itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (context, index) {
                         final s = filtered[index];
                         final isSelected = s.id == widget.selectedStationId;
