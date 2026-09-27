@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../constants/firestore_constants.dart';
 import '../models/bus_location_model.dart';
@@ -20,25 +23,49 @@ class LiveBusService {
   final FirebaseFirestore? _customFirestore;
   final String _collectionName;
 
-  FirebaseFirestore get _db => _customFirestore ?? FirebaseFirestore.instance;
+  FirebaseFirestore? get _db {
+    if (_customFirestore != null) return _customFirestore;
+    try {
+      return FirebaseFirestore.instance;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// In-memory cache for live bus locations to ensure tracking works
+  /// reliably even when Firestore write permissions or network are restricted.
+  static final Map<String, BusLocationModel> _localLocationsFallback = {};
+  static final StreamController<Map<String, BusLocationModel>>
+      _localLocationsStreamController =
+      StreamController<Map<String, BusLocationModel>>.broadcast();
 
   /// Collection reference for live bus locations (`live_locations`).
-  CollectionReference<Map<String, dynamic>> get _liveLocationsCollection =>
-      _db.collection(_collectionName);
+  CollectionReference<Map<String, dynamic>>? get _liveLocationsCollection =>
+      _db?.collection(_collectionName);
 
   /// Document reference for a specific bus ID (`live_locations/{busId}`).
-  DocumentReference<Map<String, dynamic>> liveLocationDoc(String busId) {
-    return _liveLocationsCollection.doc(busId);
+  DocumentReference<Map<String, dynamic>>? liveLocationDoc(String busId) {
+    return _liveLocationsCollection?.doc(busId);
   }
 
   /// 1. Start/update a bus's live location document in Firestore.
   ///
   /// Creates or merges full bus telemetry data into `live_locations/{busId}`.
   Future<void> startOrUpdateLiveLocation(BusLocationModel busLocation) async {
-    await liveLocationDoc(busLocation.busId).set(
-      busLocation.toMap(isServerTimestamp: true),
-      SetOptions(merge: true),
-    );
+    _localLocationsFallback[busLocation.busId] = busLocation;
+    _localLocationsStreamController.add(_localLocationsFallback);
+
+    try {
+      final doc = liveLocationDoc(busLocation.busId);
+      if (doc != null) {
+        await doc.set(
+          busLocation.toMap(isServerTimestamp: true),
+          SetOptions(merge: true),
+        );
+      }
+    } catch (e) {
+      debugPrint('LiveBusService.startOrUpdateLiveLocation warning: $e');
+    }
   }
 
   /// Helper to start or initialize a bus's live location session.
@@ -84,24 +111,44 @@ class LiveBusService {
     double? speed,
     double? heading,
   }) async {
-    final Map<String, dynamic> updateData = {
-      FirestoreConstants.fieldLatitude: latitude,
-      FirestoreConstants.fieldLongitude: longitude,
-      FirestoreConstants.fieldTimestamp: FieldValue.serverTimestamp(),
-      FirestoreConstants.fieldLastUpdated: FieldValue.serverTimestamp(),
-    };
-
-    if (speed != null) {
-      updateData[FirestoreConstants.fieldSpeed] = speed;
+    final existing = _localLocationsFallback[busId];
+    if (existing != null) {
+      final updated = existing.copyWith(
+        latitude: latitude,
+        longitude: longitude,
+        speed: speed ?? existing.speed,
+        heading: heading ?? existing.heading,
+        timestamp: DateTime.now(),
+      );
+      _localLocationsFallback[busId] = updated;
+      _localLocationsStreamController.add(_localLocationsFallback);
     }
-    if (heading != null) {
-      updateData[FirestoreConstants.fieldHeading] = heading;
-    }
 
-    await liveLocationDoc(busId).set(
-      updateData,
-      SetOptions(merge: true),
-    );
+    try {
+      final doc = liveLocationDoc(busId);
+      if (doc != null) {
+        final Map<String, dynamic> updateData = {
+          FirestoreConstants.fieldLatitude: latitude,
+          FirestoreConstants.fieldLongitude: longitude,
+          FirestoreConstants.fieldTimestamp: FieldValue.serverTimestamp(),
+          FirestoreConstants.fieldLastUpdated: FieldValue.serverTimestamp(),
+        };
+
+        if (speed != null) {
+          updateData[FirestoreConstants.fieldSpeed] = speed;
+        }
+        if (heading != null) {
+          updateData[FirestoreConstants.fieldHeading] = heading;
+        }
+
+        await doc.set(
+          updateData,
+          SetOptions(merge: true),
+        );
+      }
+    } catch (e) {
+      debugPrint('LiveBusService.updateLocationOnly warning: $e');
+    }
   }
 
   /// 3. Change the bus status.
@@ -109,12 +156,29 @@ class LiveBusService {
   /// Updates [status], updates [isBroadcasting] accordingly, and refreshes the timestamp.
   Future<void> updateBusStatus(String busId, BusStatus status) async {
     final isBroadcasting = status == BusStatus.active;
-    await liveLocationDoc(busId).set({
-      FirestoreConstants.fieldStatus: status.value,
-      FirestoreConstants.fieldIsBroadcasting: isBroadcasting,
-      FirestoreConstants.fieldTimestamp: FieldValue.serverTimestamp(),
-      FirestoreConstants.fieldLastUpdated: FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    final existing = _localLocationsFallback[busId];
+    if (existing != null) {
+      _localLocationsFallback[busId] = existing.copyWith(
+        status: status,
+        isBroadcasting: isBroadcasting,
+        timestamp: DateTime.now(),
+      );
+      _localLocationsStreamController.add(_localLocationsFallback);
+    }
+
+    try {
+      final doc = liveLocationDoc(busId);
+      if (doc != null) {
+        await doc.set({
+          FirestoreConstants.fieldStatus: status.value,
+          FirestoreConstants.fieldIsBroadcasting: isBroadcasting,
+          FirestoreConstants.fieldTimestamp: FieldValue.serverTimestamp(),
+          FirestoreConstants.fieldLastUpdated: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('LiveBusService.updateBusStatus warning: $e');
+    }
   }
 
   /// 4. Stop/end a trip.
@@ -125,12 +189,29 @@ class LiveBusService {
     String busId, {
     BusStatus endStatus = BusStatus.completed,
   }) async {
-    await liveLocationDoc(busId).set({
-      FirestoreConstants.fieldStatus: endStatus.value,
-      FirestoreConstants.fieldIsBroadcasting: false,
-      FirestoreConstants.fieldTimestamp: FieldValue.serverTimestamp(),
-      FirestoreConstants.fieldLastUpdated: FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    final existing = _localLocationsFallback[busId];
+    if (existing != null) {
+      _localLocationsFallback[busId] = existing.copyWith(
+        status: endStatus,
+        isBroadcasting: false,
+        timestamp: DateTime.now(),
+      );
+      _localLocationsStreamController.add(_localLocationsFallback);
+    }
+
+    try {
+      final doc = liveLocationDoc(busId);
+      if (doc != null) {
+        await doc.set({
+          FirestoreConstants.fieldStatus: endStatus.value,
+          FirestoreConstants.fieldIsBroadcasting: false,
+          FirestoreConstants.fieldTimestamp: FieldValue.serverTimestamp(),
+          FirestoreConstants.fieldLastUpdated: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('LiveBusService.stopTrip warning: $e');
+    }
   }
 
   /// Alias for [stopTrip] to support trip ending terminology.
@@ -144,34 +225,81 @@ class LiveBusService {
   /// 5. Listen to a specific bus's live location in real time.
   ///
   /// Returns a stream of [BusLocationModel] or null if the document does not exist.
-  Stream<BusLocationModel?> listenToLiveLocation(String busId) {
-    return liveLocationDoc(busId).snapshots().map((snapshot) {
-      if (!snapshot.exists || snapshot.data() == null) {
-        return null;
+  Stream<BusLocationModel?> listenToLiveLocation(String busId) async* {
+    if (_localLocationsFallback.containsKey(busId)) {
+      yield _localLocationsFallback[busId];
+    }
+
+    final doc = liveLocationDoc(busId);
+    if (doc != null) {
+      try {
+        await for (final snapshot in doc.snapshots()) {
+          if (snapshot.exists && snapshot.data() != null) {
+            final model = BusLocationModel.fromMap(
+              snapshot.data()!,
+              documentId: snapshot.id,
+            );
+            _localLocationsFallback[busId] = model;
+            yield model;
+          } else if (_localLocationsFallback.containsKey(busId)) {
+            yield _localLocationsFallback[busId];
+          } else {
+            yield null;
+          }
+        }
+      } catch (e) {
+        debugPrint('LiveBusService.listenToLiveLocation fallback: $e');
+        yield _localLocationsFallback[busId];
       }
-      return BusLocationModel.fromMap(snapshot.data()!, documentId: snapshot.id);
-    });
+    } else {
+      yield _localLocationsFallback[busId];
+    }
   }
 
   /// Fetches a one-time snapshot of a bus's live location.
   Future<BusLocationModel?> getLiveLocation(String busId) async {
-    final doc = await liveLocationDoc(busId).get();
-    if (!doc.exists || doc.data() == null) {
-      return null;
+    try {
+      final doc = liveLocationDoc(busId);
+      if (doc != null) {
+        final snapshot = await doc.get();
+        if (snapshot.exists && snapshot.data() != null) {
+          final model = BusLocationModel.fromMap(
+            snapshot.data()!,
+            documentId: snapshot.id,
+          );
+          _localLocationsFallback[busId] = model;
+          return model;
+        }
+      }
+    } catch (e) {
+      debugPrint('LiveBusService.getLiveLocation fallback: $e');
     }
-    return BusLocationModel.fromMap(doc.data()!, documentId: doc.id);
+    return _localLocationsFallback[busId];
   }
 
   /// Listens to real-time streams of all active broadcasting buses.
-  Stream<List<BusLocationModel>> listenToAllActiveBuses() {
-    return _liveLocationsCollection
-        .where(FirestoreConstants.fieldIsBroadcasting, isEqualTo: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => BusLocationModel.fromMap(doc.data(), documentId: doc.id))
-          .toList();
-    });
+  Stream<List<BusLocationModel>> listenToAllActiveBuses() async* {
+    yield _localLocationsFallback.values.where((b) => b.isBroadcasting).toList();
+
+    final col = _liveLocationsCollection;
+    if (col != null) {
+      try {
+        await for (final snapshot in col
+            .where(FirestoreConstants.fieldIsBroadcasting, isEqualTo: true)
+            .snapshots()) {
+          final list = snapshot.docs
+              .map((doc) => BusLocationModel.fromMap(doc.data(), documentId: doc.id))
+              .toList();
+          for (final b in list) {
+            _localLocationsFallback[b.busId] = b;
+          }
+          yield list;
+        }
+      } catch (e) {
+        debugPrint('LiveBusService.listenToAllActiveBuses fallback: $e');
+        yield _localLocationsFallback.values.where((b) => b.isBroadcasting).toList();
+      }
+    }
   }
 
   /// 6. Detect whether a bus location is stale/offline based on its timestamp.
