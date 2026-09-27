@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/seed_data.dart';
 import '../../logic/status_logic.dart';
 import '../../models/bus.dart';
+import '../../models/report.dart';
 import '../../services/eta_service.dart';
+import '../../services/firestore_service.dart';
 import 'boarding_assistance_screen.dart';
 import 'journey_confirmation_screen.dart';
 import 'report_condition_screen.dart';
@@ -42,6 +45,8 @@ class RouteDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+    final effectiveBusId = bus?.id ?? route?.busId ?? 'bus_138_outbound';
+    final firestoreService = FirestoreService();
 
     // ETA Service integration (AC-76)
     final etaResult = EtaService().calculateEta(
@@ -55,69 +60,103 @@ class RouteDetailsScreen extends StatelessWidget {
         children: [
           _TopBar(onBack: () => Navigator.of(context).maybePop()),
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                isDesktop ? 24 : 112,
-              ),
-              children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 768),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: StreamBuilder<Bus?>(
+              stream: firestoreService.streamBusById(effectiveBusId),
+              builder: (context, busSnapshot) {
+                final liveBus = busSnapshot.data ?? bus;
+
+                return StreamBuilder<List<Report>>(
+                  stream: firestoreService.streamReports(),
+                  builder: (context, reportsSnapshot) {
+                    final activeReports =
+                        reportsSnapshot.data ?? SeedData.getSampleReports();
+
+                    final liveStatusResult = liveBus != null
+                        ? StatusLogic.getBusStatus(liveBus, activeReports)
+                        : statusResult;
+
+                    String liveCrowdLevel = route?.crowdLevel ?? 'Low';
+                    if (liveBus != null) {
+                      if (liveBus.occupancy.toLowerCase() == 'medium') {
+                        liveCrowdLevel = 'Medium';
+                      } else if (liveBus.occupancy.toLowerCase() == 'high') {
+                        liveCrowdLevel = 'High';
+                      } else if (liveBus.occupancy.toLowerCase() == 'low') {
+                        liveCrowdLevel = 'Low';
+                      }
+                    }
+
+                    return ListView(
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        16,
+                        16,
+                        isDesktop ? 24 : 112,
+                      ),
                       children: [
-                        _SummaryCard(
-                          origin: origin,
-                          destination: destination,
-                          durationMinutes: _durationMinutes,
-                          arriveLabel: _arriveLabel,
-                          etaDisplayText: etaResult.displayText,
-                        ),
-                        const SizedBox(height: 24),
-                        _JourneyStepsCard(
-                          destination: destination,
-                          route: route,
-                          crowdLevel: route?.crowdLevel ?? 'Low',
-                          wheelchairAvailable:
-                              (statusResult?.status ?? route?.accessibilityStatus) !=
-                              AccessibilityStatus.notAccessible,
-                        ),
-                        const SizedBox(height: 24),
-                        _AccessibilityStatusNoticeCard(
-                          statusResult: statusResult,
-                          route: route,
-                        ),
-                        const SizedBox(height: 24),
-                        _ActionButtons(
-                          onStartNavigation: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => JourneyConfirmationScreen(
+                        Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 768),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _SummaryCard(
                                   origin: origin,
                                   destination: destination,
+                                  durationMinutes: _durationMinutes,
+                                  arriveLabel: _arriveLabel,
+                                  etaDisplayText: etaResult.displayText,
+                                ),
+                                const SizedBox(height: 24),
+                                _JourneyStepsCard(
+                                  destination: destination,
+                                  origin: origin,
+                                  route: route,
+                                  bus: liveBus,
+                                  crowdLevel: liveCrowdLevel,
+                                  wheelchairAvailable:
+                                      (liveStatusResult?.status ??
+                                              route?.accessibilityStatus) !=
+                                          AccessibilityStatus.notAccessible,
+                                ),
+                                const SizedBox(height: 24),
+                                _AccessibilityStatusNoticeCard(
+                                  statusResult: liveStatusResult,
                                   route: route,
                                 ),
-                              ),
-                            );
-                          },
-                          onReport: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ReportConditionScreen(
-                                  initialLocation: destination,
+                                const SizedBox(height: 24),
+                                _ActionButtons(
+                                  onStartNavigation: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            JourneyConfirmationScreen(
+                                          origin: origin,
+                                          destination: destination,
+                                          route: route,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  onReport: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => ReportConditionScreen(
+                                          initialLocation: destination,
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
-                              ),
-                            );
-                          },
+                              ],
+                            ),
+                          ),
                         ),
                       ],
-                    ),
-                  ),
-                ),
-              ],
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],
@@ -337,12 +376,16 @@ class _JourneyStepsCard extends StatelessWidget {
     required this.crowdLevel,
     required this.wheelchairAvailable,
     this.route,
+    this.bus,
+    this.origin = 'Colombo Fort Station',
   });
 
   final String destination;
   final String crowdLevel;
   final bool wheelchairAvailable;
   final RouteResultItem? route;
+  final Bus? bus;
+  final String origin;
 
   @override
   Widget build(BuildContext context) {
@@ -387,7 +430,11 @@ class _JourneyStepsCard extends StatelessWidget {
                 children: [
                   _WalkStep(),
                   const SizedBox(height: 24),
-                  _BoardStep(route: route),
+                  _BoardStep(
+                    route: route,
+                    bus: bus,
+                    origin: origin,
+                  ),
                   const SizedBox(height: 24),
                   _OnBoardStep(
                     crowdLevel: crowdLevel,
@@ -472,9 +519,15 @@ class _WalkStep extends StatelessWidget {
 }
 
 class _BoardStep extends StatelessWidget {
-  const _BoardStep({this.route});
+  const _BoardStep({
+    this.route,
+    this.bus,
+    this.origin = 'Colombo Fort Station',
+  });
 
   final RouteResultItem? route;
+  final Bus? bus;
+  final String origin;
 
   @override
   Widget build(BuildContext context) {
@@ -556,9 +609,18 @@ class _BoardStep extends StatelessWidget {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: () {
+                  final effectiveBusId = bus?.id ?? route?.busId ?? 'bus_138_outbound';
+                  final effectiveRouteNo = route?.title ?? (bus != null ? 'Route ${bus!.routeNo}' : 'Route 138');
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const BoardingAssistanceScreen(),
+                      builder: (_) => BoardingAssistanceScreen(
+                        busId: effectiveBusId,
+                        busLabel: effectiveRouteNo,
+                        stopName: origin,
+                        stationId: route?.intermediateStops.isNotEmpty == true
+                            ? route!.intermediateStops.first
+                            : 'st_fort',
+                      ),
                     ),
                   );
                 },
