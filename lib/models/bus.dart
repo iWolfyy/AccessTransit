@@ -13,6 +13,7 @@ class Bus {
     required this.lowFloor,
     required this.rampOk,
     required this.occupancy,
+    this.driverId,
   });
 
   final String id;
@@ -22,6 +23,7 @@ class Bus {
   final bool lowFloor;
   final bool rampOk;
   final String occupancy; // 'low', 'medium', or 'high'
+  final String? driverId;
 
   /// Factory to instantiate a [Bus] from a Firestore map and optional document [id].
   factory Bus.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -40,6 +42,9 @@ class Bus {
       lowFloor: map[FirestoreConstants.fieldLowFloor] as bool? ?? false,
       rampOk: map[FirestoreConstants.fieldRampOk] as bool? ?? true,
       occupancy: map[FirestoreConstants.fieldOccupancy]?.toString() ?? 'medium',
+      driverId: map[FirestoreConstants.fieldDriverId]?.toString() ??
+          map['driverId']?.toString() ??
+          map['assignedOperatorId']?.toString(),
     );
   }
 
@@ -60,6 +65,7 @@ class Bus {
       FirestoreConstants.fieldLowFloor: lowFloor,
       FirestoreConstants.fieldRampOk: rampOk,
       FirestoreConstants.fieldOccupancy: occupancy,
+      if (driverId != null) FirestoreConstants.fieldDriverId: driverId,
     };
   }
 
@@ -75,6 +81,7 @@ class Bus {
     bool? lowFloor,
     bool? rampOk,
     String? occupancy,
+    String? driverId,
   }) {
     return Bus(
       id: id ?? this.id,
@@ -84,6 +91,7 @@ class Bus {
       lowFloor: lowFloor ?? this.lowFloor,
       rampOk: rampOk ?? this.rampOk,
       occupancy: occupancy ?? this.occupancy,
+      driverId: driverId ?? this.driverId,
     );
   }
 
@@ -98,6 +106,7 @@ class Bus {
           lowFloor == other.lowFloor &&
           rampOk == other.rampOk &&
           occupancy == other.occupancy &&
+          driverId == other.driverId &&
           _listEquals(stops, other.stops);
 
   static bool _listEquals(List<String> a, List<String> b) {
@@ -116,5 +125,6 @@ class Bus {
       lowFloor.hashCode ^
       rampOk.hashCode ^
       occupancy.hashCode ^
+      driverId.hashCode ^
       Object.hashAll(stops);
 }
