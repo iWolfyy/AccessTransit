@@ -165,10 +165,15 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
     }
   }
 
-  List<RouteResultItem> _buildAndSortRouteItems(List<Report> activeReports) {
+  List<RouteResultItem> _buildAndSortRouteItems(
+    List<Report> activeReports, {
+    List<Bus>? buses,
+  }) {
+    final busesToMatch = (buses != null && buses.isNotEmpty) ? buses : _allBuses;
+
     // 1. Direct bus matching (AC-72)
     final matchedBuses = BusMatcher.findDirectBuses(
-      _allBuses,
+      busesToMatch,
       widget.fromStationId,
       widget.toStationId,
     );
@@ -252,13 +257,22 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
           Expanded(
             child: _isLoadingData
                 ? const Center(child: CircularProgressIndicator())
-                : StreamBuilder<List<Report>>(
-                    stream: _firestoreService.streamReports(),
-                    builder: (context, snapshot) {
-                      final reports = snapshot.data ?? SeedData.getSampleReports();
-                      final routes = _buildAndSortRouteItems(reports);
+                : StreamBuilder<List<Bus>>(
+                    stream: _firestoreService.streamBuses(),
+                    builder: (context, busSnapshot) {
+                      final buses = busSnapshot.data ?? _allBuses;
 
-                      return ListView(
+                      return StreamBuilder<List<Report>>(
+                        stream: _firestoreService.streamReports(),
+                        builder: (context, snapshot) {
+                          final reports =
+                              snapshot.data ?? SeedData.getSampleReports();
+                          final routes = _buildAndSortRouteItems(
+                            reports,
+                            buses: buses,
+                          );
+
+                          return ListView(
                         padding: EdgeInsets.fromLTRB(
                           16,
                           16,
@@ -313,10 +327,12 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                         ],
                       );
                     },
-                  ),
-          ),
-        ],
+                  );
+                },
+              ),
       ),
+    ],
+  ),
       bottomNavigationBar: isDesktop
           ? null
           : _ResultsBottomNav(
@@ -611,8 +627,7 @@ class _RouteCard extends StatelessWidget {
   const _RouteCard({
     required this.route,
     required this.onTap,
-    this.dimmed = false,
-  });
+  }) : dimmed = false;
 
   final RouteResultItem route;
   final VoidCallback onTap;
