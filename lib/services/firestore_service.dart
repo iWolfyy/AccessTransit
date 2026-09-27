@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../constants/firestore_constants.dart';
 import '../data/seed_data.dart';
+import '../models/boarding_request.dart';
 import '../models/bus.dart';
 import '../models/report.dart';
 import '../models/station.dart';
@@ -20,6 +21,14 @@ class FirestoreService {
   static final StreamController<List<Report>> _localStreamController =
       StreamController<List<Report>>.broadcast();
 
+  static final List<Bus> _localBusesFallback = [...SeedData.sampleBuses];
+  static final StreamController<List<Bus>> _localBusesStreamController =
+      StreamController<List<Bus>>.broadcast();
+
+  static final List<BoardingRequest> _localRequestsFallback = [];
+  static final StreamController<List<BoardingRequest>> _localRequestsStreamController =
+      StreamController<List<BoardingRequest>>.broadcast();
+
   /// Collection reference for `stations`.
   CollectionReference<Map<String, dynamic>> get _stationsRef =>
       _db.collection(FirestoreConstants.stationsCollection);
@@ -31,6 +40,10 @@ class FirestoreService {
   /// Collection reference for `reports`.
   CollectionReference<Map<String, dynamic>> get _reportsRef =>
       _db.collection(FirestoreConstants.reportsCollection);
+
+  /// Collection reference for `boarding_requests`.
+  CollectionReference<Map<String, dynamic>> get _boardingRequestsRef =>
+      _db.collection(FirestoreConstants.boardingRequestsCollection);
 
   /// 1. Fetches a snapshot list of all transit stations (`stations`).
   Future<List<Station>> getStations() async {
@@ -70,7 +83,7 @@ class FirestoreService {
     } catch (e) {
       debugPrint('Firestore getBuses fallback: $e');
     }
-    return SeedData.sampleBuses;
+    return _localBusesFallback;
   }
 
   /// Fetches a single static bus route by its ID (`buses/{id}`).
@@ -82,7 +95,7 @@ class FirestoreService {
       debugPrint('Firestore getBusById fallback: $e');
     }
     try {
-      return SeedData.sampleBuses.firstWhere((b) => b.id == busId);
+      return _localBusesFallback.firstWhere((b) => b.id == busId);
     } catch (_) {
       return null;
     }
@@ -315,6 +328,196 @@ class FirestoreService {
       });
     } catch (e) {
       debugPrint('Firestore flagReport warning: $e');
+    }
+  }
+
+  // --- Sprint 3: Driver Side Bus Streams & Controls (AC-84, AC-85) ---
+
+  /// Returns a real-time stream of all static buses (`buses`).
+  Stream<List<Bus>> streamBuses() async* {
+    List<Bus> mergeBuses(List<Bus> remoteBuses) {
+      final Map<String, Bus> mergedMap = {};
+      for (final b in _localBusesFallback) {
+        mergedMap[b.id] = b;
+      }
+      for (final b in remoteBuses) {
+        mergedMap[b.id] = b;
+      }
+      return mergedMap.values.toList();
+    }
+
+    yield mergeBuses([]);
+
+    final localSub = _localBusesStreamController.stream.listen((_) {});
+
+    try {
+      await for (final snapshot in _busesRef.snapshots()) {
+        final remote =
+            snapshot.docs.map((doc) => Bus.fromFirestore(doc)).toList();
+        yield mergeBuses(remote);
+      }
+    } catch (e) {
+      debugPrint('Firestore streamBuses fallback: $e');
+      yield mergeBuses([]);
+    } finally {
+      await localSub.cancel();
+    }
+  }
+
+  /// Returns a real-time stream of a single bus by ID (`buses/{id}`).
+  Stream<Bus?> streamBusById(String busId) async* {
+    Bus? findLocal() {
+      final idx = _localBusesFallback.indexWhere((b) => b.id == busId);
+      if (idx != -1) return _localBusesFallback[idx];
+      try {
+        return SeedData.sampleBuses.firstWhere((b) => b.id == busId);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    yield findLocal();
+
+    try {
+      await for (final snapshot in _busesRef.doc(busId).snapshots()) {
+        if (snapshot.exists && snapshot.data() != null) {
+          final bus = Bus.fromFirestore(snapshot);
+          final idx = _localBusesFallback.indexWhere((b) => b.id == busId);
+          if (idx != -1) {
+            _localBusesFallback[idx] = bus;
+          } else {
+            _localBusesFallback.add(bus);
+          }
+          yield bus;
+        } else {
+          yield findLocal();
+        }
+      }
+    } catch (e) {
+      debugPrint('Firestore streamBusById fallback: $e');
+      yield findLocal();
+    }
+  }
+
+  /// Updates ramp operational status and/or occupancy on a bus document (`buses/{busId}`) (AC-84).
+  Future<void> updateBusAccessibility(
+    String busId, {
+    bool? rampOk,
+    String? occupancy,
+    String? driverId,
+  }) async {
+    // 1. Update local cache
+    final idx = _localBusesFallback.indexWhere((b) => b.id == busId);
+    if (idx != -1) {
+      final current = _localBusesFallback[idx];
+      _localBusesFallback[idx] = current.copyWith(
+        rampOk: rampOk ?? current.rampOk,
+        occupancy: occupancy ?? current.occupancy,
+        driverId: driverId ?? current.driverId,
+      );
+      _localBusesStreamController.add(_localBusesFallback);
+    }
+
+    // 2. Write to Firestore
+    try {
+      final Map<String, dynamic> updates = {};
+      if (rampOk != null) {
+        updates[FirestoreConstants.fieldRampOk] = rampOk;
+      }
+      if (occupancy != null) {
+        updates[FirestoreConstants.fieldOccupancy] = occupancy.toLowerCase();
+      }
+      if (driverId != null) {
+        updates[FirestoreConstants.fieldDriverId] = driverId;
+      }
+
+      if (updates.isNotEmpty) {
+        await _busesRef.doc(busId).set(updates, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('Firestore updateBusAccessibility warning: $e');
+    }
+  }
+
+  /// Assigns a driver to a bus document (`buses/{busId}`) (AC-84).
+  Future<void> assignBusDriver(String busId, String driverId) async {
+    await updateBusAccessibility(busId, driverId: driverId);
+  }
+
+  // --- Sprint 3: Boarding Assistance Requests (AC-86) ---
+
+  /// Submits a boarding assistance request to Firestore (`boarding_requests/{id}`) (AC-86).
+  Future<void> createBoardingRequest(BoardingRequest request) async {
+    final requestId = request.id.isNotEmpty
+        ? request.id
+        : 'req_${DateTime.now().millisecondsSinceEpoch}';
+    final newRequest = request.copyWith(id: requestId);
+
+    // Save to local fallback first
+    _localRequestsFallback.removeWhere((r) => r.id == requestId);
+    _localRequestsFallback.insert(0, newRequest);
+    _localRequestsStreamController.add(_localRequestsFallback);
+
+    try {
+      final docRef = _boardingRequestsRef.doc(requestId);
+      final data = newRequest.toMap(isServerTimestamp: true);
+      await docRef.set(data);
+    } catch (e) {
+      debugPrint('Firestore createBoardingRequest warning: $e');
+    }
+  }
+
+  /// Streams boarding assistance requests for a given bus (`boarding_requests`) (AC-86).
+  Stream<List<BoardingRequest>> streamBoardingRequestsForBus(String busId) async* {
+    List<BoardingRequest> filterRequests(List<BoardingRequest> requests) {
+      final Map<String, BoardingRequest> map = {};
+      for (final r in _localRequestsFallback) {
+        if (r.busId == busId) map[r.id] = r;
+      }
+      for (final r in requests) {
+        if (r.busId == busId) map[r.id] = r;
+      }
+      final list = map.values.toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    }
+
+    yield filterRequests([]);
+
+    final localSub = _localRequestsStreamController.stream.listen((_) {});
+
+    try {
+      await for (final snapshot in _boardingRequestsRef
+          .where(FirestoreConstants.fieldBusId, isEqualTo: busId)
+          .snapshots()) {
+        final remote = snapshot.docs
+            .map((doc) => BoardingRequest.fromFirestore(doc))
+            .toList();
+        yield filterRequests(remote);
+      }
+    } catch (e) {
+      debugPrint('Firestore streamBoardingRequestsForBus fallback: $e');
+      yield filterRequests([]);
+    } finally {
+      await localSub.cancel();
+    }
+  }
+
+  /// Updates status of a boarding request (e.g. 'acknowledged', 'completed') (AC-86).
+  Future<void> updateBoardingRequestStatus(String requestId, String status) async {
+    final idx = _localRequestsFallback.indexWhere((r) => r.id == requestId);
+    if (idx != -1) {
+      _localRequestsFallback[idx] =
+          _localRequestsFallback[idx].copyWith(status: status);
+      _localRequestsStreamController.add(_localRequestsFallback);
+    }
+
+    try {
+      await _boardingRequestsRef.doc(requestId).update({
+        FirestoreConstants.fieldRequestStatus: status,
+      });
+    } catch (e) {
+      debugPrint('Firestore updateBoardingRequestStatus warning: $e');
     }
   }
 }
