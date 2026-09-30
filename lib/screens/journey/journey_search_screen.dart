@@ -660,7 +660,7 @@ class _StationSearchModalState extends State<_StationSearchModal> {
               autofocus: true,
               onChanged: (val) => setState(() => _query = val),
               decoration: InputDecoration(
-                hintText: 'Search Colombo station name or ID...',
+                hintText: 'Search bus stop or station (e.g. Pettah, Homagama, Panadura)...',
                 prefixIcon: const Icon(Icons.search, color: AppColors.primary),
                 suffixIcon: _query.isNotEmpty
                     ? IconButton(
