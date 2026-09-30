@@ -5,6 +5,7 @@ import '../constants/firestore_constants.dart';
 import '../data/seed_data.dart';
 import '../models/boarding_request.dart';
 import '../models/bus.dart';
+import '../models/bus_route.dart';
 import '../models/report.dart';
 import '../models/station.dart';
 
@@ -21,6 +22,8 @@ class FirestoreService {
   static final StreamController<List<Report>> _localStreamController =
       StreamController<List<Report>>.broadcast();
 
+  static final List<BusRoute> _localRoutesFallback = [...SeedData.sampleRoutes];
+
   static final List<Bus> _localBusesFallback = [...SeedData.sampleBuses];
   static final StreamController<List<Bus>> _localBusesStreamController =
       StreamController<List<Bus>>.broadcast();
@@ -32,6 +35,10 @@ class FirestoreService {
   /// Collection reference for `stations`.
   CollectionReference<Map<String, dynamic>> get _stationsRef =>
       _db.collection(FirestoreConstants.stationsCollection);
+
+  /// Collection reference for `routes`.
+  CollectionReference<Map<String, dynamic>> get _routesRef =>
+      _db.collection(FirestoreConstants.routesCollection);
 
   /// Collection reference for `buses`.
   CollectionReference<Map<String, dynamic>> get _busesRef =>
@@ -73,7 +80,54 @@ class FirestoreService {
     }
   }
 
-  /// 2. Fetches a snapshot list of all static bus routes (`buses`).
+  // ==========================================
+  // Routes APIs (`routes` collection)
+  // ==========================================
+
+  /// Fetches a snapshot list of all bus routes (`routes`).
+  Future<List<BusRoute>> getRoutes() async {
+    try {
+      final snapshot = await _routesRef.get();
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.map((doc) => BusRoute.fromFirestore(doc)).toList();
+      }
+    } catch (e) {
+      debugPrint('Firestore getRoutes fallback: $e');
+    }
+    return _localRoutesFallback;
+  }
+
+  /// Fetches a single bus route by its ID (`routes/{id}`).
+  Future<BusRoute?> getRouteById(String routeId) async {
+    try {
+      final doc = await _routesRef.doc(routeId).get();
+      if (doc.exists) return BusRoute.fromFirestore(doc);
+    } catch (e) {
+      debugPrint('Firestore getRouteById fallback: $e');
+    }
+    try {
+      return _localRoutesFallback.firstWhere((r) => r.id == routeId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Finds all bus routes that connect [fromStopId] to [toStopId] in valid directional order.
+  Future<List<BusRoute>> findRoutesConnectingStops(
+    String fromStopId,
+    String toStopId,
+  ) async {
+    final allRoutes = await getRoutes();
+    return allRoutes
+        .where((route) => route.isValidDirection(fromStopId, toStopId))
+        .toList();
+  }
+
+  // ==========================================
+  // Buses APIs (`buses` collection)
+  // ==========================================
+
+  /// 2. Fetches a snapshot list of all static bus vehicles (`buses`).
   Future<List<Bus>> getBuses() async {
     try {
       final snapshot = await _busesRef.get();
@@ -86,7 +140,30 @@ class FirestoreService {
     return _localBusesFallback;
   }
 
-  /// Fetches a single static bus route by its ID (`buses/{id}`).
+  /// Fetches all buses assigned to a specific [routeId] or [routeNo].
+  Future<List<Bus>> getBusesForRoute(String routeIdOrNo) async {
+    try {
+      final snapshot = await _busesRef
+          .where('routeId', isEqualTo: routeIdOrNo)
+          .get();
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.map((doc) => Bus.fromFirestore(doc)).toList();
+      }
+      final snapshotByNo = await _busesRef
+          .where(FirestoreConstants.fieldRouteNo, isEqualTo: routeIdOrNo)
+          .get();
+      if (snapshotByNo.docs.isNotEmpty) {
+        return snapshotByNo.docs.map((doc) => Bus.fromFirestore(doc)).toList();
+      }
+    } catch (e) {
+      debugPrint('Firestore getBusesForRoute fallback: $e');
+    }
+    return _localBusesFallback
+        .where((b) => b.routeId == routeIdOrNo || b.routeNo == routeIdOrNo)
+        .toList();
+  }
+
+  /// Fetches a single static bus vehicle by its ID (`buses/{id}`).
   Future<Bus?> getBusById(String busId) async {
     try {
       final doc = await _busesRef.doc(busId).get();
