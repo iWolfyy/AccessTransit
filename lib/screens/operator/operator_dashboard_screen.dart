@@ -1042,8 +1042,309 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
 
           // Visual Delay Meter Gauge
           _buildDelayMeterGauge(etaResult.delayMinutes),
+
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: AppColors.outlineVariant),
+          const SizedBox(height: 10),
+
+          // Quick Delay Reporting Section (Step 4)
+          StreamBuilder<BusLocationModel?>(
+            stream: _liveBusService.listenToLiveLocation(_selectedBusId),
+            builder: (context, locSnapshot) {
+              final loc = locSnapshot.data;
+              final hasActiveDelay =
+                  loc?.delayReason != null && loc!.delayReason!.isNotEmpty;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (hasActiveDelay) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.orange.shade400),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            size: 20,
+                            color: Colors.orange.shade900,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Broadcasted to Riders: ${loc.delayReason}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange.shade900,
+                                  ),
+                                ),
+                                Text(
+                                  '+${loc.addedDelayMinutes} mins added to passenger arrival ETAs',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.orange.shade800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              await _liveBusService.clearDelay(_selectedBusId);
+                              _showSnack(
+                                'Delay notice cleared. Normal schedule resumed.',
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red.shade700,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            child: const Text(
+                              'Clear',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  SizedBox(
+                    height: 40,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showReportDelayBottomSheet(
+                        currentReason: loc?.delayReason,
+                        currentMinutes: loc?.addedDelayMinutes ?? 5,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orange.shade900,
+                        side: BorderSide(color: Colors.orange.shade700),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.traffic_rounded, size: 18),
+                      label: Text(
+                        hasActiveDelay
+                            ? 'Update Delay / Traffic Reason'
+                            : 'Report Traffic / Delay (+5m, +10m)',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ],
       ),
+    );
+  }
+
+  /// Step 4: Displays the quick delay / traffic reason reporting modal sheet.
+  void _showReportDelayBottomSheet({
+    String? currentReason,
+    int currentMinutes = 5,
+  }) {
+    int selectedMinutes = currentMinutes > 0 ? currentMinutes : 5;
+    String selectedReason = currentReason ?? 'Traffic Congestion';
+
+    final delayOptions = [5, 10, 15, 20, 30];
+    final reasons = [
+      {'label': 'Traffic Congestion', 'icon': Icons.traffic_rounded},
+      {'label': 'Heavy Rain / Flooding', 'icon': Icons.water_drop_rounded},
+      {'label': 'Accident Ahead', 'icon': Icons.car_crash_rounded},
+      {'label': 'Road Construction', 'icon': Icons.construction_rounded},
+      {'label': 'Mechanical Breakdown', 'icon': Icons.build_rounded},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceContainerLowest,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.traffic_rounded,
+                          color: Colors.deepOrange,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Report Delay / Incident',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Alerts all passenger screens and updates live ETAs.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Estimated Delay Time',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: delayOptions.map((mins) {
+                      final isSelected = selectedMinutes == mins;
+                      return ChoiceChip(
+                        label: Text('+$mins mins'),
+                        selected: isSelected,
+                        selectedColor: Colors.orange.shade100,
+                        labelStyle: TextStyle(
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected
+                              ? Colors.orange.shade900
+                              : AppColors.onSurface,
+                        ),
+                        onSelected: (val) {
+                          if (val) {
+                            setModalState(() {
+                              selectedMinutes = mins;
+                            });
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Delay Reason',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: reasons.map((r) {
+                      final label = r['label'] as String;
+                      final icon = r['icon'] as IconData;
+                      final isSelected = selectedReason == label;
+
+                      return ChoiceChip(
+                        avatar: Icon(
+                          icon,
+                          size: 16,
+                          color: isSelected
+                              ? Colors.orange.shade900
+                              : AppColors.onSurfaceVariant,
+                        ),
+                        label: Text(label),
+                        selected: isSelected,
+                        selectedColor: Colors.orange.shade100,
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected
+                              ? Colors.orange.shade900
+                              : AppColors.onSurface,
+                        ),
+                        onSelected: (val) {
+                          if (val) {
+                            setModalState(() {
+                              selectedReason = label;
+                            });
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () async {
+                      Navigator.of(context).pop();
+                      await _liveBusService.reportDelay(
+                        busId: _selectedBusId,
+                        reason: selectedReason,
+                        delayMinutes: selectedMinutes,
+                      );
+                      _showSnack(
+                        'Delay notice broadcasted: $selectedReason (+$selectedMinutes mins)',
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.deepOrange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.broadcast_on_personal_rounded),
+                    label: Text(
+                      'Broadcast Delay (+$selectedMinutes mins)',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

@@ -97,6 +97,8 @@ class FirestoreConstants {
   static const String fieldRampOperational = 'rampOperational';
   static const String fieldElevatorWorking = 'elevatorWorking';
   static const String fieldOccupancyLevel = 'occupancyLevel';
+  static const String fieldDelayReason = 'delayReason';
+  static const String fieldAddedDelayMinutes = 'addedDelayMinutes';
   static const String fieldIsBroadcasting = 'isBroadcasting';
   static const String fieldLastUpdated = 'lastUpdated';
 

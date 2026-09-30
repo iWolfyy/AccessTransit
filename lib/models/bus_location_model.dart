@@ -26,6 +26,8 @@ class BusLocationModel {
     this.rampOperational = true,
     this.elevatorWorking = true,
     this.occupancyLevel = 'Moderate',
+    this.delayReason,
+    this.addedDelayMinutes = 0,
     bool? isBroadcasting,
   })  : routeId = routeId ?? routeNumber ?? '',
         routeNumber = routeNumber ?? routeId ?? '',
@@ -57,6 +59,8 @@ class BusLocationModel {
   final bool rampOperational;
   final bool elevatorWorking;
   final String occupancyLevel;
+  final String? delayReason;
+  final int addedDelayMinutes;
   final bool isBroadcasting;
 
   /// Alias for [driverId] to maintain operator terminology compatibility.
@@ -131,6 +135,9 @@ class BusLocationModel {
           map[FirestoreConstants.fieldElevatorWorking] as bool? ?? true,
       occupancyLevel:
           map[FirestoreConstants.fieldOccupancyLevel]?.toString() ?? 'Moderate',
+      delayReason: map[FirestoreConstants.fieldDelayReason]?.toString(),
+      addedDelayMinutes:
+          (map[FirestoreConstants.fieldAddedDelayMinutes] as num?)?.toInt() ?? 0,
       isBroadcasting: rawBroadcasting ?? (parsedStatus != BusStatus.offline),
     );
   }
@@ -171,6 +178,8 @@ class BusLocationModel {
       FirestoreConstants.fieldRampOperational: rampOperational,
       FirestoreConstants.fieldElevatorWorking: elevatorWorking,
       FirestoreConstants.fieldOccupancyLevel: occupancyLevel,
+      FirestoreConstants.fieldDelayReason: delayReason,
+      FirestoreConstants.fieldAddedDelayMinutes: addedDelayMinutes,
       FirestoreConstants.fieldIsBroadcasting: isBroadcasting,
       FirestoreConstants.fieldLastUpdated: tsValue,
     };
@@ -202,6 +211,9 @@ class BusLocationModel {
     bool? rampOperational,
     bool? elevatorWorking,
     String? occupancyLevel,
+    String? delayReason,
+    int? addedDelayMinutes,
+    bool clearDelay = false,
     bool? isBroadcasting,
   }) {
     return BusLocationModel(
@@ -223,6 +235,8 @@ class BusLocationModel {
       rampOperational: rampOperational ?? this.rampOperational,
       elevatorWorking: elevatorWorking ?? this.elevatorWorking,
       occupancyLevel: occupancyLevel ?? this.occupancyLevel,
+      delayReason: clearDelay ? null : (delayReason ?? this.delayReason),
+      addedDelayMinutes: clearDelay ? 0 : (addedDelayMinutes ?? this.addedDelayMinutes),
       isBroadcasting: isBroadcasting ?? this.isBroadcasting,
     );
   }

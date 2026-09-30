@@ -195,6 +195,70 @@ class LiveBusService {
     }
   }
 
+  /// Reports a quick traffic or weather delay with a specific reason and added delay minutes.
+  ///
+  /// Instantly synchronizes [delayReason] and [addedDelayMinutes] across live telemetry
+  /// and updates Firestore so passengers are notified immediately.
+  Future<void> reportDelay({
+    required String busId,
+    required String reason,
+    required int delayMinutes,
+  }) async {
+    final existing = _localLocationsFallback[busId];
+    if (existing != null) {
+      final updated = existing.copyWith(
+        delayReason: reason,
+        addedDelayMinutes: delayMinutes,
+        timestamp: DateTime.now(),
+      );
+      _localLocationsFallback[busId] = updated;
+      _localLocationsStreamController.add(_localLocationsFallback);
+    }
+
+    try {
+      final doc = liveLocationDoc(busId);
+      if (doc != null) {
+        final Map<String, dynamic> updateData = {
+          FirestoreConstants.fieldDelayReason: reason,
+          FirestoreConstants.fieldAddedDelayMinutes: delayMinutes,
+          FirestoreConstants.fieldTimestamp: FieldValue.serverTimestamp(),
+          FirestoreConstants.fieldLastUpdated: FieldValue.serverTimestamp(),
+        };
+        await doc.set(updateData, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('LiveBusService.reportDelay warning: $e');
+    }
+  }
+
+  /// Clears any reported delay reason and resets added delay minutes to 0.
+  Future<void> clearDelay(String busId) async {
+    final existing = _localLocationsFallback[busId];
+    if (existing != null) {
+      final updated = existing.copyWith(
+        clearDelay: true,
+        timestamp: DateTime.now(),
+      );
+      _localLocationsFallback[busId] = updated;
+      _localLocationsStreamController.add(_localLocationsFallback);
+    }
+
+    try {
+      final doc = liveLocationDoc(busId);
+      if (doc != null) {
+        final Map<String, dynamic> updateData = {
+          FirestoreConstants.fieldDelayReason: FieldValue.delete(),
+          FirestoreConstants.fieldAddedDelayMinutes: 0,
+          FirestoreConstants.fieldTimestamp: FieldValue.serverTimestamp(),
+          FirestoreConstants.fieldLastUpdated: FieldValue.serverTimestamp(),
+        };
+        await doc.set(updateData, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('LiveBusService.clearDelay warning: $e');
+    }
+  }
+
   /// 3. Change the bus status.
   ///
   /// Updates [status], updates [isBroadcasting] accordingly, and refreshes the timestamp.

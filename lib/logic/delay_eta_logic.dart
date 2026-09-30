@@ -66,6 +66,8 @@ class BusArrivalEtaResult {
     required this.delayMinutes,
     required this.delayType,
     required this.delayLabel,
+    this.delayReason,
+    this.addedDelayMinutes = 0,
     required this.countdownMinutes,
     required this.countdownText,
     required this.isLive,
@@ -84,6 +86,8 @@ class BusArrivalEtaResult {
   final int delayMinutes;
   final DelayType delayType;
   final String delayLabel;
+  final String? delayReason;
+  final int addedDelayMinutes;
   final int countdownMinutes;
   final String countdownText;
   final bool isLive;
@@ -199,6 +203,14 @@ class DelayEtaCalculator {
       tripDelayOffsetMinutes = 0;
     }
 
+    // 4b. Factor in driver-reported quick delay reasons (e.g. Traffic Congestion, Heavy Rain)
+    final driverDelayReason = liveBusLocation?.delayReason;
+    final driverAddedDelay = liveBusLocation?.addedDelayMinutes ?? 0;
+    if (driverAddedDelay > 0) {
+      estimatedArrival = estimatedArrival.add(Duration(minutes: driverAddedDelay));
+      tripDelayOffsetMinutes += driverAddedDelay;
+    }
+
     // 5. Calculate delay metrics
     final delayMinutes = tripDelayOffsetMinutes;
     final delayType = isTomorrow
@@ -206,7 +218,7 @@ class DelayEtaCalculator {
         : getDelayType(delayMinutes, isLive: isLiveDriver);
     final delayLabel = isTomorrow
         ? 'Scheduled for tomorrow'
-        : formatDelayLabel(delayMinutes, isLive: isLiveDriver);
+        : formatDelayLabel(delayMinutes, isLive: isLiveDriver, reason: driverDelayReason);
 
     // 6. Calculate countdown ETA to target stop
     final countdownMinutes = estimatedArrival.difference(now).inMinutes;
@@ -294,6 +306,8 @@ class DelayEtaCalculator {
       delayMinutes: delayMinutes,
       delayType: delayType,
       delayLabel: delayLabel,
+      delayReason: driverDelayReason,
+      addedDelayMinutes: driverAddedDelay,
       countdownMinutes: countdownMinutes,
       countdownText: countdownText,
       isLive: isLiveDriver,
@@ -322,12 +336,13 @@ class DelayEtaCalculator {
   /// - `3` -> "Delayed by 3 mins"
   /// - `0` -> "On Time"
   /// - `-2` -> "Running 2 mins early"
-  static String formatDelayLabel(int delayMinutes, {bool isLive = true}) {
+  static String formatDelayLabel(int delayMinutes, {bool isLive = true, String? reason}) {
     if (!isLive) {
       return 'Scheduled';
     }
     if (delayMinutes > 1) {
-      return 'Delayed by $delayMinutes min${delayMinutes == 1 ? '' : 's'}';
+      final reasonSuffix = (reason != null && reason.isNotEmpty) ? ' • $reason' : '';
+      return 'Delayed by $delayMinutes min${delayMinutes == 1 ? '' : 's'}$reasonSuffix';
     }
     if (delayMinutes < -1) {
       final absMins = delayMinutes.abs();
