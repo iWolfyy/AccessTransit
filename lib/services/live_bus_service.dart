@@ -333,35 +333,59 @@ class LiveBusService {
   /// 5. Listen to a specific bus's live location in real time.
   ///
   /// Returns a stream of [BusLocationModel] or null if the document does not exist.
-  Stream<BusLocationModel?> listenToLiveLocation(String busId) async* {
-    if (_localLocationsFallback.containsKey(busId)) {
-      yield _localLocationsFallback[busId];
-    }
+  Stream<BusLocationModel?> listenToLiveLocation(String busId) {
+    late final StreamController<BusLocationModel?> controller;
+    StreamSubscription? firestoreSub;
+    StreamSubscription? localSub;
 
-    final doc = liveLocationDoc(busId);
-    if (doc != null) {
-      try {
-        await for (final snapshot in doc.snapshots()) {
-          if (snapshot.exists && snapshot.data() != null) {
-            final model = BusLocationModel.fromMap(
-              snapshot.data()!,
-              documentId: snapshot.id,
+    controller = StreamController<BusLocationModel?>.broadcast(
+      onListen: () {
+        if (_localLocationsFallback.containsKey(busId)) {
+          controller.add(_localLocationsFallback[busId]);
+        }
+
+        localSub = _localLocationsStreamController.stream.listen(
+          (map) {
+            if (map.containsKey(busId)) {
+              controller.add(map[busId]);
+            }
+          },
+        );
+
+        final doc = liveLocationDoc(busId);
+        if (doc != null) {
+          try {
+            firestoreSub = doc.snapshots().listen(
+              (snapshot) {
+                if (snapshot.exists && snapshot.data() != null) {
+                  final model = BusLocationModel.fromMap(
+                    snapshot.data()!,
+                    documentId: snapshot.id,
+                  );
+                  _localLocationsFallback[busId] = model;
+                  controller.add(model);
+                } else if (_localLocationsFallback.containsKey(busId)) {
+                  controller.add(_localLocationsFallback[busId]);
+                } else {
+                  controller.add(null);
+                }
+              },
+              onError: (dynamic e) {
+                debugPrint('LiveBusService.listenToLiveLocation error: $e');
+              },
             );
-            _localLocationsFallback[busId] = model;
-            yield model;
-          } else if (_localLocationsFallback.containsKey(busId)) {
-            yield _localLocationsFallback[busId];
-          } else {
-            yield null;
+          } catch (e) {
+            debugPrint('LiveBusService.listenToLiveLocation fallback: $e');
           }
         }
-      } catch (e) {
-        debugPrint('LiveBusService.listenToLiveLocation fallback: $e');
-        yield _localLocationsFallback[busId];
-      }
-    } else {
-      yield _localLocationsFallback[busId];
-    }
+      },
+      onCancel: () {
+        localSub?.cancel();
+        firestoreSub?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   /// Fetches a one-time snapshot of a bus's live location.
@@ -386,28 +410,56 @@ class LiveBusService {
   }
 
   /// Listens to real-time streams of all active broadcasting buses.
-  Stream<List<BusLocationModel>> listenToAllActiveBuses() async* {
-    yield _localLocationsFallback.values.where((b) => b.isBroadcasting).toList();
+  Stream<List<BusLocationModel>> listenToAllActiveBuses() {
+    late final StreamController<List<BusLocationModel>> controller;
+    StreamSubscription? firestoreSub;
+    StreamSubscription? localSub;
 
-    final col = _liveLocationsCollection;
-    if (col != null) {
-      try {
-        await for (final snapshot in col
-            .where(FirestoreConstants.fieldIsBroadcasting, isEqualTo: true)
-            .snapshots()) {
-          final list = snapshot.docs
-              .map((doc) => BusLocationModel.fromMap(doc.data(), documentId: doc.id))
-              .toList();
-          for (final b in list) {
-            _localLocationsFallback[b.busId] = b;
+    controller = StreamController<List<BusLocationModel>>.broadcast(
+      onListen: () {
+        controller.add(
+          _localLocationsFallback.values.where((b) => b.isBroadcasting).toList(),
+        );
+
+        localSub = _localLocationsStreamController.stream.listen((map) {
+          controller.add(
+            map.values.where((b) => b.isBroadcasting).toList(),
+          );
+        });
+
+        final col = _liveLocationsCollection;
+        if (col != null) {
+          try {
+            firestoreSub = col
+                .where(FirestoreConstants.fieldIsBroadcasting, isEqualTo: true)
+                .snapshots()
+                .listen(
+              (snapshot) {
+                final list = snapshot.docs
+                    .map((doc) =>
+                        BusLocationModel.fromMap(doc.data(), documentId: doc.id))
+                    .toList();
+                for (final b in list) {
+                  _localLocationsFallback[b.busId] = b;
+                }
+                controller.add(list);
+              },
+              onError: (dynamic e) {
+                debugPrint('LiveBusService.listenToAllActiveBuses error: $e');
+              },
+            );
+          } catch (e) {
+            debugPrint('LiveBusService.listenToAllActiveBuses fallback: $e');
           }
-          yield list;
         }
-      } catch (e) {
-        debugPrint('LiveBusService.listenToAllActiveBuses fallback: $e');
-        yield _localLocationsFallback.values.where((b) => b.isBroadcasting).toList();
-      }
-    }
+      },
+      onCancel: () {
+        localSub?.cancel();
+        firestoreSub?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   /// 6. Detect whether a bus location is stale/offline based on its timestamp.

@@ -10,8 +10,8 @@ import '../../models/bus_location_model.dart';
 import '../../models/report.dart';
 import '../../models/station.dart';
 import '../../models/trip_model.dart';
-import '../../services/bus_tracking_service.dart';
 import '../../services/firestore_service.dart';
+import '../../services/live_bus_service.dart';
 import '../../services/trip_service.dart';
 import 'boarding_assistance_screen.dart';
 import 'live_journey_screen.dart';
@@ -268,7 +268,7 @@ class _DepartureAndStopsCard extends StatelessWidget {
         final trip = tripSnapshot.data;
 
         return StreamBuilder<BusLocationModel?>(
-          stream: BusTrackingService().watchBusLocation(busId),
+          stream: LiveBusService().listenToLiveLocation(busId),
           builder: (context, locationSnapshot) {
             final liveLocation = locationSnapshot.data;
 
@@ -399,6 +399,19 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                         : AppColors.onSurfaceVariant,
                                   ),
                                 ),
+                                if (etaResult.isLive &&
+                                    liveLocation != null &&
+                                    liveLocation.speed > 0) ...[
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '${liveLocation.speed.toStringAsFixed(0)} km/h',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF166534),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -461,6 +474,44 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                   ),
                               ],
                             ),
+                            if (etaResult.delayReason != null &&
+                                etaResult.delayReason!.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.traffic_rounded,
+                                      size: 16,
+                                      color: Color(0xFFB45309),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Driver Alert: ${etaResult.delayReason} (+${etaResult.addedDelayMinutes}m)',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF92400E),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 12),
 
                             // Countdown text
