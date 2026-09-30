@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/time_utils.dart';
 import '../../data/seed_data.dart';
 import '../../models/station.dart';
 import '../../services/firestore_service.dart';
@@ -23,6 +24,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   List<Station> _stations = [];
   Station? _selectedFromStation;
   Station? _selectedToStation;
+  DateTime _selectedDate = DateTime.now();
   bool _isLoadingStations = true;
 
   bool _wheelchairAccess = true;
@@ -118,6 +120,18 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
     );
   }
 
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2025),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
   void _searchRoutes() {
     if (_selectedFromStation == null || _selectedToStation == null) {
       ScaffoldMessenger.of(context)
@@ -147,6 +161,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
           toStationId: _selectedToStation!.id,
           origin: _selectedFromStation!.name,
           destination: _selectedToStation!.name,
+          selectedDate: _selectedDate,
         ),
       ),
     );
@@ -196,7 +211,12 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                           onSwap: _swapLocations,
                           isLoading: _isLoadingStations,
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
+                        _DatePickerCard(
+                          selectedDate: _selectedDate,
+                          onTap: _pickDate,
+                        ),
+                        const SizedBox(height: 16),
                         _DepartNowCard(
                           onChange: () => _showComingSoon('Change departure time'),
                         ),
@@ -1065,6 +1085,80 @@ class _NavItem extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DatePickerCard extends StatelessWidget {
+  const _DatePickerCard({
+    required this.selectedDate,
+    required this.onTap,
+  });
+
+  final DateTime selectedDate;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final formatted = TimeUtils.formatDateString(selectedDate);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.surfaceVariant),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.onSurface.withValues(alpha: 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.calendar_today_rounded, color: AppColors.primaryContainer),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Travel Date',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  formatted,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: 24 / 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onTap,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primaryContainer,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            ),
+            child: const Text(
+              'Select Date',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

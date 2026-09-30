@@ -153,6 +153,14 @@ class SeedData {
         'st_maharagama',
         'st_kottawa'
       ],
+      scheduleTimes: [
+        '08:00 AM',
+        '08:12 AM',
+        '08:25 AM',
+        '08:40 AM',
+        '08:55 AM',
+        '09:15 AM'
+      ],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
@@ -169,6 +177,14 @@ class SeedData {
         'st_borella',
         'st_maradana',
         'st_pettah'
+      ],
+      scheduleTimes: [
+        '09:30 AM',
+        '09:50 AM',
+        '10:05 AM',
+        '10:20 AM',
+        '10:33 AM',
+        '10:45 AM'
       ],
       hasRamp: true,
       lowFloor: true,
@@ -188,6 +204,15 @@ class SeedData {
         'st_dehiwala',
         'st_mt_lavinia'
       ],
+      scheduleTimes: [
+        '07:30 AM',
+        '07:38 AM',
+        '07:48 AM',
+        '07:58 AM',
+        '08:08 AM',
+        '08:20 AM',
+        '08:30 AM'
+      ],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
@@ -205,6 +230,14 @@ class SeedData {
         'st_dehiwala',
         'st_mt_lavinia'
       ],
+      scheduleTimes: [
+        '08:15 AM',
+        '08:30 AM',
+        '08:40 AM',
+        '08:50 AM',
+        '09:02 AM',
+        '09:15 AM'
+      ],
       hasRamp: true,
       lowFloor: true,
       rampOk: false,
@@ -215,6 +248,7 @@ class SeedData {
       id: 'bus_177_outbound',
       routeNo: '177',
       stops: ['st_kollupitiya', 'st_town_hall', 'st_borella'],
+      scheduleTimes: ['09:00 AM', '09:10 AM', '09:22 AM'],
       hasRamp: true,
       lowFloor: false,
       rampOk: false,
@@ -231,6 +265,13 @@ class SeedData {
         'st_nugegoda',
         'st_maharagama'
       ],
+      scheduleTimes: [
+        '10:00 AM',
+        '10:12 AM',
+        '10:28 AM',
+        '10:42 AM',
+        '11:00 AM'
+      ],
       hasRamp: false,
       lowFloor: false,
       rampOk: false,
@@ -241,6 +282,7 @@ class SeedData {
       id: 'bus_122_outbound',
       routeNo: '122',
       stops: ['st_pettah', 'st_maradana', 'st_borella'],
+      scheduleTimes: ['11:15 AM', '11:25 AM', '11:38 AM'],
       hasRamp: false,
       lowFloor: false,
       rampOk: false,
@@ -251,6 +293,7 @@ class SeedData {
       id: 'bus_171_outbound',
       routeNo: '171',
       stops: ['st_pettah', 'st_fort', 'st_town_hall', 'st_borella'],
+      scheduleTimes: ['08:45 AM', '08:53 AM', '09:08 AM', '09:20 AM'],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
@@ -261,6 +304,7 @@ class SeedData {
       id: 'bus_154_outbound',
       routeNo: '154',
       stops: ['st_kirulapone', 'st_bambalapitiya', 'st_town_hall', 'st_borella'],
+      scheduleTimes: ['10:30 AM', '10:42 AM', '10:55 AM', '11:10 AM'],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
@@ -271,6 +315,7 @@ class SeedData {
       id: 'bus_176_outbound',
       routeNo: '176',
       stops: ['st_dehiwala', 'st_kirulapone', 'st_nugegoda'],
+      scheduleTimes: ['01:00 PM', '01:15 PM', '01:28 PM'],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,

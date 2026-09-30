@@ -284,6 +284,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         routeNo: _selectedRouteNumber,
         stops: stops,
         driverId: driverId,
+        scheduleTimes: _currentBus?.scheduleTimes,
         departureTime: now,
       );
 

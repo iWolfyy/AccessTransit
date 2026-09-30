@@ -1262,28 +1262,37 @@ class _DepartureAndStopsTimelineCard extends StatelessWidget {
                       final isPassed =
                           isInProgress && index < trip.currentStopIndex;
 
+                      final schedTime = bus?.getScheduledTimeForStop(index) ?? '08:00 AM';
                       final timing = trip?.stopTimes[stopId];
                       String timeSubtext = '';
+                      String delayBadgeText = '';
 
                       if (isInProgress && timing != null) {
+                        final delayStr = TimeUtils.formatDelayStatus(
+                          timing.estimatedArrival,
+                          timing.actualArrival,
+                        );
+
                         if (isPassed && timing.actualArrival != null) {
                           timeSubtext =
-                              'Reached at ${_formatTime(timing.actualArrival!)}';
+                              'Reached at ${_formatTime(timing.actualArrival!)} (Sched: $schedTime)';
+                          delayBadgeText = delayStr;
                         } else if (isConfirmedCurrent) {
                           final timeStr = timing.actualArrival != null
                               ? _formatTime(timing.actualArrival!)
-                              : _formatTime(timing.estimatedArrival);
-                          timeSubtext = 'Confirmed here at $timeStr';
+                              : schedTime;
+                          timeSubtext = 'Arrived at $timeStr (Sched: $schedTime)';
+                          delayBadgeText = delayStr;
                         } else {
                           final diffMins = timing.estimatedArrival
                               .difference(DateTime.now())
                               .inMinutes
                               .clamp(1, 999);
                           timeSubtext =
-                              'Est. ${_formatTime(timing.estimatedArrival)} (in about $diffMins min)';
+                              'Scheduled: $schedTime (in about $diffMins min)';
                         }
                       } else {
-                        timeSubtext = 'Scheduled stop';
+                        timeSubtext = 'Scheduled: $schedTime';
                       }
 
                       return Row(
@@ -1356,6 +1365,31 @@ class _DepartureAndStopsTimelineCard extends StatelessWidget {
                                           ),
                                         ),
                                       ),
+                                    if (delayBadgeText.isNotEmpty && delayBadgeText != 'Scheduled') ...[
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: delayBadgeText.contains('late')
+                                              ? Colors.amber.shade100
+                                              : Colors.green.shade100,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          delayBadgeText,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: delayBadgeText.contains('late')
+                                                ? Colors.amber.shade900
+                                                : Colors.green.shade900,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                                 const SizedBox(height: 2),

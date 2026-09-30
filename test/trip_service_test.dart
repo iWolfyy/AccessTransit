@@ -108,5 +108,27 @@ void main() {
       final activeAfterComplete = await tripService.getActiveTrip(busId);
       expect(activeAfterComplete, isNull);
     });
+
+    test('5. Trip creation using seeded scheduleTimes initializes exact scheduled arrival times', () async {
+      const busId = 'bus_scheduled_test';
+      final stops = ['st_pettah', 'st_maradana'];
+      final scheduleTimes = ['08:00 AM', '08:15 AM'];
+      final baseDate = DateTime(2026, 9, 30, 8, 0, 0);
+
+      final trip = await tripService.startTrip(
+        busId: busId,
+        routeNo: '138',
+        stops: stops,
+        driverId: 'driver_unit_test',
+        scheduleTimes: scheduleTimes,
+        departureTime: baseDate,
+      );
+
+      expect(trip.stopTimes['st_pettah']!.estimatedArrival, equals(baseDate));
+      expect(
+        trip.stopTimes['st_maradana']!.estimatedArrival,
+        equals(DateTime(2026, 9, 30, 8, 15, 0)),
+      );
+    });
   });
 }

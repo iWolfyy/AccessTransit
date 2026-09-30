@@ -162,17 +162,12 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  _MapSection(
+                  _TimetableHeaderCard(
                     busName: busName,
                     routeName: routeName,
-                    liveBus: liveBus,
-                    isStale: isStale,
-                    mapController: _mapController,
                     busId: resolvedBusId,
                   ),
-                  Transform.translate(
-                    offset: const Offset(0, -16),
-                    child: Padding(
+                  Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -228,7 +223,6 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                         ],
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -634,6 +628,85 @@ class _TopBar extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _TimetableHeaderCard extends StatelessWidget {
+  const _TimetableHeaderCard({
+    required this.busName,
+    required this.routeName,
+    required this.busId,
+  });
+
+  final String busName;
+  final String routeName;
+  final String busId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.directions_bus_rounded, color: AppColors.onPrimaryContainer, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      routeName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.onPrimaryContainer,
+                      ),
+                    ),
+                    Text(
+                      busName,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.onPrimaryContainer.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.onPrimaryContainer.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.schedule, size: 14, color: AppColors.onPrimaryContainer),
+                    SizedBox(width: 4),
+                    Text(
+                      'Fixed Schedule',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

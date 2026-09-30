@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import '../core/utils/time_utils.dart';
 import '../models/trip_model.dart';
 import 'eta_service.dart';
 
@@ -26,22 +27,35 @@ class TripService {
   CollectionReference<Map<String, dynamic>>? get _tripsRef =>
       _db?.collection('trips');
 
-  /// 1. Starts a new trip for a bus route.
-  ///
-  /// Computes initial estimated arrivals for all [stops] from [departureTime] (defaults to `now`).
+  /// 1. Starts a new trip for a bus route using seeded [scheduleTimes] or fallback geodesic ETA.
   Future<TripModel> startTrip({
     required String busId,
     required String routeNo,
     required List<String> stops,
     required String driverId,
+    List<String>? scheduleTimes,
     DateTime? departureTime,
   }) async {
     final now = DateTime.now();
     final actualDepTime = departureTime ?? now;
     final tripId = 'trip_${busId}_${now.millisecondsSinceEpoch}';
 
-    // Compute initial stop estimates in one shot via EtaService
-    final stopTimes = EtaService.computeTripStopEstimates(stops, actualDepTime);
+    Map<String, StopTimingInfo> stopTimes = {};
+
+    if (scheduleTimes != null &&
+        scheduleTimes.isNotEmpty &&
+        scheduleTimes.length == stops.length) {
+      for (int i = 0; i < stops.length; i++) {
+        final timeStr = scheduleTimes[i];
+        final scheduledDt = TimeUtils.parseTimeStringToDateTime(timeStr, actualDepTime);
+        stopTimes[stops[i]] = StopTimingInfo(
+          estimatedArrival: scheduledDt,
+          actualArrival: i == 0 ? actualDepTime : null,
+        );
+      }
+    } else {
+      stopTimes = EtaService.computeTripStopEstimates(stops, actualDepTime);
+    }
 
     final trip = TripModel(
       tripId: tripId,

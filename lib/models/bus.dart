@@ -9,6 +9,7 @@ class Bus {
     required this.id,
     required this.routeNo,
     required this.stops,
+    this.scheduleTimes = const [],
     required this.hasRamp,
     required this.lowFloor,
     required this.rampOk,
@@ -19,11 +20,26 @@ class Bus {
   final String id;
   final String routeNo;
   final List<String> stops;
+  final List<String> scheduleTimes; // Ordered scheduled time strings aligned with stops (e.g. ["08:00 AM", "08:12 AM"])
   final bool hasRamp;
   final bool lowFloor;
   final bool rampOk;
   final String occupancy; // 'low', 'medium', or 'high'
   final String? driverId;
+
+  /// Helper to get or generate fallback schedule time for a stop index if missing
+  String getScheduledTimeForStop(int index) {
+    if (index >= 0 && index < scheduleTimes.length) {
+      return scheduleTimes[index];
+    }
+    // Default fallback calculation starting at 08:00 AM with +12 mins per stop
+    final startMinutes = 8 * 60 + (index * 12);
+    final hour = (startMinutes ~/ 60) % 24;
+    final minute = startMinutes % 60;
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    final period = hour >= 12 ? 'PM' : 'AM';
+    return '${displayHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
+  }
 
   /// Factory to instantiate a [Bus] from a Firestore map and optional document [id].
   factory Bus.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -32,12 +48,16 @@ class Bus {
         [];
     final parsedStops = rawStops.map((e) => e.toString()).toList();
 
+    final rawTimes = map['scheduleTimes'] as List<dynamic>? ?? [];
+    final parsedTimes = rawTimes.map((e) => e.toString()).toList();
+
     return Bus(
       id: id ?? map['id']?.toString() ?? '',
       routeNo: map[FirestoreConstants.fieldRouteNo]?.toString() ??
           map['routeNo']?.toString() ??
           '',
       stops: parsedStops,
+      scheduleTimes: parsedTimes,
       hasRamp: map[FirestoreConstants.fieldHasRamp] as bool? ?? false,
       lowFloor: map[FirestoreConstants.fieldLowFloor] as bool? ?? false,
       rampOk: map[FirestoreConstants.fieldRampOk] as bool? ?? true,
@@ -61,6 +81,7 @@ class Bus {
     return {
       FirestoreConstants.fieldRouteNo: routeNo,
       FirestoreConstants.fieldStops: stops,
+      'scheduleTimes': scheduleTimes,
       FirestoreConstants.fieldHasRamp: hasRamp,
       FirestoreConstants.fieldLowFloor: lowFloor,
       FirestoreConstants.fieldRampOk: rampOk,
@@ -77,6 +98,7 @@ class Bus {
     String? id,
     String? routeNo,
     List<String>? stops,
+    List<String>? scheduleTimes,
     bool? hasRamp,
     bool? lowFloor,
     bool? rampOk,
@@ -87,6 +109,7 @@ class Bus {
       id: id ?? this.id,
       routeNo: routeNo ?? this.routeNo,
       stops: stops ?? List.from(this.stops),
+      scheduleTimes: scheduleTimes ?? List.from(this.scheduleTimes),
       hasRamp: hasRamp ?? this.hasRamp,
       lowFloor: lowFloor ?? this.lowFloor,
       rampOk: rampOk ?? this.rampOk,

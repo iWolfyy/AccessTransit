@@ -69,12 +69,14 @@ class RouteResultsScreen extends StatefulWidget {
     this.toStationId = 'st_kottawa',
     this.origin = 'Colombo Fort Station',
     this.destination = 'Kottawa Highway Bus Station',
+    this.selectedDate,
   });
 
   final String fromStationId;
   final String toStationId;
   final String origin;
   final String destination;
+  final DateTime? selectedDate;
 
   @override
   State<RouteResultsScreen> createState() => _RouteResultsScreenState();
@@ -295,6 +297,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                                     destination: widget.destination,
                                     matchedCount: routes.length,
                                     totalCount: routes.length,
+                                    selectedDate: widget.selectedDate,
                                   ),
                                   const SizedBox(height: 16),
                                   _SortChips(
@@ -449,18 +452,22 @@ class _TripSummaryCard extends StatelessWidget {
     required this.destination,
     required this.matchedCount,
     required this.totalCount,
+    this.selectedDate,
   });
 
   final String origin;
   final String destination;
   final int matchedCount;
   final int totalCount;
+  final DateTime? selectedDate;
 
   @override
   Widget build(BuildContext context) {
     final summaryText = matchedCount > 0
-        ? '$matchedCount route${matchedCount == 1 ? '' : 's'} serve your journey · Depart now'
+        ? '$matchedCount route${matchedCount == 1 ? '' : 's'} serve your journey'
         : 'No exact matches — showing all $totalCount routes';
+
+    final dateStr = TimeUtils.formatDateString(selectedDate ?? DateTime.now());
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -479,6 +486,29 @@ class _TripSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: AppColors.secondaryContainer,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.calendar_today, size: 14, color: AppColors.onSecondaryContainer),
+                const SizedBox(width: 6),
+                Text(
+                  'Showing buses for $dateStr',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onSecondaryContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
           Row(
             children: [
               const Icon(
