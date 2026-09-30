@@ -3,15 +3,18 @@ import 'package:flutter/material.dart';
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/seed_data.dart';
+import '../../logic/delay_eta_logic.dart';
 import '../../logic/status_logic.dart';
 import '../../models/bus.dart';
+import '../../models/bus_location_model.dart';
 import '../../models/report.dart';
 import '../../models/station.dart';
 import '../../models/trip_model.dart';
+import '../../services/bus_tracking_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/trip_service.dart';
-import '../../core/utils/time_utils.dart';
 import 'boarding_assistance_screen.dart';
+import 'live_journey_screen.dart';
 import 'report_condition_screen.dart';
 import 'route_results_screen.dart';
 
@@ -115,8 +118,20 @@ class RouteDetailsScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 24),
 
-                                // ACTION BUTTONS: Confirm Schedule
+                                // ACTION BUTTONS: Track Live, Confirm Schedule, Report
                                 _ActionButtons(
+                                  onTrackLive: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => LiveJourneyScreen(
+                                          origin: origin,
+                                          destination: destination,
+                                          busId: effectiveBusId,
+                                          route: route,
+                                        ),
+                                      ),
+                                    );
+                                  },
                                   onConfirmSchedule: () {
                                     ScaffoldMessenger.of(context)
                                       ..hideCurrentSnackBar()
@@ -231,408 +246,631 @@ class _DepartureAndStopsCard extends StatelessWidget {
   final String busId;
   final RouteResultItem? route;
 
-  String _formatTime(DateTime dt) {
-    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-    final minute = dt.minute.toString().padLeft(2, '0');
-    final period = dt.hour >= 12 ? 'PM' : 'AM';
-    return '$hour:$minute $period';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final effectiveStops = bus?.stops.isNotEmpty == true
-        ? bus!.stops
-        : ['st_pettah', 'st_maradana', 'st_borella', 'st_kottawa'];
+    final effectiveBus = bus ??
+        const Bus(
+          id: 'bus_138_nd4521',
+          routeNo: '138',
+          busNo: 'WP ND-4521',
+          hasRamp: true,
+          lowFloor: true,
+          rampOk: true,
+          occupancy: 'low',
+        );
 
-    final busNumber = bus?.routeNo ?? route?.title.replaceAll('Route ', '') ?? '138';
-    final initialScheduledDeparture = bus?.getScheduledTimeForStop(0) ?? '08:00 AM';
+    final busNumber = effectiveBus.routeNo;
+    final displayBusPlate = effectiveBus.displayBusNo;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.3),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: StreamBuilder<TripModel?>(
-        stream: TripService().watchActiveTripForBus(busId),
-        builder: (context, snapshot) {
-          final trip = snapshot.data;
-          final isInProgress = trip != null && trip.isInProgress;
-          final stopsToRender =
-              trip?.stops.isNotEmpty == true ? trip!.stops : effectiveStops;
+    return StreamBuilder<TripModel?>(
+      stream: TripService().watchActiveTripForBus(busId),
+      builder: (context, tripSnapshot) {
+        final trip = tripSnapshot.data;
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Departure Header & Station Details
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryContainer.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
+        return StreamBuilder<BusLocationModel?>(
+          stream: BusTrackingService().watchBusLocation(busId),
+          builder: (context, locationSnapshot) {
+            final liveLocation = locationSnapshot.data;
+
+            return FutureBuilder<List<Station>>(
+              future: FirestoreService().getStations(),
+              builder: (context, stationsSnapshot) {
+                final stationsList =
+                    stationsSnapshot.data ?? SeedData.colomboStations;
+                final stationsMap = {
+                  for (final s in stationsList) s.id: s,
+                };
+
+                // Calculate Arrival ETA, Schedule Delays, and Timeline Progression
+                final etaResult = DelayEtaCalculator.calculateArrivalEta(
+                  bus: effectiveBus,
+                  targetStopIdOrName: origin,
+                  liveBusLocation: liveLocation,
+                  activeTrip: trip,
+                  stationsMap: stationsMap,
+                );
+
+                return Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: etaResult.isDelayed
+                          ? const Color(0xFFEF4444).withValues(alpha: 0.4)
+                          : AppColors.primary.withValues(alpha: 0.25),
+                      width: 1.5,
                     ),
-                    child: const Icon(
-                      Icons.departure_board_rounded,
-                      color: AppColors.primary,
-                      size: 28,
-                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.onSurface.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Route $busNumber Departure Details',
-                          style: const TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Boarding Station: $origin',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        Text(
-                          'Final Destination: $destination',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Departure Time & Fleet Frequency Info Card
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryContainer.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.primaryContainer.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.access_time_filled_rounded, color: AppColors.primary, size: 24),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. ROUTE PILL & LIVE TELEMETRY STATUS
+                      Row(
                         children: [
-                          Text(
-                            'Scheduled Departure: $initialScheduledDeparture',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Route $busNumber',
+                              style: const TextStyle(
+                                color: AppColors.onPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'Frequency: Every 15 min • 4 Buses Active',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.onSurfaceVariant,
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.directions_bus,
+                                  size: 14,
+                                  color: AppColors.primary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  displayBusPlate,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                    color: AppColors.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: etaResult.isLive
+                                  ? const Color(0xFFDCFCE7)
+                                  : AppColors.surfaceContainer,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: etaResult.isLive
+                                        ? const Color(0xFF16A34A)
+                                        : AppColors.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  etaResult.isLive ? 'LIVE GPS' : 'SCHEDULE',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: etaResult.isLive
+                                        ? const Color(0xFF166534)
+                                        : AppColors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isInProgress ? Colors.green.shade100 : AppColors.surfaceContainer,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        isInProgress ? 'BUS DEPARTED' : 'ON TIME',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isInProgress ? Colors.green.shade900 : AppColors.onSurfaceVariant,
+                      const SizedBox(height: 16),
+
+                      // 2. HERO ARRIVAL COUNTDOWN & DELAY CARD
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: etaResult.isDelayed
+                                ? [
+                                    const Color(0xFFFEF2F2),
+                                    const Color(0xFFFFF7ED),
+                                  ]
+                                : [
+                                    AppColors.primaryContainer.withValues(alpha: 0.12),
+                                    AppColors.primaryContainer.withValues(alpha: 0.04),
+                                  ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: etaResult.isDelayed
+                                ? const Color(0xFFFCA5A5)
+                                : AppColors.primaryContainer.withValues(alpha: 0.3),
+                            width: 1.5,
+                          ),
                         ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header: Punctuality Badge
+                            Row(
+                              children: [
+                                _buildDelayBadge(etaResult),
+                                const Spacer(),
+                                if (etaResult.isDelayed)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEF4444),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '+${etaResult.delayMinutes} min late',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Countdown text
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: etaResult.isDelayed
+                                        ? const Color(0xFFDC2626).withValues(alpha: 0.15)
+                                        : AppColors.primaryContainer.withValues(alpha: 0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.access_alarm_rounded,
+                                    color: etaResult.isDelayed
+                                        ? const Color(0xFFDC2626)
+                                        : AppColors.primary,
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        etaResult.countdownText,
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w800,
+                                          color: etaResult.isDelayed
+                                              ? const Color(0xFF991B1B)
+                                              : AppColors.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'at ${etaResult.targetStopName}',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.onSurfaceVariant,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            const Divider(height: 1),
+                            const SizedBox(height: 12),
+
+                            // Comparison: Scheduled Time vs Expected Time
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'SCHEDULED',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                          color: AppColors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        etaResult.scheduledArrivalStr,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          decoration: etaResult.isDelayed
+                                              ? TextDecoration.lineThrough
+                                              : TextDecoration.none,
+                                          color: etaResult.isDelayed
+                                              ? AppColors.onSurfaceVariant
+                                              : AppColors.onSurface,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 18,
+                                  color: AppColors.outlineVariant,
+                                ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      const Text(
+                                        'EXPECTED ARRIVAL',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        etaResult.estimatedArrivalStr,
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w800,
+                                          color: etaResult.isDelayed
+                                              ? const Color(0xFFDC2626)
+                                              : AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 3. BOARDING ASSISTANCE BUTTON
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          final effectiveRouteNo = route?.title ??
+                              'Route $busNumber';
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => BoardingAssistanceScreen(
+                                busId: busId,
+                                busLabel: effectiveRouteNo,
+                                stopName: origin,
+                                stationId: etaResult.targetStopId,
+                              ),
+                            ),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primaryContainer,
+                          side: const BorderSide(
+                            color: AppColors.primaryContainer,
+                            width: 1.8,
+                          ),
+                          minimumSize: const Size(double.infinity, 46),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        icon: const Icon(Icons.assist_walker_rounded, size: 20),
+                        label: const Text('Request Boarding Assistance'),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 4. TIMELINE HEADER
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.route_rounded,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Route Stops Schedule & Live Progress',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 5. STOPS TIMETABLE PROGRESSION
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: etaResult.stopsTimeline.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final stop = etaResult.stopsTimeline[index];
+                          return _buildTimelineStopItem(stop);
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDelayBadge(BusArrivalEtaResult eta) {
+    Color bg;
+    Color border;
+    Color text;
+    IconData icon;
+
+    switch (eta.delayType) {
+      case DelayType.delayed:
+        bg = const Color(0xFFFEE2E2);
+        border = const Color(0xFFEF4444);
+        text = const Color(0xFFDC2626);
+        icon = Icons.warning_amber_rounded;
+        break;
+      case DelayType.onTime:
+        bg = const Color(0xFFDCFCE7);
+        border = const Color(0xFF22C55E);
+        text = const Color(0xFF16A34A);
+        icon = Icons.check_circle_rounded;
+        break;
+      case DelayType.early:
+        bg = const Color(0xFFE0F2FE);
+        border = const Color(0xFF0284C7);
+        text = const Color(0xFF0284C7);
+        icon = Icons.bolt_rounded;
+        break;
+      case DelayType.scheduled:
+        bg = AppColors.surfaceContainer;
+        border = AppColors.outlineVariant;
+        text = AppColors.onSurfaceVariant;
+        icon = Icons.schedule_rounded;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: text),
+          const SizedBox(width: 6),
+          Text(
+            eta.delayLabel,
+            style: TextStyle(
+              color: text,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineStopItem(StopEtaInfo stop) {
+    Color nodeColor;
+    Widget nodeIcon;
+
+    if (stop.isCurrent) {
+      nodeColor = AppColors.primary;
+      nodeIcon = const Icon(Icons.directions_bus, size: 16, color: Colors.white);
+    } else if (stop.isTargetStop) {
+      nodeColor = const Color(0xFFEAB308); // Gold/amber for passenger stop
+      nodeIcon = const Icon(Icons.person_pin_circle, size: 18, color: Colors.white);
+    } else if (stop.isPassed) {
+      nodeColor = const Color(0xFF16A34A); // Green check
+      nodeIcon = const Icon(Icons.check, size: 16, color: Colors.white);
+    } else {
+      nodeColor = AppColors.surfaceVariant;
+      nodeIcon = Text(
+        '${stop.stopIndex + 1}',
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: AppColors.onSurface,
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: stop.isTargetStop
+            ? const Color(0xFFFEF9C3).withValues(alpha: 0.5)
+            : (stop.isCurrent
+                ? AppColors.primaryContainer.withValues(alpha: 0.12)
+                : AppColors.surfaceContainerLow),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: stop.isTargetStop
+              ? const Color(0xFFEAB308)
+              : (stop.isCurrent
+                  ? AppColors.primary
+                  : AppColors.outlineVariant.withValues(alpha: 0.4)),
+          width: (stop.isTargetStop || stop.isCurrent) ? 1.8 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: nodeColor,
+            ),
+            child: Center(child: nodeIcon),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (stop.isTargetStop) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCA8A04),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'YOUR BOARDING STOP',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ] else if (stop.isCurrent) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'BUS IS HERE NOW',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Expanded(
+                      child: Text(
+                        stop.stopName,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: stop.isTargetStop || stop.isCurrent
+                              ? FontWeight.bold
+                              : FontWeight.w600,
+                          color: AppColors.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              // Boarding Assistance Request Button
-              OutlinedButton.icon(
-                onPressed: () {
-                  final effectiveRouteNo = route?.title ?? (bus != null ? 'Route ${bus!.routeNo}' : 'Route $busNumber');
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => BoardingAssistanceScreen(
-                        busId: busId,
-                        busLabel: effectiveRouteNo,
-                        stopName: origin,
-                        stationId: route?.intermediateStops.isNotEmpty == true
-                            ? route!.intermediateStops.first
-                            : 'st_fort',
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text(
+                      stop.isPassed
+                          ? 'Passed at ${stop.estimatedTimeStr}'
+                          : 'Sched: ${stop.scheduledTimeStr} · Exp: ${stop.estimatedTimeStr}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: stop.isPassed
+                            ? const Color(0xFF16A34A)
+                            : AppColors.onSurfaceVariant,
                       ),
                     ),
-                  );
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primaryContainer,
-                  side: const BorderSide(
-                    color: AppColors.primaryContainer,
-                    width: 2,
-                  ),
-                  minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
+                    if (!stop.isPassed && stop.delayType == DelayType.delayed) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '(+${stop.delayMinutes} min late)',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                icon: const Icon(Icons.assist_walker_rounded, size: 22),
-                label: const Text('Request Boarding Assistance'),
-              ),
-              const SizedBox(height: 20),
-
-              const Text(
-                'Full Departure & Stop Schedule',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.onSurface,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Stops Timetable List
-              FutureBuilder<List<Station>>(
-                future: FirestoreService().getStations(),
-                builder: (context, stationsSnapshot) {
-                  final stationsList =
-                      stationsSnapshot.data ?? SeedData.colomboStations;
-                  final stationsMap = {
-                    for (final s in stationsList) s.id: s,
-                  };
-
-                  return ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: stopsToRender.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 14),
-                    itemBuilder: (context, index) {
-                      final stopId = stopsToRender[index];
-                      final rawStationName = stationsMap[stopId]?.name ??
-                          stopId
-                              .replaceAll('st_', '')
-                              .replaceAll('_', ' ')
-                              .toUpperCase();
-
-                      String haltTag;
-                      Color tagBgColor;
-                      Color tagTextColor;
-
-                      if (index == 0) {
-                        haltTag = 'START STOP';
-                        tagBgColor = Colors.blue.shade100;
-                        tagTextColor = Colors.blue.shade900;
-                      } else if (index == stopsToRender.length - 1) {
-                        haltTag = 'FINAL STOP';
-                        tagBgColor = Colors.purple.shade100;
-                        tagTextColor = Colors.purple.shade900;
-                      } else {
-                        haltTag = 'HALT ${index + 1}';
-                        tagBgColor = AppColors.surfaceContainer;
-                        tagTextColor = AppColors.onSurfaceVariant;
-                      }
-
-                      final isConfirmedCurrent =
-                          isInProgress && index == trip.currentStopIndex;
-                      final isPassed =
-                          isInProgress && index < trip.currentStopIndex;
-
-                      final schedTime = bus?.getScheduledTimeForStop(index) ?? '08:00 AM';
-                      final timing = trip?.stopTimes[stopId];
-                      String timeSubtext = '';
-
-                      if (isInProgress && timing != null) {
-                        if (isPassed && timing.actualArrival != null) {
-                          timeSubtext =
-                              'Reached at ${_formatTime(timing.actualArrival!)} (Sched: $schedTime)';
-                        } else if (isConfirmedCurrent) {
-                          final timeStr = timing.actualArrival != null
-                              ? _formatTime(timing.actualArrival!)
-                              : schedTime;
-                          timeSubtext = 'Arrived at $timeStr (Sched: $schedTime)';
-                        } else {
-                          timeSubtext = 'Scheduled Time: $schedTime';
-                        }
-                      } else {
-                        timeSubtext = 'Scheduled Departure / Arrival: $schedTime';
-                      }
-
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isConfirmedCurrent
-                              ? AppColors.primaryContainer.withValues(alpha: 0.15)
-                              : AppColors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isConfirmedCurrent
-                                ? AppColors.primary
-                                : AppColors.outlineVariant.withValues(alpha: 0.5),
-                            width: isConfirmedCurrent ? 2 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isConfirmedCurrent
-                                    ? AppColors.primary
-                                    : (isPassed
-                                        ? Colors.green
-                                        : AppColors.surfaceVariant),
-                              ),
-                              child: Center(
-                                child: isConfirmedCurrent
-                                    ? const Icon(
-                                        Icons.directions_bus,
-                                        size: 18,
-                                        color: Colors.white,
-                                      )
-                                    : (isPassed
-                                        ? const Icon(
-                                            Icons.check,
-                                            size: 18,
-                                            color: Colors.white,
-                                          )
-                                        : Text(
-                                            '${index + 1}',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.onSurface,
-                                            ),
-                                          )),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: tagBgColor,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          haltTag,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: tagTextColor,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      if (isConfirmedCurrent)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary,
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: const Text(
-                                            'BUS IS HERE NOW',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    rawStationName,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    timeSubtext,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: isConfirmedCurrent
-                                          ? AppColors.primary
-                                          : AppColors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ],
-          );
-        },
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1016,10 +1254,12 @@ class _SafetyBulletItem extends StatelessWidget {
 
 class _ActionButtons extends StatelessWidget {
   const _ActionButtons({
+    required this.onTrackLive,
     required this.onConfirmSchedule,
     required this.onReport,
   });
 
+  final VoidCallback onTrackLive;
   final VoidCallback onConfirmSchedule;
   final VoidCallback onReport;
 
@@ -1031,7 +1271,7 @@ class _ActionButtons extends StatelessWidget {
           height: 54,
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: onConfirmSchedule,
+            onPressed: onTrackLive,
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primaryContainer,
               foregroundColor: AppColors.onPrimary,
@@ -1043,8 +1283,28 @@ class _ActionButtons extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            icon: const Icon(Icons.check_circle_rounded, size: 22),
-            label: const Text('Confirm Bus Schedule'),
+            icon: const Icon(Icons.map_rounded, size: 22),
+            label: const Text('Track Live on Map'),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 48,
+          width: double.infinity,
+          child: FilledButton.tonalIcon(
+            onPressed: onConfirmSchedule,
+            style: FilledButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            icon: const Icon(Icons.bookmark_add_outlined, size: 20),
+            label: const Text('Save to Trip Plan'),
           ),
         ),
         const SizedBox(height: 12),
@@ -1056,8 +1316,8 @@ class _ActionButtons extends StatelessWidget {
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primaryContainer,
               side: const BorderSide(
-                color: AppColors.primaryContainer,
-                width: 2,
+                color: AppColors.outlineVariant,
+                width: 1.5,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -1068,7 +1328,7 @@ class _ActionButtons extends StatelessWidget {
               ),
             ),
             icon: const Icon(Icons.report_problem_outlined, size: 20),
-            label: const Text('Report a Condition'),
+            label: const Text('Report Accessibility Condition'),
           ),
         ),
       ],
