@@ -27,6 +27,9 @@ class FirestoreConstants {
   /// Accessibility condition reports keyed by report ID (`reports/{id}`).
   static const String reportsCollection = 'reports';
 
+  /// Bus route definitions keyed by route ID (`routes/{id}`).
+  static const String routesCollection = 'routes';
+
   /// Passenger boarding assistance requests keyed by request ID (`boarding_requests/{id}`).
   static const String boardingRequestsCollection = 'boarding_requests';
 
@@ -46,8 +49,15 @@ class FirestoreConstants {
   static const String fieldLat = 'lat';
   static const String fieldLng = 'lng';
 
+  // --- routes/{routeId} document fields ---
+
+  static const String fieldRouteDescription = 'description';
+
   // --- buses/{busId} static document fields ---
 
+  static const String fieldBusNo = 'busNo';
+  static const String fieldScheduledDeparture = 'scheduledDeparture';
+  static const String fieldScheduleTimes = 'scheduleTimes';
   static const String fieldRouteNo = 'routeNo';
   static const String fieldStops = 'stops';
   static const String fieldLowFloor = 'lowFloor';
