@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../core/utils/time_utils.dart';
 import '../models/trip_model.dart';
 import 'eta_service.dart';
+import 'live_bus_service.dart';
 
 /// Repository service for managing bus trip executions (`trips/{tripId}`).
 class TripService {
@@ -164,6 +165,19 @@ class TripService {
       debugPrint('TripService.confirmNextStopArrival warning: $e');
     }
 
+    // Instantly sync LiveBusService so passenger screens receive the new next stop
+    try {
+      final hasUpcoming = nextIndex + 1 < active.stops.length;
+      final upcomingStop = hasUpcoming ? active.stops[nextIndex + 1] : active.stops[nextIndex];
+      await LiveBusService().updateNextStop(
+        busId: busId,
+        nextStop: upcomingStop,
+        currentStopIndex: nextIndex,
+      );
+    } catch (e) {
+      debugPrint('TripService.confirmNextStopArrival LiveBusService sync warning: $e');
+    }
+
     return updatedTrip;
   }
 
@@ -184,6 +198,12 @@ class TripService {
       }
     } catch (e) {
       debugPrint('TripService.completeTrip warning: $e');
+    }
+
+    try {
+      await LiveBusService().stopTrip(busId);
+    } catch (e) {
+      debugPrint('TripService.completeTrip stopTrip warning: $e');
     }
 
     return completedTrip;

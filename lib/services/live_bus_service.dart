@@ -151,6 +151,50 @@ class LiveBusService {
     }
   }
 
+  /// Updates the current stop progression and next stop telemetry for a bus.
+  ///
+  /// Instantly synchronizes [nextStop], [currentStopIndex], and [etaMinutes]
+  /// so passenger screens receive immediate real-time progress updates.
+  Future<void> updateNextStop({
+    required String busId,
+    required String nextStop,
+    int? currentStopIndex,
+    int? etaMinutes,
+  }) async {
+    final existing = _localLocationsFallback[busId];
+    if (existing != null) {
+      final updated = existing.copyWith(
+        nextStop: nextStop,
+        currentStopIndex: currentStopIndex ?? existing.currentStopIndex,
+        etaMinutes: etaMinutes ?? existing.etaMinutes,
+        timestamp: DateTime.now(),
+      );
+      _localLocationsFallback[busId] = updated;
+      _localLocationsStreamController.add(_localLocationsFallback);
+    }
+
+    try {
+      final doc = liveLocationDoc(busId);
+      if (doc != null) {
+        final Map<String, dynamic> updateData = {
+          FirestoreConstants.fieldNextStop: nextStop,
+          FirestoreConstants.fieldTimestamp: FieldValue.serverTimestamp(),
+          FirestoreConstants.fieldLastUpdated: FieldValue.serverTimestamp(),
+        };
+        if (currentStopIndex != null) {
+          updateData[FirestoreConstants.fieldCurrentStopIndex] = currentStopIndex;
+        }
+        if (etaMinutes != null) {
+          updateData[FirestoreConstants.fieldEtaMinutes] = etaMinutes;
+        }
+
+        await doc.set(updateData, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('LiveBusService.updateNextStop warning: $e');
+    }
+  }
+
   /// 3. Change the bus status.
   ///
   /// Updates [status], updates [isBroadcasting] accordingly, and refreshes the timestamp.

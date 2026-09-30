@@ -216,7 +216,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         _selectedRouteId = 'route_${bus.routeNo}';
         _selectedRouteName = 'Route ${bus.routeNo}';
         if (bus.stops.isNotEmpty) {
-          _nextStop = bus.stops.last;
+          final targetIndex = bus.stops.length > 1 ? 1 : 0;
+          _nextStop = _resolveStopName(bus.stops[targetIndex]);
         }
       });
     });
@@ -343,6 +344,11 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         _lastUpdateTimestamp = now;
       });
 
+      final initialNextStop = (_currentBus != null && _currentBus!.stops.length > 1)
+          ? _resolveStopName(_currentBus!.stops[1])
+          : _nextStop;
+      _nextStop = initialNextStop;
+
       // 3. Create/update live_locations/{busId} document with status = active
       final initialBusModel = BusLocationModel(
         busId: _selectedBusId,
@@ -356,7 +362,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         speed: speedKmH,
         heading: headingDeg,
         status: BusStatus.active,
-        nextStop: _nextStop,
+        nextStop: initialNextStop,
+        currentStopIndex: 0,
         rampOperational: _rampOperational,
         elevatorWorking: _elevatorWorking,
         occupancyLevel: _occupancyLevel,
@@ -846,7 +853,44 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                                         ? () async {
                                             final updated = await TripService().confirmNextStopArrival(_selectedBusId);
                                             if (updated != null) {
-                                              _showSnack('Confirmed arrival at ${stationsMap[updated.stops[updated.currentStopIndex]]?.name ?? 'next stop'}!');
+                                              final safeIdx = updated.currentStopIndex.clamp(0, updated.stops.length - 1);
+                                              final arrivedStopId = updated.stops[safeIdx];
+                                              final arrivedStopName = stationsMap[arrivedStopId]?.name ?? arrivedStopId;
+
+                                              final hasUpcoming = updated.currentStopIndex + 1 < updated.stops.length;
+                                              final upcomingStopId = hasUpcoming
+                                                  ? updated.stops[updated.currentStopIndex + 1]
+                                                  : arrivedStopId;
+                                              final upcomingStopName = stationsMap[upcomingStopId]?.name ?? upcomingStopId;
+
+                                              if (mounted) {
+                                                setState(() {
+                                                  _nextStop = upcomingStopName;
+                                                });
+                                              }
+
+                                              // Calculate ETA countdown to upcoming stop
+                                              int etaMinutes = 4;
+                                              if (_currentBus != null) {
+                                                final etaCalc = DelayEtaCalculator.calculateArrivalEta(
+                                                  bus: _currentBus!,
+                                                  targetStopIdOrName: upcomingStopId,
+                                                  activeTrip: updated,
+                                                  stationsMap: stationsMap,
+                                                  currentTime: DateTime.now(),
+                                                );
+                                                etaMinutes = etaCalc.countdownMinutes.clamp(1, 120);
+                                              }
+
+                                              // Instantly sync LiveBusService with human-readable stop name for Passenger screen
+                                              await _liveBusService.updateNextStop(
+                                                busId: _selectedBusId,
+                                                nextStop: upcomingStopName,
+                                                currentStopIndex: updated.currentStopIndex,
+                                                etaMinutes: hasUpcoming ? etaMinutes : 0,
+                                              );
+
+                                              _showSnack('Arrival confirmed at $arrivedStopName! Next: $upcomingStopName');
                                             }
                                           }
                                         : null,

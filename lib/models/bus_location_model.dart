@@ -21,6 +21,7 @@ class BusLocationModel {
     DateTime? lastUpdated,
     BusStatus? status,
     this.nextStop = 'Central Station',
+    this.currentStopIndex = 0,
     this.etaMinutes = 2,
     this.rampOperational = true,
     this.elevatorWorking = true,
@@ -51,6 +52,7 @@ class BusLocationModel {
   final BusStatus status;
 
   final String nextStop;
+  final int currentStopIndex;
   final int etaMinutes;
   final bool rampOperational;
   final bool elevatorWorking;
@@ -119,6 +121,8 @@ class BusLocationModel {
       nextStop:
           map[FirestoreConstants.fieldNextStop]?.toString() ??
           'Central Station',
+      currentStopIndex:
+          (map[FirestoreConstants.fieldCurrentStopIndex] as num?)?.toInt() ?? 0,
       etaMinutes:
           (map[FirestoreConstants.fieldEtaMinutes] as num?)?.toInt() ?? 2,
       rampOperational:
@@ -162,6 +166,7 @@ class BusLocationModel {
       FirestoreConstants.fieldStatus: status.value,
       FirestoreConstants.fieldTimestamp: tsValue,
       FirestoreConstants.fieldNextStop: nextStop,
+      FirestoreConstants.fieldCurrentStopIndex: currentStopIndex,
       FirestoreConstants.fieldEtaMinutes: etaMinutes,
       FirestoreConstants.fieldRampOperational: rampOperational,
       FirestoreConstants.fieldElevatorWorking: elevatorWorking,
@@ -192,6 +197,7 @@ class BusLocationModel {
     DateTime? lastUpdated,
     BusStatus? status,
     String? nextStop,
+    int? currentStopIndex,
     int? etaMinutes,
     bool? rampOperational,
     bool? elevatorWorking,
@@ -212,6 +218,7 @@ class BusLocationModel {
       timestamp: timestamp ?? lastUpdated ?? this.timestamp,
       status: status ?? this.status,
       nextStop: nextStop ?? this.nextStop,
+      currentStopIndex: currentStopIndex ?? this.currentStopIndex,
       etaMinutes: etaMinutes ?? this.etaMinutes,
       rampOperational: rampOperational ?? this.rampOperational,
       elevatorWorking: elevatorWorking ?? this.elevatorWorking,
