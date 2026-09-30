@@ -1,5 +1,3 @@
-import 'package:access_transit/models/trip_model.dart';
-import 'package:access_transit/services/eta_service.dart';
 import 'package:access_transit/services/trip_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 

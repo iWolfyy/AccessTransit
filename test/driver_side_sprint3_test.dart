@@ -39,7 +39,7 @@ void main() {
     test(
         'TASK 2 (AC-85): End-to-end driver ramp status toggle updates rider status (Safe -> Warning -> Safe)',
         () async {
-      const busId = 'bus_138_outbound';
+      const busId = 'bus_138_nd4521';
 
       // 1. Initial State: Bus ramp is OK
       await firestoreService.updateBusAccessibility(
@@ -86,7 +86,7 @@ void main() {
     test(
         'TASK 2 (AC-85): Occupancy update does not alter accessibility badge status',
         () async {
-      const busId = 'bus_138_outbound';
+      const busId = 'bus_138_nd4521';
 
       // Safe bus with low occupancy
       await firestoreService.updateBusAccessibility(

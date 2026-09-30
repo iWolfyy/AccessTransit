@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/time_utils.dart';
 import '../../data/seed_data.dart';
+import '../../models/bus_route.dart';
 import '../../models/boarding_request.dart';
 import '../../models/bus.dart';
 import '../../models/bus_location_model.dart';
@@ -51,9 +52,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
 
   List<Bus> _availableBuses = SeedData.sampleBuses;
   Bus? _currentBus;
+  Map<String, BusRoute> _routesMap = {};
 
-  String _selectedBusId = 'bus_138_outbound';
-  String _selectedRouteId = 'route_138';
+  String _selectedBusId = 'bus_138_nd4521';
+  String _selectedRouteId = 'route_138_pettah_homagama';
   String _selectedRouteNumber = '138';
   String _selectedRouteName = 'Route 138: Pettah → Kottawa';
   String _nextStop = 'Kottawa Highway Bus Station';
@@ -77,7 +79,103 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _loadRoutes();
     _subscribeToBuses();
+  }
+
+  Future<void> _loadRoutes() async {
+    try {
+      final routes = await _firestoreService.getRoutes();
+      final list = routes.isNotEmpty ? routes : SeedData.sampleRoutes;
+      if (mounted) {
+        setState(() {
+          _routesMap = {for (final r in list) r.id: r};
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _routesMap = {for (final r in SeedData.sampleRoutes) r.id: r};
+        });
+      }
+    }
+  }
+
+  /// Finds the nearest upcoming bus run (departure within the next 24 hours)
+  /// and returns its ID. Prioritises: assigned-to-me > nearest upcoming > first bus.
+  String _autoSelectNearestUpcomingBus(List<Bus> buses, String? currentUserId) {
+    // Priority 1: Bus already assigned to this driver
+    final myBus = buses.cast<Bus?>().firstWhere(
+          (b) => b?.driverId != null && b?.driverId == currentUserId,
+          orElse: () => null,
+        );
+    if (myBus != null) return myBus.id;
+
+    // Priority 2: Nearest upcoming departure (scheduled departure >= now)
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    Bus? bestUpcoming;
+    Duration bestDelta = const Duration(days: 2);
+
+    for (final bus in buses) {
+      final depStr = bus.effectiveDepartureTime;
+      final depTime = TimeUtils.parseTimeStringToDateTime(depStr, today);
+
+      final delta = depTime.difference(now);
+      // Upcoming = departure is in the future (or within 15 min past to allow late starts)
+      if (delta.inMinutes >= -15 && delta < bestDelta) {
+        bestDelta = delta;
+        bestUpcoming = bus;
+      }
+    }
+
+    if (bestUpcoming != null) return bestUpcoming.id;
+
+    // Fallback: keep current selection if still valid, otherwise first bus
+    if (buses.any((b) => b.id == _selectedBusId)) return _selectedBusId;
+    return buses.isNotEmpty ? buses.first.id : _selectedBusId;
+  }
+
+  /// Returns a human-readable run status for a bus based on its departure time.
+  static _BusRunStatus _getBusRunStatus(Bus bus, {DateTime? clock}) {
+    final now = clock ?? DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final depStr = bus.effectiveDepartureTime;
+    final depTime = TimeUtils.parseTimeStringToDateTime(depStr, today);
+
+    // Compute last-stop arrival time from scheduleTimes
+    final lastStopStr = bus.getScheduledTimeForStop(bus.stops.length - 1);
+    final lastStopTime = TimeUtils.parseTimeStringToDateTime(lastStopStr, today);
+
+    final minsToDep = depTime.difference(now).inMinutes;
+    final minsToEnd = lastStopTime.difference(now).inMinutes;
+
+    if (minsToDep > 0) {
+      // Departure is in the future
+      return _BusRunStatus(
+        label: 'Upcoming',
+        color: Colors.blue,
+        icon: Icons.schedule,
+        sortKey: 0 + minsToDep, // upcoming sorted by proximity
+      );
+    } else if (minsToEnd >= -5) {
+      // Between departure and final stop (+ 5 min buffer)
+      return _BusRunStatus(
+        label: 'In Progress',
+        color: Colors.green,
+        icon: Icons.directions_bus,
+        sortKey: -1000, // in-progress always on top
+      );
+    } else {
+      // Past the final scheduled stop
+      return _BusRunStatus(
+        label: 'Departed',
+        color: Colors.grey,
+        icon: Icons.check_circle_outline,
+        sortKey: 2000 + minsToEnd.abs(), // departed at the bottom
+      );
+    }
   }
 
   void _subscribeToBuses() {
@@ -90,15 +188,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       setState(() {
         _availableBuses = list;
         if (!_userManuallySelectedBus) {
-          final myBus = list.cast<Bus?>().firstWhere(
-                (b) => b?.driverId != null && b?.driverId == currentUserId,
-                orElse: () => null,
-              );
-          if (myBus != null) {
-            _selectedBusId = myBus.id;
-          } else if (!_availableBuses.any((b) => b.id == _selectedBusId)) {
-            _selectedBusId = _availableBuses.first.id;
-          }
+          _selectedBusId = _autoSelectNearestUpcomingBus(list, currentUserId);
         }
       });
       _listenToSelectedBus(_selectedBusId);
@@ -800,6 +890,14 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         _currentBus!.driverId == null ||
         _currentBus!.driverId!.isEmpty;
 
+    // Sort buses: In Progress first, then Upcoming (nearest first), then Departed
+    final sortedBuses = List<Bus>.from(_availableBuses);
+    sortedBuses.sort((a, b) {
+      final statusA = _getBusRunStatus(a);
+      final statusB = _getBusRunStatus(b);
+      return statusA.sortKey.compareTo(statusB.sortKey);
+    });
+
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -813,11 +911,12 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               children: [
                 const Icon(Icons.directions_bus, color: AppColors.primary),
                 const SizedBox(width: 8),
-                const Text(
-                  'Assigned Bus & Route',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                const Expanded(
+                  child: Text(
+                    'Select Bus Run',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
-                const Spacer(),
                 if (isAssignedToMe)
                   Container(
                     padding:
@@ -875,10 +974,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               key: ValueKey(_selectedBusId),
-              initialValue: _availableBuses.any((b) => b.id == _selectedBusId)
+              initialValue: sortedBuses.any((b) => b.id == _selectedBusId)
                   ? _selectedBusId
-                  : (_availableBuses.isNotEmpty
-                      ? _availableBuses.first.id
+                  : (sortedBuses.isNotEmpty
+                      ? sortedBuses.first.id
                       : null),
               decoration: InputDecoration(
                 border: OutlineInputBorder(
@@ -889,15 +988,64 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   vertical: 12,
                 ),
               ),
-              items: _availableBuses.map((b) {
+              isExpanded: true,
+              items: sortedBuses.map((b) {
                 final isMyBus = b.driverId == currentUserId;
-                final cleanName =
-                    b.id.replaceAll('bus_', '').replaceAll('_', ' ');
+                final status = _getBusRunStatus(b);
+                final depTime = b.effectiveDepartureTime;
+                final origin = b.stops.isNotEmpty ? _resolveStopName(b.stops.first) : '';
+                final dest = b.stops.length > 1 ? _resolveStopName(b.stops.last) : '';
+                final routeEndpoints = (origin.isNotEmpty && dest.isNotEmpty)
+                    ? ' — $origin → $dest'
+                    : '';
+
                 return DropdownMenuItem<String>(
                   value: b.id,
-                  child: Text(
-                    'Bus ${b.routeNo} — $cleanName${isMyBus ? ' ★ (My Bus)' : ''}',
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    children: [
+                      // Status dot
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: status.color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      // Route + departure + endpoints
+                      Expanded(
+                        child: Text(
+                          'Bus ${b.routeNo} (Dep: $depTime)$routeEndpoints${isMyBus ? ' ★' : ''}',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isMyBus ? FontWeight.bold : FontWeight.normal,
+                            color: status.label == 'Departed'
+                                ? AppColors.onSurfaceVariant
+                                : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Status badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: status.color.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          status.label,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: status.color,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               }).toList(),
@@ -912,10 +1060,132 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                       _listenToSelectedBus(val);
                     },
             ),
+            // Show selected bus route details below the dropdown
+            if (_currentBus != null) ...[
+              const SizedBox(height: 12),
+              _buildSelectedBusInfo(_currentBus!, currentUserId),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  /// Builds an info row below the dropdown showing the selected bus's route, departure, and status.
+  Widget _buildSelectedBusInfo(Bus bus, String currentUserId) {
+    final status = _getBusRunStatus(bus);
+    final route = _routesMap[bus.routeId];
+    final routeName = route?.routeName ?? 'Route ${bus.routeNo}';
+    final depTime = bus.effectiveDepartureTime;
+    final firstStop = bus.stops.isNotEmpty ? bus.stops.first : '—';
+    final lastStop = bus.stops.length > 1 ? bus.stops.last : '—';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: status.color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: status.color.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(status.icon, size: 18, color: status.color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  routeName,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: status.color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(status.icon, size: 12, color: status.color),
+                    const SizedBox(width: 4),
+                    Text(
+                      status.label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: status.color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.access_time, size: 14, color: AppColors.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text(
+                'Departure: $depTime',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(width: 12),
+              const Icon(Icons.straighten, size: 14, color: AppColors.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text(
+                '${bus.stops.length} stops',
+                style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.trip_origin, size: 12, color: Colors.green),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  _resolveStopName(firstStop),
+                  style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const Icon(Icons.arrow_forward, size: 12, color: AppColors.onSurfaceVariant),
+              const SizedBox(width: 4),
+              const Icon(Icons.flag, size: 12, color: Colors.red),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  _resolveStopName(lastStop),
+                  style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Resolves a stop ID to a human-readable station name from the seed data.
+  String _resolveStopName(String stopId) {
+    final station = SeedData.colomboStations.cast<Station?>().firstWhere(
+          (s) => s?.id == stopId,
+          orElse: () => null,
+        );
+    return station?.name ?? stopId.replaceAll('st_', '').replaceAll('_', ' ');
   }
 
   Widget _buildLiveTelemetryCard() {
@@ -1362,4 +1632,26 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       ),
     );
   }
+}
+
+/// Lightweight data holder for a bus run's status classification.
+class _BusRunStatus {
+  const _BusRunStatus({
+    required this.label,
+    required this.color,
+    required this.icon,
+    required this.sortKey,
+  });
+
+  /// Display label: 'Upcoming', 'In Progress', or 'Departed'.
+  final String label;
+
+  /// Colour used for the status dot and badge.
+  final Color color;
+
+  /// Icon representing the status.
+  final IconData icon;
+
+  /// Numeric sort key (lower = higher in the dropdown).
+  final int sortKey;
 }
