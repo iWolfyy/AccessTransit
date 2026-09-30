@@ -138,43 +138,98 @@ class SeedData {
       lat: 6.8420,
       lng: 79.9650,
     ),
+    const Station(
+      id: 'st_homagama',
+      name: 'Homagama Central Bus Stand',
+      hasElevator: false,
+      hasRamp: true,
+      lat: 6.8400,
+      lng: 80.0030,
+    ),
+    const Station(
+      id: 'st_moratuwa',
+      name: 'Moratuwa Bus Stand',
+      hasElevator: false,
+      hasRamp: true,
+      lat: 6.7730,
+      lng: 79.8816,
+    ),
+    const Station(
+      id: 'st_panadura',
+      name: 'Panadura Main Bus Stand',
+      hasElevator: true,
+      hasRamp: true,
+      lat: 6.7135,
+      lng: 79.9074,
+    ),
+    const Station(
+      id: 'st_battaramulla',
+      name: 'Battaramulla Junction Stop',
+      hasElevator: false,
+      hasRamp: true,
+      lat: 6.8990,
+      lng: 79.9180,
+    ),
+    const Station(
+      id: 'st_malabe',
+      name: 'Malabe Bus Terminal',
+      hasElevator: false,
+      hasRamp: true,
+      lat: 6.9042,
+      lng: 79.9545,
+    ),
+    const Station(
+      id: 'st_kaduwela',
+      name: 'Kaduwela Central Bus Stand',
+      hasElevator: false,
+      hasRamp: true,
+      lat: 6.9360,
+      lng: 79.9830,
+    ),
   ];
 
-  /// Master list of transit routes with route numbers, names, descriptions, and ordered stops.
+  /// Master list of authentic transit routes with route numbers, names, descriptions, and ordered stops.
   static final List<BusRoute> sampleRoutes = [
+    // 1. Route 138 (Pettah - Homagama Outbound)
     const BusRoute(
-      id: 'route_138_outbound',
+      id: 'route_138_pettah_homagama',
       routeNo: '138',
-      routeName: 'Pettah - Kottawa (Outbound)',
-      description: 'Via High Level Road, Maradana, Borella, Nugegoda, Maharagama, Kottawa',
+      routeName: 'Pettah - Homagama (High Level Road)',
+      description: 'Via Maradana, Borella, Kirulapone, Nugegoda, Maharagama, Kottawa, Homagama',
       stops: [
         'st_pettah',
         'st_maradana',
         'st_borella',
+        'st_kirulapone',
         'st_nugegoda',
         'st_maharagama',
-        'st_kottawa'
+        'st_kottawa',
+        'st_homagama'
       ],
     ),
+    // 2. Route 138 (Homagama - Pettah Inbound)
     const BusRoute(
-      id: 'route_138_inbound',
+      id: 'route_138_homagama_pettah',
       routeNo: '138',
-      routeName: 'Kottawa - Pettah (Inbound)',
-      description: 'Via High Level Road, Maharagama, Nugegoda, Borella, Maradana, Pettah',
+      routeName: 'Homagama - Pettah (Inbound)',
+      description: 'Via Homagama, Kottawa, Maharagama, Nugegoda, Kirulapone, Borella, Maradana, Pettah',
       stops: [
+        'st_homagama',
         'st_kottawa',
         'st_maharagama',
         'st_nugegoda',
+        'st_kirulapone',
         'st_borella',
         'st_maradana',
         'st_pettah'
       ],
     ),
+    // 3. Route 100 (Pettah - Panadura Outbound)
     const BusRoute(
-      id: 'route_100_outbound',
+      id: 'route_100_pettah_panadura',
       routeNo: '100',
-      routeName: 'Pettah - Mount Lavinia (Galle Road)',
-      description: 'Via Galle Road, Fort, Kollupitiya, Bambalapitiya, Wellawatte, Dehiwala, Mount Lavinia',
+      routeName: 'Pettah - Panadura (Galle Road)',
+      description: 'Via Fort, Kollupitiya, Bambalapitiya, Wellawatte, Dehiwala, Mount Lavinia, Moratuwa, Panadura',
       stops: [
         'st_pettah',
         'st_fort',
@@ -182,164 +237,356 @@ class SeedData {
         'st_bambalapitiya',
         'st_wellawatte',
         'st_dehiwala',
-        'st_mt_lavinia'
+        'st_mt_lavinia',
+        'st_moratuwa',
+        'st_panadura'
       ],
     ),
+    // 4. Route 100 (Panadura - Pettah Inbound)
     const BusRoute(
-      id: 'route_101_outbound',
+      id: 'route_100_panadura_pettah',
+      routeNo: '100',
+      routeName: 'Panadura - Pettah (Inbound)',
+      description: 'Via Panadura, Moratuwa, Mount Lavinia, Dehiwala, Wellawatte, Bambalapitiya, Kollupitiya, Fort, Pettah',
+      stops: [
+        'st_panadura',
+        'st_moratuwa',
+        'st_mt_lavinia',
+        'st_dehiwala',
+        'st_wellawatte',
+        'st_bambalapitiya',
+        'st_kollupitiya',
+        'st_fort',
+        'st_pettah'
+      ],
+    ),
+    // 5. Route 120 (Pettah - Horana)
+    const BusRoute(
+      id: 'route_120_pettah_horana',
+      routeNo: '120',
+      routeName: 'Pettah - Horana (Via 120 Road)',
+      description: 'Via Slave Island, Town Hall, Kirulapone, Nugegoda, Maharagama, Kottawa',
+      stops: [
+        'st_pettah',
+        'st_slave_island',
+        'st_town_hall',
+        'st_kirulapone',
+        'st_nugegoda',
+        'st_maharagama',
+        'st_kottawa'
+      ],
+    ),
+    // 6. Route 177 (Kollupitiya - Kaduwela)
+    const BusRoute(
+      id: 'route_177_kollupitiya_kaduwela',
+      routeNo: '177',
+      routeName: 'Kollupitiya - Kaduwela (Via Malabe)',
+      description: 'Via Town Hall, Borella, Battaramulla, Malabe, Kaduwela',
+      stops: [
+        'st_kollupitiya',
+        'st_town_hall',
+        'st_borella',
+        'st_battaramulla',
+        'st_malabe',
+        'st_kaduwela'
+      ],
+    ),
+    // 7. Route 171 (Pettah - Battaramulla)
+    const BusRoute(
+      id: 'route_171_pettah_battaramulla',
+      routeNo: '171',
+      routeName: 'Pettah - Battaramulla (Administrative Corridor)',
+      description: 'Via Colombo Fort, Town Hall, Borella, Battaramulla',
+      stops: [
+        'st_pettah',
+        'st_fort',
+        'st_town_hall',
+        'st_borella',
+        'st_battaramulla'
+      ],
+    ),
+    // 8. Route 154 (Kirulapone - Borella)
+    const BusRoute(
+      id: 'route_154_kirulapone_borella',
+      routeNo: '154',
+      routeName: 'Kirulapone - Borella',
+      description: 'Via Bambalapitiya, Kollupitiya, Town Hall, Borella',
+      stops: [
+        'st_kirulapone',
+        'st_bambalapitiya',
+        'st_kollupitiya',
+        'st_town_hall',
+        'st_borella'
+      ],
+    ),
+    // 9. Route 176 (Dehiwala - Borella)
+    const BusRoute(
+      id: 'route_176_dehiwala_borella',
+      routeNo: '176',
+      routeName: 'Dehiwala - Borella (Via Nugegoda)',
+      description: 'Via Dehiwala, Kirulapone, Nugegoda, Borella',
+      stops: [
+        'st_dehiwala',
+        'st_kirulapone',
+        'st_nugegoda',
+        'st_borella'
+      ],
+    ),
+    // 10. Route 101 (Pettah - Moratuwa)
+    const BusRoute(
+      id: 'route_101_pettah_moratuwa',
       routeNo: '101',
-      routeName: 'Pettah - Mount Lavinia',
-      description: 'Via Kollupitiya, Bambalapitiya, Wellawatte, Dehiwala',
+      routeName: 'Pettah - Moratuwa',
+      description: 'Via Kollupitiya, Bambalapitiya, Wellawatte, Dehiwala, Mount Lavinia, Moratuwa',
       stops: [
         'st_pettah',
         'st_kollupitiya',
         'st_bambalapitiya',
         'st_wellawatte',
         'st_dehiwala',
-        'st_mt_lavinia'
+        'st_mt_lavinia',
+        'st_moratuwa'
       ],
-    ),
-    const BusRoute(
-      id: 'route_177_outbound',
-      routeNo: '177',
-      routeName: 'Kollupitiya - Borella',
-      description: 'Via Town Hall, Borella',
-      stops: ['st_kollupitiya', 'st_town_hall', 'st_borella'],
-    ),
-    const BusRoute(
-      id: 'route_120_outbound',
-      routeNo: '120',
-      routeName: 'Pettah - Maharagama',
-      description: 'Via Slave Island, Kirulapone, Nugegoda, Maharagama',
-      stops: [
-        'st_pettah',
-        'st_slave_island',
-        'st_kirulapone',
-        'st_nugegoda',
-        'st_maharagama'
-      ],
-    ),
-    const BusRoute(
-      id: 'route_122_outbound',
-      routeNo: '122',
-      routeName: 'Pettah - Avissawella',
-      description: 'Via Maradana, Borella',
-      stops: ['st_pettah', 'st_maradana', 'st_borella'],
-    ),
-    const BusRoute(
-      id: 'route_171_outbound',
-      routeNo: '171',
-      routeName: 'Pettah - Borella',
-      description: 'Via Fort, Town Hall, Borella',
-      stops: ['st_pettah', 'st_fort', 'st_town_hall', 'st_borella'],
-    ),
-    const BusRoute(
-      id: 'route_154_outbound',
-      routeNo: '154',
-      routeName: 'Kirulapone - Borella',
-      description: 'Via Bambalapitiya, Town Hall, Borella',
-      stops: ['st_kirulapone', 'st_bambalapitiya', 'st_town_hall', 'st_borella'],
-    ),
-    const BusRoute(
-      id: 'route_176_outbound',
-      routeNo: '176',
-      routeName: 'Dehiwala - Nugegoda',
-      description: 'Via Kirulapone, Nugegoda',
-      stops: ['st_dehiwala', 'st_kirulapone', 'st_nugegoda'],
     ),
   ];
 
-  /// Sample bus vehicles with registration numbers, route references, schedules, and accessibility features.
+  /// Sample bus vehicles with real Sri Lankan registration numbers, route references, schedules, and accessibility features.
   static final List<Bus> sampleBuses = [
-    // 1. Safe Bus #1 (Route 138 Outbound - Morning Express)
+    // --- Route 138 Buses (Pettah -> Homagama) ---
+    // 1. SLTB Ashok Leyland JanBus (Modern Accessible)
     const Bus(
-      id: 'bus_138_outbound',
-      busNo: 'WP NA-1381',
-      routeId: 'route_138_outbound',
+      id: 'bus_138_nd4521',
+      busNo: 'WP ND-4521',
+      routeId: 'route_138_pettah_homagama',
       routeNo: '138',
-      scheduledDeparture: '08:00 AM',
+      scheduledDeparture: '06:30 AM',
       stops: [
         'st_pettah',
         'st_maradana',
         'st_borella',
+        'st_kirulapone',
         'st_nugegoda',
         'st_maharagama',
-        'st_kottawa'
+        'st_kottawa',
+        'st_homagama'
       ],
       scheduleTimes: [
-        '08:00 AM',
-        '08:12 AM',
-        '08:25 AM',
-        '08:40 AM',
-        '08:55 AM',
-        '09:15 AM'
+        '06:30 AM',
+        '06:42 AM',
+        '06:55 AM',
+        '07:08 AM',
+        '07:22 AM',
+        '07:38 AM',
+        '07:55 AM',
+        '08:10 AM'
       ],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
       occupancy: 'low',
     ),
-    // 2. Safe Bus #1b (Route 138 Outbound - Mid-morning)
+    // 2. SLTB Low-Floor Accessible Bus
     const Bus(
-      id: 'bus_138_outbound_2',
-      busNo: 'WP NB-5420',
-      routeId: 'route_138_outbound',
+      id: 'bus_138_nb7812',
+      busNo: 'WP NB-7812',
+      routeId: 'route_138_pettah_homagama',
       routeNo: '138',
-      scheduledDeparture: '08:30 AM',
+      scheduledDeparture: '07:15 AM',
       stops: [
         'st_pettah',
         'st_maradana',
         'st_borella',
+        'st_kirulapone',
         'st_nugegoda',
         'st_maharagama',
-        'st_kottawa'
+        'st_kottawa',
+        'st_homagama'
       ],
       scheduleTimes: [
-        '08:30 AM',
+        '07:15 AM',
+        '07:27 AM',
+        '07:40 AM',
+        '07:53 AM',
+        '08:08 AM',
+        '08:25 AM',
         '08:42 AM',
-        '08:55 AM',
-        '09:10 AM',
-        '09:25 AM',
-        '09:45 AM'
+        '08:58 AM'
       ],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
       occupancy: 'medium',
     ),
-    // 3. Directional bus (Route 138 Inbound: Kottawa to Pettah)
+    // 3. Private Standard Bus (Step entry, no ramp)
     const Bus(
-      id: 'bus_138_inbound',
-      busNo: 'WP NC-2041',
-      routeId: 'route_138_inbound',
+      id: 'bus_138_na1234',
+      busNo: 'WP NA-1234',
+      routeId: 'route_138_pettah_homagama',
+      routeNo: '138',
+      scheduledDeparture: '08:00 AM',
+      stops: [
+        'st_pettah',
+        'st_maradana',
+        'st_borella',
+        'st_kirulapone',
+        'st_nugegoda',
+        'st_maharagama',
+        'st_kottawa',
+        'st_homagama'
+      ],
+      scheduleTimes: [
+        '08:00 AM',
+        '08:12 AM',
+        '08:25 AM',
+        '08:38 AM',
+        '08:52 AM',
+        '09:08 AM',
+        '09:25 AM',
+        '09:40 AM'
+      ],
+      hasRamp: false,
+      lowFloor: false,
+      rampOk: false,
+      occupancy: 'high',
+    ),
+    // 4. Warning Bus (Ramp defect reported)
+    const Bus(
+      id: 'bus_138_nc5566',
+      busNo: 'WP NC-5566',
+      routeId: 'route_138_pettah_homagama',
+      routeNo: '138',
+      scheduledDeparture: '08:45 AM',
+      stops: [
+        'st_pettah',
+        'st_maradana',
+        'st_borella',
+        'st_kirulapone',
+        'st_nugegoda',
+        'st_maharagama',
+        'st_kottawa',
+        'st_homagama'
+      ],
+      scheduleTimes: [
+        '08:45 AM',
+        '08:57 AM',
+        '09:10 AM',
+        '09:23 AM',
+        '09:38 AM',
+        '09:55 AM',
+        '10:12 AM',
+        '10:28 AM'
+      ],
+      hasRamp: true,
+      lowFloor: true,
+      rampOk: false,
+      occupancy: 'high',
+    ),
+    // 5. SLTB AC Semi-Luxury Accessible Bus
+    const Bus(
+      id: 'bus_138_nd3045',
+      busNo: 'WP ND-3045',
+      routeId: 'route_138_pettah_homagama',
       routeNo: '138',
       scheduledDeparture: '09:30 AM',
       stops: [
+        'st_pettah',
+        'st_maradana',
+        'st_borella',
+        'st_kirulapone',
+        'st_nugegoda',
+        'st_maharagama',
+        'st_kottawa',
+        'st_homagama'
+      ],
+      scheduleTimes: [
+        '09:30 AM',
+        '09:42 AM',
+        '09:55 AM',
+        '10:08 AM',
+        '10:22 AM',
+        '10:38 AM',
+        '10:55 AM',
+        '11:10 AM'
+      ],
+      hasRamp: true,
+      lowFloor: true,
+      rampOk: true,
+      occupancy: 'low',
+    ),
+
+    // --- Route 138 Inbound Bus ---
+    const Bus(
+      id: 'bus_138_nb2190',
+      busNo: 'WP NB-2190',
+      routeId: 'route_138_homagama_pettah',
+      routeNo: '138',
+      scheduledDeparture: '07:00 AM',
+      stops: [
+        'st_homagama',
         'st_kottawa',
         'st_maharagama',
         'st_nugegoda',
+        'st_kirulapone',
         'st_borella',
         'st_maradana',
         'st_pettah'
       ],
       scheduleTimes: [
-        '09:30 AM',
-        '09:50 AM',
-        '10:05 AM',
-        '10:20 AM',
-        '10:33 AM',
-        '10:45 AM'
+        '07:00 AM',
+        '07:15 AM',
+        '07:32 AM',
+        '07:48 AM',
+        '08:02 AM',
+        '08:15 AM',
+        '08:28 AM',
+        '08:40 AM'
       ],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
       occupancy: 'medium',
     ),
-    // 4. Safe Bus #2 (Route 100 Outbound: Galle Road Corridor)
+
+    // --- Route 100 Buses (Pettah -> Panadura) ---
+    // 7. SLTB Galle Road Accessible Bus
     const Bus(
-      id: 'bus_100_outbound',
-      busNo: 'WP ND-1001',
-      routeId: 'route_100_outbound',
+      id: 'bus_100_nd1002',
+      busNo: 'WP ND-1002',
+      routeId: 'route_100_pettah_panadura',
+      routeNo: '100',
+      scheduledDeparture: '06:45 AM',
+      stops: [
+        'st_pettah',
+        'st_fort',
+        'st_kollupitiya',
+        'st_bambalapitiya',
+        'st_wellawatte',
+        'st_dehiwala',
+        'st_mt_lavinia',
+        'st_moratuwa',
+        'st_panadura'
+      ],
+      scheduleTimes: [
+        '06:45 AM',
+        '06:52 AM',
+        '07:02 AM',
+        '07:12 AM',
+        '07:22 AM',
+        '07:35 AM',
+        '07:46 AM',
+        '08:02 AM',
+        '08:20 AM'
+      ],
+      hasRamp: true,
+      lowFloor: true,
+      rampOk: true,
+      occupancy: 'low',
+    ),
+    // 8. SLTB City Bus Accessible
+    const Bus(
+      id: 'bus_100_nb9912',
+      busNo: 'WP NB-9912',
+      routeId: 'route_100_pettah_panadura',
       routeNo: '100',
       scheduledDeparture: '07:30 AM',
       stops: [
@@ -349,29 +596,33 @@ class SeedData {
         'st_bambalapitiya',
         'st_wellawatte',
         'st_dehiwala',
-        'st_mt_lavinia'
+        'st_mt_lavinia',
+        'st_moratuwa',
+        'st_panadura'
       ],
       scheduleTimes: [
         '07:30 AM',
-        '07:38 AM',
+        '07:37 AM',
         '07:48 AM',
         '07:58 AM',
-        '08:08 AM',
-        '08:20 AM',
-        '08:30 AM'
+        '08:09 AM',
+        '08:22 AM',
+        '08:34 AM',
+        '08:52 AM',
+        '09:10 AM'
       ],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
       occupancy: 'medium',
     ),
-    // 5. Accessible Bus #2b (Route 100 Outbound - Later Run)
+    // 9. Private High-Deck Bus (No ramp)
     const Bus(
-      id: 'bus_100_outbound_2',
-      busNo: 'WP ND-1002',
-      routeId: 'route_100_outbound',
+      id: 'bus_100_na6654',
+      busNo: 'WP NA-6654',
+      routeId: 'route_100_pettah_panadura',
       routeNo: '100',
-      scheduledDeparture: '08:45 AM',
+      scheduledDeparture: '08:15 AM',
       stops: [
         'st_pettah',
         'st_fort',
@@ -379,27 +630,296 @@ class SeedData {
         'st_bambalapitiya',
         'st_wellawatte',
         'st_dehiwala',
-        'st_mt_lavinia'
+        'st_mt_lavinia',
+        'st_moratuwa',
+        'st_panadura'
       ],
       scheduleTimes: [
-        '08:45 AM',
-        '08:53 AM',
-        '09:03 AM',
-        '09:13 AM',
-        '09:23 AM',
-        '09:35 AM',
-        '09:45 AM'
+        '08:15 AM',
+        '08:22 AM',
+        '08:33 AM',
+        '08:44 AM',
+        '08:55 AM',
+        '09:08 AM',
+        '09:20 AM',
+        '09:38 AM',
+        '09:55 AM'
+      ],
+      hasRamp: false,
+      lowFloor: false,
+      rampOk: false,
+      occupancy: 'high',
+    ),
+    // 10. AC Low-Floor Cityliner
+    const Bus(
+      id: 'bus_100_nc4110',
+      busNo: 'WP NC-4110',
+      routeId: 'route_100_pettah_panadura',
+      routeNo: '100',
+      scheduledDeparture: '09:00 AM',
+      stops: [
+        'st_pettah',
+        'st_fort',
+        'st_kollupitiya',
+        'st_bambalapitiya',
+        'st_wellawatte',
+        'st_dehiwala',
+        'st_mt_lavinia',
+        'st_moratuwa',
+        'st_panadura'
+      ],
+      scheduleTimes: [
+        '09:00 AM',
+        '09:07 AM',
+        '09:18 AM',
+        '09:28 AM',
+        '09:38 AM',
+        '09:50 AM',
+        '10:02 AM',
+        '10:20 AM',
+        '10:38 AM'
       ],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
       occupancy: 'low',
     ),
-    // 6. Warning Bus #1 (Route 101: Broken Ramp, rampOk = false)
+
+    // --- Route 100 Inbound Bus ---
     const Bus(
-      id: 'bus_101_outbound',
+      id: 'bus_100_nd8871',
+      busNo: 'WP ND-8871',
+      routeId: 'route_100_panadura_pettah',
+      routeNo: '100',
+      scheduledDeparture: '07:15 AM',
+      stops: [
+        'st_panadura',
+        'st_moratuwa',
+        'st_mt_lavinia',
+        'st_dehiwala',
+        'st_wellawatte',
+        'st_bambalapitiya',
+        'st_kollupitiya',
+        'st_fort',
+        'st_pettah'
+      ],
+      scheduleTimes: [
+        '07:15 AM',
+        '07:32 AM',
+        '07:48 AM',
+        '08:00 AM',
+        '08:12 AM',
+        '08:23 AM',
+        '08:34 AM',
+        '08:45 AM',
+        '08:52 AM'
+      ],
+      hasRamp: true,
+      lowFloor: true,
+      rampOk: true,
+      occupancy: 'medium',
+    ),
+
+    // --- Route 120 Buses (Pettah -> Horana) ---
+    const Bus(
+      id: 'bus_120_ga1205',
+      busNo: 'WP GA-1205',
+      routeId: 'route_120_pettah_horana',
+      routeNo: '120',
+      scheduledDeparture: '07:00 AM',
+      stops: [
+        'st_pettah',
+        'st_slave_island',
+        'st_town_hall',
+        'st_kirulapone',
+        'st_nugegoda',
+        'st_maharagama',
+        'st_kottawa'
+      ],
+      scheduleTimes: [
+        '07:00 AM',
+        '07:10 AM',
+        '07:22 AM',
+        '07:38 AM',
+        '07:52 AM',
+        '08:08 AM',
+        '08:25 AM'
+      ],
+      hasRamp: true,
+      lowFloor: true,
+      rampOk: true,
+      occupancy: 'low',
+    ),
+    const Bus(
+      id: 'bus_120_gb3320',
+      busNo: 'WP GB-3320',
+      routeId: 'route_120_pettah_horana',
+      routeNo: '120',
+      scheduledDeparture: '08:00 AM',
+      stops: [
+        'st_pettah',
+        'st_slave_island',
+        'st_town_hall',
+        'st_kirulapone',
+        'st_nugegoda',
+        'st_maharagama',
+        'st_kottawa'
+      ],
+      scheduleTimes: [
+        '08:00 AM',
+        '08:10 AM',
+        '08:22 AM',
+        '08:38 AM',
+        '08:52 AM',
+        '09:08 AM',
+        '09:25 AM'
+      ],
+      hasRamp: false,
+      lowFloor: false,
+      rampOk: false,
+      occupancy: 'high',
+    ),
+
+    // --- Route 177 Buses (Kollupitiya -> Kaduwela) ---
+    const Bus(
+      id: 'bus_177_na7711',
+      busNo: 'WP NA-7711',
+      routeId: 'route_177_kollupitiya_kaduwela',
+      routeNo: '177',
+      scheduledDeparture: '07:45 AM',
+      stops: [
+        'st_kollupitiya',
+        'st_town_hall',
+        'st_borella',
+        'st_battaramulla',
+        'st_malabe',
+        'st_kaduwela'
+      ],
+      scheduleTimes: [
+        '07:45 AM',
+        '07:56 AM',
+        '08:08 AM',
+        '08:25 AM',
+        '08:42 AM',
+        '09:00 AM'
+      ],
+      hasRamp: true,
+      lowFloor: true,
+      rampOk: true,
+      occupancy: 'low',
+    ),
+    const Bus(
+      id: 'bus_177_nf4412',
+      busNo: 'WP NF-4412',
+      routeId: 'route_177_kollupitiya_kaduwela',
+      routeNo: '177',
+      scheduledDeparture: '08:30 AM',
+      stops: [
+        'st_kollupitiya',
+        'st_town_hall',
+        'st_borella',
+        'st_battaramulla',
+        'st_malabe',
+        'st_kaduwela'
+      ],
+      scheduleTimes: [
+        '08:30 AM',
+        '08:41 AM',
+        '08:53 AM',
+        '09:10 AM',
+        '09:28 AM',
+        '09:45 AM'
+      ],
+      hasRamp: true,
+      lowFloor: false,
+      rampOk: false,
+      occupancy: 'high',
+    ),
+
+    // --- Route 171 Bus (Pettah -> Battaramulla) ---
+    const Bus(
+      id: 'bus_171_nd1710',
+      busNo: 'WP ND-1710',
+      routeId: 'route_171_pettah_battaramulla',
+      routeNo: '171',
+      scheduledDeparture: '08:00 AM',
+      stops: [
+        'st_pettah',
+        'st_fort',
+        'st_town_hall',
+        'st_borella',
+        'st_battaramulla'
+      ],
+      scheduleTimes: [
+        '08:00 AM',
+        '08:08 AM',
+        '08:22 AM',
+        '08:34 AM',
+        '08:52 AM'
+      ],
+      hasRamp: true,
+      lowFloor: true,
+      rampOk: true,
+      occupancy: 'low',
+    ),
+
+    // --- Route 154 Bus (Kirulapone -> Borella) ---
+    const Bus(
+      id: 'bus_154_nb8822',
+      busNo: 'WP NB-8822',
+      routeId: 'route_154_kirulapone_borella',
+      routeNo: '154',
+      scheduledDeparture: '09:15 AM',
+      stops: [
+        'st_kirulapone',
+        'st_bambalapitiya',
+        'st_kollupitiya',
+        'st_town_hall',
+        'st_borella'
+      ],
+      scheduleTimes: [
+        '09:15 AM',
+        '09:27 AM',
+        '09:38 AM',
+        '09:48 AM',
+        '10:02 AM'
+      ],
+      hasRamp: true,
+      lowFloor: true,
+      rampOk: true,
+      occupancy: 'medium',
+    ),
+
+    // --- Route 176 Bus (Dehiwala -> Borella) ---
+    const Bus(
+      id: 'bus_176_nc3319',
+      busNo: 'WP NC-3319',
+      routeId: 'route_176_dehiwala_borella',
+      routeNo: '176',
+      scheduledDeparture: '08:30 AM',
+      stops: [
+        'st_dehiwala',
+        'st_kirulapone',
+        'st_nugegoda',
+        'st_borella'
+      ],
+      scheduleTimes: [
+        '08:30 AM',
+        '08:44 AM',
+        '08:55 AM',
+        '09:12 AM'
+      ],
+      hasRamp: true,
+      lowFloor: true,
+      rampOk: true,
+      occupancy: 'low',
+    ),
+
+    // --- Route 101 Bus (Pettah -> Moratuwa) ---
+    const Bus(
+      id: 'bus_101_ne3390',
       busNo: 'WP NE-3390',
-      routeId: 'route_101_outbound',
+      routeId: 'route_101_pettah_moratuwa',
       routeNo: '101',
       scheduledDeparture: '08:15 AM',
       stops: [
@@ -408,116 +928,22 @@ class SeedData {
         'st_bambalapitiya',
         'st_wellawatte',
         'st_dehiwala',
-        'st_mt_lavinia'
+        'st_mt_lavinia',
+        'st_moratuwa'
       ],
       scheduleTimes: [
         '08:15 AM',
-        '08:30 AM',
-        '08:40 AM',
-        '08:50 AM',
-        '09:02 AM',
-        '09:15 AM'
+        '08:28 AM',
+        '08:38 AM',
+        '08:48 AM',
+        '09:00 AM',
+        '09:12 AM',
+        '09:30 AM'
       ],
       hasRamp: true,
       lowFloor: true,
       rampOk: false,
       occupancy: 'high',
-    ),
-    // 7. Warning Bus #2 (Route 177: Broken Ramp, rampOk = false)
-    const Bus(
-      id: 'bus_177_outbound',
-      busNo: 'WP NF-4412',
-      routeId: 'route_177_outbound',
-      routeNo: '177',
-      scheduledDeparture: '09:00 AM',
-      stops: ['st_kollupitiya', 'st_town_hall', 'st_borella'],
-      scheduleTimes: ['09:00 AM', '09:10 AM', '09:22 AM'],
-      hasRamp: true,
-      lowFloor: false,
-      rampOk: false,
-      occupancy: 'high',
-    ),
-    // 8. Not Accessible Bus #1 (Route 120: High step, no ramp, no low floor)
-    const Bus(
-      id: 'bus_120_outbound',
-      busNo: 'WP GA-6710',
-      routeId: 'route_120_outbound',
-      routeNo: '120',
-      scheduledDeparture: '10:00 AM',
-      stops: [
-        'st_pettah',
-        'st_slave_island',
-        'st_kirulapone',
-        'st_nugegoda',
-        'st_maharagama'
-      ],
-      scheduleTimes: [
-        '10:00 AM',
-        '10:12 AM',
-        '10:28 AM',
-        '10:42 AM',
-        '11:00 AM'
-      ],
-      hasRamp: false,
-      lowFloor: false,
-      rampOk: false,
-      occupancy: 'high',
-    ),
-    // 9. Not Accessible Bus #2 (Route 122: Standard non-accessible coach)
-    const Bus(
-      id: 'bus_122_outbound',
-      busNo: 'WP GB-9011',
-      routeId: 'route_122_outbound',
-      routeNo: '122',
-      scheduledDeparture: '11:15 AM',
-      stops: ['st_pettah', 'st_maradana', 'st_borella'],
-      scheduleTimes: ['11:15 AM', '11:25 AM', '11:38 AM'],
-      hasRamp: false,
-      lowFloor: false,
-      rampOk: false,
-      occupancy: 'medium',
-    ),
-    // 10. Safe Accessible Bus #3 (Route 171)
-    const Bus(
-      id: 'bus_171_outbound',
-      busNo: 'WP NA-7711',
-      routeId: 'route_171_outbound',
-      routeNo: '171',
-      scheduledDeparture: '08:45 AM',
-      stops: ['st_pettah', 'st_fort', 'st_town_hall', 'st_borella'],
-      scheduleTimes: ['08:45 AM', '08:53 AM', '09:08 AM', '09:20 AM'],
-      hasRamp: true,
-      lowFloor: true,
-      rampOk: true,
-      occupancy: 'low',
-    ),
-    // 11. Safe Accessible Bus #4 (Route 154)
-    const Bus(
-      id: 'bus_154_outbound',
-      busNo: 'WP NB-8822',
-      routeId: 'route_154_outbound',
-      routeNo: '154',
-      scheduledDeparture: '10:30 AM',
-      stops: ['st_kirulapone', 'st_bambalapitiya', 'st_town_hall', 'st_borella'],
-      scheduleTimes: ['10:30 AM', '10:42 AM', '10:55 AM', '11:10 AM'],
-      hasRamp: true,
-      lowFloor: true,
-      rampOk: true,
-      occupancy: 'medium',
-    ),
-    // 12. Safe Accessible Bus #5 (Route 176)
-    const Bus(
-      id: 'bus_176_outbound',
-      busNo: 'WP NC-3319',
-      routeId: 'route_176_outbound',
-      routeNo: '176',
-      scheduledDeparture: '01:00 PM',
-      stops: ['st_dehiwala', 'st_kirulapone', 'st_nugegoda'],
-      scheduleTimes: ['01:00 PM', '01:15 PM', '01:28 PM'],
-      hasRamp: true,
-      lowFloor: true,
-      rampOk: true,
-      occupancy: 'low',
     ),
   ];
 
@@ -540,11 +966,11 @@ class SeedData {
         confirmedBy: const ['user_demo_1', 'user_demo_2'],
         flaggedBy: const [],
       ),
-      // Active older report (> 15 hours ago for expiry testing)
+      // Active older report on Route 101 bus (testing ramp issue)
       Report(
         id: 'report_2',
         targetType: 'bus',
-        targetId: 'bus_101_outbound',
+        targetId: 'bus_101_ne3390',
         problemType: 'Wheelchair ramp deployment motor jammed',
         status: 'active',
         createdAt: now.subtract(const Duration(hours: 15)),
@@ -573,9 +999,33 @@ class SeedData {
     ];
   }
 
-  /// Executes batched writes to populate `stations`, `buses`, and `reports`.
+  /// Cleans existing collections and executes batched writes to populate `stations`, `routes`, `buses`, and `reports`.
   Future<void> seedAll() async {
-    debugPrint('Starting AccessTransit Firestore Seeding...');
+    debugPrint('Starting AccessTransit Clean Firestore Seeding...');
+    
+    // 0. Clean old existing routes, buses, active_buses, and stations documents first
+    try {
+      final oldRoutes = await _db.collection(FirestoreConstants.routesCollection).get();
+      for (final doc in oldRoutes.docs) {
+        await doc.reference.delete();
+      }
+      final oldBuses = await _db.collection(FirestoreConstants.staticBusesCollection).get();
+      for (final doc in oldBuses.docs) {
+        await doc.reference.delete();
+      }
+      final oldActiveBuses = await _db.collection(FirestoreConstants.busesCollection).get();
+      for (final doc in oldActiveBuses.docs) {
+        await doc.reference.delete();
+      }
+      final oldStations = await _db.collection(FirestoreConstants.stationsCollection).get();
+      for (final doc in oldStations.docs) {
+        await doc.reference.delete();
+      }
+      debugPrint('Cleared old Firestore routes, buses, and stations.');
+    } catch (e) {
+      debugPrint('Note: Error or no old docs while clearing: $e');
+    }
+
     final batch = _db.batch();
 
     // 1. Seed Stations

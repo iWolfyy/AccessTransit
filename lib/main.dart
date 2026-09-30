@@ -4,8 +4,11 @@ import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'core/routing/password_reset_link_handler.dart';
 import 'core/theme/app_colors.dart';
+import 'data/seed_data.dart';
 import 'firebase_options.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/splash/splash_screen.dart';
@@ -14,6 +17,17 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Sync authentic Sri Lankan routes and buses into Firestore
+  try {
+    final routes = await FirebaseFirestore.instance.collection('routes').get();
+    final hasNewSlRoutes = routes.docs.any((d) => d.id == 'route_138_pettah_homagama');
+    if (!hasNewSlRoutes) {
+      await SeedData().seedAll();
+    }
+  } catch (e) {
+    debugPrint('Database initialization warning: $e');
+  }
 
   runApp(const AccessTransitApp());
 }

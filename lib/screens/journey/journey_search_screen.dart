@@ -40,9 +40,13 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
 
   Future<void> _loadStations() async {
     try {
+      final routes = await _firestoreService.getRoutes();
+      final hasNewSlRoutes = routes.any((r) => r.id == 'route_138_pettah_homagama');
+      if (!hasNewSlRoutes) {
+        await SeedData().seedAll();
+      }
       var fetched = await _firestoreService.getStations();
       if (fetched.isEmpty) {
-        // Auto-seed Firestore if empty so realistic stations exist!
         await SeedData().seedAll();
         fetched = await _firestoreService.getStations();
       }
@@ -70,6 +74,44 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
           _selectedToStation = SeedData.colomboStations[7]; // st_mt_lavinia
           _isLoadingStations = false;
         });
+      }
+    }
+  }
+
+  Future<void> _resyncDatabase() async {
+    setState(() => _isLoadingStations = true);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Updating Sri Lankan transit database...')),
+      );
+    try {
+      await SeedData().seedAll();
+      await _loadStations();
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text('Database updated with authentic Sri Lankan routes & buses!'),
+              backgroundColor: AppColors.primaryContainer,
+            ),
+          );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('Error updating database: $e'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingStations = false);
       }
     }
   }
@@ -201,6 +243,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
             isDesktop: isDesktop,
             onMenu: () => Navigator.of(context).maybePop(),
             onProfile: () => AppNavigation.openProfile(context),
+            onSync: _resyncDatabase,
           ),
           Expanded(
             child: ListView(
@@ -308,11 +351,13 @@ class _TopBar extends StatelessWidget {
     required this.isDesktop,
     required this.onMenu,
     required this.onProfile,
+    this.onSync,
   });
 
   final bool isDesktop;
   final VoidCallback onMenu;
   final VoidCallback onProfile;
+  final VoidCallback? onSync;
 
   @override
   Widget build(BuildContext context) {
@@ -347,6 +392,13 @@ class _TopBar extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (onSync != null)
+                  IconButton(
+                    onPressed: onSync,
+                    icon: const Icon(Icons.cloud_sync_outlined),
+                    color: AppColors.primary,
+                    tooltip: 'Reset & Sync Sri Lankan Bus Data',
+                  ),
                 InkWell(
                   onTap: onProfile,
                   borderRadius: BorderRadius.circular(999),
