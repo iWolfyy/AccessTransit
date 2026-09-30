@@ -134,7 +134,7 @@ class _AddStationDialogState extends State<AddStationDialog> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: widget.buses.any((b) => b.id == _selectedBusId) ? _selectedBusId : (widget.buses.isNotEmpty ? widget.buses.first.id : null),
+                initialValue: widget.buses.any((b) => b.id == _selectedBusId) ? _selectedBusId : (widget.buses.isNotEmpty ? widget.buses.first.id : null),
                 decoration: const InputDecoration(labelText: 'Target Bus Route'),
                 items: widget.buses.map((b) {
                   return DropdownMenuItem(value: b.id, child: Text('Bus ${b.routeNo} (${b.id})'));
