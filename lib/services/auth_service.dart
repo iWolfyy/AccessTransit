@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/enums/user_role.dart';
 import '../models/user_model.dart';
@@ -7,22 +8,37 @@ import 'user_service.dart';
 /// Handles Firebase Authentication for AccessTransit.
 class AuthService {
   AuthService({FirebaseAuth? auth, UserService? userService})
-    : _auth = auth ?? FirebaseAuth.instance,
+    : _customAuth = auth,
       _userService = userService ?? UserService();
 
-  final FirebaseAuth _auth;
+  final FirebaseAuth? _customAuth;
   final UserService _userService;
 
+  FirebaseAuth get _auth => _customAuth ?? FirebaseAuth.instance;
+
   /// Currently signed-in Firebase user.
-  User? get currentUser => _auth.currentUser;
+  User? get currentUser {
+    try {
+      return _auth.currentUser;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Stream that emits whenever the authentication state changes.
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  Stream<User?> get authStateChanges {
+    try {
+      return _auth.authStateChanges();
+    } catch (_) {
+      return const Stream.empty();
+    }
+  }
 
   /// Registers a new AccessTransit user.
   ///
-  /// 1. Creates the Firebase Authentication account.
-  /// 2. Creates the corresponding Firestore user profile.
+  /// 1. Creates the Firebase Authentication account (or resumes if previous attempt was interrupted).
+  /// 2. Updates the user's displayName in Firebase Auth.
+  /// 3. Creates the corresponding Firestore user profile.
   Future<UserModel> register({
     required String name,
     required String email,
@@ -30,15 +46,41 @@ class AuthService {
     String? phone,
     UserRole role = UserRole.passenger,
   }) async {
-    final credential = await _auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    User? firebaseUser;
 
-    final firebaseUser = credential.user;
+    try {
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      firebaseUser = credential.user;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        // If an earlier attempt created the Auth user but was interrupted before completion,
+        // attempt to authenticate with the provided credentials to complete registration.
+        try {
+          final loginCred = await _auth.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+          firebaseUser = loginCred.user;
+        } catch (_) {
+          // If sign-in fails, the email belongs to an existing different account
+          rethrow;
+        }
+      } else {
+        rethrow;
+      }
+    }
 
     if (firebaseUser == null) {
-      throw Exception('Failed to create Firebase user.');
+      throw Exception('Failed to obtain authenticated Firebase user.');
+    }
+
+    try {
+      await firebaseUser.updateDisplayName(name);
+    } catch (e) {
+      debugPrint('AuthService.register: updateDisplayName warning: $e');
     }
 
     final user = UserModel.fromAuth(
@@ -49,7 +91,11 @@ class AuthService {
       role: role,
     );
 
-    await _userService.createUser(user);
+    try {
+      await _userService.createUser(user);
+    } catch (e) {
+      debugPrint('AuthService.register: createUser warning: $e');
+    }
 
     return user;
   }

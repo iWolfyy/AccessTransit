@@ -153,10 +153,19 @@ class _RegisterScreenState extends State<RegisterScreen>
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
+      debugPrint('RegisterScreen FirebaseAuthException: ${e.code} - ${e.message}');
       _showMessage(_getAuthErrorMessage(e), isError: true);
-    } catch (_) {
+    } on FirebaseException catch (e) {
       if (!mounted) return;
-      _showMessage('Registration failed. Please try again.', isError: true);
+      debugPrint('RegisterScreen FirebaseException: ${e.code} - ${e.message}');
+      _showMessage(
+        e.message ?? 'Registration encountered an error. Please try again.',
+        isError: true,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      debugPrint('RegisterScreen error: $e');
+      _showMessage('Registration failed. Please check your connection and try again.', isError: true);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -195,8 +204,12 @@ class _RegisterScreenState extends State<RegisterScreen>
         return 'Email/password authentication is not enabled.';
       case 'network-request-failed':
         return 'Network error. Please check your internet connection.';
+      case 'channel-error':
+        return 'Please fill in all required fields properly.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please try again shortly.';
       default:
-        return e.message ?? 'Unable to create account.';
+        return e.message ?? 'Unable to create account. Please try again.';
     }
   }
 

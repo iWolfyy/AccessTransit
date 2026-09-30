@@ -8,7 +8,6 @@ import '../../services/auth_service.dart';
 import '../../services/journey_service.dart';
 import '../auth/login_screen.dart';
 import '../journey/journey_search_screen.dart';
-import '../journey/live_journey_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.initialUser});
@@ -72,12 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _resumeJourney() {
-    final uid = _authService.currentUser?.uid ?? '';
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => LiveJourneyScreen(passengerId: uid),
-      ),
-    );
+    _openJourneySearch();
   }
 
   Future<void> _logout() async {

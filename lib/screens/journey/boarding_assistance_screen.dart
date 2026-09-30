@@ -2,17 +2,24 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/boarding_request.dart';
+import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 
 /// Boarding Assistance request screen — ramp, extra time, boarding help.
 class BoardingAssistanceScreen extends StatefulWidget {
   const BoardingAssistanceScreen({
     super.key,
-    this.stopName = 'Main St & 4th Ave',
-    this.busLabel = 'Bus 42',
+    this.busId = 'bus_138_outbound',
+    this.stopName = 'Colombo Fort Station',
+    this.stationId = 'st_fort',
+    this.busLabel = 'Route 138',
     this.minutesAway = 3,
   });
 
+  final String busId;
   final String stopName;
+  final String stationId;
   final String busLabel;
   final int minutesAway;
 
@@ -23,10 +30,13 @@ class BoardingAssistanceScreen extends StatefulWidget {
 
 class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
   static const double _desktopBreakpoint = 768;
+  final FirestoreService _firestoreService = FirestoreService();
+  final AuthService _authService = AuthService();
 
   bool _deployRamp = false;
   bool _extraTime = false;
   bool _boardingHelp = false;
+  bool _isSubmitting = false;
 
   bool get _hasSelection => _deployRamp || _extraTime || _boardingHelp;
 
@@ -36,7 +46,9 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _sendRequest() {
+  Future<void> _sendRequest() async {
+    if (_isSubmitting) return;
+
     if (!_hasSelection) {
       _showSnack('Please select at least one assistance option.');
       return;
@@ -48,11 +60,46 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
       if (_boardingHelp) 'Boarding Help',
     ];
 
-    _showSnack(
-      'Assistance request sent: ${selected.join(', ')}. Status: Pending',
-    );
+    setState(() => _isSubmitting = true);
 
-    Navigator.of(context).maybePop();
+    try {
+      final user = _authService.currentUser;
+      final riderId = user?.uid ?? 'guest_rider';
+      final riderName = (user?.displayName != null && user!.displayName!.isNotEmpty)
+          ? user.displayName!
+          : (user?.email != null && user!.email!.isNotEmpty
+              ? user.email!
+              : 'Rider (${riderId.length > 6 ? riderId.substring(0, 6) : riderId})');
+
+      final request = BoardingRequest(
+        id: 'req_${DateTime.now().millisecondsSinceEpoch}',
+        riderId: riderId,
+        riderName: riderName,
+        busId: widget.busId,
+        routeNo: widget.busLabel,
+        stationId: widget.stationId,
+        stopName: widget.stopName,
+        assistanceTypes: selected,
+        status: 'pending',
+        createdAt: DateTime.now(),
+      );
+
+      await _firestoreService.createBoardingRequest(request);
+
+      _showSnack(
+        'Assistance request sent: ${selected.join(', ')}. Status: Pending',
+      );
+
+      if (mounted) {
+        Navigator.of(context).maybePop();
+      }
+    } catch (e) {
+      _showSnack('Could not send assistance request: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override

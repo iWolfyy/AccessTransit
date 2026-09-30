@@ -1,35 +1,20 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/time_utils.dart';
+import '../../logic/status_logic.dart';
+import '../../models/bus.dart';
+import '../../models/report.dart';
+import '../../models/station.dart';
+import '../../services/firestore_service.dart';
 import '../journey/report_condition_screen.dart';
 import 'report_details_screen.dart';
 
 enum _CommunityTab { liveUpdates, myReports }
 
-enum _ReportBadge { major, verified, minor }
-
-class _FeedItem {
-  const _FeedItem({
-    required this.title,
-    required this.subtitle,
-    required this.timeLabel,
-    required this.icon,
-    required this.badge,
-    this.verifyCount,
-    this.verifiedByUsers,
-    this.dimmed = false,
-  });
-
-  final String title;
-  final String subtitle;
-  final String timeLabel;
-  final IconData icon;
-  final _ReportBadge badge;
-  final int? verifyCount;
-  final int? verifiedByUsers;
-  final bool dimmed;
-}
+enum _ReportBadge { active, verified, resolved, expired }
 
 /// Community hub — live updates feed and my reports.
 class CommunityScreen extends StatefulWidget {
@@ -45,43 +30,30 @@ class _CommunityScreenState extends State<CommunityScreen> {
   static const Color _minorFg = Color(0xFFF57F17);
 
   _CommunityTab _tab = _CommunityTab.liveUpdates;
+  final FirestoreService _firestoreService = FirestoreService();
 
-  static const _liveFeed = <_FeedItem>[
-    _FeedItem(
-      title: 'Elevator Out',
-      subtitle: 'Central Station - North Exit',
-      timeLabel: 'Reported 5 mins ago',
-      icon: Icons.accessible,
-      badge: _ReportBadge.major,
-      verifyCount: 32,
-    ),
-    _FeedItem(
-      title: 'Ramp Operational',
-      subtitle: 'Bus 42',
-      timeLabel: 'Reported 12 mins ago',
-      icon: Icons.accessible_forward,
-      badge: _ReportBadge.verified,
-      verifiedByUsers: 15,
-    ),
-    _FeedItem(
-      title: 'Heavy Crowding',
-      subtitle: 'Main St Subway',
-      timeLabel: 'Reported 20 mins ago',
-      icon: Icons.groups,
-      badge: _ReportBadge.minor,
-      dimmed: true,
-    ),
-  ];
+  Map<String, Station> _stationsMap = {};
+  Map<String, Bus> _busesMap = {};
 
-  static const _myReports = <_FeedItem>[
-    _FeedItem(
-      title: 'Ramp/Access',
-      subtitle: 'Central Station - Main Entrance',
-      timeLabel: 'Submitted just now',
-      icon: Icons.accessible,
-      badge: _ReportBadge.minor,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadMetadata();
+  }
+
+  Future<void> _loadMetadata() async {
+    try {
+      final stations = await _firestoreService.getStations();
+      final buses = await _firestoreService.getBuses();
+
+      if (mounted) {
+        setState(() {
+          _stationsMap = {for (final s in stations) s.id: s};
+          _busesMap = {for (final b in buses) b.id: b};
+        });
+      }
+    } catch (_) {}
+  }
 
   void _showSnack(String message) {
     ScaffoldMessenger.of(context)
@@ -97,31 +69,26 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  void _openReportDetails(_FeedItem item) {
+  String _resolveTargetTitle(Report report) {
+    if (report.targetType.toLowerCase() == 'station') {
+      return _stationsMap[report.targetId]?.name ??
+          'Station ${report.targetId}';
+    } else {
+      final bus = _busesMap[report.targetId];
+      if (bus != null) {
+        return 'Bus Route ${bus.routeNo}';
+      }
+      return 'Bus ${report.targetId}';
+    }
+  }
+
+  void _openReportDetails(Report report) {
+    final targetTitle = _resolveTargetTitle(report);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ReportDetailsScreen(
-          title: item.title,
-          reportedAgo: item.timeLabel,
-          vehicleLabel: item.subtitle.contains('Bus')
-              ? item.subtitle
-              : 'Bus 138',
-          routeLabel: item.subtitle.contains('Bus')
-              ? 'Route: Local Service'
-              : 'Location: ${item.subtitle}',
-          crowdLevel: item.title.toLowerCase().contains('crowd')
-              ? 'High'
-              : 'Moderate',
-          accessibilityLabel: item.badge == _ReportBadge.verified
-              ? 'Available'
-              : 'Limited',
-          quote: item.badge == _ReportBadge.verified
-              ? '"Ramp is working and confirmed by multiple riders." - User report'
-              : '"${item.title} reported at ${item.subtitle}." - User report',
-          mapLocationLabel: item.subtitle,
-          communityVerified: item.badge == _ReportBadge.verified ||
-              item.verifyCount != null ||
-              item.verifiedByUsers != null,
+          report: report,
+          targetTitle: targetTitle,
         ),
       ),
     );
@@ -139,14 +106,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
-    final items =
-        _tab == _CommunityTab.liveUpdates ? _liveFeed : _myReports;
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: isDesktop ? 8 : 8),
+        padding: const EdgeInsets.only(bottom: 8),
         child: FloatingActionButton.extended(
           onPressed: _openReportIssue,
           backgroundColor: AppColors.primaryContainer,
@@ -174,48 +140,125 @@ class _CommunityScreenState extends State<CommunityScreen> {
             onSearch: () => _showSnack('Search will be available soon.'),
           ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 100),
-              children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 768),
-                    child: Column(
-                      children: [
-                        _FilterTabs(
-                          selected: _tab,
-                          onChanged: (tab) => setState(() => _tab = tab),
-                        ),
-                        const SizedBox(height: 24),
-                        if (items.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 48),
-                            child: Text(
-                              'No reports yet.',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: AppColors.onSurfaceVariant,
-                              ),
+            child: StreamBuilder<List<Report>>(
+              stream: _firestoreService.streamReports(
+                userId: _tab == _CommunityTab.myReports ? currentUserId : null,
+              ),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  );
+                }
+
+                final reports = snapshot.data ?? [];
+
+                // Separate active vs expired/resolved
+                final activeReports = <Report>[];
+                final inactiveReports = <Report>[];
+
+                for (final r in reports) {
+                  if (StatusLogic.isReportActive(r)) {
+                    activeReports.add(r);
+                  } else {
+                    inactiveReports.add(r);
+                  }
+                }
+
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 100),
+                  children: [
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 768),
+                        child: Column(
+                          children: [
+                            _FilterTabs(
+                              selected: _tab,
+                              onChanged: (tab) => setState(() => _tab = tab),
                             ),
-                          )
-                        else
-                          ...[
-                            for (var i = 0; i < items.length; i++) ...[
-                              if (i > 0) const SizedBox(height: 16),
-                              _ReportCard(
-                                item: items[i],
-                                minorBg: _minorBg,
-                                minorFg: _minorFg,
-                                onTap: () => _openReportDetails(items[i]),
-                                onComment: () => _openReportDetails(items[i]),
-                              ),
+                            const SizedBox(height: 24),
+                            if (reports.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 48,
+                                ),
+                                child: Text(
+                                  _tab == _CommunityTab.myReports
+                                      ? 'You have not submitted any reports yet.'
+                                      : 'No active reports right now.',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: AppColors.onSurfaceVariant,
+                                  ),
+                                ),
+                              )
+                            else ...[
+                              // Active reports section
+                              if (activeReports.isNotEmpty) ...[
+                                for (var i = 0; i < activeReports.length; i++) ...[
+                                  if (i > 0) const SizedBox(height: 16),
+                                  _ReportCardWidget(
+                                    report: activeReports[i],
+                                    targetTitle: _resolveTargetTitle(
+                                      activeReports[i],
+                                    ),
+                                    isActive: true,
+                                    minorBg: _minorBg,
+                                    minorFg: _minorFg,
+                                    onTap: () => _openReportDetails(
+                                      activeReports[i],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                              // Inactive / Resolved section header
+                              if (inactiveReports.isNotEmpty) ...[
+                                const SizedBox(height: 24),
+                                const Row(
+                                  children: [
+                                    Expanded(child: Divider(color: AppColors.outlineVariant)),
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 12),
+                                      child: Text(
+                                        'Resolved & Past Reports',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.outline,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(child: Divider(color: AppColors.outlineVariant)),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                for (var i = 0; i < inactiveReports.length; i++) ...[
+                                  if (i > 0) const SizedBox(height: 16),
+                                  _ReportCardWidget(
+                                    report: inactiveReports[i],
+                                    targetTitle: _resolveTargetTitle(
+                                      inactiveReports[i],
+                                    ),
+                                    isActive: false,
+                                    minorBg: _minorBg,
+                                    minorFg: _minorFg,
+                                    onTap: () => _openReportDetails(
+                                      inactiveReports[i],
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ],
                           ],
-                      ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -369,25 +412,45 @@ class _TabButton extends StatelessWidget {
   }
 }
 
-class _ReportCard extends StatelessWidget {
-  const _ReportCard({
-    required this.item,
+class _ReportCardWidget extends StatelessWidget {
+  const _ReportCardWidget({
+    required this.report,
+    required this.targetTitle,
+    required this.isActive,
     required this.minorBg,
     required this.minorFg,
     required this.onTap,
-    required this.onComment,
   });
 
-  final _FeedItem item;
+  final Report report;
+  final String targetTitle;
+  final bool isActive;
   final Color minorBg;
   final Color minorFg;
   final VoidCallback onTap;
-  final VoidCallback onComment;
 
   @override
   Widget build(BuildContext context) {
+    final isResolved = report.status.toLowerCase() == 'resolved';
+    final isExpired = !isActive && !isResolved;
+
+    final _ReportBadge badgeType;
+    if (isResolved) {
+      badgeType = _ReportBadge.resolved;
+    } else if (isExpired) {
+      badgeType = _ReportBadge.expired;
+    } else if (report.confirmCount > 0) {
+      badgeType = _ReportBadge.verified;
+    } else {
+      badgeType = _ReportBadge.active;
+    }
+
+    final trustLine = report.confirmCount > 0
+        ? 'Confirmed by ${report.confirmCount} ${report.confirmCount == 1 ? 'rider' : 'riders'}, ${TimeUtils.formatRelativeTime(report.lastConfirmedAt ?? report.createdAt)}'
+        : 'Reported ${TimeUtils.formatRelativeTime(report.createdAt)}';
+
     return Opacity(
-      opacity: item.dimmed ? 0.8 : 1,
+      opacity: isActive ? 1.0 : 0.65,
       child: Material(
         color: AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(16),
@@ -420,7 +483,7 @@ class _ReportCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            item.title,
+                            report.problemType,
                             style: const TextStyle(
                               fontSize: 18,
                               height: 24 / 18,
@@ -430,7 +493,7 @@ class _ReportCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            item.subtitle,
+                            targetTitle,
                             style: const TextStyle(
                               fontSize: 14,
                               height: 20 / 14,
@@ -440,8 +503,8 @@ class _ReportCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    _BadgeChip(
-                      badge: item.badge,
+                    _BadgeChipWidget(
+                      badge: badgeType,
                       minorBg: minorBg,
                       minorFg: minorFg,
                     ),
@@ -458,75 +521,28 @@ class _ReportCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Icon(
-                        item.icon,
+                        report.targetType.toLowerCase() == 'bus'
+                            ? Icons.directions_bus
+                            : Icons.accessible,
                         size: 20,
                         color: AppColors.primary,
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text(
-                      item.timeLabel,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        height: 16 / 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.outline,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Divider(height: 1, color: AppColors.surfaceVariant),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    if (item.verifyCount != null)
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.verified,
-                            size: 20,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${item.verifyCount}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              height: 20 / 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      )
-                    else if (item.verifiedByUsers != null)
-                      Text(
-                        'Verified by ${item.verifiedByUsers} users',
+                    Expanded(
+                      child: Text(
+                        trustLine,
                         style: const TextStyle(
                           fontSize: 12,
                           height: 16 / 12,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.onSurfaceVariant,
-                        ),
-                      )
-                    else
-                      const Spacer(),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: onComment,
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.onSurfaceVariant,
-                        minimumSize: const Size(48, 48),
-                      ),
-                      icon: const Icon(Icons.chat_bubble_outline, size: 20),
-                      label: const Text(
-                        'Comment',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          color: AppColors.outline,
                         ),
                       ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: AppColors.onSurfaceVariant,
                     ),
                   ],
                 ),
@@ -539,8 +555,8 @@ class _ReportCard extends StatelessWidget {
   }
 }
 
-class _BadgeChip extends StatelessWidget {
-  const _BadgeChip({
+class _BadgeChipWidget extends StatelessWidget {
+  const _BadgeChipWidget({
     required this.badge,
     required this.minorBg,
     required this.minorFg,
@@ -553,11 +569,11 @@ class _BadgeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (bg, fg, icon, label) = switch (badge) {
-      _ReportBadge.major => (
+      _ReportBadge.active => (
           AppColors.errorContainer,
           AppColors.onErrorContainer,
           Icons.warning,
-          'Major',
+          'Active',
         ),
       _ReportBadge.verified => (
           AppColors.secondary,
@@ -565,11 +581,17 @@ class _BadgeChip extends StatelessWidget {
           Icons.check_circle,
           'Verified',
         ),
-      _ReportBadge.minor => (
-          minorBg,
-          minorFg,
-          Icons.info,
-          'Minor',
+      _ReportBadge.resolved => (
+          AppColors.success.withValues(alpha: 0.2),
+          AppColors.success,
+          Icons.check_circle_outline,
+          'Resolved',
+        ),
+      _ReportBadge.expired => (
+          AppColors.surfaceContainer,
+          AppColors.outline,
+          Icons.history,
+          'Expired',
         ),
     };
 
@@ -578,9 +600,6 @@ class _BadgeChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(4),
-        border: badge == _ReportBadge.minor
-            ? Border.all(color: minorFg.withValues(alpha: 0.2))
-            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

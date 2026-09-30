@@ -4,13 +4,21 @@ import 'package:latlong2/latlong.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/seed_data.dart';
+import '../../logic/delay_eta_logic.dart';
+import '../../models/bus.dart';
 import '../../models/bus_location_model.dart';
 import '../../models/enums/bus_status.dart';
 import '../../models/journey_model.dart';
+import '../../models/station.dart';
+import '../../models/trip_model.dart';
 import '../../services/eta_service.dart';
+import '../../services/firestore_service.dart';
 import '../../services/journey_service.dart';
 import '../../services/live_bus_service.dart';
+import '../../services/trip_service.dart';
 import 'boarding_assistance_screen.dart';
+
 import 'report_condition_screen.dart';
 import 'route_results_screen.dart';
 
@@ -50,18 +58,11 @@ class LiveJourneyScreen extends StatefulWidget {
 class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
   final LiveBusService _liveBusService = LiveBusService();
   final JourneyService _journeyService = JourneyService();
-  final MapController _mapController = MapController();
 
   void _showSnack(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  @override
-  void dispose() {
-    _mapController.dispose();
-    super.dispose();
   }
 
   // ---------------------------------------------------------------------------
@@ -81,8 +82,13 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
           return Column(
             children: [
               _TopBar(
-                onClose: () =>
-                    Navigator.of(context).popUntil((r) => r.isFirst),
+                onClose: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    Navigator.of(context).popUntil((r) => r.isFirst);
+                  }
+                },
               ),
               Expanded(
                 child: Center(
@@ -143,29 +149,68 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
         final rampWorking = liveBus?.rampOperational ?? true;
         final elevatorWorking = liveBus?.elevatorWorking ?? true;
 
+        final effectiveOrigin = widget.route?.origin ?? widget.origin;
+        final effectiveDestination = passengerStop;
+
+        Bus matchedBus = widget.route?.rawBus ??
+            Bus(
+              id: resolvedBusId,
+              routeNo: busNumber,
+              busNo: busNumber,
+              hasRamp: rampWorking,
+              lowFloor: true,
+              rampOk: rampWorking,
+              occupancy: liveBus?.occupancyLevel ?? 'Moderate',
+              stops: [effectiveOrigin, effectiveDestination],
+              scheduleTimes: const ['08:00 AM', '08:45 AM'],
+            );
+
+        final stationsMap = {
+          for (final st in SeedData.colomboStations) st.id: st,
+          for (final st in SeedData.colomboStations) st.name: st,
+        };
+
+        final etaResult = DelayEtaCalculator.calculateArrivalEta(
+          bus: matchedBus,
+          targetStopIdOrName: effectiveOrigin,
+          liveBusLocation: liveBus,
+          stationsMap: stationsMap,
+        );
+
         return Column(
           children: [
             _TopBar(
               onClose: () {
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
               },
               journeyInfo: '$routeName · Destination: $passengerStop',
+            ),
+            _LiveMapTrackingView(
+              busId: resolvedBusId,
+              busName: busName,
+              liveBus: liveBus,
+              origin: effectiveOrigin,
+              destination: effectiveDestination,
+              route: widget.route,
+              matchedBus: matchedBus,
+              etaResult: etaResult,
+              isBroadcasting: isBroadcasting,
+              isStale: isStale,
             ),
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  _MapSection(
+                  _TimetableHeaderCard(
                     busName: busName,
                     routeName: routeName,
-                    liveBus: liveBus,
-                    isStale: isStale,
-                    mapController: _mapController,
                     busId: resolvedBusId,
                   ),
-                  Transform.translate(
-                    offset: const Offset(0, -16),
-                    child: Padding(
+                  Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -179,7 +224,10 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                             isStale: isStale,
                             speed: liveBus?.speed ?? 0.0,
                             liveBus: liveBus,
+                            arrivalEta: etaResult,
                           ),
+                          const SizedBox(height: 24),
+                          _LiveStopTimelineCard(busId: resolvedBusId),
                           const SizedBox(height: 24),
                           _LiveAccessibilitySection(
                             rampOperational: rampWorking,
@@ -219,7 +267,6 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                         ],
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -244,8 +291,13 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
             if (journeySnapshot.hasError) {
               return _ErrorBody(
                 error: journeySnapshot.error.toString(),
-                onClose: () =>
-                    Navigator.of(context).popUntil((r) => r.isFirst),
+                onClose: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    Navigator.of(context).popUntil((r) => r.isFirst);
+                  }
+                },
               );
             }
 
@@ -259,8 +311,13 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                   ConnectionState.waiting) {
                 return _LoadingBody(
                   isDesktop: isDesktop,
-                  onClose: () => Navigator.of(context)
-                      .popUntil((r) => r.isFirst),
+                  onClose: () {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    } else {
+                      Navigator.of(context).popUntil((r) => r.isFirst);
+                    }
+                  },
                   onNavTap: (label) => AppNavigation.handleBottomNav(
                     context,
                     label,
@@ -272,8 +329,13 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
 
               return _NoJourneyBody(
                 isDesktop: isDesktop,
-                onClose: () =>
-                    Navigator.of(context).popUntil((r) => r.isFirst),
+                onClose: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    Navigator.of(context).popUntil((r) => r.isFirst);
+                  }
+                },
                 onNavTap: (label) => AppNavigation.handleBottomNav(
                   context,
                   label,
@@ -630,380 +692,827 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _MapSection extends StatelessWidget {
-  const _MapSection({
-    required this.busName,
-    required this.routeName,
-    required this.liveBus,
-    required this.isStale,
-    required this.mapController,
+// ──────────────────────────────────────────────────────────────────────────────
+// Live Real-Time Interactive Map View
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _LiveMapTrackingView extends StatefulWidget {
+  const _LiveMapTrackingView({
     required this.busId,
+    required this.busName,
+    required this.liveBus,
+    required this.origin,
+    required this.destination,
+    required this.route,
+    required this.matchedBus,
+    required this.etaResult,
+    required this.isBroadcasting,
+    required this.isStale,
   });
 
-  final String busName;
-  final String routeName;
-  final BusLocationModel? liveBus;
-  final bool isStale;
-  final MapController mapController;
   final String busId;
+  final String busName;
+  final BusLocationModel? liveBus;
+  final String origin;
+  final String destination;
+  final RouteResultItem? route;
+  final Bus? matchedBus;
+  final BusArrivalEtaResult etaResult;
+  final bool isBroadcasting;
+  final bool isStale;
 
-  static LatLng _getRouteDefaultLocation(String busId) {
-    switch (busId) {
-      case 'bus_01':
-        return const LatLng(7.2513, 80.3464); // Route 01 (Colombo -> Kandy / Hettimulla)
-      case 'bus_02':
-        return const LatLng(6.4000, 79.9800); // Route 02 (Colombo -> Galle)
-      case 'bus_87':
-        return const LatLng(8.3114, 80.4037); // Route 87 (Colombo -> Jaffna)
-      case 'bus_49':
-        return const LatLng(7.8731, 80.7718); // Route 49 (Colombo -> Trincomalee)
-      case 'bus_99':
-        return const LatLng(6.8833, 80.6000); // Route 99 (Colombo -> Badulla)
-      default:
-        return const LatLng(6.9271, 79.8612); // Colombo Central
+  @override
+  State<_LiveMapTrackingView> createState() => _LiveMapTrackingViewState();
+}
+
+class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
+  late final MapController _mapController;
+  bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _mapController = MapController();
+  }
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  LatLng? _resolveStopCoordinates(String stopName) {
+    if (stopName.trim().isEmpty) return null;
+    final fromEta = EtaService.getStopCoordinates(stopName);
+    if (fromEta != null) return fromEta;
+
+    final q = stopName.trim().toLowerCase();
+    for (final st in SeedData.colomboStations) {
+      final sName = st.name.toLowerCase();
+      if (sName == q || sName.contains(q) || q.contains(sName)) {
+        return LatLng(st.lat, st.lng);
+      }
+    }
+    return null;
+  }
+
+  List<LatLng> _buildRoutePolyline(
+    LatLng busPos,
+    LatLng passengerPos,
+    LatLng? destPos,
+  ) {
+    final List<LatLng> points = [];
+
+    final List<String> stopNames = [];
+    if (widget.matchedBus != null &&
+        widget.matchedBus!.stops.isNotEmpty) {
+      stopNames.addAll(widget.matchedBus!.stops);
+    } else if (widget.route != null) {
+      stopNames.add(widget.route!.origin);
+      stopNames.addAll(widget.route!.intermediateStops);
+      stopNames.add(widget.route!.destination);
+    }
+
+    for (final stop in stopNames) {
+      final coord = _resolveStopCoordinates(stop);
+      if (coord != null && !points.contains(coord)) {
+        points.add(coord);
+      }
+    }
+
+    if (points.length < 2) {
+      return [busPos, passengerPos, ?destPos];
+    }
+    return points;
+  }
+
+  String _formatDistance(LatLng busPos, LatLng passengerPos) {
+    final meters = const Distance().distance(busPos, passengerPos);
+    if (meters < 1000) {
+      return '${meters.toStringAsFixed(0)} m';
+    }
+    return '${(meters / 1000).toStringAsFixed(1)} km';
+  }
+
+  void _fitJourney(LatLng busPos, LatLng passengerPos, LatLng? destPos) {
+    final pts = [busPos, passengerPos, ?destPos];
+    try {
+      final bounds = LatLngBounds.fromPoints(pts);
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.all(40),
+        ),
+      );
+    } catch (_) {
+      _mapController.move(passengerPos, 13.5);
     }
   }
 
-  bool get _hasValidLocation =>
-      liveBus != null &&
-      (liveBus!.latitude != 0.0 || liveBus!.longitude != 0.0);
-
-  LatLng get _busLatLng => _hasValidLocation
-      ? LatLng(liveBus!.latitude, liveBus!.longitude)
-      : _getRouteDefaultLocation(busId);
-
   @override
   Widget build(BuildContext context) {
-    final centerLatLng = _busLatLng;
-    final busNumStr = liveBus?.routeNumber.isNotEmpty == true
-        ? liveBus!.routeNumber
-        : busId.replaceAll('bus_', '');
+    // 1. Resolve positions
+    LatLng? busPos;
+    if (widget.liveBus != null &&
+        widget.liveBus!.latitude != 0.0 &&
+        widget.liveBus!.longitude != 0.0) {
+      busPos = LatLng(widget.liveBus!.latitude, widget.liveBus!.longitude);
+    } else if (widget.liveBus?.nextStop != null &&
+        widget.liveBus!.nextStop.isNotEmpty) {
+      busPos = _resolveStopCoordinates(widget.liveBus!.nextStop);
+    }
+    busPos ??= _resolveStopCoordinates(widget.origin) ??
+        const LatLng(6.9360, 79.8527); // Pettah default
 
-    return SizedBox(
-      height: 270,
-      width: double.infinity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          FlutterMap(
-            mapController: mapController,
-            options: MapOptions(
-              initialCenter: centerLatLng,
-              initialZoom: 14.5,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.access_transit',
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: centerLatLng,
-                    width: 64,
-                    height: 64,
-                    child: Semantics(
-                      label: 'Current bus location marker for $busName',
-                      child: _LiveBusMarker(
-                        heading: liveBus?.heading ?? 45.0,
-                        routeNumber: busNumStr,
-                        isStale: isStale,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+    final passengerPos = _resolveStopCoordinates(widget.origin) ??
+        _resolveStopCoordinates('Colombo Fort') ??
+        const LatLng(6.9333, 79.8500);
+
+    final destPos = _resolveStopCoordinates(widget.destination);
+
+    final polylinePoints = _buildRoutePolyline(busPos, passengerPos, destPos);
+    final distanceText = _formatDistance(busPos, passengerPos);
+
+    final isLiveGps = widget.isBroadcasting && !widget.isStale;
+    final delayText = widget.etaResult.delayLabel;
+    final delayType = widget.etaResult.delayType;
+
+    final Color delayBadgeColor;
+    final Color delayBadgeTextColor;
+    if (delayType == DelayType.delayed) {
+      delayBadgeColor = const Color(0xFFFFECE0);
+      delayBadgeTextColor = const Color(0xFFD84315);
+    } else if (delayType == DelayType.early) {
+      delayBadgeColor = const Color(0xFFE1F5FE);
+      delayBadgeTextColor = const Color(0xFF0277BD);
+    } else {
+      delayBadgeColor = const Color(0xFFE8F5E9);
+      delayBadgeTextColor = const Color(0xFF2E7D32);
+    }
+
+    final double mapHeight = _isExpanded ? 460.0 : 290.0;
+
+    return Semantics(
+      label:
+          'Live interactive map showing bus ${widget.busName} heading toward ${widget.origin}',
+      container: true,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        height: mapHeight,
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.outlineVariant.withValues(alpha: 0.5),
+            width: 1.5,
           ),
-
-          // ── Stale / Missing telemetry overlay banner ────────────────────────
-          if (liveBus == null)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 24,
-              child: Semantics(
-                liveRegion: true,
-                label: 'Connecting to live GPS stream for $busName',
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface.withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: AppColors.outlineVariant.withValues(alpha: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.onSurface.withValues(alpha: 0.1),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            // ── OpenStreetMap Widget ──
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: passengerPos,
+                initialZoom: 13.8,
+                minZoom: 9.0,
+                maxZoom: 18.0,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.accesstransit.app',
+                ),
+                // Outer glow route polyline
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: polylinePoints,
+                      strokeWidth: 7.0,
+                      color: AppColors.primary.withValues(alpha: 0.3),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.onSurface.withValues(alpha: 0.1),
-                        blurRadius: 6,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Connecting to live GPS for $busName...',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.onSurface,
+                    Polyline(
+                      points: polylinePoints,
+                      strokeWidth: 4.5,
+                      color: AppColors.primary,
+                    ),
+                  ],
+                ),
+                // Markers
+                MarkerLayer(
+                  markers: [
+                    // Intermediate stop dots along corridor
+                    for (int i = 0; i < polylinePoints.length; i++)
+                      if (polylinePoints[i] != passengerPos &&
+                          polylinePoints[i] != destPos &&
+                          polylinePoints[i] != busPos)
+                        Marker(
+                          point: polylinePoints[i],
+                          width: 14,
+                          height: 14,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.primary,
+                                width: 2.5,
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 3,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            )
-          else if (isStale)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 24,
-              child: Semantics(
-                liveRegion: true,
-                label:
-                    'Location unavailable. Signal lost or telemetry is stale.',
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.errorContainer.withValues(alpha: 0.98),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.error, width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.onSurface.withValues(alpha: 0.15),
-                        blurRadius: 6,
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(
-                        Icons.sensors_off_rounded,
-                        size: 22,
-                        color: AppColors.onErrorContainer,
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
+
+                    // Destination Stop Marker
+                    if (destPos != null)
+                      Marker(
+                        point: destPos,
+                        width: 90,
+                        height: 64,
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              'Location unavailable',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.onErrorContainer,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFC2185B),
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 3,
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                widget.destination,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                            Text(
-                              'Signal lost — location updates delayed',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.onErrorContainer,
+                            const SizedBox(height: 2),
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE91E63),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.pink.withValues(alpha: 0.4),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.flag_rounded,
+                                color: Colors.white,
+                                size: 16,
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+
+                    // Passenger's Boarding Stop Marker
+                    Marker(
+                      point: passengerPos,
+                      width: 100,
+                      height: 70,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE65100),
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 3,
+                                ),
+                              ],
+                            ),
+                            child: const Text(
+                              'You Board Here',
+                              maxLines: 1,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF9800),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.orange.withValues(alpha: 0.5),
+                                  blurRadius: 8,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.hail_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Live Bus Marker
+                    Marker(
+                      point: busPos,
+                      width: 90,
+                      height: 74,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isLiveGps
+                                  ? const Color(0xFF1B5E20)
+                                  : AppColors.primary,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 3,
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              widget.liveBus?.routeNumber.isNotEmpty == true
+                                  ? 'BUS ${widget.liveBus!.routeNumber}'
+                                  : widget.busName,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: isLiveGps
+                                  ? const Color(0xFF00C853)
+                                  : AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 3,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (isLiveGps
+                                          ? const Color(0xFF00C853)
+                                          : AppColors.primary)
+                                      .withValues(alpha: 0.5),
+                                  blurRadius: 10,
+                                  spreadRadius: 3,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.directions_bus_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            // ── Top Floating Overlay: Live Status & Delay Pill ──
+            Positioned(
+              top: 12,
+              left: 12,
+              right: 64, // Leaves space for control column
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: isLiveGps
+                            ? const Color(0xFF00C853)
+                            : Colors.orange,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                isLiveGps ? 'LIVE GPS' : 'TIMETABLE',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                  color: isLiveGps
+                                      ? const Color(0xFF2E7D32)
+                                      : Colors.orange.shade800,
+                                ),
+                              ),
+                              const Text(' · ', style: TextStyle(color: Colors.grey)),
+                              Text(
+                                distanceText,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            widget.etaResult.countdownText,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: delayBadgeColor,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            delayText,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: delayBadgeTextColor,
+                            ),
+                          ),
+                        ),
+                        if (widget.etaResult.delayReason != null &&
+                            widget.etaResult.delayReason!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFFFB74D),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 11,
+                                  color: Color(0xFFD84315),
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${widget.etaResult.delayReason} (+${widget.etaResult.addedDelayMinutes}m)',
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFD84315),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
 
-          // ── Top right bus status badge ──────────────────────────────────────
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Semantics(
-              label:
-                  '$busName tracking status: ${isStale ? "Location unavailable" : "Live GPS active"}',
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.surface.withValues(alpha: 0.96),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isStale ? AppColors.error : AppColors.secondary,
-                    width: 1.5,
+            // ── Floating Action Buttons (Right-side controls) ──
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Column(
+                children: [
+                  _MapActionButton(
+                    icon: _isExpanded
+                        ? Icons.fullscreen_exit_rounded
+                        : Icons.fullscreen_rounded,
+                    tooltip: _isExpanded ? 'Collapse map' : 'Expand map',
+                    onTap: () {
+                      setState(() {
+                        _isExpanded = !_isExpanded;
+                      });
+                    },
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.onSurface.withValues(alpha: 0.15),
-                      blurRadius: 6,
-                    ),
-                  ],
+                  const SizedBox(height: 6),
+                  _MapActionButton(
+                    icon: Icons.crop_free_rounded,
+                    tooltip: 'Fit journey bounds',
+                    onTap: () => _fitJourney(busPos!, passengerPos, destPos),
+                  ),
+                  const SizedBox(height: 6),
+                  _MapActionButton(
+                    icon: Icons.directions_bus_rounded,
+                    tooltip: 'Focus on bus',
+                    onTap: () => _mapController.move(busPos!, 15.0),
+                  ),
+                  const SizedBox(height: 6),
+                  _MapActionButton(
+                    icon: Icons.person_pin_circle_rounded,
+                    tooltip: 'Focus on my stop',
+                    onTap: () => _mapController.move(passengerPos, 15.5),
+                  ),
+                  const SizedBox(height: 6),
+                  _MapActionButton(
+                    icon: Icons.add_rounded,
+                    tooltip: 'Zoom in',
+                    onTap: () {
+                      final current = _mapController.camera.center;
+                      final zoom = (_mapController.camera.zoom + 1.0)
+                          .clamp(8.0, 18.0);
+                      _mapController.move(current, zoom);
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  _MapActionButton(
+                    icon: Icons.remove_rounded,
+                    tooltip: 'Zoom out',
+                    onTap: () {
+                      final current = _mapController.camera.center;
+                      final zoom = (_mapController.camera.zoom - 1.0)
+                          .clamp(8.0, 18.0);
+                      _mapController.move(current, zoom);
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Bottom Floating Pill: Telemetry info ──
+            Positioned(
+              bottom: 10,
+              left: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      isStale
-                          ? Icons.sensors_off_rounded
-                          : Icons.sensors_rounded,
-                      size: 18,
-                      color: isStale ? AppColors.error : AppColors.secondary,
+                      isLiveGps
+                          ? Icons.speed_rounded
+                          : Icons.schedule_rounded,
+                      size: 14,
+                      color: Colors.white,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 5),
                     Text(
-                      busName,
+                      isLiveGps
+                          ? '${widget.liveBus?.speed.toStringAsFixed(0) ?? 0} km/h · Next: ${widget.liveBus?.nextStop ?? 'Approaching'}'
+                          : 'Next Stop: ${widget.liveBus?.nextStop ?? widget.origin}',
                       style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-          // ── Re-center button ────────────────────────────────────────────────
-          if (_hasValidLocation)
-            Positioned(
-              top: 16,
-              left: 16,
-              child: Semantics(
-                button: true,
-                label: 'Re-center map on $busName current position',
-                child: FloatingActionButton.small(
-                  heroTag: 're_center_bus_btn',
-                  onPressed: () {
-                    mapController.move(centerLatLng, 15.0);
-                  },
-                  backgroundColor: AppColors.surface.withValues(alpha: 0.96),
-                  foregroundColor: AppColors.primary,
-                  tooltip: 'Center on Bus',
-                  child: const Icon(Icons.my_location, size: 22),
+class _MapActionButton extends StatelessWidget {
+  const _MapActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.95),
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(
+            color: AppColors.outlineVariant.withValues(alpha: 0.4),
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          child: SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(
+              icon,
+              size: 20,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimetableHeaderCard extends StatelessWidget {
+  const _TimetableHeaderCard({
+    required this.busName,
+    required this.routeName,
+    required this.busId,
+  });
+
+  final String busName;
+  final String routeName;
+  final String busId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.directions_bus_rounded, color: AppColors.onPrimaryContainer, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      routeName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.onPrimaryContainer,
+                      ),
+                    ),
+                    Text(
+                      busName,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.onPrimaryContainer.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.onPrimaryContainer.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.schedule, size: 14, color: AppColors.onPrimaryContainer),
+                    SizedBox(width: 4),
+                    Text(
+                      'Fixed Schedule',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _LiveBusMarker extends StatelessWidget {
-  const _LiveBusMarker({
-    required this.heading,
-    required this.routeNumber,
-    required this.isStale,
-  });
+// ──────────────────────────────────────────────────────────────────────────────
+// Status Card: Bus info, Live badge, Last updated, Next stop, Route name
+// ──────────────────────────────────────────────────────────────────────────────
 
-  final double heading;
-  final String routeNumber;
-  final bool isStale;
 
-  @override
-  Widget build(BuildContext context) {
-    final statusColor = isStale ? AppColors.error : AppColors.primaryContainer;
 
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Pulse ring
-        if (!isStale) const _PulseMarker(),
 
-        // Rotated marker pin
-        Transform.rotate(
-          angle: heading * (3.141592653589793 / 180),
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              shape: BoxShape.circle,
-              border: Border.all(color: statusColor, width: 3.5),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.onSurface.withValues(alpha: 0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Icon(
-                Icons.directions_bus_filled_rounded,
-                color: statusColor,
-                size: 26,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
-class _PulseMarker extends StatefulWidget {
-  const _PulseMarker();
-
-  @override
-  State<_PulseMarker> createState() => _PulseMarkerState();
-}
-
-class _PulseMarkerState extends State<_PulseMarker>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final t = _controller.value;
-        return Transform.scale(
-          scale: 0.9 + (t * 1.5),
-          child: Opacity(
-            opacity: (1 - t).clamp(0.0, 0.7),
-            child: Container(
-              width: 58,
-              height: 58,
-              decoration: const BoxDecoration(
-                color: AppColors.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Status Card: Bus info, Live badge, Last updated, Next stop, Route name
@@ -1019,6 +1528,7 @@ class _StatusCard extends StatelessWidget {
     required this.isStale,
     required this.speed,
     required this.liveBus,
+    this.arrivalEta,
   });
 
   final String busName;
@@ -1029,6 +1539,7 @@ class _StatusCard extends StatelessWidget {
   final bool isStale;
   final double speed;
   final BusLocationModel? liveBus;
+  final BusArrivalEtaResult? arrivalEta;
 
   String _formatTimestamp(DateTime? timestamp) {
     if (timestamp == null) return 'No GPS signal';
@@ -1202,6 +1713,7 @@ class _StatusCard extends StatelessWidget {
               isStale: isStale,
             ),
             targetStop: passengerStop,
+            arrivalEta: arrivalEta,
           ),
           const SizedBox(height: 16),
 
@@ -1339,13 +1851,181 @@ class _EtaBannerCard extends StatelessWidget {
   const _EtaBannerCard({
     required this.etaResult,
     required this.targetStop,
+    this.arrivalEta,
   });
 
   final EtaResult etaResult;
   final String targetStop;
+  final BusArrivalEtaResult? arrivalEta;
 
   @override
   Widget build(BuildContext context) {
+    if (arrivalEta != null) {
+      final arrival = arrivalEta!;
+      final Color badgeColor;
+      final Color badgeTextColor;
+      if (arrival.delayType == DelayType.delayed) {
+        badgeColor = const Color(0xFFFFECE0);
+        badgeTextColor = const Color(0xFFD84315);
+      } else if (arrival.delayType == DelayType.early) {
+        badgeColor = const Color(0xFFE1F5FE);
+        badgeTextColor = const Color(0xFF0277BD);
+      } else {
+        badgeColor = const Color(0xFFE8F5E9);
+        badgeTextColor = const Color(0xFF2E7D32);
+      }
+
+      return Semantics(
+        liveRegion: true,
+        label: '${arrival.countdownText}. ${arrival.delayLabel}',
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.primaryContainer.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.primaryContainer.withValues(alpha: 0.4),
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.schedule_rounded,
+                      color: AppColors.onPrimaryContainer,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          arrival.countdownText,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'at $targetStop',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: badgeColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      arrival.delayLabel,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: badgeTextColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Scheduled: ${arrival.scheduledArrivalStr}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      'Expected: ${arrival.estimatedArrivalStr}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: arrival.delayType == DelayType.delayed
+                            ? const Color(0xFFD84315)
+                            : AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (arrival.delayReason != null &&
+                  arrival.delayReason!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFFB74D)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Color(0xFFD84315),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Driver Notice: ${arrival.delayReason} (+${arrival.addedDelayMinutes} mins)',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFD84315),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
     if (etaResult.isReliable) {
       final distanceKm = (etaResult.distanceMeters / 1000).toStringAsFixed(1);
 
@@ -1966,3 +2646,192 @@ class _NavItem extends StatelessWidget {
     );
   }
 }
+
+class _LiveStopTimelineCard extends StatelessWidget {
+  const _LiveStopTimelineCard({required this.busId});
+
+  final String busId;
+
+  String _formatTime(DateTime dt) {
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<TripModel?>(
+      stream: TripService().watchActiveTripForBus(busId),
+      builder: (context, snapshot) {
+        final trip = snapshot.data;
+        final isInProgress = trip != null && trip.isInProgress;
+
+        if (!isInProgress) {
+          return const SizedBox.shrink();
+        }
+
+        final stops = trip.stops;
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          color: AppColors.surfaceContainerLowest,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.timeline_rounded, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Live Per-Stop Timeline',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.green.shade600),
+                      ),
+                      child: Text(
+                        'Live Run',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                FutureBuilder<List<Station>>(
+                  future: FirestoreService().getStations(),
+                  builder: (context, stationsSnapshot) {
+                    final stationsList =
+                        stationsSnapshot.data ?? SeedData.colomboStations;
+                    final stationsMap = {
+                      for (final s in stationsList) s.id: s,
+                    };
+
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: stops.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final stopId = stops[index];
+                        final stationName = stationsMap[stopId]?.name ??
+                            stopId
+                                .replaceAll('st_', '')
+                                .replaceAll('_', ' ')
+                                .toUpperCase();
+
+                        final isConfirmedCurrent =
+                            index == trip.currentStopIndex;
+                        final isPassed = index < trip.currentStopIndex;
+                        final timing = trip.stopTimes[stopId];
+
+                        String subtext = '';
+                        if (timing != null) {
+                          if (isPassed && timing.actualArrival != null) {
+                            subtext =
+                                'Reached at ${_formatTime(timing.actualArrival!)}';
+                          } else if (isConfirmedCurrent) {
+                            final timeStr = timing.actualArrival != null
+                                ? _formatTime(timing.actualArrival!)
+                                : _formatTime(timing.estimatedArrival);
+                            subtext = 'Bus is here now (Confirmed $timeStr)';
+                          } else {
+                            final diffMins = timing.estimatedArrival
+                                .difference(DateTime.now())
+                                .inMinutes
+                                .clamp(1, 999);
+                            subtext =
+                                'Est. ${_formatTime(timing.estimatedArrival)} (in about $diffMins min)';
+                          }
+                        }
+
+                        return Row(
+                          children: [
+                            Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isConfirmedCurrent
+                                    ? AppColors.primaryContainer
+                                    : (isPassed
+                                        ? Colors.green
+                                        : AppColors.surfaceContainer),
+                                border: Border.all(
+                                  color: isConfirmedCurrent
+                                      ? AppColors.primary
+                                      : (isPassed
+                                          ? Colors.green
+                                          : AppColors.outlineVariant),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Icon(
+                                isConfirmedCurrent
+                                    ? Icons.directions_bus
+                                    : (isPassed ? Icons.check : Icons.circle),
+                                size: 10,
+                                color: isConfirmedCurrent || isPassed
+                                    ? Colors.white
+                                    : AppColors.outline,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    stationName,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isConfirmedCurrent
+                                          ? FontWeight.bold
+                                          : FontWeight.w600,
+                                      color: AppColors.onSurface,
+                                    ),
+                                  ),
+                                  Text(
+                                    subtext,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isConfirmedCurrent
+                                          ? AppColors.primary
+                                          : AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+

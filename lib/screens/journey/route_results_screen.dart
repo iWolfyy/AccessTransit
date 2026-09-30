@@ -2,12 +2,24 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/seed_data.dart';
+import '../../logic/bus_matcher.dart';
+import '../../logic/status_logic.dart';
+import '../../models/bus.dart';
 import '../../models/bus_location_model.dart';
+import '../../models/bus_route.dart';
 import '../../models/enums/bus_status.dart';
+import '../../models/report.dart';
+import '../../models/station.dart';
+import '../../services/firestore_service.dart';
 import '../../services/live_bus_service.dart';
+import '../../services/trip_service.dart';
+import '../../models/trip_model.dart';
+import '../../core/utils/time_utils.dart';
 import 'route_details_screen.dart';
 
-/// Sample route result used for passenger route selection.
+
+/// Route result item used for passenger route selection.
 class RouteResultItem {
   const RouteResultItem({
     required this.id,
@@ -21,10 +33,17 @@ class RouteResultItem {
     required this.safetyLabel,
     required this.summary,
     this.busId = 'bus_01',
+    this.busNo,
+    this.routeNo,
+    this.routeName,
+    this.scheduledDeparture,
     this.origin = 'Colombo',
     this.destination = 'Kandy',
     this.intermediateStops = const [],
     this.recommended = false,
+    this.rawBus,
+    this.statusResult,
+    this.nextDepartureDateTime,
   });
 
   final String id;
@@ -38,10 +57,17 @@ class RouteResultItem {
   final String safetyLabel;
   final String summary;
   final String busId;
+  final String? busNo;
+  final String? routeNo;
+  final String? routeName;
+  final String? scheduledDeparture;
   final String origin;
   final String destination;
   final List<String> intermediateStops;
   final bool recommended;
+  final Bus? rawBus;
+  final BusStatusResult? statusResult;
+  final DateTime? nextDepartureDateTime;
 }
 
 enum AccessibilityStatus { accessible, partial, notAccessible }
@@ -50,12 +76,24 @@ enum AccessibilityStatus { accessible, partial, notAccessible }
 class RouteResultsScreen extends StatefulWidget {
   const RouteResultsScreen({
     super.key,
-    this.origin = 'Current Location',
-    this.destination = 'Destination',
+    this.fromStationId = 'st_fort',
+    this.toStationId = 'st_kottawa',
+    this.origin = 'Colombo Fort Station',
+    this.destination = 'Kottawa Highway Bus Station',
+    this.selectedDate,
+    this.wheelchairAccessRequired = false,
+    this.stepFreeOnly = false,
+    this.minimizeWalking = false,
   });
 
+  final String fromStationId;
+  final String toStationId;
   final String origin;
   final String destination;
+  final DateTime? selectedDate;
+  final bool wheelchairAccessRequired;
+  final bool stepFreeOnly;
+  final bool minimizeWalking;
 
   @override
   State<RouteResultsScreen> createState() => _RouteResultsScreenState();
@@ -63,202 +101,54 @@ class RouteResultsScreen extends StatefulWidget {
 
 class _RouteResultsScreenState extends State<RouteResultsScreen> {
   static const double _desktopBreakpoint = 768;
+  final FirestoreService _firestoreService = FirestoreService();
 
+  List<Bus> _allBuses = [];
+  Map<String, BusRoute> _routesMap = {};
+  Map<String, Station> _stationsMap = {};
+  bool _isLoadingData = true;
   String _sortBy = 'Best';
 
-  static const _sampleRoutes = [
-    RouteResultItem(
-      id: 'route_01',
-      title: 'Route 01: Colombo → Kandy',
-      durationMinutes: 195,
-      etaLabel: 'Departs in 10 min',
-      transfers: 0,
-      crowdLevel: 'Medium',
-      accessibilityStatus: AccessibilityStatus.accessible,
-      accessibilityLabel: 'Accessible',
-      safetyLabel: 'Highway Express',
-      summary: 'Step-free boarding · Ramp available',
-      busId: 'bus_01',
-      origin: 'Colombo',
-      destination: 'Kandy',
-      intermediateStops: [
-        'colombo',
-        'kadawatha',
-        'gampaha',
-        'nittambuwa',
-        'warakapola',
-        'ambepussa',
-        'hettimulla',
-        'kegalle',
-        'mawanella',
-        'peradeniya',
-        'kandy'
-      ],
-      recommended: true,
-    ),
-    RouteResultItem(
-      id: 'route_02',
-      title: 'Route 02: Colombo → Galle',
-      durationMinutes: 135,
-      etaLabel: 'Departs in 15 min',
-      transfers: 0,
-      crowdLevel: 'Low',
-      accessibilityStatus: AccessibilityStatus.accessible,
-      accessibilityLabel: 'Accessible',
-      safetyLabel: 'Southern Expressway',
-      summary: 'Low-floor elevator · Air-conditioned',
-      busId: 'bus_02',
-      origin: 'Colombo',
-      destination: 'Galle',
-      intermediateStops: [
-        'colombo',
-        'moratuwa',
-        'panadura',
-        'kalutara',
-        'beruwala',
-        'aluthgama',
-        'ambalangoda',
-        'hikkaduwa',
-        'galle'
-      ],
-      recommended: true,
-    ),
-    RouteResultItem(
-      id: 'route_87',
-      title: 'Route 87: Colombo → Jaffna',
-      durationMinutes: 410,
-      etaLabel: 'Departs in 30 min',
-      transfers: 0,
-      crowdLevel: 'Medium',
-      accessibilityStatus: AccessibilityStatus.partial,
-      accessibilityLabel: 'Partially Accessible',
-      safetyLabel: 'A9 Highway Direct',
-      summary: 'Long distance · Assistance available',
-      busId: 'bus_87',
-      origin: 'Colombo',
-      destination: 'Jaffna',
-      intermediateStops: [
-        'colombo',
-        'negombo',
-        'chilaw',
-        'puttalam',
-        'anuradhapura',
-        'vavuniya',
-        'kilinochchi',
-        'jaffna'
-      ],
-    ),
-    RouteResultItem(
-      id: 'route_49',
-      title: 'Route 49: Colombo → Trincomalee',
-      durationMinutes: 340,
-      etaLabel: 'Departs in 20 min',
-      transfers: 0,
-      crowdLevel: 'Low',
-      accessibilityStatus: AccessibilityStatus.accessible,
-      accessibilityLabel: 'Accessible',
-      safetyLabel: 'Eastern Express',
-      summary: 'Step-free boarding · Ramp available',
-      busId: 'bus_49',
-      origin: 'Colombo',
-      destination: 'Trincomalee',
-      intermediateStops: [
-        'colombo',
-        'kurunegala',
-        'dambulla',
-        'habarana',
-        'kantale',
-        'trincomalee'
-      ],
-    ),
-    RouteResultItem(
-      id: 'route_99',
-      title: 'Route 99: Colombo → Badulla',
-      durationMinutes: 360,
-      etaLabel: 'Departs in 25 min',
-      transfers: 0,
-      crowdLevel: 'High',
-      accessibilityStatus: AccessibilityStatus.accessible,
-      accessibilityLabel: 'Accessible',
-      safetyLabel: 'Scenic Mountain Route',
-      summary: 'Low-floor elevator · Ramp available',
-      busId: 'bus_99',
-      origin: 'Colombo',
-      destination: 'Badulla',
-      intermediateStops: [
-        'colombo',
-        'avissawella',
-        'ratnapura',
-        'balangoda',
-        'beragala',
-        'haputale',
-        'bandarawela',
-        'badulla'
-      ],
-    ),
-  ];
-
-  List<RouteResultItem> get _sortedRoutes {
-    final routes = List<RouteResultItem>.from(_sampleRoutes);
-    final queryDest = widget.destination.trim().toLowerCase();
-    final queryOrig = widget.origin.trim().toLowerCase();
-
-    /// Returns true if the route serves this query term (origin, destination,
-    /// title, or any intermediate stop).
-    bool servedBy(RouteResultItem r, String term) {
-      if (term.isEmpty || term == 'current location' || term == 'destination') {
-        return false;
-      }
-      if (r.origin.toLowerCase().contains(term) ||
-          r.destination.toLowerCase().contains(term) ||
-          r.title.toLowerCase().contains(term)) {
-        return true;
-      }
-      return r.intermediateStops
-          .any((stop) => stop.contains(term) || term.contains(stop));
-    }
-
-    /// Match score:
-    ///   2 = route serves BOTH the origin and destination query (exact match)
-    ///   1 = route serves only ONE of the two (partial)
-    ///   0 = no match
-    int matchScore(RouteResultItem r) {
-      final origMatch = servedBy(r, queryOrig);
-      final destMatch = servedBy(r, queryDest);
-      if (origMatch && destMatch) return 2;
-      if (origMatch || destMatch) return 1;
-      return 0;
-    }
-
-    routes.sort((a, b) {
-      final scoreDiff = matchScore(b).compareTo(matchScore(a)); // higher score first
-      if (scoreDiff != 0) return scoreDiff;
-
-      switch (_sortBy) {
-        case 'Fastest':
-          return a.durationMinutes.compareTo(b.durationMinutes);
-        case 'Least crowded':
-          return _crowdRank(a.crowdLevel).compareTo(_crowdRank(b.crowdLevel));
-        case 'Best':
-        default:
-          if (a.recommended == b.recommended) {
-            return a.durationMinutes.compareTo(b.durationMinutes);
-          }
-          return a.recommended ? -1 : 1;
-      }
-    });
-
-    return routes;
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
   }
 
-  int _crowdRank(String level) {
-    switch (level.toLowerCase()) {
-      case 'low':
-        return 0;
-      case 'medium':
-        return 1;
-      default:
-        return 2;
+  Future<void> _loadInitialData() async {
+    try {
+      final fetchedBuses = await _firestoreService.getBuses();
+      final fetchedStations = await _firestoreService.getStations();
+      final fetchedRoutes = await _firestoreService.getRoutes();
+
+      final buses = fetchedBuses.isNotEmpty ? fetchedBuses : SeedData.sampleBuses;
+      final stationsList = fetchedStations.isNotEmpty
+          ? fetchedStations
+          : SeedData.colomboStations;
+      final routesList = fetchedRoutes.isNotEmpty
+          ? fetchedRoutes
+          : SeedData.sampleRoutes;
+
+      final stationsMap = {for (final s in stationsList) s.id: s};
+      final routesMap = {for (final r in routesList) r.id: r};
+
+      if (mounted) {
+        setState(() {
+          _allBuses = buses;
+          _stationsMap = stationsMap;
+          _routesMap = routesMap;
+          _isLoadingData = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _allBuses = SeedData.sampleBuses;
+          _stationsMap = {for (final s in SeedData.colomboStations) s.id: s};
+          _routesMap = {for (final r in SeedData.sampleRoutes) r.id: r};
+          _isLoadingData = false;
+        });
+      }
     }
   }
 
@@ -277,44 +167,183 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
           origin: widget.origin,
           destination: widget.destination,
           route: route,
+          bus: route.rawBus,
+          statusResult: route.statusResult,
         ),
       ),
     );
   }
 
-  /// Computes the match score for a single route against the current query.
-  int _matchScore(RouteResultItem r) {
-    final queryDest = widget.destination.trim().toLowerCase();
-    final queryOrig = widget.origin.trim().toLowerCase();
+  int _statusRank(AccessibilityStatus status) {
+    switch (status) {
+      case AccessibilityStatus.accessible:
+        return 0; // Safe first
+      case AccessibilityStatus.partial:
+        return 1; // Warning second
+      case AccessibilityStatus.notAccessible:
+        return 2; // Not accessible third
+    }
+  }
 
-    bool servedBy(RouteResultItem r, String term) {
-      if (term.isEmpty ||
-          term == 'current location' ||
-          term == 'destination') {
-        return false;
-      }
-      if (r.origin.toLowerCase().contains(term) ||
-          r.destination.toLowerCase().contains(term) ||
-          r.title.toLowerCase().contains(term)) {
-        return true;
-      }
-      return r.intermediateStops
-          .any((stop) => stop.contains(term) || term.contains(stop));
+  int _crowdRank(String level) {
+    switch (level.toLowerCase()) {
+      case 'low':
+        return 0;
+      case 'medium':
+        return 1;
+      default:
+        return 2;
+    }
+  }
+
+  List<RouteResultItem> _buildAndSortRouteItems(
+    List<Report> activeReports, {
+    List<Bus>? buses,
+  }) {
+    final busesToMatch = (buses != null && buses.isNotEmpty) ? buses : _allBuses;
+
+    // 1. Direct bus matching (AC-72)
+    var matchedBuses = BusMatcher.findDirectBuses(
+      busesToMatch,
+      widget.fromStationId,
+      widget.toStationId,
+    );
+
+    // 2. Filter by user's accessibility requirements
+    if (widget.wheelchairAccessRequired) {
+      matchedBuses = matchedBuses.where((bus) => bus.wheelchairAccessible).toList();
+    }
+    if (widget.stepFreeOnly) {
+      matchedBuses = matchedBuses.where((bus) => bus.lowFloor).toList();
     }
 
-    final origMatch = servedBy(r, queryOrig);
-    final destMatch = servedBy(r, queryDest);
-    if (origMatch && destMatch) return 2;
-    if (origMatch || destMatch) return 1;
-    return 0;
+    final now = DateTime.now();
+    final todayBase = DateTime(now.year, now.month, now.day);
+
+    // 3. Compute status & reasons (AC-74)
+    final List<RouteResultItem> items = matchedBuses.map((bus) {
+      final statusResult = StatusLogic.getBusStatus(
+        bus,
+        activeReports,
+        stationsMap: _stationsMap,
+      );
+
+      final routeObj = _routesMap[bus.routeId] ??
+          _routesMap.values.cast<BusRoute?>().firstWhere(
+                (r) => r?.routeNo == bus.routeNo,
+                orElse: () => null,
+              );
+
+      final routeName = routeObj?.routeName ?? 'Route ${bus.routeNo}';
+      final displayBusNo = bus.displayBusNo;
+
+      // Determine scheduled departure at the passenger's boarding station
+      final fromIdx = bus.stops.indexWhere((s) =>
+          s.toLowerCase() == widget.fromStationId.toLowerCase() ||
+          (_stationsMap[s]?.name.toLowerCase() == widget.fromStationId.toLowerCase()) ||
+          (_stationsMap[s]?.name.toLowerCase() == widget.origin.toLowerCase()));
+      final targetIdx = fromIdx != -1 ? fromIdx : 0;
+      final stopTimeStr = bus.getScheduledTimeForStop(targetIdx);
+
+      var nextDepDateTime = TimeUtils.parseTimeStringToDateTime(stopTimeStr, todayBase);
+      bool isTomorrow = false;
+      if (nextDepDateTime.isBefore(now.subtract(const Duration(minutes: 10)))) {
+        nextDepDateTime = nextDepDateTime.add(const Duration(days: 1));
+        isTomorrow = true;
+      }
+
+      final diffMins = nextDepDateTime.difference(now).inMinutes;
+
+      final String scheduledDepartureDisplay;
+      final String etaLabelDisplay;
+      if (isTomorrow) {
+        scheduledDepartureDisplay = 'Tomorrow, $stopTimeStr';
+        etaLabelDisplay = 'Tomorrow at $stopTimeStr';
+      } else {
+        if (diffMins <= 1 && diffMins >= 0) {
+          scheduledDepartureDisplay = '$stopTimeStr (Now)';
+          etaLabelDisplay = 'Arriving now • $stopTimeStr';
+        } else if (diffMins < 60) {
+          scheduledDepartureDisplay = '$stopTimeStr (in ${diffMins}m)';
+          etaLabelDisplay = 'Departs in $diffMins mins • Today, $stopTimeStr';
+        } else {
+          scheduledDepartureDisplay = 'Today, $stopTimeStr';
+          etaLabelDisplay = 'Today at $stopTimeStr';
+        }
+      }
+
+      final summaryText = statusResult.reasons.isNotEmpty
+          ? statusResult.reasons.first
+          : (bus.wheelchairAccessible
+              ? 'Wheelchair Ramp Ready · Step-free entry'
+              : (bus.hasRamp
+                  ? 'Ramp equipped · Check operator assistance'
+                  : 'Standard bus service'));
+
+      String crowdLabel = 'Low';
+      if (bus.occupancy.toLowerCase() == 'medium') crowdLabel = 'Medium';
+      if (bus.occupancy.toLowerCase() == 'high') crowdLabel = 'High';
+
+      final fromName = _stationsMap[widget.fromStationId]?.name ?? widget.origin;
+      final toName = _stationsMap[widget.toStationId]?.name ?? widget.destination;
+
+      return RouteResultItem(
+        id: bus.id,
+        title: 'Route ${bus.routeNo} • $displayBusNo',
+        busNo: displayBusNo,
+        routeNo: bus.routeNo,
+        routeName: routeName,
+        scheduledDeparture: scheduledDepartureDisplay,
+        durationMinutes: (bus.stops.length * 6).clamp(10, 120),
+        etaLabel: etaLabelDisplay,
+        transfers: 0,
+        crowdLevel: crowdLabel,
+        accessibilityStatus: statusResult.status,
+        accessibilityLabel: statusResult.statusLabel,
+        safetyLabel: bus.wheelchairAccessible
+            ? 'Wheelchair Accessible Bus'
+            : (bus.hasRamp ? 'Standard Ramp Bus' : 'Standard Bus'),
+        summary: '$routeName · $summaryText',
+        busId: bus.id,
+        origin: fromName,
+        destination: toName,
+        intermediateStops: bus.stops,
+        recommended: statusResult.status == AccessibilityStatus.accessible && bus.wheelchairAccessible,
+        rawBus: bus,
+        statusResult: statusResult,
+        nextDepartureDateTime: nextDepDateTime,
+      );
+    }).toList();
+
+    // 4. Sort: Next upcoming departure in next 24 hours first (or user selected sort)
+    items.sort((a, b) {
+      if (_sortBy == 'Fastest') {
+        return a.durationMinutes.compareTo(b.durationMinutes);
+      }
+      if (_sortBy == 'Least crowded') {
+        return _crowdRank(a.crowdLevel).compareTo(_crowdRank(b.crowdLevel));
+      }
+
+      // 'Best' / Default: Earliest upcoming bus first within next 24 hours!
+      final timeA = a.nextDepartureDateTime ?? DateTime.now();
+      final timeB = b.nextDepartureDateTime ?? DateTime.now();
+      final timeComp = timeA.compareTo(timeB);
+      if (timeComp != 0) {
+        return timeComp;
+      }
+
+      // Secondary sort: Accessibility status rank (Safe first, then Warning)
+      final rankA = _statusRank(a.accessibilityStatus);
+      final rankB = _statusRank(b.accessibilityStatus);
+      return rankA.compareTo(rankB);
+    });
+
+    return items;
   }
 
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
-    final routes = _sortedRoutes;
-    final matchedCount = routes.where((r) => _matchScore(r) == 2).length;
-    final hasPartials = routes.any((r) => _matchScore(r) == 1);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -325,91 +354,87 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
             onFilter: () => _showComingSoon('Filters'),
           ),
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, isDesktop ? 24 : 112),
-              children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 768),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _TripSummaryCard(
-                          origin: widget.origin,
-                          destination: widget.destination,
-                          matchedCount: matchedCount,
-                          totalCount: routes.length,
+            child: _isLoadingData
+                ? const Center(child: CircularProgressIndicator())
+                : StreamBuilder<List<Bus>>(
+                    stream: _firestoreService.streamBuses(),
+                    builder: (context, busSnapshot) {
+                      final buses = busSnapshot.data ?? _allBuses;
+
+                      return StreamBuilder<List<Report>>(
+                        stream: _firestoreService.streamReports(),
+                        builder: (context, snapshot) {
+                          final reports =
+                              snapshot.data ?? SeedData.getSampleReports();
+                          final routes = _buildAndSortRouteItems(
+                            reports,
+                            buses: buses,
+                          );
+
+                          return ListView(
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          16,
+                          16,
+                          isDesktop ? 24 : 112,
                         ),
-                        const SizedBox(height: 16),
-                        _SortChips(
-                          selected: _sortBy,
-                          onSelected: (value) =>
-                              setState(() => _sortBy = value),
-                        ),
-                        const SizedBox(height: 16),
-                        // ── Fully-matching routes ───────────────────────────
-                        if (matchedCount > 0) ...[
-                          _SectionLabel(
-                            label:
-                                'Serving your route ($matchedCount)',
-                            icon: Icons.check_circle_outline,
-                            color: AppColors.secondary,
-                          ),
-                          const SizedBox(height: 8),
-                          ...routes
-                              .where((r) => _matchScore(r) == 2)
-                              .map(
-                                (route) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _RouteCard(
-                                    route: route,
-                                    onTap: () => _onSelectRoute(route),
+                        children: [
+                          Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 768),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _TripSummaryCard(
+                                    origin: widget.origin,
+                                    destination: widget.destination,
+                                    matchedCount: routes.length,
+                                    totalCount: routes.length,
+                                    selectedDate: widget.selectedDate,
+                                    wheelchairRequired: widget.wheelchairAccessRequired,
+                                    stepFreeOnly: widget.stepFreeOnly,
                                   ),
-                                ),
-                              ),
-                        ],
-                        // ── Other available routes ──────────────────────────
-                        if (hasPartials) ...[
-                          const SizedBox(height: 4),
-                          _SectionLabel(
-                            label: 'Other available routes',
-                            icon: Icons.directions_bus_outlined,
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                          const SizedBox(height: 8),
-                          ...routes
-                              .where((r) => _matchScore(r) < 2)
-                              .map(
-                                (route) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _RouteCard(
-                                    route: route,
-                                    onTap: () => _onSelectRoute(route),
-                                    dimmed: true,
+                                  const SizedBox(height: 16),
+                                  _SortChips(
+                                    selected: _sortBy,
+                                    onSelected: (value) =>
+                                        setState(() => _sortBy = value),
                                   ),
-                                ),
-                              ),
-                        ],
-                        // ── Fallback: no queries at all ─────────────────────
-                        if (matchedCount == 0 && !hasPartials)
-                          ...routes.map(
-                            (route) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _RouteCard(
-                                route: route,
-                                onTap: () => _onSelectRoute(route),
+                                  const SizedBox(height: 16),
+
+                                  if (routes.isEmpty) ...[
+                                    _buildEmptyState(),
+                                  ] else ...[
+                                    _SectionLabel(
+                                      label:
+                                          'Direct Routes Found (${routes.length})',
+                                      icon: Icons.check_circle_outline,
+                                      color: AppColors.secondary,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ...routes.map(
+                                      (route) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 12),
+                                        child: _RouteCard(
+                                          route: route,
+                                          onTap: () => _onSelectRoute(route),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
       ),
+    ],
+  ),
       bottomNavigationBar: isDesktop
           ? null
           : _ResultsBottomNav(
@@ -422,6 +447,52 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                 );
               },
             ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    final isFiltered = widget.wheelchairAccessRequired || widget.stepFreeOnly;
+    final emptyTitle = isFiltered
+        ? 'No Accessible Buses Found'
+        : 'No Direct Buses Found';
+    final emptyDesc = isFiltered
+        ? 'No buses matching your active accessibility criteria (e.g. wheelchair ramp) were found connecting ${widget.origin} to ${widget.destination}. Try loosening your filters or selecting a different departure time.'
+        : 'There are currently no direct bus routes connecting ${widget.origin} to ${widget.destination}.';
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: AppColors.surfaceContainerLowest,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          children: [
+            Icon(
+              isFiltered ? Icons.accessible_forward : Icons.directions_bus_outlined,
+              size: 56,
+              color: AppColors.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              emptyTitle,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              emptyDesc,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -484,18 +555,26 @@ class _TripSummaryCard extends StatelessWidget {
     required this.destination,
     required this.matchedCount,
     required this.totalCount,
+    this.selectedDate,
+    this.wheelchairRequired = false,
+    this.stepFreeOnly = false,
   });
 
   final String origin;
   final String destination;
   final int matchedCount;
   final int totalCount;
+  final DateTime? selectedDate;
+  final bool wheelchairRequired;
+  final bool stepFreeOnly;
 
   @override
   Widget build(BuildContext context) {
     final summaryText = matchedCount > 0
-        ? '$matchedCount route${matchedCount == 1 ? '' : 's'} serve your journey · Depart now'
-        : 'No exact matches — showing all $totalCount routes';
+        ? '$matchedCount bus${matchedCount == 1 ? '' : 'es'} matching your criteria'
+        : 'No matching buses found';
+
+    final dateStr = TimeUtils.formatDateString(selectedDate ?? DateTime.now());
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -514,6 +593,82 @@ class _TripSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryContainer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.calendar_today, size: 14, color: AppColors.onSecondaryContainer),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Date: $dateStr',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.onSecondaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (wheelchairRequired)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.primaryContainer.withValues(alpha: 0.3)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.accessible, size: 14, color: AppColors.primary),
+                      SizedBox(width: 6),
+                      Text(
+                        'Wheelchair Access Required',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (stepFreeOnly)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.tertiary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.stairs, size: 14, color: AppColors.tertiary),
+                      SizedBox(width: 6),
+                      Text(
+                        'Step-Free Only',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.tertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               const Icon(
@@ -666,8 +821,7 @@ class _RouteCard extends StatelessWidget {
   const _RouteCard({
     required this.route,
     required this.onTap,
-    this.dimmed = false,
-  });
+  }) : dimmed = false;
 
   final RouteResultItem route;
   final VoidCallback onTap;
@@ -702,6 +856,70 @@ class _RouteCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 1. Route Number & Bus Plate Number Pills
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryContainer,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Route ${route.routeNo ?? route.rawBus?.routeNo ?? ""}',
+                      style: const TextStyle(
+                        color: AppColors.onPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.directions_bus, size: 14, color: AppColors.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text(
+                          route.busNo ?? route.rawBus?.displayBusNo ?? route.busId,
+                          style: const TextStyle(
+                            color: AppColors.onSurface,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (route.recommended) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondaryContainer,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'Recommended',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onSecondaryContainer,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // 2. Title & Departure Time Row
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -709,33 +927,11 @@ class _RouteCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (route.recommended) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.secondaryContainer,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: const Text(
-                              'Recommended',
-                              style: TextStyle(
-                                fontSize: 12,
-                                height: 16 / 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.onSecondaryContainer,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
                         Text(
-                          route.title,
+                          route.routeName ?? route.title,
                           style: const TextStyle(
-                            fontSize: 18,
-                            height: 24 / 18,
+                            fontSize: 17,
+                            height: 22 / 17,
                             fontWeight: FontWeight.w700,
                             color: AppColors.onSurface,
                           ),
@@ -744,8 +940,8 @@ class _RouteCard extends StatelessWidget {
                         Text(
                           route.summary,
                           style: const TextStyle(
-                            fontSize: 14,
-                            height: 20 / 14,
+                            fontSize: 13,
+                            height: 18 / 13,
                             color: AppColors.onSurfaceVariant,
                           ),
                         ),
@@ -756,20 +952,25 @@ class _RouteCard extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        '${route.durationMinutes} min',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          height: 28 / 22,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.schedule, size: 16, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            route.scheduledDeparture ?? '${route.durationMinutes} min',
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
                       ),
                       Text(
-                        route.etaLabel,
+                        '~${route.durationMinutes} min trip',
                         style: const TextStyle(
                           fontSize: 12,
-                          height: 16 / 12,
                           color: AppColors.onSurfaceVariant,
                         ),
                       ),
@@ -777,51 +978,47 @@ class _RouteCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
+
+              // 3. Accessibility & Telemetry Badges
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _LiveTrackingBadge(busId: route.busId),
-                  _InfoChip(
-                    icon: Icons.transfer_within_a_station,
-                    label: route.transfers == 0
-                        ? 'Direct'
-                        : '${route.transfers} transfer',
-                  ),
-                  _InfoChip(
-                    icon: Icons.groups_outlined,
-                    label: 'Crowd: ${route.crowdLevel}',
-                  ),
+                  if (route.rawBus?.wheelchairAccessible == true)
+                    const _InfoChip(
+                      icon: Icons.accessible,
+                      label: 'Wheelchair Ready',
+                    ),
+                  if (route.rawBus?.lowFloor == true)
+                    const _InfoChip(
+                      icon: Icons.stairs,
+                      label: 'Low-Floor Entry',
+                    ),
                   _AccessibilityChip(
                     status: route.accessibilityStatus,
                     label: route.accessibilityLabel,
                   ),
                   _InfoChip(
-                    icon: Icons.shield_outlined,
-                    label: route.safetyLabel,
+                    icon: Icons.groups_outlined,
+                    label: 'Crowd: ${route.crowdLevel}',
                   ),
+                  _LiveTripBadge(busId: route.busId),
+                  _LiveTrackingBadge(busId: route.busId),
                 ],
               ),
               const SizedBox(height: 12),
+
+              // 4. Action Button
               Row(
                 children: [
                   const Spacer(),
-                  TextButton(
+                  FilledButton.tonalIcon(
                     onPressed: onTap,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primaryContainer,
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'View details',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        SizedBox(width: 4),
-                        Icon(Icons.arrow_forward, size: 18),
-                      ],
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: const Text(
+                      'Select Bus',
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
@@ -1078,3 +1275,50 @@ class _LiveTrackingBadge extends StatelessWidget {
     );
   }
 }
+
+class _LiveTripBadge extends StatelessWidget {
+  const _LiveTripBadge({required this.busId});
+
+  final String busId;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<TripModel?>(
+      stream: TripService().watchActiveTripForBus(busId),
+      builder: (context, snapshot) {
+        final trip = snapshot.data;
+        if (trip == null || !trip.isInProgress) return const SizedBox.shrink();
+
+        final depTime = trip.actualDepartureTime ?? trip.createdAt;
+        final elapsedMinutes = DateTime.now().difference(depTime).inMinutes.clamp(0, 999);
+        final label = elapsedMinutes == 0 ? 'Departed just now' : 'Departed $elapsedMinutes min ago';
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.green.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.green.shade600, width: 1),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.directions_bus_filled, size: 16, color: Colors.green.shade700),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 16 / 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade800,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+

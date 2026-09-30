@@ -21,10 +21,13 @@ class BusLocationModel {
     DateTime? lastUpdated,
     BusStatus? status,
     this.nextStop = 'Central Station',
+    this.currentStopIndex = 0,
     this.etaMinutes = 2,
     this.rampOperational = true,
     this.elevatorWorking = true,
     this.occupancyLevel = 'Moderate',
+    this.delayReason,
+    this.addedDelayMinutes = 0,
     bool? isBroadcasting,
   })  : routeId = routeId ?? routeNumber ?? '',
         routeNumber = routeNumber ?? routeId ?? '',
@@ -51,10 +54,13 @@ class BusLocationModel {
   final BusStatus status;
 
   final String nextStop;
+  final int currentStopIndex;
   final int etaMinutes;
   final bool rampOperational;
   final bool elevatorWorking;
   final String occupancyLevel;
+  final String? delayReason;
+  final int addedDelayMinutes;
   final bool isBroadcasting;
 
   /// Alias for [driverId] to maintain operator terminology compatibility.
@@ -119,6 +125,8 @@ class BusLocationModel {
       nextStop:
           map[FirestoreConstants.fieldNextStop]?.toString() ??
           'Central Station',
+      currentStopIndex:
+          (map[FirestoreConstants.fieldCurrentStopIndex] as num?)?.toInt() ?? 0,
       etaMinutes:
           (map[FirestoreConstants.fieldEtaMinutes] as num?)?.toInt() ?? 2,
       rampOperational:
@@ -127,6 +135,9 @@ class BusLocationModel {
           map[FirestoreConstants.fieldElevatorWorking] as bool? ?? true,
       occupancyLevel:
           map[FirestoreConstants.fieldOccupancyLevel]?.toString() ?? 'Moderate',
+      delayReason: map[FirestoreConstants.fieldDelayReason]?.toString(),
+      addedDelayMinutes:
+          (map[FirestoreConstants.fieldAddedDelayMinutes] as num?)?.toInt() ?? 0,
       isBroadcasting: rawBroadcasting ?? (parsedStatus != BusStatus.offline),
     );
   }
@@ -162,10 +173,13 @@ class BusLocationModel {
       FirestoreConstants.fieldStatus: status.value,
       FirestoreConstants.fieldTimestamp: tsValue,
       FirestoreConstants.fieldNextStop: nextStop,
+      FirestoreConstants.fieldCurrentStopIndex: currentStopIndex,
       FirestoreConstants.fieldEtaMinutes: etaMinutes,
       FirestoreConstants.fieldRampOperational: rampOperational,
       FirestoreConstants.fieldElevatorWorking: elevatorWorking,
       FirestoreConstants.fieldOccupancyLevel: occupancyLevel,
+      FirestoreConstants.fieldDelayReason: delayReason,
+      FirestoreConstants.fieldAddedDelayMinutes: addedDelayMinutes,
       FirestoreConstants.fieldIsBroadcasting: isBroadcasting,
       FirestoreConstants.fieldLastUpdated: tsValue,
     };
@@ -192,10 +206,14 @@ class BusLocationModel {
     DateTime? lastUpdated,
     BusStatus? status,
     String? nextStop,
+    int? currentStopIndex,
     int? etaMinutes,
     bool? rampOperational,
     bool? elevatorWorking,
     String? occupancyLevel,
+    String? delayReason,
+    int? addedDelayMinutes,
+    bool clearDelay = false,
     bool? isBroadcasting,
   }) {
     return BusLocationModel(
@@ -212,10 +230,13 @@ class BusLocationModel {
       timestamp: timestamp ?? lastUpdated ?? this.timestamp,
       status: status ?? this.status,
       nextStop: nextStop ?? this.nextStop,
+      currentStopIndex: currentStopIndex ?? this.currentStopIndex,
       etaMinutes: etaMinutes ?? this.etaMinutes,
       rampOperational: rampOperational ?? this.rampOperational,
       elevatorWorking: elevatorWorking ?? this.elevatorWorking,
       occupancyLevel: occupancyLevel ?? this.occupancyLevel,
+      delayReason: clearDelay ? null : (delayReason ?? this.delayReason),
+      addedDelayMinutes: clearDelay ? 0 : (addedDelayMinutes ?? this.addedDelayMinutes),
       isBroadcasting: isBroadcasting ?? this.isBroadcasting,
     );
   }

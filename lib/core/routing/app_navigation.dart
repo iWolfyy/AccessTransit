@@ -1,10 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/user_model.dart';
 import '../../screens/community/community_screen.dart';
 import '../../screens/journey/journey_search_screen.dart';
-import '../../screens/journey/live_journey_screen.dart';
 import '../../screens/profile/profile_screen.dart';
 
 /// Shared navigation helpers for AccessTransit screens.
@@ -21,15 +19,9 @@ abstract final class AppNavigation {
     );
   }
 
-  /// Opens Live Journey, passing the current user's UID so the screen can
-  /// resolve the active journey from Firestore.
+  /// Opens Journey Search Plan (replacing former Live Journey).
   static Future<void> openLive(BuildContext context, {String? passengerId}) {
-    final uid = passengerId ?? FirebaseAuth.instance.currentUser?.uid ?? '';
-    return Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => LiveJourneyScreen(passengerId: uid),
-      ),
-    );
+    return openPlan(context);
   }
 
   /// Opens the Community hub.
