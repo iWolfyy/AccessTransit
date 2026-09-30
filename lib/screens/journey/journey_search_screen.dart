@@ -25,6 +25,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   Station? _selectedFromStation;
   Station? _selectedToStation;
   DateTime _selectedDate = DateTime.now();
+  TimeOfDay? _selectedTime;
   bool _isLoadingStations = true;
 
   bool _wheelchairAccess = true;
@@ -132,6 +133,16 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
     }
   }
 
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime ?? TimeOfDay.now(),
+    );
+    if (picked != null) {
+      setState(() => _selectedTime = picked);
+    }
+  }
+
   void _searchRoutes() {
     if (_selectedFromStation == null || _selectedToStation == null) {
       ScaffoldMessenger.of(context)
@@ -162,6 +173,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
           origin: _selectedFromStation!.name,
           destination: _selectedToStation!.name,
           selectedDate: _selectedDate,
+          wheelchairAccessRequired: _wheelchairAccess,
+          stepFreeOnly: _stepFreeOnly,
+          minimizeWalking: _minimizeWalking,
         ),
       ),
     );
@@ -218,7 +232,8 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                         ),
                         const SizedBox(height: 16),
                         _DepartNowCard(
-                          onChange: () => _showComingSoon('Change departure time'),
+                          selectedTime: _selectedTime,
+                          onChange: _pickTime,
                         ),
                         const SizedBox(height: 24),
                         _AccessibilityFiltersSection(
@@ -683,12 +698,20 @@ class _StationSearchModalState extends State<_StationSearchModal> {
 }
 
 class _DepartNowCard extends StatelessWidget {
-  const _DepartNowCard({required this.onChange});
+  const _DepartNowCard({
+    required this.onChange,
+    this.selectedTime,
+  });
 
   final VoidCallback onChange;
+  final TimeOfDay? selectedTime;
 
   @override
   Widget build(BuildContext context) {
+    final label = selectedTime != null
+        ? 'Depart at ${selectedTime!.format(context)}'
+        : 'Depart Now';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -707,10 +730,10 @@ class _DepartNowCard extends StatelessWidget {
         children: [
           const Icon(Icons.schedule, color: AppColors.onSurfaceVariant),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Depart Now',
-              style: TextStyle(
+              label,
+              style: const TextStyle(
                 fontSize: 16,
                 height: 24 / 16,
                 fontWeight: FontWeight.w600,
@@ -724,9 +747,9 @@ class _DepartNowCard extends StatelessWidget {
               foregroundColor: AppColors.primaryContainer,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             ),
-            child: const Text(
-              'Change',
-              style: TextStyle(
+            child: Text(
+              selectedTime != null ? 'Change' : 'Set Time',
+              style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),

@@ -70,6 +70,9 @@ class RouteResultsScreen extends StatefulWidget {
     this.origin = 'Colombo Fort Station',
     this.destination = 'Kottawa Highway Bus Station',
     this.selectedDate,
+    this.wheelchairAccessRequired = false,
+    this.stepFreeOnly = false,
+    this.minimizeWalking = false,
   });
 
   final String fromStationId;
@@ -77,6 +80,9 @@ class RouteResultsScreen extends StatefulWidget {
   final String origin;
   final String destination;
   final DateTime? selectedDate;
+  final bool wheelchairAccessRequired;
+  final bool stepFreeOnly;
+  final bool minimizeWalking;
 
   @override
   State<RouteResultsScreen> createState() => _RouteResultsScreenState();
