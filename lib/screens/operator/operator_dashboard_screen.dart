@@ -146,7 +146,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
     final depTime = TimeUtils.parseTimeStringToDateTime(depStr, today);
 
     // Compute last-stop arrival time from scheduleTimes
-    final lastStopStr = bus.getScheduledTimeForStop(bus.stops.length - 1);
+    final lastIndex = bus.stops.isNotEmpty ? bus.stops.length - 1 : 0;
+    final lastStopStr = bus.getScheduledTimeForStop(lastIndex);
     final lastStopTime = TimeUtils.parseTimeStringToDateTime(lastStopStr, today);
 
     final minsToDep = depTime.difference(now).inMinutes;
@@ -1182,17 +1183,18 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                20,
-                20,
-                MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  20,
+                  20,
+                  MediaQuery.of(context).viewInsets.bottom + 24,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   Row(
                     children: [
                       Container(
@@ -1341,12 +1343,13 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   ),
                 ],
               ),
-            );
-          },
-        );
-      },
-    );
-  }
+            ),
+          );
+        },
+      );
+    },
+  );
+}
 
   /// Builds a pre-trip punctuality badge and departure timetable check.
   Widget _buildPreTripPunctualityCard() {
@@ -1545,12 +1548,16 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            time,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppColors.onSurface,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              time,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.onSurface,
+              ),
             ),
           ),
           const SizedBox(height: 2),

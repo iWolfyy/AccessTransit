@@ -302,6 +302,7 @@ class LiveBusService {
       _localLocationsFallback[busId] = existing.copyWith(
         status: endStatus,
         isBroadcasting: false,
+        clearDelay: true,
         timestamp: DateTime.now(),
       );
       _localLocationsStreamController.add(_localLocationsFallback);
@@ -313,6 +314,8 @@ class LiveBusService {
         await doc.set({
           FirestoreConstants.fieldStatus: endStatus.value,
           FirestoreConstants.fieldIsBroadcasting: false,
+          FirestoreConstants.fieldDelayReason: FieldValue.delete(),
+          FirestoreConstants.fieldAddedDelayMinutes: 0,
           FirestoreConstants.fieldTimestamp: FieldValue.serverTimestamp(),
           FirestoreConstants.fieldLastUpdated: FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
