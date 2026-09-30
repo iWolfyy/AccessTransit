@@ -152,7 +152,15 @@ class DelayEtaCalculator {
 
     // 3. Compute baseline scheduled arrival time for the target stop
     final scheduledTimeStr = bus.getScheduledTimeForStop(targetIndex);
-    final scheduledArrival = TimeUtils.parseTimeStringToDateTime(scheduledTimeStr, todayBase);
+    DateTime scheduledArrival = TimeUtils.parseTimeStringToDateTime(scheduledTimeStr, todayBase);
+
+    // If driver is offline and today's scheduled departure has already elapsed by > 15 mins,
+    // the next service instance is on the next day (tomorrow)
+    bool isTomorrow = false;
+    if (!isLiveDriver && activeTrip == null && scheduledArrival.isBefore(now.subtract(const Duration(minutes: 15)))) {
+      scheduledArrival = scheduledArrival.add(const Duration(days: 1));
+      isTomorrow = true;
+    }
 
     // 4. Compute estimated arrival time based on live driver telemetry or active trip
     DateTime estimatedArrival;
@@ -193,16 +201,33 @@ class DelayEtaCalculator {
 
     // 5. Calculate delay metrics
     final delayMinutes = tripDelayOffsetMinutes;
-    final delayType = getDelayType(delayMinutes, isLive: isLiveDriver);
-    final delayLabel = formatDelayLabel(delayMinutes, isLive: isLiveDriver);
+    final delayType = isTomorrow
+        ? DelayType.scheduled
+        : getDelayType(delayMinutes, isLive: isLiveDriver);
+    final delayLabel = isTomorrow
+        ? 'Scheduled for tomorrow'
+        : formatDelayLabel(delayMinutes, isLive: isLiveDriver);
 
     // 6. Calculate countdown ETA to target stop
     final countdownMinutes = estimatedArrival.difference(now).inMinutes;
-    final countdownText = formatCountdown(countdownMinutes);
+    final countdownText = formatCountdown(
+      countdownMinutes,
+      isTomorrow: isTomorrow,
+      scheduledTimeStr: scheduledTimeStr,
+    );
+
+    final scheduledArrivalStr = isTomorrow
+        ? 'Tomorrow, $scheduledTimeStr'
+        : scheduledTimeStr;
+    final estimatedArrivalStr = isTomorrow
+        ? 'Tomorrow, ${TimeUtils.formatTimeString(estimatedArrival)}'
+        : TimeUtils.formatTimeString(estimatedArrival);
 
     final liveStatusDescription = isLiveDriver
         ? 'Live GPS tracking active · Telemetry from driver'
-        : 'Timetable schedule · Driver offline';
+        : (isTomorrow
+            ? 'Timetable schedule · Next departure tomorrow'
+            : 'Timetable schedule · Driver offline');
 
     // 7. Build stops timeline progression
     final List<StopEtaInfo> timeline = [];
@@ -211,11 +236,12 @@ class DelayEtaCalculator {
             ? bus.stops.indexWhere((s) => s.toLowerCase() == liveBusLocation.nextStop.toLowerCase())
             : -1);
 
+    final effectiveBase = isTomorrow ? todayBase.add(const Duration(days: 1)) : todayBase;
     for (int i = 0; i < bus.stops.length; i++) {
       final stopId = bus.stops[i];
       final stopName = stationsMap?[stopId]?.name ?? stopId;
       final stopScheduledStr = bus.getScheduledTimeForStop(i);
-      final stopScheduledTime = TimeUtils.parseTimeStringToDateTime(stopScheduledStr, todayBase);
+      final stopScheduledTime = TimeUtils.parseTimeStringToDateTime(stopScheduledStr, effectiveBase);
 
       DateTime stopEstTime;
       if (activeTrip != null && activeTrip.stopTimes.containsKey(stopId)) {
@@ -262,9 +288,9 @@ class DelayEtaCalculator {
       targetStopId: targetStopId,
       targetStopName: targetStopName,
       scheduledArrival: scheduledArrival,
-      scheduledArrivalStr: scheduledTimeStr,
+      scheduledArrivalStr: scheduledArrivalStr,
       estimatedArrival: estimatedArrival,
-      estimatedArrivalStr: TimeUtils.formatTimeString(estimatedArrival),
+      estimatedArrivalStr: estimatedArrivalStr,
       delayMinutes: delayMinutes,
       delayType: delayType,
       delayLabel: delayLabel,
@@ -313,13 +339,49 @@ class DelayEtaCalculator {
   /// Formats countdown string.
   ///
   /// Examples:
-  /// - `<= 0` -> "Arriving now"
-  /// - `1` -> "Arriving in 1 min"
+  /// - `isTomorrow` -> "Tomorrow at 09:00 AM (in 9h 54m)"
+  /// - `0..1` -> "Arriving now"
   /// - `12` -> "Arriving in 12 mins"
-  static String formatCountdown(int countdownMinutes) {
-    if (countdownMinutes <= 0) {
+  /// - `125` -> "Arriving in 2h 5m"
+  /// - `< 0` -> "Departed"
+  static String formatCountdown(
+    int countdownMinutes, {
+    bool isTomorrow = false,
+    String? scheduledTimeStr,
+  }) {
+    if (isTomorrow) {
+      final hours = countdownMinutes ~/ 60;
+      final mins = countdownMinutes % 60;
+      final timeSuffix = scheduledTimeStr != null && scheduledTimeStr.isNotEmpty
+          ? ' at $scheduledTimeStr'
+          : '';
+      if (hours < 24) {
+        if (mins == 0) {
+          return 'Tomorrow$timeSuffix (in ${hours}h)';
+        }
+        return 'Tomorrow$timeSuffix (in ${hours}h ${mins}m)';
+      }
+      return 'Tomorrow$timeSuffix';
+    }
+
+    if (countdownMinutes < -15) {
+      return 'Departed';
+    }
+    if (countdownMinutes < 0) {
+      final absMins = countdownMinutes.abs();
+      return 'Departed $absMins min${absMins == 1 ? '' : 's'} ago';
+    }
+    if (countdownMinutes <= 1) {
       return 'Arriving now';
     }
-    return 'Arriving in $countdownMinutes min${countdownMinutes == 1 ? '' : 's'}';
+    if (countdownMinutes < 60) {
+      return 'Arriving in $countdownMinutes min${countdownMinutes == 1 ? '' : 's'}';
+    }
+    final hours = countdownMinutes ~/ 60;
+    final mins = countdownMinutes % 60;
+    if (mins == 0) {
+      return 'Arriving in $hours hr${hours == 1 ? '' : 's'}';
+    }
+    return 'Arriving in ${hours}h ${mins}m';
   }
 }

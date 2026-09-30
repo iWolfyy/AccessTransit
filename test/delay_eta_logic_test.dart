@@ -243,5 +243,37 @@ void main() {
       // Borella is the passenger target stop
       expect(result.stopsTimeline[2].isTargetStop, isTrue);
     });
+
+    test('Rolls over to tomorrow and displays hours remaining when offline bus timetable has passed for today', () {
+      // Viewing 08:00 AM bus at 11:06 AM today
+      final laterToday = DateTime(2026, 9, 30, 11, 6);
+
+      final result = DelayEtaCalculator.calculateArrivalEta(
+        bus: sampleBus,
+        targetStopIdOrName: 'st_pettah',
+        liveBusLocation: null,
+        activeTrip: null,
+        stationsMap: stationsMap,
+        currentTime: laterToday,
+      );
+
+      // Should be scheduled for tomorrow at 08:00 AM
+      expect(result.scheduledArrivalStr, 'Tomorrow, 08:00 AM');
+      expect(result.estimatedArrivalStr, 'Tomorrow, 08:00 AM');
+      expect(result.delayType, DelayType.scheduled);
+      // 11:06 AM today to 08:00 AM tomorrow = 20h 54m (1254 mins)
+      expect(result.countdownMinutes, 1254);
+      expect(result.countdownText, 'Tomorrow at 08:00 AM (in 20h 54m)');
+    });
+
+    test('formatCountdown outputs Departed for negative minutes and Arriving now only for 0-1 min', () {
+      expect(DelayEtaCalculator.formatCountdown(-30), 'Departed');
+      expect(DelayEtaCalculator.formatCountdown(-5), 'Departed 5 mins ago');
+      expect(DelayEtaCalculator.formatCountdown(0), 'Arriving now');
+      expect(DelayEtaCalculator.formatCountdown(1), 'Arriving now');
+      expect(DelayEtaCalculator.formatCountdown(15), 'Arriving in 15 mins');
+      expect(DelayEtaCalculator.formatCountdown(90), 'Arriving in 1h 30m');
+    });
   });
 }
+

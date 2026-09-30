@@ -43,6 +43,7 @@ class RouteResultItem {
     this.recommended = false,
     this.rawBus,
     this.statusResult,
+    this.nextDepartureDateTime,
   });
 
   final String id;
@@ -66,6 +67,7 @@ class RouteResultItem {
   final bool recommended;
   final Bus? rawBus;
   final BusStatusResult? statusResult;
+  final DateTime? nextDepartureDateTime;
 }
 
 enum AccessibilityStatus { accessible, partial, notAccessible }
@@ -215,6 +217,9 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       matchedBuses = matchedBuses.where((bus) => bus.lowFloor).toList();
     }
 
+    final now = DateTime.now();
+    final todayBase = DateTime(now.year, now.month, now.day);
+
     // 3. Compute status & reasons (AC-74)
     final List<RouteResultItem> items = matchedBuses.map((bus) {
       final statusResult = StatusLogic.getBusStatus(
@@ -231,7 +236,41 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 
       final routeName = routeObj?.routeName ?? 'Route ${bus.routeNo}';
       final displayBusNo = bus.displayBusNo;
-      final departureTime = bus.effectiveDepartureTime;
+
+      // Determine scheduled departure at the passenger's boarding station
+      final fromIdx = bus.stops.indexWhere((s) =>
+          s.toLowerCase() == widget.fromStationId.toLowerCase() ||
+          (_stationsMap[s]?.name.toLowerCase() == widget.fromStationId.toLowerCase()) ||
+          (_stationsMap[s]?.name.toLowerCase() == widget.origin.toLowerCase()));
+      final targetIdx = fromIdx != -1 ? fromIdx : 0;
+      final stopTimeStr = bus.getScheduledTimeForStop(targetIdx);
+
+      var nextDepDateTime = TimeUtils.parseTimeStringToDateTime(stopTimeStr, todayBase);
+      bool isTomorrow = false;
+      if (nextDepDateTime.isBefore(now.subtract(const Duration(minutes: 10)))) {
+        nextDepDateTime = nextDepDateTime.add(const Duration(days: 1));
+        isTomorrow = true;
+      }
+
+      final diffMins = nextDepDateTime.difference(now).inMinutes;
+
+      final String scheduledDepartureDisplay;
+      final String etaLabelDisplay;
+      if (isTomorrow) {
+        scheduledDepartureDisplay = 'Tomorrow, $stopTimeStr';
+        etaLabelDisplay = 'Tomorrow at $stopTimeStr';
+      } else {
+        if (diffMins <= 1 && diffMins >= 0) {
+          scheduledDepartureDisplay = '$stopTimeStr (Now)';
+          etaLabelDisplay = 'Arriving now • $stopTimeStr';
+        } else if (diffMins < 60) {
+          scheduledDepartureDisplay = '$stopTimeStr (in ${diffMins}m)';
+          etaLabelDisplay = 'Departs in $diffMins mins • Today, $stopTimeStr';
+        } else {
+          scheduledDepartureDisplay = 'Today, $stopTimeStr';
+          etaLabelDisplay = 'Today at $stopTimeStr';
+        }
+      }
 
       final summaryText = statusResult.reasons.isNotEmpty
           ? statusResult.reasons.first
@@ -254,9 +293,9 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
         busNo: displayBusNo,
         routeNo: bus.routeNo,
         routeName: routeName,
-        scheduledDeparture: departureTime,
+        scheduledDeparture: scheduledDepartureDisplay,
         durationMinutes: (bus.stops.length * 6).clamp(10, 120),
-        etaLabel: 'Departs at $departureTime',
+        etaLabel: etaLabelDisplay,
         transfers: 0,
         crowdLevel: crowdLabel,
         accessibilityStatus: statusResult.status,
@@ -272,26 +311,31 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
         recommended: statusResult.status == AccessibilityStatus.accessible && bus.wheelchairAccessible,
         rawBus: bus,
         statusResult: statusResult,
+        nextDepartureDateTime: nextDepDateTime,
       );
     }).toList();
 
-    // 4. Sort: Safe first, then Warning, then Not accessible (AC-73)
+    // 4. Sort: Next upcoming departure in next 24 hours first (or user selected sort)
     items.sort((a, b) {
-      final rankA = _statusRank(a.accessibilityStatus);
-      final rankB = _statusRank(b.accessibilityStatus);
-      if (rankA != rankB) {
-        return rankA.compareTo(rankB);
+      if (_sortBy == 'Fastest') {
+        return a.durationMinutes.compareTo(b.durationMinutes);
+      }
+      if (_sortBy == 'Least crowded') {
+        return _crowdRank(a.crowdLevel).compareTo(_crowdRank(b.crowdLevel));
       }
 
-      switch (_sortBy) {
-        case 'Fastest':
-          return a.durationMinutes.compareTo(b.durationMinutes);
-        case 'Least crowded':
-          return _crowdRank(a.crowdLevel).compareTo(_crowdRank(b.crowdLevel));
-        case 'Best':
-        default:
-          return a.durationMinutes.compareTo(b.durationMinutes);
+      // 'Best' / Default: Earliest upcoming bus first within next 24 hours!
+      final timeA = a.nextDepartureDateTime ?? DateTime.now();
+      final timeB = b.nextDepartureDateTime ?? DateTime.now();
+      final timeComp = timeA.compareTo(timeB);
+      if (timeComp != 0) {
+        return timeComp;
       }
+
+      // Secondary sort: Accessibility status rank (Safe first, then Warning)
+      final rankA = _statusRank(a.accessibilityStatus);
+      final rankB = _statusRank(b.accessibilityStatus);
+      return rankA.compareTo(rankB);
     });
 
     return items;
