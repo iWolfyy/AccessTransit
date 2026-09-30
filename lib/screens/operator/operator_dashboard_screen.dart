@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/time_utils.dart';
 import '../../data/seed_data.dart';
+import '../../logic/delay_eta_logic.dart';
 import '../../models/bus_route.dart';
 import '../../models/boarding_request.dart';
 import '../../models/bus.dart';
@@ -783,12 +784,14 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (!isInProgress)
+                if (!isInProgress) ...[
                   const Text(
                     'No active trip run. Tap Start Trip above to record actual departure time and activate the rider per-stop timeline.',
                     style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
-                  )
-                else ...[
+                  ),
+                  const SizedBox(height: 10),
+                  _buildPreTripPunctualityCard(),
+                ] else ...[
                   FutureBuilder<List<Station>>(
                     future: _firestoreService.getStations(),
                     builder: (context, stationsSnapshot) {
@@ -828,7 +831,11 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
+
+                          // --- Step 2: Driver Punctuality & Schedule Comparison Card (Delay Meter) ---
+                          _buildDelayMeterCard(trip, stationsMap),
+
+                          const SizedBox(height: 14),
                           Row(
                             children: [
                               Expanded(
@@ -880,6 +887,455 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         );
       },
     );
+  }
+
+  /// Step 2: Builds the real-time Driver Punctuality & Schedule Comparison Card (Delay Meter).
+  Widget _buildDelayMeterCard(TripModel trip, Map<String, Station> stationsMap) {
+    if (_currentBus == null) return const SizedBox.shrink();
+
+    final hasNextStop = trip.currentStopIndex + 1 < trip.stops.length;
+    final targetStopIndex = hasNextStop ? trip.currentStopIndex + 1 : trip.currentStopIndex;
+    final targetStopId = trip.stops[targetStopIndex];
+    final targetStopName = stationsMap[targetStopId]?.name ?? targetStopId;
+
+    final etaResult = DelayEtaCalculator.calculateArrivalEta(
+      bus: _currentBus!,
+      targetStopIdOrName: targetStopId,
+      activeTrip: trip,
+      stationsMap: stationsMap,
+      currentTime: DateTime.now(),
+    );
+
+    final delayColor = _getDelayColor(etaResult.delayType);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: delayColor.withValues(alpha: 0.35),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Target Stop & Punctuality Badge
+          Row(
+            children: [
+              Icon(Icons.speed_rounded, size: 20, color: delayColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  hasNextStop ? 'Target: $targetStopName' : 'Destination: $targetStopName',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              _buildPunctualityBadge(etaResult.delayType, etaResult.delayMinutes),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Schedule vs Current ETA Comparison Grid
+          Row(
+            children: [
+              Expanded(
+                child: _buildTimeComparisonBox(
+                  label: 'SCHEDULED ARRIVAL',
+                  time: etaResult.scheduledArrivalStr,
+                  subtitle: 'Timetable Target',
+                  icon: Icons.calendar_today_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.compare_arrows_rounded,
+                      size: 20,
+                      color: delayColor,
+                    ),
+                    const SizedBox(height: 2),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: delayColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        _formatVariance(etaResult.delayMinutes),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: delayColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _buildTimeComparisonBox(
+                  label: 'CURRENT ETA',
+                  time: etaResult.estimatedArrivalStr,
+                  subtitle: etaResult.countdownText,
+                  icon: Icons.timelapse_rounded,
+                  color: delayColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Visual Delay Meter Gauge
+          _buildDelayMeterGauge(etaResult.delayMinutes),
+        ],
+      ),
+    );
+  }
+
+  /// Builds a pre-trip punctuality badge and departure timetable check.
+  Widget _buildPreTripPunctualityCard() {
+    if (_currentBus == null) return const SizedBox.shrink();
+
+    final bus = _currentBus!;
+    final depStr = bus.effectiveDepartureTime;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final depTime = TimeUtils.parseTimeStringToDateTime(depStr, today);
+    final minsDiff = depTime.difference(now).inMinutes;
+
+    final String statusBadgeText;
+    final Color badgeColor;
+    final IconData badgeIcon;
+
+    if (minsDiff > 1) {
+      statusBadgeText = 'Departs in $minsDiff mins';
+      badgeColor = Colors.blue.shade700;
+      badgeIcon = Icons.schedule_rounded;
+    } else if (minsDiff >= -1 && minsDiff <= 1) {
+      statusBadgeText = 'On Time (Departs Now)';
+      badgeColor = Colors.green.shade700;
+      badgeIcon = Icons.check_circle_rounded;
+    } else {
+      final lateMins = minsDiff.abs();
+      statusBadgeText = 'Delayed by $lateMins mins';
+      badgeColor = Colors.orange.shade800;
+      badgeIcon = Icons.warning_amber_rounded;
+    }
+
+    final firstStopName = bus.stops.isNotEmpty ? _resolveStopName(bus.stops.first) : 'Origin';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.departure_board_rounded, size: 16, color: badgeColor),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  'Pre-Trip Schedule Check',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: badgeColor.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(badgeIcon, size: 12, color: badgeColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      statusBadgeText,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: badgeColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.access_time, size: 14, color: AppColors.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Scheduled Dep: $depStr ($firstStopName)',
+                  style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds the Punctuality Status Badge (🟢 On Time (±1 min) | 🟠 Delayed by X mins | 🔵 Running Early).
+  Widget _buildPunctualityBadge(DelayType type, int delayMinutes) {
+    final Color bg;
+    final Color fg;
+    final Border border;
+    final IconData icon;
+    final String label;
+
+    switch (type) {
+      case DelayType.onTime:
+        bg = Colors.green.withValues(alpha: 0.15);
+        fg = Colors.green.shade800;
+        border = Border.all(color: Colors.green.shade400);
+        icon = Icons.check_circle_rounded;
+        label = 'On Time (±1 min)';
+        break;
+      case DelayType.delayed:
+        bg = Colors.orange.withValues(alpha: 0.15);
+        fg = Colors.orange.shade900;
+        border = Border.all(color: Colors.orange.shade400);
+        icon = Icons.warning_amber_rounded;
+        label = 'Delayed by $delayMinutes min${delayMinutes == 1 ? '' : 's'}';
+        break;
+      case DelayType.early:
+        final absMins = delayMinutes.abs();
+        bg = Colors.blue.withValues(alpha: 0.15);
+        fg = Colors.blue.shade800;
+        border = Border.all(color: Colors.blue.shade400);
+        icon = Icons.fast_forward_rounded;
+        label = 'Running Early ($absMins min${absMins == 1 ? '' : 's'})';
+        break;
+      case DelayType.scheduled:
+        bg = AppColors.outlineVariant.withValues(alpha: 0.2);
+        fg = AppColors.onSurfaceVariant;
+        border = Border.all(color: AppColors.outlineVariant);
+        icon = Icons.schedule_rounded;
+        label = 'Scheduled';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: border,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds a metric comparison box displaying scheduled vs ETA times.
+  Widget _buildTimeComparisonBox({
+    required String label,
+    required String time,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 12, color: color),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                    letterSpacing: 0.4,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            time,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.onSurfaceVariant,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Visual horizontal Delay Meter gauge with 3 color-coded zones and a needle pointer.
+  Widget _buildDelayMeterGauge(int delayMinutes) {
+    const minMins = -5.0;
+    const maxMins = 15.0;
+    final clamped = delayMinutes.clamp(minMins.toInt(), maxMins.toInt()).toDouble();
+    final fraction = (clamped - minMins) / (maxMins - minMins);
+
+    final delayColor = _getDelayColor(DelayEtaCalculator.getDelayType(delayMinutes));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Running Early',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue.shade700),
+            ),
+            Text(
+              'On Time Target',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade700),
+            ),
+            Text(
+              'Delayed',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange.shade800),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final trackWidth = constraints.maxWidth;
+            final pointerLeft = (fraction * trackWidth).clamp(8.0, trackWidth - 8.0) - 8.0;
+
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // 3-zone gradient track
+                Container(
+                  height: 10,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(5),
+                    gradient: const LinearGradient(
+                      stops: [0.0, 0.2, 0.35, 0.45, 0.6, 1.0],
+                      colors: [
+                        Colors.blue,
+                        Colors.lightBlueAccent,
+                        Colors.green,
+                        Colors.green,
+                        Colors.orange,
+                        Colors.deepOrange,
+                      ],
+                    ),
+                  ),
+                ),
+                // Current variance pointer marker
+                Positioned(
+                  left: pointerLeft,
+                  top: -4,
+                  child: Container(
+                    width: 16,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: delayColor,
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('-5m', style: TextStyle(fontSize: 9, color: AppColors.onSurfaceVariant.withValues(alpha: 0.7))),
+            Text('0 (On Schedule)', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.green.shade800)),
+            Text('+15m', style: TextStyle(fontSize: 9, color: AppColors.onSurfaceVariant.withValues(alpha: 0.7))),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static Color _getDelayColor(DelayType type) {
+    switch (type) {
+      case DelayType.onTime:
+        return Colors.green.shade700;
+      case DelayType.delayed:
+        return Colors.orange.shade800;
+      case DelayType.early:
+        return Colors.blue.shade700;
+      case DelayType.scheduled:
+        return AppColors.outline;
+    }
+  }
+
+  static String _formatVariance(int delayMinutes) {
+    if (delayMinutes == 0) return '0 min';
+    if (delayMinutes > 0) return '+$delayMinutes min late';
+    return '$delayMinutes min early';
   }
 
   Widget _buildRouteSelectorCard() {
