@@ -10,7 +10,14 @@ import '../../models/journey_model.dart';
 import '../../services/eta_service.dart';
 import '../../services/journey_service.dart';
 import '../../services/live_bus_service.dart';
+import '../../services/trip_service.dart';
+import '../../services/firestore_service.dart';
+import '../../models/trip_model.dart';
+import '../../models/station.dart';
+import '../../data/seed_data.dart';
+import '../../core/utils/time_utils.dart';
 import 'boarding_assistance_screen.dart';
+
 import 'report_condition_screen.dart';
 import 'route_results_screen.dart';
 
@@ -180,6 +187,8 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                             speed: liveBus?.speed ?? 0.0,
                             liveBus: liveBus,
                           ),
+                          const SizedBox(height: 24),
+                          _LiveStopTimelineCard(busId: resolvedBusId),
                           const SizedBox(height: 24),
                           _LiveAccessibilitySection(
                             rampOperational: rampWorking,
@@ -1966,3 +1975,192 @@ class _NavItem extends StatelessWidget {
     );
   }
 }
+
+class _LiveStopTimelineCard extends StatelessWidget {
+  const _LiveStopTimelineCard({required this.busId});
+
+  final String busId;
+
+  String _formatTime(DateTime dt) {
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<TripModel?>(
+      stream: TripService().watchActiveTripForBus(busId),
+      builder: (context, snapshot) {
+        final trip = snapshot.data;
+        final isInProgress = trip != null && trip.isInProgress;
+
+        if (!isInProgress) {
+          return const SizedBox.shrink();
+        }
+
+        final stops = trip.stops;
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          color: AppColors.surfaceContainerLowest,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.timeline_rounded, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Live Per-Stop Timeline',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.green.shade600),
+                      ),
+                      child: Text(
+                        'Live Run',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                FutureBuilder<List<Station>>(
+                  future: FirestoreService().getStations(),
+                  builder: (context, stationsSnapshot) {
+                    final stationsList =
+                        stationsSnapshot.data ?? SeedData.colomboStations;
+                    final stationsMap = {
+                      for (final s in stationsList) s.id: s,
+                    };
+
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: stops.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final stopId = stops[index];
+                        final stationName = stationsMap[stopId]?.name ??
+                            stopId
+                                .replaceAll('st_', '')
+                                .replaceAll('_', ' ')
+                                .toUpperCase();
+
+                        final isConfirmedCurrent =
+                            index == trip.currentStopIndex;
+                        final isPassed = index < trip.currentStopIndex;
+                        final timing = trip.stopTimes[stopId];
+
+                        String subtext = '';
+                        if (timing != null) {
+                          if (isPassed && timing.actualArrival != null) {
+                            subtext =
+                                'Reached at ${_formatTime(timing.actualArrival!)}';
+                          } else if (isConfirmedCurrent) {
+                            final timeStr = timing.actualArrival != null
+                                ? _formatTime(timing.actualArrival!)
+                                : _formatTime(timing.estimatedArrival);
+                            subtext = 'Bus is here now (Confirmed $timeStr)';
+                          } else {
+                            final diffMins = timing.estimatedArrival
+                                .difference(DateTime.now())
+                                .inMinutes
+                                .clamp(1, 999);
+                            subtext =
+                                'Est. ${_formatTime(timing.estimatedArrival)} (in about $diffMins min)';
+                          }
+                        }
+
+                        return Row(
+                          children: [
+                            Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isConfirmedCurrent
+                                    ? AppColors.primaryContainer
+                                    : (isPassed
+                                        ? Colors.green
+                                        : AppColors.surfaceContainer),
+                                border: Border.all(
+                                  color: isConfirmedCurrent
+                                      ? AppColors.primary
+                                      : (isPassed
+                                          ? Colors.green
+                                          : AppColors.outlineVariant),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Icon(
+                                isConfirmedCurrent
+                                    ? Icons.directions_bus
+                                    : (isPassed ? Icons.check : Icons.circle),
+                                size: 10,
+                                color: isConfirmedCurrent || isPassed
+                                    ? Colors.white
+                                    : AppColors.outline,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    stationName,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isConfirmedCurrent
+                                          ? FontWeight.bold
+                                          : FontWeight.w600,
+                                      color: AppColors.onSurface,
+                                    ),
+                                  ),
+                                  Text(
+                                    subtext,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isConfirmedCurrent
+                                          ? AppColors.primary
+                                          : AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+

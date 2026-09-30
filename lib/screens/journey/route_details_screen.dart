@@ -6,9 +6,14 @@ import '../../data/seed_data.dart';
 import '../../logic/status_logic.dart';
 import '../../models/bus.dart';
 import '../../models/report.dart';
+import '../../models/station.dart';
+import '../../models/trip_model.dart';
 import '../../services/eta_service.dart';
 import '../../services/firestore_service.dart';
+import '../../services/trip_service.dart';
+import '../../core/utils/time_utils.dart';
 import 'boarding_assistance_screen.dart';
+
 import 'journey_confirmation_screen.dart';
 import 'report_condition_screen.dart';
 import 'route_results_screen.dart';
@@ -119,6 +124,12 @@ class RouteDetailsScreen extends StatelessWidget {
                                               route?.accessibilityStatus) !=
                                           AccessibilityStatus.notAccessible,
                                 ),
+                                const SizedBox(height: 24),
+                                _DepartureAndStopsTimelineCard(
+                                  bus: liveBus,
+                                  busId: effectiveBusId,
+                                ),
+                                const SizedBox(height: 24),
                                 const SizedBox(height: 24),
                                 _AccessibilityStatusNoticeCard(
                                   statusResult: liveStatusResult,
@@ -1124,3 +1135,256 @@ class _NavItem extends StatelessWidget {
     );
   }
 }
+
+class _DepartureAndStopsTimelineCard extends StatelessWidget {
+  const _DepartureAndStopsTimelineCard({
+    required this.bus,
+    required this.busId,
+  });
+
+  final Bus? bus;
+  final String busId;
+
+  String _formatTime(DateTime dt) {
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveStops = bus?.stops.isNotEmpty == true
+        ? bus!.stops
+        : ['st_pettah', 'st_maradana', 'st_borella', 'st_kottawa'];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.onSurface.withValues(alpha: 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: StreamBuilder<TripModel?>(
+        stream: TripService().watchActiveTripForBus(busId),
+        builder: (context, snapshot) {
+          final trip = snapshot.data;
+          final isInProgress = trip != null && trip.isInProgress;
+          final stopsToRender =
+              trip?.stops.isNotEmpty == true ? trip!.stops : effectiveStops;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.departure_board, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Departure & Stops Timeline',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isInProgress
+                          ? Colors.green.withValues(alpha: 0.15)
+                          : AppColors.surfaceContainer,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: isInProgress
+                            ? Colors.green.shade600
+                            : AppColors.outlineVariant,
+                      ),
+                    ),
+                    child: Text(
+                      isInProgress ? 'Trip Active' : 'Not yet departed',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isInProgress
+                            ? Colors.green.shade800
+                            : AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isInProgress && trip.actualDepartureTime != null
+                    ? 'Departed start station at ${_formatTime(trip.actualDepartureTime!)} (${TimeUtils.formatRelativeTime(trip.actualDepartureTime!)})'
+                    : 'Bus has not departed the main stand yet.',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              FutureBuilder<List<Station>>(
+                future: FirestoreService().getStations(),
+                builder: (context, stationsSnapshot) {
+                  final stationsList =
+                      stationsSnapshot.data ?? SeedData.colomboStations;
+                  final stationsMap = {
+                    for (final s in stationsList) s.id: s,
+                  };
+
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: stopsToRender.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final stopId = stopsToRender[index];
+                      final stationName = stationsMap[stopId]?.name ??
+                          stopId
+                              .replaceAll('st_', '')
+                              .replaceAll('_', ' ')
+                              .toUpperCase();
+                      final isConfirmedCurrent =
+                          isInProgress && index == trip.currentStopIndex;
+                      final isPassed =
+                          isInProgress && index < trip.currentStopIndex;
+
+                      final timing = trip?.stopTimes[stopId];
+                      String timeSubtext = '';
+
+                      if (isInProgress && timing != null) {
+                        if (isPassed && timing.actualArrival != null) {
+                          timeSubtext =
+                              'Reached at ${_formatTime(timing.actualArrival!)}';
+                        } else if (isConfirmedCurrent) {
+                          final timeStr = timing.actualArrival != null
+                              ? _formatTime(timing.actualArrival!)
+                              : _formatTime(timing.estimatedArrival);
+                          timeSubtext = 'Confirmed here at $timeStr';
+                        } else {
+                          final diffMins = timing.estimatedArrival
+                              .difference(DateTime.now())
+                              .inMinutes
+                              .clamp(1, 999);
+                          timeSubtext =
+                              'Est. ${_formatTime(timing.estimatedArrival)} (in about $diffMins min)';
+                        }
+                      } else {
+                        timeSubtext = 'Scheduled stop';
+                      }
+
+                      return Row(
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isConfirmedCurrent
+                                  ? AppColors.primaryContainer
+                                  : (isPassed
+                                      ? Colors.green
+                                      : AppColors.surfaceContainer),
+                              border: Border.all(
+                                color: isConfirmedCurrent
+                                    ? AppColors.primary
+                                    : (isPassed
+                                        ? Colors.green
+                                        : AppColors.outlineVariant),
+                                width: 2,
+                              ),
+                            ),
+                            child: Icon(
+                              isConfirmedCurrent
+                                  ? Icons.directions_bus
+                                  : (isPassed ? Icons.check : Icons.circle),
+                              size: 12,
+                              color: isConfirmedCurrent || isPassed
+                                  ? Colors.white
+                                  : AppColors.outline,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        stationName,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: isConfirmedCurrent
+                                              ? FontWeight.bold
+                                              : FontWeight.w600,
+                                          color: AppColors.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isConfirmedCurrent)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryContainer,
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          'Bus is here now',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.onPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  timeSubtext,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isConfirmedCurrent
+                                        ? AppColors.primary
+                                        : AppColors.onSurfaceVariant,
+                                    fontWeight: isConfirmedCurrent
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+

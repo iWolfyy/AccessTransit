@@ -15,7 +15,13 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/live_bus_service.dart';
 import '../../services/location_service.dart';
+import '../../services/trip_service.dart';
+import '../../models/trip_model.dart';
+import '../../models/station.dart';
+import '../../widgets/add_station_dialog.dart';
 import '../auth/login_screen.dart';
+
+
 
 /// Screen for Bus Operators to start/stop trips and broadcast real-time GPS telemetry to Firestore.
 class OperatorDashboardScreen extends StatefulWidget {
@@ -268,6 +274,19 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
 
       await _liveBusService.startOrUpdateLiveLocation(initialBusModel);
 
+      // Create new trip document in trips/{tripId} with actualDepartureTime = now
+      final stops = _currentBus?.stops.isNotEmpty == true
+          ? _currentBus!.stops
+          : ['st_pettah', 'st_maradana', 'st_borella', 'st_kottawa'];
+
+      await TripService().startTrip(
+        busId: _selectedBusId,
+        routeNo: _selectedRouteNumber,
+        stops: stops,
+        driverId: driverId,
+        departureTime: now,
+      );
+
       // 4. Listen to live GPS location stream with background tracking enabled
       await _positionSubscription?.cancel();
       _positionSubscription = _locationService
@@ -302,7 +321,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       });
 
       _showSnack(
-        'Trip Started! Broadcasting live GPS for Bus $_selectedRouteNumber',
+        'Trip Started! Broadcasting live GPS & per-stop timeline for Bus $_selectedRouteNumber',
       );
     } catch (e) {
       if (!mounted) return;
@@ -355,12 +374,13 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
     _tripTimer?.cancel();
     _tripTimer = null;
 
-    // 2. Update Firestore status to completed and turn off broadcasting flag
+    // 2. Update Firestore status to completed
     try {
       await _liveBusService.stopTrip(
         _selectedBusId,
         endStatus: BusStatus.completed,
       );
+      await TripService().completeTrip(_selectedBusId);
     } catch (e) {
       _showSnack('Notice: Updated status to completed ($e)', isError: true);
     }
@@ -463,6 +483,17 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         backgroundColor: AppColors.primaryContainer,
         foregroundColor: AppColors.onPrimary,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.add_location_alt_outlined),
+            tooltip: 'Add Station to Route',
+            onPressed: () {
+              AddStationDialog.show(
+                context,
+                buses: _availableBuses,
+                defaultBusId: _selectedBusId,
+              );
+            },
+          ),
           if (kDebugMode)
             IconButton(
               icon: const Icon(Icons.cloud_upload_outlined),
@@ -502,6 +533,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildTripControlCard(),
+            const SizedBox(height: 16),
+            _buildTripProgressCard(),
             const SizedBox(height: 16),
             _buildRouteSelectorCard(),
             const SizedBox(height: 16),
@@ -611,6 +644,150 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTripProgressCard() {
+    return StreamBuilder<TripModel?>(
+      stream: TripService().watchActiveTripForBus(_selectedBusId),
+      builder: (context, snapshot) {
+        final trip = snapshot.data;
+        final isInProgress = trip != null && trip.isInProgress;
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          color: isInProgress ? AppColors.surfaceContainerLowest : AppColors.surfaceContainerLow,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.timeline, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Trip Route Progress',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isInProgress
+                            ? Colors.green.withValues(alpha: 0.15)
+                            : AppColors.outlineVariant.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        isInProgress ? 'In Progress' : 'No Active Trip',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isInProgress ? Colors.green.shade800 : AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (!isInProgress)
+                  const Text(
+                    'No active trip run. Tap Start Trip above to record actual departure time and activate the rider per-stop timeline.',
+                    style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+                  )
+                else ...[
+                  FutureBuilder<List<Station>>(
+                    future: _firestoreService.getStations(),
+                    builder: (context, stationsSnapshot) {
+                      final stationsList = stationsSnapshot.data ?? SeedData.colomboStations;
+                      final stationsMap = {for (final s in stationsList) s.id: s};
+
+                      final safeIndex = trip.currentStopIndex.clamp(0, trip.stops.length - 1);
+                      final currentStopId = trip.stops[safeIndex];
+                      final currentStopName = stationsMap[currentStopId]?.name ?? currentStopId;
+
+                      final hasNextStop = trip.currentStopIndex + 1 < trip.stops.length;
+                      final nextStopId = hasNextStop ? trip.stops[trip.currentStopIndex + 1] : null;
+                      final nextStopName = nextStopId != null ? (stationsMap[nextStopId]?.name ?? nextStopId) : 'Final Destination Reached';
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Current Position: Stop ${trip.currentStopIndex + 1} of ${trip.stops.length}',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.outline),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            currentStopName,
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(Icons.arrow_forward_rounded, size: 16, color: AppColors.onSurfaceVariant),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Next Stop: $nextStopName',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.onSurface),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 48,
+                                  child: FilledButton.icon(
+                                    onPressed: hasNextStop
+                                        ? () async {
+                                            final updated = await TripService().confirmNextStopArrival(_selectedBusId);
+                                            if (updated != null) {
+                                              _showSnack('Confirmed arrival at ${stationsMap[updated.stops[updated.currentStopIndex]]?.name ?? 'next stop'}!');
+                                            }
+                                          }
+                                        : null,
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: AppColors.primaryContainer,
+                                      foregroundColor: AppColors.onPrimary,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    icon: const Icon(Icons.check_circle_rounded, size: 20),
+                                    label: Text(hasNextStop ? 'Next Stop Reached' : 'Final Stop Reached'),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                height: 48,
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _stopTrip(),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.error,
+                                    side: const BorderSide(color: AppColors.error),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  icon: const Icon(Icons.flag_rounded, size: 18),
+                                  label: const Text('End Trip'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

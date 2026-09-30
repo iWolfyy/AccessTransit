@@ -444,6 +444,53 @@ class FirestoreService {
     await updateBusAccessibility(busId, driverId: driverId);
   }
 
+  /// Adds a new [Station] to Firestore (`stations/{id}`) and inserts its ID
+  /// into an existing [Bus] route's ordered `stops` list at [insertIndex].
+  Future<void> addStationAndInsertIntoBusRoute({
+    required Station newStation,
+    required String busId,
+    required int insertIndex,
+  }) async {
+    // 1. Save new station
+    try {
+      await _stationsRef.doc(newStation.id).set(newStation.toMap(), SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Firestore addStation warning: $e');
+    }
+
+    // 2. Fetch target bus
+    final bus = await getBusById(busId);
+    if (bus == null) return;
+
+    final updatedStops = List<String>.from(bus.stops);
+    if (!updatedStops.contains(newStation.id)) {
+      if (insertIndex < 0 || insertIndex > updatedStops.length) {
+        updatedStops.add(newStation.id);
+      } else {
+        updatedStops.insert(insertIndex, newStation.id);
+      }
+    }
+
+    final updatedBus = bus.copyWith(stops: updatedStops);
+
+    // 3. Update local fallback
+    final idx = _localBusesFallback.indexWhere((b) => b.id == busId);
+    if (idx != -1) {
+      _localBusesFallback[idx] = updatedBus;
+      _localBusesStreamController.add(_localBusesFallback);
+    }
+
+    // 4. Write updated stops to Firestore
+    try {
+      await _busesRef.doc(busId).set({
+        FirestoreConstants.fieldStops: updatedStops,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Firestore updateBusStops warning: $e');
+    }
+  }
+
+
   // --- Sprint 3: Boarding Assistance Requests (AC-86) ---
 
   /// Submits a boarding assistance request to Firestore (`boarding_requests/{id}`) (AC-86).

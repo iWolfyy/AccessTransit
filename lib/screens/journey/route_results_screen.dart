@@ -12,7 +12,11 @@ import '../../models/report.dart';
 import '../../models/station.dart';
 import '../../services/firestore_service.dart';
 import '../../services/live_bus_service.dart';
+import '../../services/trip_service.dart';
+import '../../models/trip_model.dart';
+import '../../core/utils/time_utils.dart';
 import 'route_details_screen.dart';
+
 
 /// Route result item used for passenger route selection.
 class RouteResultItem {
@@ -742,6 +746,7 @@ class _RouteCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  _LiveTripBadge(busId: route.busId),
                   _LiveTrackingBadge(busId: route.busId),
                   _InfoChip(
                     icon: Icons.transfer_within_a_station,
@@ -1038,3 +1043,50 @@ class _LiveTrackingBadge extends StatelessWidget {
     );
   }
 }
+
+class _LiveTripBadge extends StatelessWidget {
+  const _LiveTripBadge({required this.busId});
+
+  final String busId;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<TripModel?>(
+      stream: TripService().watchActiveTripForBus(busId),
+      builder: (context, snapshot) {
+        final trip = snapshot.data;
+        if (trip == null || !trip.isInProgress) return const SizedBox.shrink();
+
+        final depTime = trip.actualDepartureTime ?? trip.createdAt;
+        final elapsedMinutes = DateTime.now().difference(depTime).inMinutes.clamp(0, 999);
+        final label = elapsedMinutes == 0 ? 'Departed just now' : 'Departed $elapsedMinutes min ago';
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.green.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.green.shade600, width: 1),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.directions_bus_filled, size: 16, color: Colors.green.shade700),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 16 / 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade800,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
