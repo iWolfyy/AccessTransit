@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/time_utils.dart';
 import '../../logic/status_logic.dart';
@@ -25,7 +24,6 @@ class CommunityScreen extends StatefulWidget {
 }
 
 class _CommunityScreenState extends State<CommunityScreen> {
-  static const double _desktopBreakpoint = 768;
   static const Color _minorBg = Color(0xFFFFF8E1);
   static const Color _minorFg = Color(0xFFF57F17);
 
@@ -94,18 +92,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  void _onNavTap(String label) {
-    AppNavigation.handleBottomNav(
-      context,
-      label,
-      currentTab: 'Community',
-      onUnsupported: _showSnack,
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
@@ -263,9 +253,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : _CommunityBottomNav(onNavTap: _onNavTap),
+      bottomNavigationBar: null,
     );
   }
 }
@@ -620,109 +608,3 @@ class _BadgeChipWidget extends StatelessWidget {
   }
 }
 
-/// App-standard nav: Home → Plan → Live → Community → Profile.
-class _CommunityBottomNav extends StatelessWidget {
-  const _CommunityBottomNav({required this.onNavTap});
-
-  final ValueChanged<String> onNavTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 8,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_outlined,
-                label: 'Home',
-                onTap: () => onNavTap('Home'),
-              ),
-              _NavItem(
-                icon: Icons.directions_bus_outlined,
-                label: 'Plan',
-                onTap: () => onNavTap('Plan'),
-              ),
-              _NavItem(
-                icon: Icons.sensors,
-                label: 'Live',
-                onTap: () => onNavTap('Live'),
-              ),
-              _NavItem(
-                icon: Icons.group_outlined,
-                label: 'Community',
-                selected: true,
-                onTap: () => onNavTap('Community'),
-              ),
-              _NavItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                onTap: () => onNavTap('Profile'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.selected = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 64,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: selected
-            ? BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                height: 16 / 12,
-                color: selected
-                    ? AppColors.onPrimaryContainer
-                    : AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

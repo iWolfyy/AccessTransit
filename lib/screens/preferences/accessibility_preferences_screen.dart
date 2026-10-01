@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/user_model.dart';
-import '../home/home_screen.dart';
+import '../main_shell.dart';
 
 class AccessibilityPreferencesScreen extends StatefulWidget {
   const AccessibilityPreferencesScreen({
@@ -41,7 +41,7 @@ class _AccessibilityPreferencesScreenState
     if (widget.continueToHome) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => HomeScreen(initialUser: widget.initialUser),
+          builder: (_) => MainShell(initialUser: widget.initialUser),
         ),
       );
       return;
@@ -200,24 +200,11 @@ class _AccessibilityPreferencesScreenState
           ),
         ],
       ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : _BottomNav(
-              onHomeTap: widget.continueToHome
-                  ? () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              HomeScreen(initialUser: widget.initialUser),
-                        ),
-                      );
-                    }
-                  : () => Navigator.of(context).pop(),
-              onProfileTap: _openProfile,
-            ),
+      bottomNavigationBar: null,
     );
   }
 }
+
 
 class _MobileTopBar extends StatelessWidget {
   const _MobileTopBar({required this.onProfile});
@@ -423,121 +410,3 @@ class _PreferenceToggle extends StatelessWidget {
   }
 }
 
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({
-    required this.onHomeTap,
-    this.onProfileTap,
-  });
-
-  final VoidCallback onHomeTap;
-  final VoidCallback? onProfileTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 4,
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            children: [
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.home_outlined,
-                  label: 'Home',
-                  onTap: onHomeTap,
-                ),
-              ),
-              const Expanded(
-                child: _NavItem(
-                  icon: Icons.directions_bus,
-                  label: 'Plan',
-                ),
-              ),
-              const Expanded(
-                child: _NavItem(
-                  icon: Icons.sensors,
-                  label: 'Live',
-                ),
-              ),
-              const Expanded(
-                child: _NavItem(
-                  icon: Icons.group_outlined,
-                  label: 'Community',
-                ),
-              ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.person,
-                  label: 'Profile',
-                  selected: true,
-                  onTap: onProfileTap,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    this.selected = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Padding(
-      padding: selected
-          ? const EdgeInsets.symmetric(horizontal: 12, vertical: 4)
-          : const EdgeInsets.all(8),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: selected
-                ? AppColors.onPrimaryContainer
-                : AppColors.onSurfaceVariant,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              height: 16 / 12,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (selected) {
-      return Center(
-        child: Material(
-          color: AppColors.primaryContainer,
-          borderRadius: BorderRadius.circular(12),
-          child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(12), child: content),
-        ),
-      );
-    }
-
-    return InkWell(onTap: onTap, child: content);
-  }
-}

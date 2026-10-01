@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import 'membership_card_screen.dart';
 
@@ -19,26 +18,14 @@ class RewardsContributionsScreen extends StatelessWidget {
   final int reportsSubmitted;
   final int verifiedSpots;
 
-  static const double _desktopBreakpoint = 768;
-
   void _showSnack(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _onNavTap(BuildContext context, String label) {
-    AppNavigation.handleBottomNav(
-      context,
-      label,
-      onUnsupported: (message) => _showSnack(context, message),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
-
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: Column(
@@ -128,11 +115,7 @@ class RewardsContributionsScreen extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : _RewardsBottomNav(
-              onNavTap: (label) => _onNavTap(context, label),
-            ),
+      bottomNavigationBar: null,
     );
   }
 }
@@ -365,108 +348,3 @@ class _StatTile extends StatelessWidget {
 }
 
 /// App-standard nav: Home → Plan → Live → Community → Profile.
-class _RewardsBottomNav extends StatelessWidget {
-  const _RewardsBottomNav({required this.onNavTap});
-
-  final ValueChanged<String> onNavTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 8,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_outlined,
-                label: 'Home',
-                onTap: () => onNavTap('Home'),
-              ),
-              _NavItem(
-                icon: Icons.directions_bus_outlined,
-                label: 'Plan',
-                onTap: () => onNavTap('Plan'),
-              ),
-              _NavItem(
-                icon: Icons.sensors,
-                label: 'Live',
-                onTap: () => onNavTap('Live'),
-              ),
-              _NavItem(
-                icon: Icons.group_outlined,
-                label: 'Community',
-                onTap: () => onNavTap('Community'),
-              ),
-              _NavItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                selected: true,
-                onTap: () => onNavTap('Profile'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.selected = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 64,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: selected
-            ? BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                height: 16 / 12,
-                color: selected
-                    ? AppColors.onPrimaryContainer
-                    : AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

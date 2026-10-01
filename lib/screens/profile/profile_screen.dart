@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/enums/user_role.dart';
 import '../../models/user_model.dart';
@@ -115,23 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Expanded(child: _buildBody(context)),
         ],
       ),
-      // Keep existing bottom nav unchanged.
-      bottomNavigationBar: _ProfileBottomNav(
-        onHomeTap: widget.onHomeTap ?? () => AppNavigation.goHome(context),
-        onNavTap: (feature) {
-          if (widget.onNavTap != null) {
-            widget.onNavTap!(feature);
-            return;
-          }
-          AppNavigation.handleBottomNav(
-            context,
-            feature,
-            currentTab: 'Profile',
-            profileUser: _user,
-            onUnsupported: (message) => _showComingSoon(context, message),
-          );
-        },
-      ),
+      bottomNavigationBar: null,
     );
   }
 
@@ -951,111 +934,3 @@ class _AccountSection extends StatelessWidget {
   }
 }
 
-class _ProfileBottomNav extends StatelessWidget {
-  const _ProfileBottomNav({
-    required this.onHomeTap,
-    required this.onNavTap,
-  });
-
-  final VoidCallback onHomeTap;
-  final void Function(String feature) onNavTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 8,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_outlined,
-                label: 'Home',
-                onTap: onHomeTap,
-              ),
-              _NavItem(
-                icon: Icons.directions_bus_outlined,
-                label: 'Plan',
-                onTap: () => onNavTap('Plan'),
-              ),
-              _NavItem(
-                icon: Icons.sensors,
-                label: 'Live',
-                onTap: () => onNavTap('Live'),
-              ),
-              _NavItem(
-                icon: Icons.group_outlined,
-                label: 'Community',
-                onTap: () => onNavTap('Community'),
-              ),
-              const _NavItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                selected: true,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    this.selected = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 64,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: selected
-            ? BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                height: 16 / 12,
-                color: selected
-                    ? AppColors.onPrimaryContainer
-                    : AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

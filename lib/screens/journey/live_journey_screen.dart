@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/seed_data.dart';
 import '../../logic/delay_eta_logic.dart';
@@ -390,7 +389,6 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
               if (journeySnapshot.connectionState ==
                   ConnectionState.waiting) {
                 return _LoadingBody(
-                  isDesktop: isDesktop,
                   onClose: () {
                     if (Navigator.of(context).canPop()) {
                       Navigator.of(context).pop();
@@ -398,17 +396,10 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                       Navigator.of(context).popUntil((r) => r.isFirst);
                     }
                   },
-                  onNavTap: (label) => AppNavigation.handleBottomNav(
-                    context,
-                    label,
-                    currentTab: 'Live',
-                    onUnsupported: (m) => _showSnack(context, m),
-                  ),
                 );
               }
 
               return _NoJourneyBody(
-                isDesktop: isDesktop,
                 onClose: () {
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
@@ -416,12 +407,6 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                     Navigator.of(context).popUntil((r) => r.isFirst);
                   }
                 },
-                onNavTap: (label) => AppNavigation.handleBottomNav(
-                  context,
-                  label,
-                  currentTab: 'Live',
-                  onUnsupported: (m) => _showSnack(context, m),
-                ),
               );
             }
 
@@ -434,33 +419,11 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                 resolvedBusId: journey.busId,
                 journey: journey,
               ),
-              bottomNavigationBar: isDesktop
-                  ? null
-                  : _LiveBottomNav(
-                      onNavTap: (label) {
-                        AppNavigation.handleBottomNav(
-                          context,
-                          label,
-                          currentTab: 'Live',
-                          onUnsupported: (m) => _showSnack(context, m),
-                        );
-                      },
-                    ),
+              bottomNavigationBar: null,
             );
           },
         ),
-        bottomNavigationBar: isDesktop
-            ? null
-            : _LiveBottomNav(
-                onNavTap: (label) {
-                  AppNavigation.handleBottomNav(
-                    context,
-                    label,
-                    currentTab: 'Live',
-                    onUnsupported: (m) => _showSnack(context, m),
-                  );
-                },
-              ),
+        bottomNavigationBar: null,
       );
     }
 
@@ -472,18 +435,7 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
         isDesktop: isDesktop,
         resolvedBusId: widget.busId,
       ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : _LiveBottomNav(
-              onNavTap: (label) {
-                AppNavigation.handleBottomNav(
-                  context,
-                  label,
-                  currentTab: 'Live',
-                  onUnsupported: (message) => _showSnack(context, message),
-                );
-              },
-            ),
+      bottomNavigationBar: null,
     );
   }
 }
@@ -564,13 +516,9 @@ class _ErrorBody extends StatelessWidget {
 
 class _LoadingBody extends StatelessWidget {
   const _LoadingBody({
-    required this.isDesktop,
     required this.onClose,
-    required this.onNavTap,
   });
-  final bool isDesktop;
   final VoidCallback onClose;
-  final ValueChanged<String> onNavTap;
 
   @override
   Widget build(BuildContext context) {
@@ -607,13 +555,9 @@ class _LoadingBody extends StatelessWidget {
 
 class _NoJourneyBody extends StatelessWidget {
   const _NoJourneyBody({
-    required this.isDesktop,
     required this.onClose,
-    required this.onNavTap,
   });
-  final bool isDesktop;
   final VoidCallback onClose;
-  final ValueChanged<String> onNavTap;
 
   @override
   Widget build(BuildContext context) {
@@ -3626,117 +3570,6 @@ class _EmergencyActions extends StatelessWidget {
   }
 }
 
-class _LiveBottomNav extends StatelessWidget {
-  const _LiveBottomNav({required this.onNavTap});
-
-  final ValueChanged<String> onNavTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 8,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 76,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_outlined,
-                label: 'Home',
-                onTap: () => onNavTap('Home'),
-              ),
-              _NavItem(
-                icon: Icons.directions_bus_outlined,
-                label: 'Plan',
-                onTap: () => onNavTap('Plan'),
-              ),
-              _NavItem(
-                icon: Icons.sensors_rounded,
-                label: 'Live',
-                selected: true,
-                onTap: () => onNavTap('Live'),
-              ),
-              _NavItem(
-                icon: Icons.group_outlined,
-                label: 'Community',
-                onTap: () => onNavTap('Community'),
-              ),
-              _NavItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                onTap: () => onNavTap('Profile'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.selected = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: '$label tab',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: 64,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: selected
-              ? BoxDecoration(
-                  color: AppColors.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                )
-              : null,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: selected
-                    ? AppColors.onPrimaryContainer
-                    : AppColors.onSurfaceVariant,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 16 / 12,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected
-                      ? AppColors.onPrimaryContainer
-                      : AppColors.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _LiveStopTimelineCard extends StatelessWidget {
   const _LiveStopTimelineCard({required this.busId});

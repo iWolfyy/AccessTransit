@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Digital Membership Card — QR, points, member benefits.
@@ -29,19 +28,6 @@ class MembershipCardScreen extends StatelessWidget {
   static const _qrImageUrl =
       'https://lh3.googleusercontent.com/aida-public/AB6AXuD2EQGr3mG0xmxMRtptwz2DxqjbTc0HOrxCPch-Fo9geg1Pw_IJ3nmXV-UPsNBAgZvJSJfKqLABsvPK1_RVKKh4mh5_ac6pmS3PwobkhPwvmSVN_TrRFeN6i0f-seR7xHBdv__RERvnbGphw-h9qeTu_cj9Z80Izax_vDtRyTsRzf-ByxyLP7tPOWf6Ld66B3PhHmIH6sO5eNryEaDB-RNoST4MMKNhZvUzhaMhZCRo1FbmMscPpjX0YA';
 
-  void _showSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  void _onNavTap(BuildContext context, String label) {
-    AppNavigation.handleBottomNav(
-      context,
-      label,
-      onUnsupported: (message) => _showSnack(context, message),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,11 +94,7 @@ class MembershipCardScreen extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : _MembershipBottomNav(
-              onNavTap: (label) => _onNavTap(context, label),
-            ),
+      bottomNavigationBar: null,
     );
   }
 }
@@ -594,108 +576,3 @@ class _BenefitRow extends StatelessWidget {
 }
 
 /// App-standard nav: Home → Plan → Live → Community → Profile.
-class _MembershipBottomNav extends StatelessWidget {
-  const _MembershipBottomNav({required this.onNavTap});
-
-  final ValueChanged<String> onNavTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 8,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_outlined,
-                label: 'Home',
-                onTap: () => onNavTap('Home'),
-              ),
-              _NavItem(
-                icon: Icons.directions_bus_outlined,
-                label: 'Plan',
-                onTap: () => onNavTap('Plan'),
-              ),
-              _NavItem(
-                icon: Icons.sensors,
-                label: 'Live',
-                onTap: () => onNavTap('Live'),
-              ),
-              _NavItem(
-                icon: Icons.group_outlined,
-                label: 'Community',
-                onTap: () => onNavTap('Community'),
-              ),
-              _NavItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                selected: true,
-                onTap: () => onNavTap('Profile'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.selected = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 64,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: selected
-            ? BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                height: 16 / 12,
-                color: selected
-                    ? AppColors.onPrimaryContainer
-                    : AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

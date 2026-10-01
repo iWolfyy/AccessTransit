@@ -8,6 +8,7 @@ import '../../services/auth_service.dart';
 import '../../services/journey_service.dart';
 import '../auth/login_screen.dart';
 import '../journey/journey_search_screen.dart';
+import '../main_shell.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.initialUser});
@@ -99,17 +100,15 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const JourneySearchScreen()),
     );
+  }  void _onNavTap(String label) {
+    final shell = context.findAncestorStateOfType<MainShellState>();
+    if (shell != null) {
+      shell.switchToTab(label);
+    } else {
+      AppNavigation.handleBottomNav(context, label);
+    }
   }
 
-  void _onBottomNavTap(String feature) {
-    AppNavigation.handleBottomNav(
-      context,
-      feature,
-      currentTab: 'Home',
-      profileUser: _user,
-      onUnsupported: _showComingSoon,
-    );
-  }
 
   String get _initials {
     final name = _user?.name.trim() ?? '';
@@ -145,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _DesktopTopNav(
                     initials: _initials,
                     onMenu: () => _scaffoldKey.currentState?.openDrawer(),
-                    onNavTap: _onBottomNavTap,
+                    onNavTap: _onNavTap,
                     onProfileTap: _openProfile,
                   )
                 else
@@ -162,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           isDesktop ? 24 : 16,
                           24,
                           isDesktop ? 24 : 16,
-                          isDesktop ? 24 : 112,
+                          isDesktop ? 24 : 24,
                         ),
                         sliver: SliverToBoxAdapter(
                           child: Center(
@@ -203,15 +202,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: isDesktop ? 0 : 72),
+        padding: const EdgeInsets.only(bottom: 0),
         child: _AssistanceFab(
           showLabel: MediaQuery.sizeOf(context).width >= 640,
           onPressed: () => _showComingSoon('Assistance'),
         ),
       ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : _MobileBottomNav(onNavTap: _onBottomNavTap),
+      bottomNavigationBar: null,
     );
   }
 }
@@ -387,14 +384,14 @@ class _DesktopTopNav extends StatelessWidget {
                   onTap: () => onNavTap('Plan'),
                 ),
                 _DesktopNavChip(
-                  icon: Icons.sensors,
-                  label: 'Live',
-                  onTap: () => onNavTap('Live'),
-                ),
-                _DesktopNavChip(
                   icon: Icons.groups,
                   label: 'Community',
                   onTap: () => onNavTap('Community'),
+                ),
+                _DesktopNavChip(
+                  icon: Icons.person,
+                  label: 'Profile',
+                  onTap: () => onNavTap('Profile'),
                 ),
                 const Spacer(),
                 _AvatarButton(
@@ -1237,120 +1234,3 @@ class _AssistanceFab extends StatelessWidget {
   }
 }
 
-class _MobileBottomNav extends StatelessWidget {
-  const _MobileBottomNav({required this.onNavTap});
-
-  final void Function(String feature) onNavTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 8,
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            children: [
-              const Expanded(
-                child: _BottomNavItem(
-                  icon: Icons.home,
-                  label: 'Home',
-                  selected: true,
-                ),
-              ),
-              Expanded(
-                child: _BottomNavItem(
-                  icon: Icons.directions_bus,
-                  label: 'Plan',
-                  onTap: () => onNavTap('Plan'),
-                ),
-              ),
-              Expanded(
-                child: _BottomNavItem(
-                  icon: Icons.sensors,
-                  label: 'Live',
-                  onTap: () => onNavTap('Live'),
-                ),
-              ),
-              Expanded(
-                child: _BottomNavItem(
-                  icon: Icons.groups,
-                  label: 'Community',
-                  onTap: () => onNavTap('Community'),
-                ),
-              ),
-              Expanded(
-                child: _BottomNavItem(
-                  icon: Icons.person_outline,
-                  label: 'Profile',
-                  onTap: () => onNavTap('Profile'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BottomNavItem extends StatelessWidget {
-  const _BottomNavItem({
-    required this.icon,
-    required this.label,
-    this.selected = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: selected
-            ? BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                height: 14 / 11,
-                fontWeight: FontWeight.w600,
-                color: selected
-                    ? AppColors.onPrimaryContainer
-                    : AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

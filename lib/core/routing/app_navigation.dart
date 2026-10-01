@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
 import '../../screens/community/community_screen.dart';
 import '../../screens/journey/journey_search_screen.dart';
+import '../../screens/main_shell.dart';
 import '../../screens/profile/profile_screen.dart';
 
 /// Shared navigation helpers for AccessTransit screens.
@@ -17,11 +18,6 @@ abstract final class AppNavigation {
     return Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const JourneySearchScreen()),
     );
-  }
-
-  /// Opens Journey Search Plan (replacing former Live Journey).
-  static Future<void> openLive(BuildContext context, {String? passengerId}) {
-    return openPlan(context);
   }
 
   /// Opens the Community hub.
@@ -43,10 +39,11 @@ abstract final class AppNavigation {
     );
   }
 
-  /// Shared bottom-nav handler used across journey / community / profile UIs.
+  /// Shared bottom-nav handler used across push-screens that still reference
+  /// navigation by label.
   ///
   /// [currentTab] is the tab for the screen the user is already on
-  /// (`Home`, `Plan`, `Live`, `Community`, or `Profile`).
+  /// (`Home`, `Plan`, `Community`, or `Profile`).
   static void handleBottomNav(
     BuildContext context,
     String label, {
@@ -58,15 +55,18 @@ abstract final class AppNavigation {
       return;
     }
 
+    final shell = context.findAncestorStateOfType<MainShellState>();
+    if (shell != null) {
+      shell.switchToTab(label);
+      return;
+    }
+
     switch (label) {
       case 'Home':
         goHome(context);
         return;
       case 'Plan':
         openPlan(context);
-        return;
-      case 'Live':
-        openLive(context);
         return;
       case 'Community':
         openCommunity(context);
