@@ -13,7 +13,7 @@ import '../../models/station.dart';
 import '../../models/trip_model.dart';
 import '../../services/firestore_service.dart';
 import '../../services/trip_service.dart';
-import 'route_details_screen.dart';
+import 'live_journey_screen.dart';
 
 /// Route result item used for passenger route selection.
 /// Enhanced in Phase 2 with LMT Go inspired fields: departure/arrival times,
@@ -171,12 +171,11 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   void _onSelectRoute(RouteResultItem route) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => RouteDetailsScreen(
+        builder: (_) => LiveJourneyScreen(
           origin: widget.origin,
           destination: widget.destination,
           route: route,
-          bus: route.rawBus,
-          statusResult: route.statusResult,
+          busId: route.busId,
         ),
       ),
     );
