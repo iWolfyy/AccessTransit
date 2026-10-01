@@ -450,10 +450,11 @@ class _DepartureAndStopsCard extends StatelessWidget {
                           children: [
                             // Header: Punctuality Badge
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                _buildDelayBadge(etaResult),
-                                const Spacer(),
-                                if (etaResult.isDelayed)
+                                Flexible(child: _buildDelayBadge(etaResult)),
+                                if (etaResult.isDelayed) ...[
+                                  const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
@@ -472,6 +473,7 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                       ),
                                     ),
                                   ),
+                                ],
                               ],
                             ),
                             if (etaResult.delayReason != null &&
@@ -765,12 +767,15 @@ class _DepartureAndStopsCard extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: text),
           const SizedBox(width: 6),
-          Text(
-            eta.delayLabel,
-            style: TextStyle(
-              color: text,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
+          Flexible(
+            child: Text(
+              eta.delayLabel,
+              style: TextStyle(
+                color: text,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

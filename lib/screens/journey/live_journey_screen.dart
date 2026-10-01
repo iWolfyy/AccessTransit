@@ -756,13 +756,8 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
     return null;
   }
 
-  List<LatLng> _buildRoutePolyline(
-    LatLng busPos,
-    LatLng passengerPos,
-    LatLng? destPos,
-  ) {
-    final List<LatLng> points = [];
-
+  /// Enriched stop record for full-route visualization.
+  List<_RouteStopInfo> _buildRouteStops() {
     final List<String> stopNames = [];
     if (widget.matchedBus != null &&
         widget.matchedBus!.stops.isNotEmpty) {
@@ -773,17 +768,89 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
       stopNames.add(widget.route!.destination);
     }
 
-    for (final stop in stopNames) {
-      final coord = _resolveStopCoordinates(stop);
-      if (coord != null && !points.contains(coord)) {
-        points.add(coord);
+    final int currentIdx = widget.liveBus?.currentStopIndex ?? 0;
+    final originQ = widget.origin.trim().toLowerCase();
+    final destQ = widget.destination.trim().toLowerCase();
+
+    final List<_RouteStopInfo> result = [];
+    for (int i = 0; i < stopNames.length; i++) {
+      final name = stopNames[i];
+      final coord = _resolveStopCoordinates(name);
+      if (coord == null) continue;
+
+      // Determine display name from SeedData
+      String displayName = name;
+      for (final st in SeedData.colomboStations) {
+        final sName = st.name.toLowerCase();
+        final sId = st.id.toLowerCase();
+        final q = name.trim().toLowerCase();
+        if (sId == q || sName == q || sName.contains(q) || q.contains(sName)) {
+          displayName = st.name
+              .replaceAll(' Station', '')
+              .replaceAll(' Bus Stand', '')
+              .replaceAll(' Bus Stop', '')
+              .replaceAll(' Stop', '')
+              .replaceAll(' Central', '')
+              .replaceAll(' Bus Complex', '')
+              .replaceAll(' Highway Bus', '')
+              .replaceAll(' Market', '')
+              .replaceAll(' Junction', '')
+              .replaceAll(' Terminal', '');
+          break;
+        }
+      }
+
+      // Determine progression status
+      final nameQ = name.trim().toLowerCase();
+      _StopStatus status;
+      if (_fuzzyMatch(nameQ, originQ)) {
+        status = _StopStatus.boarding;
+      } else if (_fuzzyMatch(nameQ, destQ)) {
+        status = _StopStatus.alighting;
+      } else if (i < currentIdx) {
+        status = _StopStatus.passed;
+      } else if (i == currentIdx) {
+        status = _StopStatus.current;
+      } else {
+        status = _StopStatus.upcoming;
+      }
+
+      result.add(_RouteStopInfo(
+        name: displayName,
+        fullName: name,
+        coord: coord,
+        index: i,
+        status: status,
+      ));
+    }
+    return result;
+  }
+
+  bool _fuzzyMatch(String a, String b) {
+    if (a == b) return true;
+    if (a.contains(b) || b.contains(a)) return true;
+    // Check SeedData station IDs/names
+    for (final st in SeedData.colomboStations) {
+      final sName = st.name.toLowerCase();
+      final sId = st.id.toLowerCase();
+      if ((sId == a || sName.contains(a) || a.contains(sName)) &&
+          (sId == b || sName.contains(b) || b.contains(sName))) {
+        return true;
       }
     }
+    return false;
+  }
 
-    if (points.length < 2) {
-      return [busPos, passengerPos, ?destPos];
+  List<LatLng> _buildRoutePolyline(
+    LatLng busPos,
+    LatLng passengerPos,
+    LatLng? destPos,
+  ) {
+    final stops = _buildRouteStops();
+    if (stops.length >= 2) {
+      return stops.map((s) => s.coord).toList();
     }
-    return points;
+    return [busPos, passengerPos, ?destPos];
   }
 
   String _formatDistance(LatLng busPos, LatLng passengerPos) {
@@ -795,7 +862,13 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
   }
 
   void _fitJourney(LatLng busPos, LatLng passengerPos, LatLng? destPos) {
-    final pts = [busPos, passengerPos, ?destPos];
+    final routeStops = _buildRouteStops();
+    final pts = [
+      busPos,
+      passengerPos,
+      ?destPos,
+      ...routeStops.map((s) => s.coord),
+    ];
     try {
       final bounds = LatLngBounds.fromPoints(pts);
       _mapController.fitCamera(
@@ -806,6 +879,68 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
       );
     } catch (_) {
       _mapController.move(passengerPos, 13.5);
+    }
+  }
+
+  // ── Stop marker color helpers ──
+
+  Color _stopLabelColor(_StopStatus status) {
+    switch (status) {
+      case _StopStatus.passed:
+        return const Color(0xFFE0E0E0);
+      case _StopStatus.current:
+        return const Color(0xFF1565C0);
+      case _StopStatus.boarding:
+        return const Color(0xFFE65100);
+      case _StopStatus.alighting:
+        return const Color(0xFFC2185B);
+      case _StopStatus.upcoming:
+        return Colors.white.withValues(alpha: 0.95);
+    }
+  }
+
+  Color _stopLabelTextColor(_StopStatus status) {
+    switch (status) {
+      case _StopStatus.passed:
+        return const Color(0xFF757575);
+      case _StopStatus.current:
+        return Colors.white;
+      case _StopStatus.boarding:
+        return Colors.white;
+      case _StopStatus.alighting:
+        return Colors.white;
+      case _StopStatus.upcoming:
+        return const Color(0xFF424242);
+    }
+  }
+
+  Color _stopDotColor(_StopStatus status) {
+    switch (status) {
+      case _StopStatus.passed:
+        return const Color(0xFF66BB6A);
+      case _StopStatus.current:
+        return const Color(0xFF1E88E5);
+      case _StopStatus.boarding:
+        return const Color(0xFFFF9800);
+      case _StopStatus.alighting:
+        return const Color(0xFFE91E63);
+      case _StopStatus.upcoming:
+        return Colors.white;
+    }
+  }
+
+  Color _stopDotBorderColor(_StopStatus status) {
+    switch (status) {
+      case _StopStatus.passed:
+        return const Color(0xFF43A047);
+      case _StopStatus.current:
+        return Colors.white;
+      case _StopStatus.boarding:
+        return Colors.white;
+      case _StopStatus.alighting:
+        return Colors.white;
+      case _StopStatus.upcoming:
+        return AppColors.primary;
     }
   }
 
@@ -830,8 +965,24 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
 
     final destPos = _resolveStopCoordinates(widget.destination);
 
+    final routeStops = _buildRouteStops();
     final polylinePoints = _buildRoutePolyline(busPos, passengerPos, destPos);
     final distanceText = _formatDistance(busPos, passengerPos);
+
+    // Split polyline into traveled and remaining segments for visual progression
+    final int currentIdx = widget.liveBus?.currentStopIndex ?? 0;
+    final List<LatLng> traveledPoints = [];
+    final List<LatLng> remainingPoints = [];
+    if (routeStops.length >= 2) {
+      for (int i = 0; i < routeStops.length; i++) {
+        if (i <= currentIdx) {
+          traveledPoints.add(routeStops[i].coord);
+        }
+        if (i >= currentIdx) {
+          remainingPoints.add(routeStops[i].coord);
+        }
+      }
+    }
 
     final isLiveGps = widget.isBroadcasting && !widget.isStale;
     final delayText = widget.etaResult.delayLabel;
@@ -893,56 +1044,134 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                       'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.accesstransit.app',
                 ),
-                // Outer glow route polyline
+                // ── Route Polyline: Traveled (dim) + Remaining (bright) ──
                 PolylineLayer(
                   polylines: [
+                    // Full route outer glow
                     Polyline(
                       points: polylinePoints,
                       strokeWidth: 7.0,
-                      color: AppColors.primary.withValues(alpha: 0.3),
+                      color: AppColors.primary.withValues(alpha: 0.15),
                     ),
-                    Polyline(
-                      points: polylinePoints,
-                      strokeWidth: 4.5,
-                      color: AppColors.primary,
-                    ),
+                    // Traveled segment (greyed out)
+                    if (traveledPoints.length >= 2)
+                      Polyline(
+                        points: traveledPoints,
+                        strokeWidth: 5.0,
+                        color: const Color(0xFF9E9E9E).withValues(alpha: 0.6),
+                        pattern: const StrokePattern.dotted(),
+                      ),
+                    // Remaining segment (bright primary)
+                    if (remainingPoints.length >= 2)
+                      Polyline(
+                        points: remainingPoints,
+                        strokeWidth: 5.0,
+                        color: AppColors.primary,
+                      ),
+                    // Fallback: full route when no split data
+                    if (traveledPoints.length < 2 && remainingPoints.length < 2)
+                      Polyline(
+                        points: polylinePoints,
+                        strokeWidth: 4.5,
+                        color: AppColors.primary,
+                      ),
                   ],
                 ),
-                // Markers
+
+                // ── All Route Stop Markers (labeled) ──
                 MarkerLayer(
                   markers: [
-                    // Intermediate stop dots along corridor
-                    for (int i = 0; i < polylinePoints.length; i++)
-                      if (polylinePoints[i] != passengerPos &&
-                          polylinePoints[i] != destPos &&
-                          polylinePoints[i] != busPos)
+                    // Route stop markers with labels and progression colors
+                    for (final stop in routeStops)
+                      if (stop.status != _StopStatus.boarding &&
+                          stop.status != _StopStatus.alighting)
                         Marker(
-                          point: polylinePoints[i],
-                          width: 14,
-                          height: 14,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.primary,
-                                width: 2.5,
-                              ),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 3,
+                          point: stop.coord,
+                          width: 90,
+                          height: stop.status == _StopStatus.current ? 56 : 44,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Stop name label
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1.5,
                                 ),
-                              ],
-                            ),
+                                decoration: BoxDecoration(
+                                  color: _stopLabelColor(stop.status),
+                                  borderRadius: BorderRadius.circular(6),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black12,
+                                      blurRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  stop.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _stopLabelTextColor(stop.status),
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 1.5),
+                              // Stop dot/circle
+                              Container(
+                                width: stop.status == _StopStatus.current
+                                    ? 22
+                                    : 16,
+                                height: stop.status == _StopStatus.current
+                                    ? 22
+                                    : 16,
+                                decoration: BoxDecoration(
+                                  color: _stopDotColor(stop.status),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _stopDotBorderColor(stop.status),
+                                    width: 2.5,
+                                  ),
+                                  boxShadow: [
+                                    if (stop.status == _StopStatus.current)
+                                      BoxShadow(
+                                        color: const Color(0xFF2196F3)
+                                            .withValues(alpha: 0.5),
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                      ),
+                                    const BoxShadow(
+                                      color: Colors.black12,
+                                      blurRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: stop.status == _StopStatus.passed
+                                    ? const Icon(
+                                        Icons.check_rounded,
+                                        size: 9,
+                                        color: Colors.white,
+                                      )
+                                    : stop.status == _StopStatus.current
+                                        ? const Icon(
+                                            Icons.near_me_rounded,
+                                            size: 12,
+                                            color: Colors.white,
+                                          )
+                                        : null,
+                              ),
+                            ],
                           ),
                         ),
 
-                    // Destination Stop Marker
+                    // Destination / Alighting Stop Marker
                     if (destPos != null)
                       Marker(
                         point: destPos,
-                        width: 90,
+                        width: 100,
                         height: 64,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -962,15 +1191,28 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                                   ),
                                 ],
                               ),
-                              child: Text(
-                                widget.destination,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.flag_rounded,
+                                    size: 10,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Flexible(
+                                    child: Text(
+                                      widget.destination,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -2835,3 +3077,50 @@ class _LiveStopTimelineCard extends StatelessWidget {
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Route Stop Progression Data
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Progression status of a stop along the bus route.
+enum _StopStatus {
+  /// Stop the passenger boards at.
+  boarding,
+
+  /// Stop the passenger alights at.
+  alighting,
+
+  /// Bus has already passed this stop.
+  passed,
+
+  /// Bus is currently at or approaching this stop.
+  current,
+
+  /// Bus has not yet reached this stop.
+  upcoming,
+}
+
+/// Enriched data record for a single stop along the full route.
+class _RouteStopInfo {
+  const _RouteStopInfo({
+    required this.name,
+    required this.fullName,
+    required this.coord,
+    required this.index,
+    required this.status,
+  });
+
+  /// Short display name (cleaned from SeedData).
+  final String name;
+
+  /// Raw stop identifier / full station name.
+  final String fullName;
+
+  /// Geographic coordinates of this stop.
+  final LatLng coord;
+
+  /// Index position in the route's stop list.
+  final int index;
+
+  /// Progression status relative to bus position and passenger journey.
+  final _StopStatus status;
+}
