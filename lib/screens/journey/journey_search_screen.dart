@@ -1252,13 +1252,16 @@ class _AccessibilityFilterRow extends StatelessWidget {
                 onTap: onTap,
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.secondaryContainer.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: AppColors.secondary.withValues(alpha: 0.5)),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(Icons.tune_rounded, size: 16, color: AppColors.onSecondaryContainer),
                       const SizedBox(width: 4),
@@ -1280,7 +1283,7 @@ class _AccessibilityFilterRow extends StatelessWidget {
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
-              runSpacing: 6,
+              runSpacing: 8,
               children: activeFilters.map((f) {
                 return Chip(
                   avatar: const Icon(Icons.check, size: 14, color: AppColors.secondary),
@@ -1299,7 +1302,7 @@ class _AccessibilityFilterRow extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                     side: const BorderSide(color: AppColors.outlineVariant),
                   ),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  materialTapTargetSize: MaterialTapTargetSize.padded,
                 );
               }).toList(),
             ),

@@ -578,6 +578,7 @@ class _TopBar extends StatelessWidget {
                   color: AppColors.primary,
                   tooltip: 'Back',
                   iconSize: 26,
+                  constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                 ),
                 const SizedBox(width: 6),
                 const Column(
@@ -782,6 +783,8 @@ class _TabItem extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
+        constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+        alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerLowest,
