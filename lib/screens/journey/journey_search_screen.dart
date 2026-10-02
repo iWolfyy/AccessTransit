@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/time_utils.dart';
 import '../../data/seed_data.dart';
 import '../../models/station.dart';
+import '../../services/accessibility_preferences_service.dart';
 import '../../services/firestore_service.dart';
 import 'route_results_screen.dart';
 
@@ -29,14 +30,18 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   TimeOfDay? _selectedTime;
   bool _isLoadingStations = true;
 
-  // Accessibility requirements
-  bool _wheelchairAccess = true;
-  bool _stepFreeOnly = false;
-  bool _minimizeWalking = true;
+  // Accessibility requirements loaded from user preferences
+  late bool _wheelchairAccess;
+  late bool _stepFreeOnly;
+  late bool _minimizeWalking;
 
   @override
   void initState() {
     super.initState();
+    final prefs = AccessibilityPreferencesService.instance;
+    _wheelchairAccess = prefs.isWheelchairOnly;
+    _stepFreeOnly = prefs.isStepFree;
+    _minimizeWalking = prefs.minimizeWalking;
     _loadStations();
   }
 

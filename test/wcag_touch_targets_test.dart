@@ -12,6 +12,7 @@ void main() {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 2.0;
       addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
       await tester.pumpWidget(
         const MaterialApp(
@@ -37,8 +38,12 @@ void main() {
         }
       }
 
-      // Verify Save button touch target height is at least 48dp
+      // Scroll to ensure Save button is visible in ListView
       final saveBtn = find.text('Save Preferences');
+      await tester.scrollUntilVisible(saveBtn, 200);
+      await tester.pumpAndSettle();
+
+      // Verify Save button touch target height is at least 48dp
       expect(saveBtn, findsOneWidget);
       final saveBtnBox = tester.getSize(find.byType(FilledButton));
       expect(saveBtnBox.height, greaterThanOrEqualTo(48.0));

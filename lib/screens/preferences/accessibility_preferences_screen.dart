@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/user_model.dart';
+import '../../services/accessibility_preferences_service.dart';
 import '../main_shell.dart';
 
 /// Modern Accessible Preferences Screen adhering to WCAG 2.2 Level AA (48dp+ tap targets).
@@ -25,20 +26,50 @@ class AccessibilityPreferencesScreen extends StatefulWidget {
 
 class _AccessibilityPreferencesScreenState
     extends State<AccessibilityPreferencesScreen> {
-  bool _wheelchairAccess = true;
-  bool _stepFree = false;
-  bool _minimizeWalking = false;
-  bool _highContrast = false;
-  bool _voiceGuidance = true;
-  bool _hapticAlerts = false;
-  bool _boardingAssistance = false;
-  bool _quietRoutes = false;
+  late bool _wheelchairAccess;
+  late bool _stepFree;
+  late bool _minimizeWalking;
+  late bool _highContrast;
+  late bool _voiceGuidance;
+  late bool _hapticAlerts;
+  late bool _boardingAssistance;
+  late bool _quietRoutes;
+  late bool _hasLargeTargets;
+
+  @override
+  void initState() {
+    super.initState();
+    final prefs = AccessibilityPreferencesService.instance;
+    _wheelchairAccess = prefs.isWheelchairOnly;
+    _stepFree = prefs.isStepFree;
+    _minimizeWalking = prefs.minimizeWalking;
+    _highContrast = prefs.isHighContrast;
+    _voiceGuidance = prefs.voiceGuidance;
+    _hapticAlerts = prefs.hapticAlerts;
+    _boardingAssistance = prefs.boardingAssistance;
+    _quietRoutes = prefs.quietRoutes;
+    _hasLargeTargets = prefs.hasLargeTargets;
+  }
 
   void _openProfile() {
     AppNavigation.openProfile(context, initialUser: widget.initialUser);
   }
 
-  void _save() {
+  Future<void> _save() async {
+    await AccessibilityPreferencesService.instance.savePreferences(
+      isWheelchairOnly: _wheelchairAccess,
+      isStepFree: _stepFree,
+      minimizeWalking: _minimizeWalking,
+      isHighContrast: _highContrast,
+      voiceGuidance: _voiceGuidance,
+      hapticAlerts: _hapticAlerts,
+      boardingAssistance: _boardingAssistance,
+      quietRoutes: _quietRoutes,
+      hasLargeTargets: _hasLargeTargets,
+    );
+
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -194,6 +225,14 @@ class _AccessibilityPreferencesScreenState
                       subtitle: 'Prioritize connections closest to entry points',
                       value: _minimizeWalking,
                       onChanged: (v) => setState(() => _minimizeWalking = v),
+                    ),
+                    const Divider(height: 1, indent: 64),
+                    _PreferenceToggle(
+                      icon: Icons.touch_app_rounded,
+                      label: 'Large tap targets (48dp+)',
+                      subtitle: 'Enforce minimum 48dp touch targets across buttons & controls',
+                      value: _hasLargeTargets,
+                      onChanged: (v) => setState(() => _hasLargeTargets = v),
                     ),
                   ],
                 ),
