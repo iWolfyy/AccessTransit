@@ -18,6 +18,12 @@ class AppTheme {
         error: AppColors.error,
       ),
       scaffoldBackgroundColor: AppColors.surfaceBright,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(48, 48),
+        ),
+      ),
     );
   }
 
@@ -81,6 +87,12 @@ class AppTheme {
         }),
         trackOutlineColor: const WidgetStatePropertyAll(highContrastOutline),
         trackOutlineWidth: const WidgetStatePropertyAll(2.0),
+      ),
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(48, 48),
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

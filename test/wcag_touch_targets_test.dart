@@ -1,4 +1,6 @@
+import 'package:access_transit/core/theme/app_theme.dart';
 import 'package:access_transit/screens/preferences/accessibility_preferences_screen.dart';
+import 'package:access_transit/widgets/app_bottom_nav_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -77,6 +79,46 @@ void main() {
           );
         }
       }
+    });
+
+    testWidgets('AppBottomNavBar items guarantee >= 48dp touch targets',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            bottomNavigationBar: AppBottomNavBar(
+              currentTab: 'Home',
+              onTabSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final navInkWells = find.descendant(
+        of: find.byType(AppBottomNavBar),
+        matching: find.byType(InkWell),
+      );
+      expect(navInkWells, findsNWidgets(4));
+
+      for (final element in navInkWells.evaluate()) {
+        final renderBox = element.renderObject as RenderBox?;
+        if (renderBox != null && renderBox.hasSize) {
+          expect(renderBox.size.height, greaterThanOrEqualTo(48.0));
+          expect(renderBox.size.width, greaterThanOrEqualTo(48.0));
+        }
+      }
+    });
+
+    test('AppTheme enforces padded tap target size and 48dp minimum IconButton size', () {
+      expect(AppTheme.lightTheme.materialTapTargetSize, MaterialTapTargetSize.padded);
+      expect(AppTheme.highContrastTheme.materialTapTargetSize, MaterialTapTargetSize.padded);
+
+      final lightIconStyle = AppTheme.lightTheme.iconButtonTheme.style;
+      final hcIconStyle = AppTheme.highContrastTheme.iconButtonTheme.style;
+
+      expect(lightIconStyle?.minimumSize?.resolve({}), const Size(48, 48));
+      expect(hcIconStyle?.minimumSize?.resolve({}), const Size(48, 48));
     });
   });
 }
