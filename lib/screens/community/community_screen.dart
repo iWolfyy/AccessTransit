@@ -15,7 +15,7 @@ enum _CommunityTab { liveUpdates, myReports }
 
 enum _ReportBadge { active, verified, resolved, expired }
 
-/// Community hub — live updates feed and my reports.
+/// Community hub — live updates feed and my reports matching LMT Go design.
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
 
@@ -24,9 +24,6 @@ class CommunityScreen extends StatefulWidget {
 }
 
 class _CommunityScreenState extends State<CommunityScreen> {
-  static const Color _minorBg = Color(0xFFFFF8E1);
-  static const Color _minorFg = Color(0xFFF57F17);
-
   _CommunityTab _tab = _CommunityTab.liveUpdates;
   final FirestoreService _firestoreService = FirestoreService();
 
@@ -53,12 +50,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     } catch (_) {}
   }
 
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
   void _openReportIssue() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -72,8 +63,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       return report.targetName;
     }
     if (report.targetType.toLowerCase() == 'station') {
-      return _stationsMap[report.targetId]?.name ??
-          'Station ${report.targetId}';
+      return _stationsMap[report.targetId]?.name ?? 'Station ${report.targetId}';
     } else {
       final bus = _busesMap[report.targetId];
       if (bus != null) {
@@ -95,234 +85,253 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Community Hub',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: AppColors.onSurface,
+              ),
+            ),
+            Text(
+              'Real-time accessibility alerts from fellow riders',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            onPressed: _openReportIssue,
+            tooltip: 'Report Issue',
+            icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: FloatingActionButton.extended(
           onPressed: _openReportIssue,
-          backgroundColor: AppColors.primaryContainer,
-          foregroundColor: AppColors.onPrimaryContainer,
-          elevation: 6,
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.onPrimary,
+          elevation: 4,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          icon: const Icon(Icons.add_alert),
+          icon: const Icon(Icons.add_alert_rounded, size: 20),
           label: const Text(
             'Report Issue',
             style: TextStyle(
               fontSize: 14,
-              height: 20 / 14,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.1,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
             ),
           ),
         ),
       ),
-      body: Column(
-        children: [
-          _TopBar(
-            onMenu: () => _showSnack('Menu will be available soon.'),
-            onSearch: () => _showSnack('Search will be available soon.'),
-          ),
-          Expanded(
-            child: StreamBuilder<List<Report>>(
-              stream: _firestoreService.streamReports(
-                userId: _tab == _CommunityTab.myReports ? currentUserId : null,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: _ModernFilterTabs(
+                selected: _tab,
+                onChanged: (tab) => setState(() => _tab = tab),
               ),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    !snapshot.hasData) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
-                }
-
-                final reports = snapshot.data ?? [];
-
-                // Separate active vs expired/resolved
-                final activeReports = <Report>[];
-                final inactiveReports = <Report>[];
-
-                for (final r in reports) {
-                  if (StatusLogic.isReportActive(r)) {
-                    activeReports.add(r);
-                  } else {
-                    inactiveReports.add(r);
+            ),
+            Expanded(
+              child: StreamBuilder<List<Report>>(
+                stream: _firestoreService.streamReports(
+                  userId: _tab == _CommunityTab.myReports ? currentUserId : null,
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
+                    return const Center(
+                      child: CircularProgressIndicator(color: AppColors.primary),
+                    );
                   }
-                }
 
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 100),
-                  children: [
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 768),
-                        child: Column(
-                          children: [
-                            _FilterTabs(
-                              selected: _tab,
-                              onChanged: (tab) => setState(() => _tab = tab),
-                            ),
-                            const SizedBox(height: 24),
-                            if (reports.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 48,
-                                ),
-                                child: Text(
-                                  _tab == _CommunityTab.myReports
-                                      ? 'You have not submitted any reports yet.'
-                                      : 'No active reports right now.',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
-                                ),
-                              )
-                            else ...[
-                              // Active reports section
-                              if (activeReports.isNotEmpty) ...[
-                                for (var i = 0; i < activeReports.length; i++) ...[
-                                  if (i > 0) const SizedBox(height: 16),
-                                  _ReportCardWidget(
-                                    report: activeReports[i],
-                                    targetTitle: _resolveTargetTitle(
-                                      activeReports[i],
-                                    ),
-                                    isActive: true,
-                                    minorBg: _minorBg,
-                                    minorFg: _minorFg,
-                                    onTap: () => _openReportDetails(
-                                      activeReports[i],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                              // Inactive / Resolved section header
-                              if (inactiveReports.isNotEmpty) ...[
-                                const SizedBox(height: 24),
-                                const Row(
-                                  children: [
-                                    Expanded(child: Divider(color: AppColors.outlineVariant)),
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 12),
-                                      child: Text(
-                                        'Resolved & Past Reports',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.outline,
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(child: Divider(color: AppColors.outlineVariant)),
-                                  ],
+                  final reports = snapshot.data ?? [];
+
+                  // Separate active vs expired/resolved
+                  final activeReports = <Report>[];
+                  final inactiveReports = <Report>[];
+
+                  for (final r in reports) {
+                    if (StatusLogic.isReportActive(r)) {
+                      activeReports.add(r);
+                    } else {
+                      inactiveReports.add(r);
+                    }
+                  }
+
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                    children: [
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 720),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // If My Reports tab is active, show the points & contribution banner
+                              if (_tab == _CommunityTab.myReports) ...[
+                                _MyContributionsBanner(
+                                  reportCount: reports.length,
+                                  onNewReport: _openReportIssue,
                                 ),
                                 const SizedBox(height: 16),
-                                for (var i = 0; i < inactiveReports.length; i++) ...[
-                                  if (i > 0) const SizedBox(height: 16),
-                                  _ReportCardWidget(
-                                    report: inactiveReports[i],
-                                    targetTitle: _resolveTargetTitle(
-                                      inactiveReports[i],
+                              ],
+
+                              if (reports.isEmpty)
+                                _buildEmptyState()
+                              else ...[
+                                // Active reports section
+                                if (activeReports.isNotEmpty) ...[
+                                  for (var i = 0; i < activeReports.length; i++) ...[
+                                    if (i > 0) const SizedBox(height: 12),
+                                    _ModernReportCard(
+                                      report: activeReports[i],
+                                      targetTitle: _resolveTargetTitle(activeReports[i]),
+                                      isActive: true,
+                                      onTap: () => _openReportDetails(activeReports[i]),
                                     ),
-                                    isActive: false,
-                                    minorBg: _minorBg,
-                                    minorFg: _minorFg,
-                                    onTap: () => _openReportDetails(
-                                      inactiveReports[i],
-                                    ),
+                                  ],
+                                ],
+
+                                // Inactive / Resolved section header
+                                if (inactiveReports.isNotEmpty) ...[
+                                  const SizedBox(height: 24),
+                                  const Row(
+                                    children: [
+                                      Expanded(child: Divider(color: AppColors.outlineVariant)),
+                                      Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 12),
+                                        child: Text(
+                                          'Resolved & Past Reports',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(child: Divider(color: AppColors.outlineVariant)),
+                                    ],
                                   ),
+                                  const SizedBox(height: 12),
+                                  for (var i = 0; i < inactiveReports.length; i++) ...[
+                                    if (i > 0) const SizedBox(height: 12),
+                                    _ModernReportCard(
+                                      report: inactiveReports[i],
+                                      targetTitle: _resolveTargetTitle(inactiveReports[i]),
+                                      isActive: false,
+                                      onTap: () => _openReportDetails(inactiveReports[i]),
+                                    ),
+                                  ],
                                 ],
                               ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-      bottomNavigationBar: null,
     );
   }
-}
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.onMenu,
-    required this.onSearch,
-  });
+  Widget _buildEmptyState() {
+    final isMyReports = _tab == _CommunityTab.myReports;
 
-  final VoidCallback onMenu;
-  final VoidCallback onSearch;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 1,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 48,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: onMenu,
-                  tooltip: 'Menu',
-                  icon: const Icon(
-                    Icons.menu,
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-                const Expanded(
-                  child: Text(
-                    'Community',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      height: 28 / 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: onSearch,
-                  tooltip: 'Search',
-                  icon: const Icon(
-                    Icons.search,
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-              ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 16),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer.withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isMyReports ? Icons.assignment_turned_in_outlined : Icons.check_circle_outline_rounded,
+                size: 40,
+                color: AppColors.primary,
+              ),
             ),
-          ),
+            const SizedBox(height: 16),
+            Text(
+              isMyReports ? 'No Reports Yet' : 'All Clear on the Corridors',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.onSurface,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              isMyReports
+                  ? 'Reports you submit about wheelchair access, crowding, or lifts will show up here.'
+                  : 'No active accessibility issues reported right now. Help fellow commuters by reporting any hazards.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.onSurfaceVariant,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: _openReportIssue,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              icon: const Icon(Icons.add_alert_rounded, size: 18, color: AppColors.primary),
+              label: const Text(
+                'Submit a Condition Report',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _FilterTabs extends StatelessWidget {
-  const _FilterTabs({
+/// Equal 2-Segmented Tab Bar matching LMT Go
+class _ModernFilterTabs extends StatelessWidget {
+  const _ModernFilterTabs({
     required this.selected,
     required this.onChanged,
   });
@@ -333,25 +342,29 @@ class _FilterTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(maxWidth: 448),
+      constraints: const BoxConstraints(maxWidth: 720),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outlineVariant),
       ),
       child: Row(
         children: [
           Expanded(
             child: _TabButton(
+              icon: Icons.bolt_rounded,
               label: 'Live Updates',
-              selected: selected == _CommunityTab.liveUpdates,
+              isSelected: selected == _CommunityTab.liveUpdates,
               onTap: () => onChanged(_CommunityTab.liveUpdates),
             ),
           ),
+          const SizedBox(width: 4),
           Expanded(
             child: _TabButton(
+              icon: Icons.person_rounded,
               label: 'My Reports',
-              selected: selected == _CommunityTab.myReports,
+              isSelected: selected == _CommunityTab.myReports,
               onTap: () => onChanged(_CommunityTab.myReports),
             ),
           ),
@@ -363,61 +376,136 @@ class _FilterTabs extends StatelessWidget {
 
 class _TabButton extends StatelessWidget {
   const _TabButton({
+    required this.icon,
     required this.label,
-    required this.selected,
+    required this.isSelected,
     required this.onTap,
   });
 
+  final IconData icon;
   final String label;
-  final bool selected;
+  final bool isSelected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: selected ? AppColors.surfaceContainerLowest : Colors.transparent,
-      elevation: selected ? 1 : 0,
-      shadowColor: Colors.black.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(6),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              height: 20 / 14,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.1,
-              color: selected
-                  ? AppColors.primary
-                  : AppColors.onSurfaceVariant,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant,
             ),
-          ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _ReportCardWidget extends StatelessWidget {
-  const _ReportCardWidget({
+/// Community contribution rewards banner shown under 'My Reports'
+class _MyContributionsBanner extends StatelessWidget {
+  const _MyContributionsBanner({
+    required this.reportCount,
+    required this.onNewReport,
+  });
+
+  final int reportCount;
+  final VoidCallback onNewReport;
+
+  @override
+  Widget build(BuildContext context) {
+    final earnedPoints = reportCount * 10;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.emoji_events_rounded, color: AppColors.onPrimary, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Community Contributor',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$reportCount reports submitted • $earnedPoints Contribution Points',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Modern Accessible Report Card matching LMT Go
+class _ModernReportCard extends StatelessWidget {
+  const _ModernReportCard({
     required this.report,
     required this.targetTitle,
     required this.isActive,
-    required this.minorBg,
-    required this.minorFg,
     required this.onTap,
   });
 
   final Report report;
   final String targetTitle;
   final bool isActive;
-  final Color minorBg;
-  final Color minorFg;
   final VoidCallback onTap;
 
   @override
@@ -436,191 +524,206 @@ class _ReportCardWidget extends StatelessWidget {
       badgeType = _ReportBadge.active;
     }
 
-    final trustLine = report.confirmCount > 0
-        ? 'Confirmed by ${report.confirmCount} ${report.confirmCount == 1 ? 'rider' : 'riders'}, ${TimeUtils.formatRelativeTime(report.lastConfirmedAt ?? report.createdAt)}'
-        : 'Reported ${TimeUtils.formatRelativeTime(report.createdAt)}';
+    final isBus = report.targetType.toLowerCase() == 'bus';
+    final timeAgo = TimeUtils.formatRelativeTime(report.createdAt);
 
     return Opacity(
       opacity: isActive ? 1.0 : 0.65,
-      child: Material(
-        color: AppColors.surfaceContainerLowest,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.outlineVariant.withValues(alpha: 0.3),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isActive
+                  ? AppColors.outlineVariant.withValues(alpha: 0.6)
+                  : AppColors.outlineVariant.withValues(alpha: 0.3),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Row: Target Mode, Name & Status Badge
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      isBus ? Icons.directions_bus_rounded : Icons.store_mall_directory_rounded,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          targetTitle,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          timeAgo,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _buildBadgeWidget(badgeType),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Problem Condition Title
+              Text(
+                report.problemType,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                  color: AppColors.onSurface,
+                ),
+              ),
+
+              if (report.description.trim().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  '“${report.description.trim()}”',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: AppColors.onSurfaceVariant,
+                  ),
                 ),
               ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+
+              const SizedBox(height: 14),
+
+              // Bottom Details Row: Photo indicator, Trust verification, Chevron
+              Row(
+                children: [
+                  if (report.photoUrl.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          Icon(Icons.photo_camera_rounded, size: 14, color: AppColors.primary),
+                          SizedBox(width: 4),
                           Text(
-                            report.problemType,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              height: 24 / 18,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            targetTitle,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              height: 20 / 14,
-                              color: AppColors.onSurfaceVariant,
+                            'Photo',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    _BadgeChipWidget(
-                      badge: badgeType,
-                      minorBg: minorBg,
-                      minorFg: minorFg,
-                    ),
+                    const SizedBox(width: 8),
                   ],
-                ),
-                if (report.photoUrl.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
+
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          report.confirmCount > 0
+                              ? Icons.verified_rounded
+                              : Icons.schedule_rounded,
+                          size: 15,
+                          color: report.confirmCount > 0 ? AppColors.success : AppColors.outline,
                         ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryContainer.withValues(
-                            alpha: 0.15,
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            report.confirmCount > 0
+                                ? 'Confirmed by ${report.confirmCount} rider${report.confirmCount == 1 ? "" : "s"}'
+                                : 'Awaiting confirmation',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: report.confirmCount > 0
+                                  ? AppColors.success
+                                  : AppColors.outline,
+                            ),
                           ),
-                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.photo_camera,
-                              size: 14,
-                              color: AppColors.primary,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Photo Attached',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: AppColors.onSurfaceVariant,
                   ),
                 ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainer,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Icon(
-                        report.targetType.toLowerCase() == 'bus'
-                            ? Icons.directions_bus
-                            : Icons.accessible,
-                        size: 20,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        trustLine,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          height: 16 / 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.outline,
-                        ),
-                      ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right,
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
-}
 
-class _BadgeChipWidget extends StatelessWidget {
-  const _BadgeChipWidget({
-    required this.badge,
-    required this.minorBg,
-    required this.minorFg,
-  });
-
-  final _ReportBadge badge;
-  final Color minorBg;
-  final Color minorFg;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildBadgeWidget(_ReportBadge badge) {
     final (bg, fg, icon, label) = switch (badge) {
       _ReportBadge.active => (
           AppColors.errorContainer,
           AppColors.onErrorContainer,
-          Icons.warning,
+          Icons.error_outline_rounded,
           'Active',
         ),
       _ReportBadge.verified => (
-          AppColors.secondary,
-          AppColors.onSecondary,
-          Icons.check_circle,
+          AppColors.success.withValues(alpha: 0.15),
+          AppColors.success,
+          Icons.verified_rounded,
           'Verified',
         ),
       _ReportBadge.resolved => (
-          AppColors.success.withValues(alpha: 0.2),
-          AppColors.success,
-          Icons.check_circle_outline,
+          AppColors.primaryContainer.withValues(alpha: 0.3),
+          AppColors.primary,
+          Icons.check_circle_rounded,
           'Resolved',
         ),
       _ReportBadge.expired => (
           AppColors.surfaceContainer,
           AppColors.outline,
-          Icons.history,
-          'Expired',
+          Icons.history_rounded,
+          'Past',
         ),
     };
 
@@ -628,17 +731,17 @@ class _BadgeChipWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: fg),
+          Icon(icon, size: 14, color: fg),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               color: fg,
             ),
@@ -648,4 +751,3 @@ class _BadgeChipWidget extends StatelessWidget {
     );
   }
 }
-

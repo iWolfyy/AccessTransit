@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../data/seed_data.dart';
@@ -64,11 +66,13 @@ class ReportCategoryDef {
 
 /// Accessible Community Report screen matching LMT Go guidelines.
 ///
-/// Organized cleanly with:
+/// Features:
 /// 1. Bus Route selection
 /// 2. Target Choice (On a Bus vs At a Bus Stop)
-/// 3. Context-aware Crowding Level + Category Tabs & Sub-Card Grid
-/// 4. Optional note and 1-tap submission (+10 Community Points)
+/// 3. Context-aware Crowding Level + Category Tabs & Sub-Card Grid (No horizontal overflow)
+/// 4. Live Report Summary card displaying BOTH Crowding & Accessibility issue
+/// 5. Optional Camera / Gallery photo evidence attachment
+/// 6. Optional note and 1-tap submission (+10 Community Points)
 class ReportConditionScreen extends StatefulWidget {
   const ReportConditionScreen({
     super.key,
@@ -91,6 +95,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
   final FirestoreService _firestoreService = FirestoreService();
   final TextEditingController _noteController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
 
   // Data loaded from Firestore / SeedData
   List<BusRoute> _allRoutes = [];
@@ -107,12 +112,15 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   // Crowding level (for Bus)
   CrowdingLevel _selectedCrowding = CrowdingLevel.medium;
 
-  // Active Category indices
+  // Active Category indices (0 = first category)
   int _activeBusCategoryIndex = 0;
   int _activeStationCategoryIndex = 0;
 
   // Selected Option
   late ReportIssueOption _selectedOption;
+
+  // Picked photo evidence
+  File? _pickedImage;
 
   // Submission state
   bool _isSubmitting = false;
@@ -154,7 +162,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         ReportIssueOption(
           id: 'bay_blocked',
           title: 'Bay Blocked',
-          subtitle: 'Blocked by bags or passengers',
+          subtitle: 'Blocked by bags or standing crowd',
           icon: Icons.block_rounded,
           color: Color(0xFFF57F17),
           category: 'crowding',
@@ -164,7 +172,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     ),
     const ReportCategoryDef(
       id: 'priority_seats',
-      title: 'Priority Seats',
+      title: 'Seats',
       icon: Icons.airline_seat_recline_normal_rounded,
       options: [
         ReportIssueOption(
@@ -197,7 +205,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       ],
     ),
     const ReportCategoryDef(
-      id: 'safety_hygiene',
+      id: 'safety_clean',
       title: 'Safety & Clean',
       icon: Icons.security_rounded,
       options: [
@@ -500,6 +508,108 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (image != null) {
+        setState(() {
+          _pickedImage = File(image.path);
+        });
+        _showSnack('Photo attached successfully!');
+      }
+    } catch (e) {
+      _showSnack('Unable to attach image: $e');
+    }
+  }
+
+  void _showPhotoOptionsModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Attach Evidence Photo',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Help verify condition for commuters with disabilities',
+                  style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _pickImage(ImageSource.camera);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          side: const BorderSide(color: AppColors.primary, width: 1.5),
+                        ),
+                        icon: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
+                        label: const Text(
+                          'Take Photo',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _pickImage(ImageSource.gallery);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          side: const BorderSide(color: AppColors.outlineVariant),
+                        ),
+                        icon: const Icon(Icons.photo_library_rounded, color: AppColors.onSurface),
+                        label: const Text(
+                          'From Gallery',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _submitReport() async {
     final isBus = _targetType == ReportTargetType.bus;
     final targetId = isBus
@@ -548,6 +658,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         category: _selectedOption.category,
         severity: _selectedOption.severity,
         description: _noteController.text.trim(),
+        photoUrl: _pickedImage?.path ?? '',
         status: 'active',
         createdAt: DateTime.now(),
         lastConfirmedAt: DateTime.now(),
@@ -667,36 +778,28 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                         // Crowding Level Selector
                         _buildCrowdingSelector(),
                         const SizedBox(height: 24),
-                        // Bus Categories and Sub-Cards
-                        _buildCategorySection(
-                          categories: _busCategories,
-                          activeIndex: _activeBusCategoryIndex,
-                          onCategoryChanged: (idx) {
-                            setState(() {
-                              _activeBusCategoryIndex = idx;
-                              _selectedOption = _busCategories[idx].options[0];
-                            });
-                          },
-                        ),
+                        // Bus Categories and Sub-Cards (Equal non-scrolling tabs)
+                        _buildBusCategorySection(),
                       ] else ...[
-                        // Station Categories and Sub-Cards
-                        _buildCategorySection(
-                          categories: _stationCategories,
-                          activeIndex: _activeStationCategoryIndex,
-                          onCategoryChanged: (idx) {
-                            setState(() {
-                              _activeStationCategoryIndex = idx;
-                              _selectedOption = _stationCategories[idx].options[0];
-                            });
-                          },
-                        ),
+                        // Station Categories and Sub-Cards (2x2 equal grid tabs)
+                        _buildStationCategorySection(),
                       ],
 
                       const SizedBox(height: 28),
 
-                      // Step 4: Optional Short Note
+                      // Step 4: Optional Evidence Photo (Camera / Gallery)
                       _buildSectionHeader(
                         step: '4',
+                        title: 'Evidence Photo (Optional)',
+                        subtitle: 'Take a photo or upload from gallery to verify status',
+                      ),
+                      const SizedBox(height: 12),
+                      _buildPhotoUploadSection(),
+                      const SizedBox(height: 28),
+
+                      // Step 5: Optional Short Note
+                      _buildSectionHeader(
+                        step: '5',
                         title: 'Additional Note (Optional)',
                         subtitle: 'Add helpful details for fellow wheelchair or elderly riders',
                       ),
@@ -705,7 +808,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                         controller: _noteController,
                         maxLines: 2,
                         decoration: InputDecoration(
-                          hintText: 'e.g. Ramp is usable but driver assistance was needed',
+                          hintText: 'e.g. Ramp was lowered but driver needed bystander help',
                           hintStyle: const TextStyle(
                             color: AppColors.onSurfaceVariant,
                             fontSize: 14,
@@ -727,9 +830,14 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 28),
 
-                      // Step 5: Large Accessible Submit Button
+                      // Live Report Summary Preview Card
+                      _buildReportSummaryCard(),
+
+                      const SizedBox(height: 28),
+
+                      // Step 6: Large Accessible Submit Button
                       SizedBox(
                         height: 56,
                         child: FilledButton.icon(
@@ -1016,7 +1124,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Crowding Level (තදබදය)',
+          'Crowding Level',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -1085,12 +1193,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     );
   }
 
-  Widget _buildCategorySection({
-    required List<ReportCategoryDef> categories,
-    required int activeIndex,
-    required ValueChanged<int> onCategoryChanged,
-  }) {
-    final activeCategory = categories[activeIndex];
+  // Equal 3-segmented Category bar for Bus (Never cuts off)
+  Widget _buildBusCategorySection() {
+    final activeCat = _busCategories[_activeBusCategoryIndex];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1105,166 +1210,434 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         ),
         const SizedBox(height: 10),
 
-        // Horizontal Category Tabs
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: List.generate(categories.length, (idx) {
-              final cat = categories[idx];
-              final isCatSelected = idx == activeIndex;
+        // Equal Row without horizontal scrolling
+        Row(
+          children: List.generate(_busCategories.length, (idx) {
+            final cat = _busCategories[idx];
+            final isSelected = idx == _activeBusCategoryIndex;
 
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: idx < _busCategories.length - 1 ? 6 : 0,
+                ),
                 child: InkWell(
-                  onTap: () => onCategoryChanged(idx),
+                  onTap: () {
+                    setState(() {
+                      _activeBusCategoryIndex = idx;
+                      _selectedOption = cat.options[0];
+                    });
+                  },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                     decoration: BoxDecoration(
-                      color: isCatSelected
-                          ? AppColors.primary
-                          : AppColors.surfaceContainerLowest,
+                      color: isSelected ? AppColors.primary : AppColors.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isCatSelected ? AppColors.primary : AppColors.outlineVariant,
+                        color: isSelected ? AppColors.primary : AppColors.outlineVariant,
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           cat.icon,
-                          size: 18,
-                          color: isCatSelected ? AppColors.onPrimary : AppColors.primary,
+                          size: 20,
+                          color: isSelected ? AppColors.onPrimary : AppColors.primary,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(height: 4),
                         Text(
                           cat.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: isCatSelected ? AppColors.onPrimary : AppColors.onSurface,
+                            color: isSelected ? AppColors.onPrimary : AppColors.onSurface,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-              );
-            }),
-          ),
+              ),
+            );
+          }),
         ),
 
         const SizedBox(height: 16),
+        _buildSubCardsGrid(activeCat.options),
+      ],
+    );
+  }
 
-        // Sub-Category Cards (2 Columns)
-        GridView.builder(
+  // 2x2 Equal Grid Category bar for Station (Never cuts off)
+  Widget _buildStationCategorySection() {
+    final activeCat = _stationCategories[_activeStationCategoryIndex];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Station Facility Category',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppColors.onSurface,
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        GridView.count(
+          crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: activeCategory.options.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 1.35,
-          ),
-          itemBuilder: (context, optIdx) {
-            final opt = activeCategory.options[optIdx];
-            final isOptSelected = _selectedOption.id == opt.id;
+          childAspectRatio: 2.8,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          children: List.generate(_stationCategories.length, (idx) {
+            final cat = _stationCategories[idx];
+            final isSelected = idx == _activeStationCategoryIndex;
 
             return InkWell(
-              onTap: () => setState(() => _selectedOption = opt),
-              borderRadius: BorderRadius.circular(14),
+              onTap: () {
+                setState(() {
+                  _activeStationCategoryIndex = idx;
+                  _selectedOption = cat.options[0];
+                });
+              },
+              borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: isOptSelected
-                      ? opt.color.withValues(alpha: 0.12)
-                      : AppColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(14),
+                  color: isSelected ? AppColors.primary : AppColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isOptSelected ? opt.color : AppColors.outlineVariant,
-                    width: isOptSelected ? 2 : 1,
+                    color: isSelected ? AppColors.primary : AppColors.outlineVariant,
                   ),
-                  boxShadow: isOptSelected
-                      ? [
-                          BoxShadow(
-                            color: opt.color.withValues(alpha: 0.15),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Icon(opt.icon, color: opt.color, size: 22),
-                        const Spacer(),
-                        if (isOptSelected)
-                          Icon(Icons.check_circle_rounded, color: opt.color, size: 16),
-                      ],
+                    Icon(
+                      cat.icon,
+                      size: 20,
+                      color: isSelected ? AppColors.onPrimary : AppColors.primary,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      opt.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: isOptSelected ? opt.color : AppColors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      opt.subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppColors.onSurfaceVariant,
-                        height: 1.2,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        cat.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? AppColors.onPrimary : AppColors.onSurface,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             );
-          },
+          }),
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
+        _buildSubCardsGrid(activeCat.options),
+      ],
+    );
+  }
 
-        // Selected Status Summary Badge
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: _selectedOption.color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: _selectedOption.color.withValues(alpha: 0.3),
+  Widget _buildSubCardsGrid(List<ReportIssueOption> options) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: options.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 1.35,
+      ),
+      itemBuilder: (context, optIdx) {
+        final opt = options[optIdx];
+        final isOptSelected = _selectedOption.id == opt.id;
+
+        return InkWell(
+          onTap: () => setState(() => _selectedOption = opt),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isOptSelected
+                  ? opt.color.withValues(alpha: 0.12)
+                  : AppColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isOptSelected ? opt.color : AppColors.outlineVariant,
+                width: isOptSelected ? 2 : 1,
+              ),
+              boxShadow: isOptSelected
+                  ? [
+                      BoxShadow(
+                        color: opt.color.withValues(alpha: 0.15),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    Icon(opt.icon, color: opt.color, size: 22),
+                    const Spacer(),
+                    if (isOptSelected)
+                      Icon(Icons.check_circle_rounded, color: opt.color, size: 16),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  opt.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isOptSelected ? opt.color : AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  opt.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.onSurfaceVariant,
+                    height: 1.2,
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Row(
-            children: [
-              Icon(_selectedOption.icon, size: 18, color: _selectedOption.color),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Selected: ${_selectedOption.title} — ${_selectedOption.subtitle}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _selectedOption.color,
+        );
+      },
+    );
+  }
+
+  Widget _buildPhotoUploadSection() {
+    if (_pickedImage != null) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.file(
+                _pickedImage!,
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Photo Attached',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: AppColors.onSurface,
+                    ),
                   ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Will be uploaded with report',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: () => setState(() => _pickedImage = null),
+              icon: const Icon(Icons.cancel_rounded, color: AppColors.error),
+              tooltip: 'Remove photo',
+            ),
+          ],
+        ),
+      );
+    }
+
+    return InkWell(
+      onTap: _showPhotoOptionsModal,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        height: 72,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.outlineVariant, style: BorderStyle.solid),
+        ),
+        child: const Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColors.primaryContainer,
+              child: Icon(Icons.add_a_photo_rounded, size: 20, color: AppColors.primary),
+            ),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Add Photo',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Tap to take photo or choose from device',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: AppColors.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportSummaryCard() {
+    final isBus = _targetType == ReportTargetType.bus;
+    final targetTitle = isBus
+        ? (_selectedBus != null
+            ? '${_selectedBus!.busNo} (Route ${_selectedRoute?.routeNo ?? ""})'
+            : 'Bus Route ${_selectedRoute?.routeNo ?? ""}')
+        : (_selectedStation?.name ?? 'Station on Route ${_selectedRoute?.routeNo ?? ""}');
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.assignment_turned_in_rounded, size: 20, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text(
+                'Report Summary',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.onSurface,
                 ),
               ),
             ],
+          ),
+          const Divider(height: 20),
+          _buildSummaryRow(
+            icon: isBus ? Icons.directions_bus_rounded : Icons.place_rounded,
+            label: 'Location / Vehicle',
+            value: targetTitle,
+            color: AppColors.primary,
+          ),
+          if (isBus) ...[
+            const SizedBox(height: 8),
+            _buildSummaryRow(
+              icon: _selectedCrowding.icon,
+              label: 'Crowding Level',
+              value: '${_selectedCrowding.label} — ${_selectedCrowding.subtitle}',
+              color: _selectedCrowding.color,
+            ),
+          ],
+          const SizedBox(height: 8),
+          _buildSummaryRow(
+            icon: _selectedOption.icon,
+            label: 'Accessibility Status',
+            value: '${_selectedOption.title} — ${_selectedOption.subtitle}',
+            color: _selectedOption.color,
+          ),
+          if (_pickedImage != null) ...[
+            const SizedBox(height: 8),
+            _buildSummaryRow(
+              icon: Icons.camera_alt_rounded,
+              label: 'Photo Evidence',
+              value: '1 photo attached',
+              color: AppColors.success,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: const TextStyle(fontSize: 12, height: 1.3, color: AppColors.onSurface),
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                TextSpan(
+                  text: value,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
           ),
         ),
       ],

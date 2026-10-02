@@ -114,7 +114,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   Map<String, BusRoute> _routesMap = {};
   Map<String, Station> _stationsMap = {};
   bool _isLoadingData = true;
-  String _selectedFilterTab = 'All'; // 'All', '♿ Accessible', '⚡ Fastest'
+  String _selectedFilterTab = 'All'; // 'All', 'Accessible', 'Fastest'
 
   @override
   void initState() {
@@ -340,9 +340,9 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       );
     }).toList();
 
-    // 3. Filter by Tab ('All', '♿ Accessible', '⚡ Fastest')
+    // 3. Filter by Tab ('All', 'Accessible', 'Fastest')
     var filtered = items;
-    if (_selectedFilterTab == '♿ Accessible') {
+    if (_selectedFilterTab == 'Accessible') {
       filtered = filtered
           .where((r) => r.rawBus?.wheelchairAccessible == true || r.rawBus?.hasRamp == true)
           .toList();
@@ -350,7 +350,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 
     // 4. Sort
     filtered.sort((a, b) {
-      if (_selectedFilterTab == '⚡ Fastest') {
+      if (_selectedFilterTab == 'Fastest') {
         return a.durationMinutes.compareTo(b.durationMinutes);
       }
 
@@ -496,7 +496,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   }
 
   Widget _buildEmptyState() {
-    final isFiltered = _selectedFilterTab == '♿ Accessible' ||
+    final isFiltered = _selectedFilterTab == 'Accessible' ||
         widget.wheelchairAccessRequired ||
         widget.stepFreeOnly;
 
@@ -746,16 +746,16 @@ class _LmtGoFilterTabs extends StatelessWidget {
           const SizedBox(width: 8),
           _TabItem(
             icon: Icons.accessible_rounded,
-            label: '♿ Accessible ($accessibleCount)',
-            isSelected: selectedTab == '♿ Accessible',
-            onTap: () => onTabSelected('♿ Accessible'),
+            label: 'Accessible ($accessibleCount)',
+            isSelected: selectedTab == 'Accessible',
+            onTap: () => onTabSelected('Accessible'),
           ),
           const SizedBox(width: 8),
           _TabItem(
             icon: Icons.flash_on_rounded,
-            label: '⚡ Fastest',
-            isSelected: selectedTab == '⚡ Fastest',
-            onTap: () => onTabSelected('⚡ Fastest'),
+            label: 'Fastest',
+            isSelected: selectedTab == 'Fastest',
+            onTap: () => onTabSelected('Fastest'),
           ),
         ],
       ),
