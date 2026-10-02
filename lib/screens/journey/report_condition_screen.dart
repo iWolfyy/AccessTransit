@@ -2,13 +2,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../models/bus.dart';
 import '../../models/report.dart';
+import '../../models/station.dart';
 import '../../services/firestore_service.dart';
 import 'report_submitted_screen.dart';
 
 enum ReportCategory {
   rampAccess,
   elevatorOut,
+  audioVisualIssue,
+  tactilePavingBlocked,
+  driverAssistanceDenied,
   crowding,
   cleanliness,
   safetyHazard,
@@ -17,13 +22,13 @@ enum ReportCategory {
 
 enum ReportSeverity { minor, moderate, major }
 
-/// Report a Condition screen — location, category, severity, photo, details.
+/// Community accessibility condition reporting screen — target selector, category, severity, photo, details.
 class ReportConditionScreen extends StatefulWidget {
   const ReportConditionScreen({
     super.key,
     this.targetType = 'station',
-    this.targetId = 'st_01',
-    this.initialLocation = 'Central Station - Main Entrance',
+    this.targetId = '',
+    this.initialLocation = '',
   });
 
   final String targetType;
@@ -36,19 +41,93 @@ class ReportConditionScreen extends StatefulWidget {
 
 class _ReportConditionScreenState extends State<ReportConditionScreen> {
   static const double _desktopBreakpoint = 768;
+  static String? _cachedGuestUserId;
+
+  static const Map<ReportCategory, List<String>> _subCategoryOptions = {
+    ReportCategory.rampAccess: [
+      'Ramp broken / deployment motor jammed',
+      'Ramp gradient too steep or uneven',
+      'Pathway to ramp blocked by obstacles',
+      'Non-slip ramp surface damaged or slippery',
+      'Ramp safety guardrail missing or damaged',
+    ],
+    ReportCategory.elevatorOut: [
+      'Elevator completely out of service',
+      'Elevator doors failing to open / jammed',
+      'Elevator floor level misaligned with platform',
+      'Braille / Audio button feedback broken',
+      'Emergency call button non-responsive',
+    ],
+    ReportCategory.audioVisualIssue: [
+      'Bus stop display screen turned off or frozen',
+      'Next-stop audio announcements silent',
+      'Visual route display showing wrong destination',
+      'Braille / tactile station sign missing',
+      'PA announcement system distorted',
+    ],
+    ReportCategory.tactilePavingBlocked: [
+      'Tactile paving tiles cracked, broken, or missing',
+      'Tactile pathway blocked by vehicles or luggage',
+      'Loose tiles causing trip hazard',
+      'Tactile path ends abruptly without warning tile',
+    ],
+    ReportCategory.driverAssistanceDenied: [
+      'Driver refused to deploy ramp upon request',
+      'Driver did not allow enough time to sit down',
+      'Vehicle parked too far from platform curb',
+      'Wheelchair securement straps not fastened',
+    ],
+    ReportCategory.crowding: [
+      'Priority seating occupied by non-priority riders',
+      'Wheelchair / stroller bay blocked by heavy bags',
+      'Vehicle overcrowded - unable to board safely',
+      'Platform queue area dangerously congested',
+    ],
+    ReportCategory.cleanliness: [
+      'Spills or litter in priority seating area',
+      'Dirty handrails or seating upholstery',
+      'Vandalism / graffiti obstructing accessibility info',
+      'Strong unpleasant or toxic odor',
+    ],
+    ReportCategory.safetyHazard: [
+      'Slippery floor / uncleaned liquid spill',
+      'Broken seat / loose handrail or grab bar',
+      'Trip hazard on platform edge or stairs',
+      'Inadequate lighting in walkway',
+      'Wide gap between bus/train and platform',
+    ],
+    ReportCategory.other: [
+      'General accessibility concern',
+      'Station staff unavailable or unhelpful',
+      'Wide ticket gate for wheelchairs locked',
+      'Other accessibility issue',
+    ],
+  };
 
   late final TextEditingController _locationController;
   late final TextEditingController _detailsController;
+  final FirestoreService _firestoreService = FirestoreService();
 
+  late String _targetType;
   ReportCategory _category = ReportCategory.rampAccess;
+  String? _selectedSubCategory;
+  String? _selectedPhotoUrl;
   ReportSeverity _severity = ReportSeverity.moderate;
   bool _isSubmitting = false;
+
+  List<Station> _availableStations = [];
+  List<Bus> _availableBuses = [];
+  Station? _selectedStation;
+  Bus? _selectedBus;
 
   @override
   void initState() {
     super.initState();
+    _targetType = widget.targetType.isNotEmpty ? widget.targetType : 'station';
     _locationController = TextEditingController(text: widget.initialLocation);
     _detailsController = TextEditingController();
+    _selectedSubCategory = _subCategoryOptions[_category]!.first;
+    _loadTargetMetadata();
   }
 
   @override
@@ -58,36 +137,237 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     super.dispose();
   }
 
+  Future<void> _loadTargetMetadata() async {
+    try {
+      final stations = await _firestoreService.getStations();
+      final buses = await _firestoreService.getBuses();
+
+      if (mounted) {
+        setState(() {
+          _availableStations = stations;
+          _availableBuses = buses;
+
+          if (widget.targetId.isNotEmpty) {
+            if (_targetType == 'station') {
+              try {
+                _selectedStation = stations.firstWhere(
+                  (s) => s.id == widget.targetId,
+                );
+                _locationController.text = _selectedStation!.name;
+              } catch (_) {}
+            } else {
+              try {
+                _selectedBus = buses.firstWhere((b) => b.id == widget.targetId);
+                _locationController.text = 'Bus Route ${_selectedBus!.routeNo}';
+              } catch (_) {}
+            }
+          } else if (_locationController.text.isEmpty && stations.isNotEmpty) {
+            _selectedStation = stations.first;
+            _locationController.text = stations.first.name;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  String _getOrCreateUserId() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && user.uid.isNotEmpty) {
+      return user.uid;
+    }
+    _cachedGuestUserId ??=
+        'guest_user_${DateTime.now().millisecondsSinceEpoch}';
+    return _cachedGuestUserId!;
+  }
+
   void _showSnack(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _showPhotoPickerDialog() {
+    final urlController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.add_a_photo, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text(
+              'Attach Condition Photo',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.onSurface,
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Select sample evidence photo or enter image URL:',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildPhotoOption(
+                    dialogContext,
+                    'Broken Ramp',
+                    'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=600&q=80',
+                  ),
+                  _buildPhotoOption(
+                    dialogContext,
+                    'Elevator Out',
+                    'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80',
+                  ),
+                  _buildPhotoOption(
+                    dialogContext,
+                    'Crowded Bus',
+                    'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=600&q=80',
+                  ),
+                  _buildPhotoOption(
+                    dialogContext,
+                    'Station Hazard',
+                    'https://images.unsplash.com/photo-1517649763962-0c623266010b?auto=format&fit=crop&w=600&q=80',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              TextField(
+                controller: urlController,
+                decoration: InputDecoration(
+                  labelText: 'Image Web URL',
+                  hintText: 'https://example.com/photo.jpg',
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final url = urlController.text.trim();
+              if (url.isNotEmpty) {
+                setState(() => _selectedPhotoUrl = url);
+                Navigator.of(dialogContext).pop();
+                _showSnack('Photo attached!');
+              } else {
+                _showSnack('Please select a photo or enter a valid URL.');
+              }
+            },
+            child: const Text('Use URL'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoOption(
+    BuildContext dialogContext,
+    String label,
+    String url,
+  ) {
+    return InkWell(
+      onTap: () {
+        setState(() => _selectedPhotoUrl = url);
+        Navigator.of(dialogContext).pop();
+        _showSnack('$label photo attached!');
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 125,
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.outlineVariant),
+        ),
+        child: Column(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.network(
+                url,
+                height: 65,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 65,
+                  color: AppColors.surfaceContainer,
+                  child: const Icon(
+                    Icons.broken_image,
+                    color: AppColors.outline,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
-    final location = _locationController.text.trim();
-    if (location.isEmpty) {
-      _showSnack('Please enter a location or vehicle.');
+    final locationName = _locationController.text.trim();
+    if (locationName.isEmpty) {
+      _showSnack('Please select or enter a location or vehicle.');
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        try {
-          final anonCred = await FirebaseAuth.instance.signInAnonymously();
-          user = anonCred.user;
-        } catch (_) {}
+      final userId = _getOrCreateUserId();
+
+      String derivedTargetId = '';
+      if (_targetType == 'station') {
+        derivedTargetId =
+            _selectedStation?.id ??
+            (widget.targetId.isNotEmpty
+                ? widget.targetId
+                : 'st_${locationName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}');
+      } else {
+        derivedTargetId =
+            _selectedBus?.id ??
+            (widget.targetId.isNotEmpty
+                ? widget.targetId
+                : 'bus_${locationName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}');
       }
-      final userId = user?.uid ?? 'user_anon_${DateTime.now().millisecondsSinceEpoch}';
-      final targetId = widget.targetId.isNotEmpty ? widget.targetId : location;
 
       // Rate limit check: 15 minutes window (AC-77)
-      final isRateLimited = await FirestoreService().checkRateLimit(
+      final isRateLimited = await _firestoreService.checkRateLimit(
         userId,
-        targetId,
+        derivedTargetId,
         thresholdMinutes: 15,
       );
 
@@ -99,22 +379,20 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         return;
       }
 
-      final problemLabel = switch (_category) {
-        ReportCategory.rampAccess => 'Ramp broken',
-        ReportCategory.elevatorOut => 'Elevator broken',
-        ReportCategory.crowding => 'Ramp stuck',
-        ReportCategory.cleanliness => 'Cleanliness issue',
-        ReportCategory.safetyHazard => 'Safety Hazard',
-        ReportCategory.other => _detailsController.text.trim().isNotEmpty
-            ? _detailsController.text.trim()
-            : 'Other issue',
-      };
+      final subCategoryText =
+          _selectedSubCategory ?? _subCategoryOptions[_category]!.first;
 
       final report = Report(
         id: '',
-        targetType: widget.targetType,
-        targetId: targetId,
-        problemType: problemLabel,
+        targetType: _targetType,
+        targetId: derivedTargetId,
+        targetName: locationName,
+        problemType: subCategoryText,
+        subCategory: subCategoryText,
+        photoUrl: _selectedPhotoUrl ?? '',
+        severity: _severity.name,
+        category: _category.name,
+        description: _detailsController.text.trim(),
         status: 'active',
         createdAt: DateTime.now(),
         lastConfirmedAt: DateTime.now(),
@@ -125,15 +403,13 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         flaggedBy: const [],
       );
 
-      await FirestoreService().createReport(report);
+      await _firestoreService.createReport(report);
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => ReportSubmittedScreen(
-              report: report,
-              targetName: location,
-            ),
+            builder: (_) =>
+                ReportSubmittedScreen(report: report, targetName: locationName),
           ),
         );
       }
@@ -168,7 +444,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const Text(
-                          'Location or Vehicle',
+                          'Target Type & Location',
                           style: TextStyle(
                             fontSize: 18,
                             height: 24 / 18,
@@ -176,7 +452,138 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                             color: AppColors.onSurface,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Center(
+                                  child: Text('Station / Stop'),
+                                ),
+                                selected: _targetType == 'station',
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    setState(() {
+                                      _targetType = 'station';
+                                      _selectedBus = null;
+                                      if (_availableStations.isNotEmpty) {
+                                        _selectedStation =
+                                            _availableStations.first;
+                                        _locationController.text =
+                                            _selectedStation!.name;
+                                      }
+                                    });
+                                  }
+                                },
+                                selectedColor: AppColors.primaryContainer,
+                                labelStyle: TextStyle(
+                                  color: _targetType == 'station'
+                                      ? AppColors.onPrimary
+                                      : AppColors.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Center(
+                                  child: Text('Bus Route / Vehicle'),
+                                ),
+                                selected: _targetType == 'bus',
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    setState(() {
+                                      _targetType = 'bus';
+                                      _selectedStation = null;
+                                      if (_availableBuses.isNotEmpty) {
+                                        _selectedBus = _availableBuses.first;
+                                        _locationController.text =
+                                            'Bus Route ${_selectedBus!.routeNo}';
+                                      }
+                                    });
+                                  }
+                                },
+                                selectedColor: AppColors.primaryContainer,
+                                labelStyle: TextStyle(
+                                  color: _targetType == 'bus'
+                                      ? AppColors.onPrimary
+                                      : AppColors.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        if (_targetType == 'station' &&
+                            _availableStations.isNotEmpty) ...[
+                          DropdownButtonFormField<Station>(
+                            initialValue: _selectedStation,
+                            decoration: InputDecoration(
+                              labelText: 'Select Station',
+                              prefixIcon: const Icon(
+                                Icons.location_city,
+                                color: AppColors.primary,
+                              ),
+                              filled: true,
+                              fillColor: AppColors.surfaceContainerLowest,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            items: _availableStations.map((s) {
+                              return DropdownMenuItem<Station>(
+                                value: s,
+                                child: Text(s.name),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _selectedStation = val;
+                                  _locationController.text = val.name;
+                                });
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                        ] else if (_targetType == 'bus' &&
+                            _availableBuses.isNotEmpty) ...[
+                          DropdownButtonFormField<Bus>(
+                            initialValue: _selectedBus,
+                            decoration: InputDecoration(
+                              labelText: 'Select Bus Route',
+                              prefixIcon: const Icon(
+                                Icons.directions_bus,
+                                color: AppColors.primary,
+                              ),
+                              filled: true,
+                              fillColor: AppColors.surfaceContainerLowest,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            items: _availableBuses.map((b) {
+                              return DropdownMenuItem<Bus>(
+                                value: b,
+                                child: Text(
+                                  'Bus Route ${b.routeNo} (ID: ${b.id})',
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _selectedBus = val;
+                                  _locationController.text =
+                                      'Bus Route ${val.routeNo}';
+                                });
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         TextField(
                           controller: _locationController,
                           style: const TextStyle(
@@ -185,7 +592,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                             color: AppColors.onSurface,
                           ),
                           decoration: InputDecoration(
-                            hintText: 'e.g., Bus 42, Central Station...',
+                            hintText: 'e.g., Central Station - Main Entrance',
+                            labelText: 'Location / Vehicle Name',
                             hintStyle: const TextStyle(
                               color: AppColors.onSurfaceVariant,
                             ),
@@ -220,15 +628,6 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Current detected location',
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 20 / 14,
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                        ),
                         const SizedBox(height: 32),
                         const Text(
                           "What's the issue?",
@@ -242,8 +641,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                         const SizedBox(height: 16),
                         LayoutBuilder(
                           builder: (context, constraints) {
-                            final crossAxisCount =
-                                constraints.maxWidth >= 600 ? 3 : 2;
+                            final crossAxisCount = constraints.maxWidth >= 600
+                                ? 3
+                                : 2;
                             const spacing = 16.0;
                             final tileWidth =
                                 (constraints.maxWidth -
@@ -262,6 +662,21 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                 'Elevator Out',
                               ),
                               (
+                                ReportCategory.audioVisualIssue,
+                                Icons.volume_off,
+                                'Audio/Display',
+                              ),
+                              (
+                                ReportCategory.tactilePavingBlocked,
+                                Icons.blind,
+                                'Tactile Path',
+                              ),
+                              (
+                                ReportCategory.driverAssistanceDenied,
+                                Icons.person_off,
+                                'Driver Support',
+                              ),
+                              (
                                 ReportCategory.crowding,
                                 Icons.groups,
                                 'Crowding',
@@ -276,7 +691,11 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                 Icons.warning_amber_rounded,
                                 'Safety Hazard',
                               ),
-                              (ReportCategory.other, Icons.help_outline, 'Other'),
+                              (
+                                ReportCategory.other,
+                                Icons.help_outline,
+                                'Other',
+                              ),
                             ];
 
                             return Wrap(
@@ -291,13 +710,67 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                       icon: item.$2,
                                       label: item.$3,
                                       selected: _category == item.$1,
-                                      onTap: () => setState(
-                                        () => _category = item.$1,
-                                      ),
+                                      onTap: () => setState(() {
+                                        _category = item.$1;
+                                        _selectedSubCategory =
+                                            _subCategoryOptions[_category]!
+                                                .first;
+                                      }),
                                     ),
                                   ),
                               ],
                             );
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Specific Issue Details',
+                          style: TextStyle(
+                            fontSize: 18,
+                            height: 24 / 18,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value:
+                              _selectedSubCategory ??
+                              _subCategoryOptions[_category]!.first,
+                          decoration: InputDecoration(
+                            labelText: 'Detailed Condition Issue',
+                            prefixIcon: const Icon(
+                              Icons.tune,
+                              color: AppColors.primary,
+                            ),
+                            filled: true,
+                            fillColor: AppColors.surfaceContainerLowest,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: AppColors.outline,
+                              ),
+                            ),
+                          ),
+                          isExpanded: true,
+                          items:
+                              (_subCategoryOptions[_category] ?? []).map((opt) {
+                                return DropdownMenuItem<String>(
+                                  value: opt,
+                                  child: Text(
+                                    opt,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.onSurface,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _selectedSubCategory = val);
+                            }
                           },
                         ),
                         const SizedBox(height: 32),
@@ -341,8 +814,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                       selected:
                                           _severity == ReportSeverity.minor,
                                       onTap: () => setState(
-                                        () =>
-                                            _severity = ReportSeverity.minor,
+                                        () => _severity = ReportSeverity.minor,
                                       ),
                                     ),
                                     _SeverityTile(
@@ -350,8 +822,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                       selected:
                                           _severity == ReportSeverity.moderate,
                                       onTap: () => setState(
-                                        () => _severity =
-                                            ReportSeverity.moderate,
+                                        () =>
+                                            _severity = ReportSeverity.moderate,
                                       ),
                                     ),
                                     _SeverityTile(
@@ -360,8 +832,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                           _severity == ReportSeverity.major,
                                       emphasizeError: true,
                                       onTap: () => setState(
-                                        () =>
-                                            _severity = ReportSeverity.major,
+                                        () => _severity = ReportSeverity.major,
                                       ),
                                     ),
                                   ];
@@ -369,9 +840,11 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                   if (stacked) {
                                     return Column(
                                       children: [
-                                        for (var i = 0;
-                                            i < tiles.length;
-                                            i++) ...[
+                                        for (
+                                          var i = 0;
+                                          i < tiles.length;
+                                          i++
+                                        ) ...[
                                           if (i > 0) const SizedBox(height: 8),
                                           tiles[i],
                                         ],
@@ -381,9 +854,11 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
                                   return Row(
                                     children: [
-                                      for (var i = 0;
-                                          i < tiles.length;
-                                          i++) ...[
+                                      for (
+                                        var i = 0;
+                                        i < tiles.length;
+                                        i++
+                                      ) ...[
                                         if (i > 0) const SizedBox(width: 8),
                                         Expanded(child: tiles[i]),
                                       ],
@@ -420,46 +895,153 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Material(
-                          color: AppColors.surfaceContainerLowest,
-                          borderRadius: BorderRadius.circular(12),
-                          child: InkWell(
-                            onTap: () => _showSnack(
-                              'Photo upload will be available soon.',
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            child: CustomPaint(
-                              painter: _DashedBorderPainter(
-                                color: AppColors.outlineVariant,
-                                radius: 12,
+                        if (_selectedPhotoUrl != null &&
+                            _selectedPhotoUrl!.isNotEmpty) ...[
+                          Container(
+                            height: 170,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppColors.primary,
+                                width: 1.5,
                               ),
-                              child: const SizedBox(
-                                height: 120,
-                                width: double.infinity,
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.add_a_photo_outlined,
-                                      size: 32,
-                                      color: AppColors.onSurfaceVariant,
-                                    ),
-                                    SizedBox(height: 8),
-                                    Text(
-                                      'Tap to upload or take a photo',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        height: 20 / 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.onSurfaceVariant,
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Image.network(
+                                    _selectedPhotoUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (_, __, ___) => Container(
+                                          color: AppColors.surfaceContainer,
+                                          child: const Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.broken_image,
+                                                size: 40,
+                                                color: AppColors.outline,
+                                              ),
+                                              SizedBox(height: 8),
+                                              Text(
+                                                'Photo preview unavailable',
+                                                style: TextStyle(
+                                                  color:
+                                                      AppColors
+                                                          .onSurfaceVariant,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                  ),
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: CircleAvatar(
+                                      backgroundColor: Colors.black.withValues(
+                                        alpha: 0.7,
+                                      ),
+                                      radius: 18,
+                                      child: IconButton(
+                                        padding: EdgeInsets.zero,
+                                        icon: const Icon(
+                                          Icons.close,
+                                          size: 20,
+                                          color: Colors.white,
+                                        ),
+                                        onPressed: () {
+                                          setState(
+                                            () => _selectedPhotoUrl = null,
+                                          );
+                                          _showSnack('Photo removed');
+                                        },
                                       ),
                                     ),
-                                  ],
+                                  ),
+                                  Positioned(
+                                    bottom: 8,
+                                    left: 8,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.75,
+                                        ),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Row(
+                                        children: [
+                                          Icon(
+                                            Icons.check_circle,
+                                            color: AppColors.success,
+                                            size: 14,
+                                          ),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            'Photo Attached',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          Material(
+                            color: AppColors.surfaceContainerLowest,
+                            borderRadius: BorderRadius.circular(12),
+                            child: InkWell(
+                              onTap: _showPhotoPickerDialog,
+                              borderRadius: BorderRadius.circular(12),
+                              child: CustomPaint(
+                                painter: _DashedBorderPainter(
+                                  color: AppColors.outlineVariant,
+                                  radius: 12,
+                                ),
+                                child: const SizedBox(
+                                  height: 120,
+                                  width: double.infinity,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.add_a_photo_outlined,
+                                        size: 32,
+                                        color: AppColors.onSurfaceVariant,
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'Tap to upload or select a photo',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          height: 20 / 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                         const SizedBox(height: 24),
                         const Text(
                           'Additional Details',
@@ -732,10 +1314,7 @@ class _SeverityTile extends StatelessWidget {
 }
 
 class _DashedBorderPainter extends CustomPainter {
-  _DashedBorderPainter({
-    required this.color,
-    required this.radius,
-  });
+  _DashedBorderPainter({required this.color, required this.radius});
 
   final Color color;
   final double radius;
@@ -775,4 +1354,3 @@ class _DashedBorderPainter extends CustomPainter {
     return oldDelegate.color != color || oldDelegate.radius != radius;
   }
 }
-

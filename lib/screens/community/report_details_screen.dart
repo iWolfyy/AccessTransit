@@ -1,8 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../../constants/firestore_constants.dart';
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/time_utils.dart';
@@ -23,12 +21,10 @@ class ReportDetailsScreen extends StatefulWidget {
     this.routeLabel = 'Route: Colombo Fort',
     this.crowdLevel = 'High',
     this.accessibilityLabel = 'Limited',
-    this.quote =
-        '"Bus is full to the door. Wheelchair ramp cannot be deployed at this time due to crowding." - User report',
+    this.quote = '"Bus is full to the door. Wheelchair ramp cannot be deployed at this time due to crowding." - User report',
     this.mapLocationLabel = 'Near Galle Road',
     this.communityVerified = true,
-    this.mapImageUrl =
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuAOMMcLufr5bpq0EgIxEjqEV1LLclBgoIANV1g531KV4Zys1O3GHBI_pr_mgZ2otnxPhD2Eaae8tKy0R23GOFc7CPANsZxaAnGPObXTw92waN1G_9v-1maG4whOGa-BcLo2mimewhM-r-F4zDN1zAGyRZpXrvTu9GDEJAIFNY3_0yFb32q3xsG1Knafg-ipok7lYOiu-IpV3g6OBm2YTwAZC_QRWqnGN-FtO5QnEuTX3jVQD-r7iw-_KA',
+    this.mapImageUrl = 'https://lh3.googleusercontent.com/aida-public/AB6AXuAOMMcLufr5bpq0EgIxEjqEV1LLclBgoIANV1g531KV4Zys1O3GHBI_pr_mgZ2otnxPhD2Eaae8tKy0R23GOFc7CPANsZxaAnGPObXTw92waN1G_9v-1maG4whOGa-BcLo2mimewhM-r-F4zDN1zAGyRZpXrvTu9GDEJAIFNY3_0yFb32q3xsG1Knafg-ipok7lYOiu-IpV3g6OBm2YTwAZC_QRWqnGN-FtO5QnEuTX3jVQD-r7iw-_KA',
   });
 
   final Report? report;
@@ -70,15 +66,20 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     );
   }
 
-  Future<void> _handleConfirm(Report report) async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      try {
-        final cred = await FirebaseAuth.instance.signInAnonymously();
-        user = cred.user;
-      } catch (_) {}
+  static String? _cachedGuestUserId;
+
+  String _getOrCreateUserId() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && user.uid.isNotEmpty) {
+      return user.uid;
     }
-    final userId = user?.uid ?? 'user_anon_${DateTime.now().millisecondsSinceEpoch}';
+    _cachedGuestUserId ??=
+        'guest_user_${DateTime.now().millisecondsSinceEpoch}';
+    return _cachedGuestUserId!;
+  }
+
+  Future<void> _handleConfirm(Report report) async {
+    final userId = _getOrCreateUserId();
     if (report.confirmedBy.contains(userId)) {
       _showSnack('You already confirmed this report.');
       return;
@@ -92,7 +93,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        _showSnack('Action failed: ${e.toString().replaceAll('Exception: ', '')}');
+        _showSnack(
+          'Action failed: ${e.toString().replaceAll('Exception: ', '')}',
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoadingAction = false);
@@ -108,7 +111,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        _showSnack('Action failed: ${e.toString().replaceAll('Exception: ', '')}');
+        _showSnack(
+          'Action failed: ${e.toString().replaceAll('Exception: ', '')}',
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoadingAction = false);
@@ -116,7 +121,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   }
 
   Future<void> _handleFlag(Report report) async {
-    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'user_anon';
+    final userId = _getOrCreateUserId();
     if (report.flaggedBy.contains(userId)) {
       _showSnack('You already flagged this report.');
       return;
@@ -130,7 +135,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        _showSnack('Action failed: ${e.toString().replaceAll('Exception: ', '')}');
+        _showSnack(
+          'Action failed: ${e.toString().replaceAll('Exception: ', '')}',
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoadingAction = false);
@@ -143,26 +150,22 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     final targetReportId = widget.report?.id ?? widget.reportId ?? '';
 
     if (targetReportId.isNotEmpty) {
-      return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection(FirestoreConstants.reportsCollection)
-            .doc(targetReportId)
-            .snapshots(),
+      return StreamBuilder<Report?>(
+        stream: FirestoreService().streamReportById(targetReportId),
         builder: (context, snapshot) {
-          Report currentReport = widget.report ??
+          Report currentReport =
+              snapshot.data ??
+              widget.report ??
               Report(
                 id: targetReportId,
                 targetType: 'station',
                 targetId: '',
+                targetName: widget.targetTitle,
                 problemType: widget.title,
                 status: 'active',
                 createdAt: DateTime.now(),
                 userId: '',
               );
-
-          if (snapshot.hasData && snapshot.data!.exists) {
-            currentReport = Report.fromFirestore(snapshot.data!);
-          }
 
           return _buildContent(context, isDesktop, currentReport);
         },
@@ -172,14 +175,11 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     return _buildContent(context, isDesktop, widget.report);
   }
 
-  Widget _buildContent(
-    BuildContext context,
-    bool isDesktop,
-    Report? report,
-  ) {
+  Widget _buildContent(BuildContext context, bool isDesktop, Report? report) {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? 'user_anon';
-    final isReportActive =
-        report != null ? StatusLogic.isReportActive(report) : true;
+    final isReportActive = report != null
+        ? StatusLogic.isReportActive(report)
+        : true;
     final isResolved = report?.status.toLowerCase() == 'resolved';
     final isHidden = report?.status.toLowerCase() == 'hidden';
     final hasConfirmed = report?.confirmedBy.contains(userId) ?? false;
@@ -195,11 +195,17 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
     final trustLine = report != null
         ? (report.confirmCount > 0
-            ? 'Confirmed by ${report.confirmCount} ${report.confirmCount == 1 ? 'rider' : 'riders'}, $lastConfirmedAgoText'
-            : 'Reported $timeAgoText')
+              ? 'Confirmed by ${report.confirmCount} ${report.confirmCount == 1 ? 'rider' : 'riders'}, $lastConfirmedAgoText'
+              : 'Reported $timeAgoText')
         : 'Confirmed by riders';
 
-    final targetNameLabel = widget.targetTitle;
+    final targetNameLabel = (report?.targetName.trim().isNotEmpty == true)
+        ? report!.targetName
+        : widget.targetTitle;
+
+    final descriptionQuote = (report?.description.trim().isNotEmpty == true)
+        ? '"${report!.description}"'
+        : widget.quote;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -211,12 +217,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           ),
           Expanded(
             child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                isDesktop ? 24 : 16,
-                16,
-                24,
-              ),
+              padding: EdgeInsets.fromLTRB(16, isDesktop ? 24 : 16, 16, 24),
               children: [
                 Center(
                   child: ConstrainedBox(
@@ -231,15 +232,20 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           routeLabel: report != null
                               ? 'Target: ${report.targetType.toUpperCase()} (${report.targetId})'
                               : widget.routeLabel,
-                          crowdLevel: widget.crowdLevel,
+                          crowdLevel: report != null
+                              ? 'Severity: ${report.severity.toUpperCase()}'
+                              : widget.crowdLevel,
                           accessibilityLabel: isResolved
                               ? 'Resolved / Fixed'
-                              : (isReportActive ? 'Warning / Issue' : 'Expired'),
-                          quote: widget.quote,
+                              : (isReportActive
+                                    ? 'Warning / Issue'
+                                    : 'Expired'),
+                          quote: descriptionQuote,
                           communityVerified: (report?.confirmCount ?? 0) > 0,
                           isResolved: isResolved,
                           isExpired: !isReportActive && !isResolved,
                           tertiaryContainer: _tertiaryContainer,
+                          photoUrl: report?.photoUrl,
                         ),
                         const SizedBox(height: 24),
                         _MapSection(
@@ -263,7 +269,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: AppColors.errorContainer.withValues(alpha: 0.2),
+                              color: AppColors.errorContainer.withValues(
+                                alpha: 0.2,
+                              ),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Text(
@@ -276,7 +284,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           ),
                         ] else ...[
                           _ActionButtons(
-                            onShare: () => _showSnack('Share Alert coming soon.'),
+                            onShare: () =>
+                                _showSnack('Share Alert coming soon.'),
                             onAddUpdate: () =>
                                 _showSnack('Add Update coming soon.'),
                           ),
@@ -296,10 +305,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.onBack,
-    this.onProfile,
-  });
+  const _TopBar({required this.onBack, this.onProfile});
 
   final VoidCallback onBack;
   final VoidCallback? onProfile;
@@ -321,10 +327,7 @@ class _TopBar extends StatelessWidget {
                 IconButton(
                   onPressed: onBack,
                   tooltip: 'Go back',
-                  icon: const Icon(
-                    Icons.arrow_back,
-                    color: AppColors.primary,
-                  ),
+                  icon: const Icon(Icons.arrow_back, color: AppColors.primary),
                 ),
                 const SizedBox(width: 4),
                 const Expanded(
@@ -369,6 +372,7 @@ class _StatusCard extends StatelessWidget {
     required this.isResolved,
     required this.isExpired,
     required this.tertiaryContainer,
+    this.photoUrl,
   });
 
   final String title;
@@ -382,6 +386,7 @@ class _StatusCard extends StatelessWidget {
   final bool isResolved;
   final bool isExpired;
   final Color tertiaryContainer;
+  final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -591,6 +596,33 @@ class _StatusCard extends StatelessWidget {
                     );
                   },
                 ),
+                if (photoUrl != null && photoUrl!.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Attached Photo Evidence',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      photoUrl!,
+                      height: 200,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 90,
+                        color: AppColors.surfaceContainer,
+                        alignment: Alignment.center,
+                        child: const Text('Image preview unavailable'),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -601,10 +633,7 @@ class _StatusCard extends StatelessWidget {
 }
 
 class _VehicleInfo extends StatelessWidget {
-  const _VehicleInfo({
-    required this.vehicleLabel,
-    required this.routeLabel,
-  });
+  const _VehicleInfo({required this.vehicleLabel, required this.routeLabel});
 
   final String vehicleLabel;
   final String routeLabel;
@@ -764,10 +793,7 @@ class _MetricBadge extends StatelessWidget {
 }
 
 class _MapSection extends StatelessWidget {
-  const _MapSection({
-    required this.imageUrl,
-    required this.locationLabel,
-  });
+  const _MapSection({required this.imageUrl, required this.locationLabel});
 
   final String imageUrl;
   final String locationLabel;
@@ -861,7 +887,9 @@ class _ReportActionPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.4)),
+        border: Border.all(
+          color: AppColors.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -918,7 +946,10 @@ class _ReportActionPanel extends StatelessWidget {
                     icon: const Icon(Icons.thumb_up, size: 18),
                     label: Text(
                       hasConfirmed ? 'Confirmed' : 'Still broken',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -932,7 +963,9 @@ class _ReportActionPanel extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.success,
                       side: BorderSide(
-                        color: isResolved ? AppColors.outline : AppColors.success,
+                        color: isResolved
+                            ? AppColors.outline
+                            : AppColors.success,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -941,7 +974,10 @@ class _ReportActionPanel extends StatelessWidget {
                     icon: const Icon(Icons.check_circle_outline, size: 18),
                     label: Text(
                       isResolved ? 'Resolved' : 'Fixed now',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -953,13 +989,14 @@ class _ReportActionPanel extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: (hasFlagged || isLoading) ? null : onFlag,
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.error,
-              ),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
               icon: const Icon(Icons.flag_outlined, size: 16),
               label: Text(
                 hasFlagged ? 'Flagged as false' : 'Report as false',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ),
@@ -970,10 +1007,7 @@ class _ReportActionPanel extends StatelessWidget {
 }
 
 class _ActionButtons extends StatelessWidget {
-  const _ActionButtons({
-    required this.onShare,
-    required this.onAddUpdate,
-  });
+  const _ActionButtons({required this.onShare, required this.onAddUpdate});
 
   final VoidCallback onShare;
   final VoidCallback onAddUpdate;
@@ -1028,21 +1062,13 @@ class _ActionButtons extends StatelessWidget {
         if (stacked) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              share,
-              const SizedBox(height: 8),
-              update,
-            ],
+            children: [share, const SizedBox(height: 8), update],
           );
         }
 
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            share,
-            const SizedBox(width: 8),
-            update,
-          ],
+          children: [share, const SizedBox(width: 8), update],
         );
       },
     );

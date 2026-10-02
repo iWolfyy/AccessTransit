@@ -68,7 +68,13 @@ class FirestoreConstants {
 
   static const String fieldTargetType = 'targetType';
   static const String fieldTargetId = 'targetId';
+  static const String fieldTargetName = 'targetName';
   static const String fieldProblemType = 'problemType';
+  static const String fieldSeverity = 'severity';
+  static const String fieldCategory = 'category';
+  static const String fieldSubCategory = 'subCategory';
+  static const String fieldDescription = 'description';
+  static const String fieldPhotoUrl = 'photoUrl';
   static const String fieldLastConfirmedAt = 'lastConfirmedAt';
   static const String fieldConfirmCount = 'confirmCount';
   static const String fieldFalseCount = 'falseCount';

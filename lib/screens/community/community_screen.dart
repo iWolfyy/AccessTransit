@@ -68,6 +68,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   String _resolveTargetTitle(Report report) {
+    if (report.targetName.trim().isNotEmpty) {
+      return report.targetName;
+    }
     if (report.targetType.toLowerCase() == 'station') {
       return _stationsMap[report.targetId]?.name ??
           'Station ${report.targetId}';
@@ -498,6 +501,44 @@ class _ReportCardWidget extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (report.photoUrl != null && report.photoUrl!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryContainer.withValues(
+                            alpha: 0.15,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.photo_camera,
+                              size: 14,
+                              color: AppColors.primary,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Photo Attached',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Row(
                   children: [

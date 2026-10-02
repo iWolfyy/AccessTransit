@@ -237,6 +237,37 @@ class FirestoreService {
     }
   }
 
+  /// Returns a real-time stream of a single report by ID (`reports/{id}`).
+  Stream<Report?> streamReportById(String reportId) async* {
+    Report? findLocal() {
+      final idx = _localReportsFallback.indexWhere((r) => r.id == reportId);
+      if (idx != -1) return _localReportsFallback[idx];
+      return null;
+    }
+
+    yield findLocal();
+
+    try {
+      await for (final snapshot in _reportsRef.doc(reportId).snapshots()) {
+        if (snapshot.exists && snapshot.data() != null) {
+          final report = Report.fromFirestore(snapshot);
+          final idx = _localReportsFallback.indexWhere((r) => r.id == reportId);
+          if (idx != -1) {
+            _localReportsFallback[idx] = report;
+          } else {
+            _localReportsFallback.add(report);
+          }
+          yield report;
+        } else {
+          yield findLocal();
+        }
+      }
+    } catch (e) {
+      debugPrint('Firestore streamReportById fallback: $e');
+      yield findLocal();
+    }
+  }
+
   /// Submits a new condition report to Firestore (`reports/{id}`).
   Future<void> createReport(Report report) async {
     final reportId = report.id.isNotEmpty

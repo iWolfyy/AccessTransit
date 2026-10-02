@@ -91,53 +91,72 @@ class ReportSubmittedScreen extends StatelessWidget {
                             ),
                           ],
                         ),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const CircleAvatar(
-                              radius: 24,
-                              backgroundColor: AppColors.primaryContainer,
-                              child: Icon(
-                                Icons.accessible_forward,
-                                color: AppColors.onPrimaryContainer,
-                              ),
+                            Row(
+                              children: [
+                                const CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: AppColors.primaryContainer,
+                                  child: Icon(
+                                    Icons.accessible_forward,
+                                    color: AppColors.onPrimaryContainer,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        report != null
+                                            ? report!.problemType
+                                            : 'Report Active',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          height: 24 / 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '$targetName • ${report != null ? TimeUtils.formatRelativeTime(report!.createdAt) : 'Just now'}',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          height: 20 / 14,
+                                          color: AppColors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        'Status: Active • Visible in Community Hub',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    report != null
-                                        ? report!.problemType
-                                        : 'Report Active',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      height: 24 / 18,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '$targetName • ${report != null ? TimeUtils.formatRelativeTime(report!.createdAt) : 'Just now'}',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      height: 20 / 14,
-                                      color: AppColors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text(
-                                    'Status: Active • Visible in Community Hub',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ],
+                            if (report?.photoUrl != null &&
+                                report!.photoUrl!.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  report!.photoUrl!,
+                                  height: 140,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
