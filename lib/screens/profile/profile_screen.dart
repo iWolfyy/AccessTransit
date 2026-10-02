@@ -341,7 +341,7 @@ class _ProfileHeader extends StatelessWidget {
               child: Text(
                 initials,
                 style: const TextStyle(
-                  color: AppColors.onPrimaryContainer,
+                  color: AppColors.onPrimary,
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
                 ),
@@ -553,7 +553,7 @@ class _ImpactCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.favorite, color: AppColors.onPrimaryContainer),
+                      Icon(Icons.favorite, color: AppColors.onPrimary),
                       SizedBox(width: 8),
                       Text(
                         'Your Impact',
@@ -561,7 +561,7 @@ class _ImpactCard extends StatelessWidget {
                           fontSize: 18,
                           height: 24 / 18,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.onPrimaryContainer,
+                          color: AppColors.onPrimary,
                         ),
                       ),
                     ],
@@ -572,7 +572,7 @@ class _ImpactCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 16,
                         height: 24 / 16,
-                        color: AppColors.onPrimaryContainer,
+                        color: AppColors.onPrimary,
                       ),
                       children: [
                         TextSpan(text: 'Your reports have helped '),

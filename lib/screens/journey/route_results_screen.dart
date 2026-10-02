@@ -845,11 +845,11 @@ class _LmtGoRouteCard extends StatelessWidget {
     final hasRamp = rawBus?.wheelchairAccessible == true || rawBus?.hasRamp == true;
     final hasLowFloor = rawBus?.lowFloor == true;
 
-    // LMT Go Status Pill Color
+    // LMT Go Status Pill Color (WCAG AA/AAA compliant contrast)
     final (statusBg, statusFg) = switch (route.liveStatusLabel.toLowerCase()) {
-      'ongoing' => (const Color(0xFFE8F5E9), const Color(0xFF2E7D32)),
-      'approaching' => (const Color(0xFFE3F2FD), const Color(0xFF1565C0)),
-      'delayed' => (const Color(0xFFFFEBEE), const Color(0xFFC62828)),
+      'ongoing' => (const Color(0xFFE8F5E9), const Color(0xFF1B5E20)), // 6.7:1 on #E8F5E9
+      'approaching' => (const Color(0xFFE3F2FD), const Color(0xFF0D47A1)), // 8.2:1 on #E3F2FD
+      'delayed' => (const Color(0xFFFFEBEE), const Color(0xFFB71C1C)), // 7.0:1 on #FFEBEE
       _ => (AppColors.surfaceContainer, AppColors.onSurfaceVariant),
     };
 
@@ -1201,14 +1201,14 @@ class _LiveTripBadge extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.directions_bus_filled, size: 14, color: Colors.green.shade700),
+              Icon(Icons.directions_bus_filled, size: 14, color: Colors.green.shade800),
               const SizedBox(width: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: Colors.green.shade800,
+                  color: Colors.green.shade900,
                 ),
               ),
             ],

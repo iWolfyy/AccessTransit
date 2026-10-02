@@ -902,7 +902,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: AppColors.onPrimaryContainer,
+              color: AppColors.onPrimary,
             ),
           ),
         ),
@@ -1695,14 +1695,14 @@ class _TargetChoiceCard extends StatelessWidget {
                 Icon(
                   icon,
                   size: 24,
-                  color: isSelected ? AppColors.onPrimaryContainer : AppColors.primary,
+                  color: isSelected ? AppColors.onPrimary : AppColors.primary,
                 ),
                 const Spacer(),
                 if (isSelected)
                   const Icon(
                     Icons.check_circle_rounded,
                     size: 18,
-                    color: AppColors.primary,
+                    color: AppColors.onPrimary,
                   ),
               ],
             ),
@@ -1714,7 +1714,7 @@ class _TargetChoiceCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: isSelected ? AppColors.onPrimaryContainer : AppColors.onSurface,
+                color: isSelected ? AppColors.onPrimary : AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 2),
@@ -1725,7 +1725,7 @@ class _TargetChoiceCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 color: isSelected
-                    ? AppColors.onPrimaryContainer.withValues(alpha: 0.8)
+                    ? AppColors.primaryFixed
                     : AppColors.onSurfaceVariant,
               ),
             ),

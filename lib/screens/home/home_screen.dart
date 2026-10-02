@@ -439,7 +439,7 @@ class _DesktopNavChip extends StatelessWidget {
                   icon,
                   size: 22,
                   color: selected
-                      ? AppColors.onPrimaryContainer
+                      ? AppColors.onPrimary
                       : AppColors.onSurfaceVariant,
                 ),
                 const SizedBox(width: 8),
@@ -451,7 +451,7 @@ class _DesktopNavChip extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.1,
                     color: selected
-                        ? AppColors.onPrimaryContainer
+                        ? AppColors.onPrimary
                         : AppColors.onSurfaceVariant,
                   ),
                 ),
@@ -516,7 +516,7 @@ class _AvatarButton extends StatelessWidget {
           child: Text(
             initials,
             style: const TextStyle(
-              color: AppColors.onPrimaryContainer,
+              color: AppColors.onPrimary,
               fontWeight: FontWeight.w700,
               fontSize: 12,
             ),
@@ -1001,7 +1001,7 @@ class _ActiveJourneyBanner extends StatelessWidget {
                 ),
                 child: const Icon(
                   Icons.directions_bus_rounded,
-                  color: AppColors.onPrimaryContainer,
+                  color: AppColors.onPrimary,
                   size: 28,
                 ),
               ),

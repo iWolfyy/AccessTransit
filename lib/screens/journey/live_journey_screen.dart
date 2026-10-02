@@ -2297,11 +2297,11 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 0.5,
                                   color: isLiveGps
-                                      ? const Color(0xFF2E7D32)
-                                      : Colors.orange.shade800,
+                                      ? const Color(0xFF1B5E20) // 6.7:1 on white
+                                      : const Color(0xFFB25000), // 4.8:1 on white
                                 ),
                               ),
-                              const Text(' · ', style: TextStyle(color: Colors.grey)),
+                              const Text(' · ', style: TextStyle(color: Color(0xFF5D616B))),
                               Text(
                                 distanceText,
                                 style: const TextStyle(

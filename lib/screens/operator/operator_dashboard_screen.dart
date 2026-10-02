@@ -173,7 +173,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       // Past the final scheduled stop
       return _BusRunStatus(
         label: 'Departed',
-        color: Colors.grey,
+        color: const Color(0xFF5D616B), // WCAG AA 6.1:1 on white (was Colors.grey 2.8:1)
         icon: Icons.check_circle_outline,
         sortKey: 2000 + minsToEnd.abs(), // departed at the bottom
       );
