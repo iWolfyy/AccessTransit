@@ -1,5 +1,7 @@
 import 'package:access_transit/models/report.dart';
+import 'package:access_transit/screens/journey/report_condition_screen.dart';
 import 'package:access_transit/services/firestore_service.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -146,6 +148,26 @@ void main() {
 
       final flaggedDoc = await service.streamReportById(flagReportId).first;
       expect(flaggedDoc?.status, equals('hidden'));
+    });
+
+    testWidgets('ReportConditionScreen target selection and photo upload sheet rendering test', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ReportConditionScreen(
+            targetType: 'bus',
+            initialLocation: 'Bus Route 100',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Check title and target chips
+      expect(find.text('Report a Condition'), findsOneWidget);
+      expect(find.text('Station / Stop'), findsOneWidget);
+      expect(find.text('Bus Route / Vehicle'), findsOneWidget);
+
+      // Check Location textfield
+      expect(find.text('Bus Route 100'), findsOneWidget);
     });
   });
 }

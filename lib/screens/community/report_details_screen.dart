@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -609,24 +611,61 @@ class _StatusCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      photoUrl!,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 90,
-                        color: AppColors.surfaceContainer,
-                        alignment: Alignment.center,
-                        child: const Text('Image preview unavailable'),
-                      ),
-                    ),
+                    child: _buildImageWidget(photoUrl!),
                   ),
                 ],
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildImageWidget(String pathOrUrl) {
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      return Image.network(
+        pathOrUrl,
+        height: 200,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          height: 90,
+          color: AppColors.surfaceContainer,
+          alignment: Alignment.center,
+          child: const Text('Image preview unavailable'),
+        ),
+      );
+    }
+
+    try {
+      final file = File(pathOrUrl);
+      if (file.existsSync()) {
+        return Image.file(
+          file,
+          height: 200,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            height: 90,
+            color: AppColors.surfaceContainer,
+            alignment: Alignment.center,
+            child: const Text('Image preview unavailable'),
+          ),
+        );
+      }
+    } catch (_) {}
+
+    return Image.network(
+      pathOrUrl,
+      height: 200,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        height: 90,
+        color: AppColors.surfaceContainer,
+        alignment: Alignment.center,
+        child: const Text('Image preview unavailable'),
       ),
     );
   }

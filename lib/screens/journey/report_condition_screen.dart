@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/bus.dart';
@@ -42,6 +45,7 @@ class ReportConditionScreen extends StatefulWidget {
 class _ReportConditionScreenState extends State<ReportConditionScreen> {
   static const double _desktopBreakpoint = 768;
   static String? _cachedGuestUserId;
+  final ImagePicker _picker = ImagePicker();
 
   static const Map<ReportCategory, List<String>> _subCategoryOptions = {
     ReportCategory.rampAccess: [
@@ -137,6 +141,13 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     super.dispose();
   }
 
+  String _getBusTitle(Bus b) {
+    if (b.busNo != null && b.busNo!.isNotEmpty) {
+      return 'Bus Route ${b.routeNo} (${b.busNo})';
+    }
+    return 'Bus Route ${b.routeNo}';
+  }
+
   Future<void> _loadTargetMetadata() async {
     try {
       final stations = await _firestoreService.getStations();
@@ -158,7 +169,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             } else {
               try {
                 _selectedBus = buses.firstWhere((b) => b.id == widget.targetId);
-                _locationController.text = 'Bus Route ${_selectedBus!.routeNo}';
+                _locationController.text = _getBusTitle(_selectedBus!);
               } catch (_) {}
             }
           } else if (_locationController.text.isEmpty && stations.isNotEmpty) {
@@ -186,150 +197,169 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (pickedFile != null && mounted) {
+        setState(() {
+          _selectedPhotoUrl = pickedFile.path;
+        });
+        _showSnack(
+          source == ImageSource.camera
+              ? 'Photo captured successfully!'
+              : 'Photo selected from device gallery!',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Unable to access device photo: ${e.toString()}');
+      }
+    }
+  }
+
   void _showPhotoPickerDialog() {
-    final urlController = TextEditingController();
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.add_a_photo, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text(
-              'Attach Condition Photo',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.onSurface,
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
               const Text(
-                'Select sample evidence photo or enter image URL:',
+                'Attach Condition Photo',
                 style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.onSurfaceVariant,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.onSurface,
                 ),
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _buildPhotoOption(
-                    dialogContext,
-                    'Broken Ramp',
-                    'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=600&q=80',
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: AppColors.primaryContainer,
+                  child: Icon(
+                    Icons.camera_alt,
+                    color: AppColors.onPrimaryContainer,
                   ),
-                  _buildPhotoOption(
-                    dialogContext,
-                    'Elevator Out',
-                    'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80',
-                  ),
-                  _buildPhotoOption(
-                    dialogContext,
-                    'Crowded Bus',
-                    'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=600&q=80',
-                  ),
-                  _buildPhotoOption(
-                    dialogContext,
-                    'Station Hazard',
-                    'https://images.unsplash.com/photo-1517649763962-0c623266010b?auto=format&fit=crop&w=600&q=80',
-                  ),
-                ],
+                ),
+                title: const Text(
+                  'Take Photo with Camera',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'Capture live evidence photo using device camera',
+                ),
+                onTap: () {
+                  Navigator.of(modalContext).pop();
+                  _pickImage(ImageSource.camera);
+                },
               ),
-              const SizedBox(height: 16),
-              const Divider(),
               const SizedBox(height: 8),
-              TextField(
-                controller: urlController,
-                decoration: InputDecoration(
-                  labelText: 'Image Web URL',
-                  hintText: 'https://example.com/photo.jpg',
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: AppColors.primaryContainer,
+                  child: Icon(
+                    Icons.photo_library,
+                    color: AppColors.onPrimaryContainer,
                   ),
                 ),
+                title: const Text(
+                  'Choose from Device Gallery',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'Select an existing photo saved on your device',
+                ),
+                onTap: () {
+                  Navigator.of(modalContext).pop();
+                  _pickImage(ImageSource.gallery);
+                },
               ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final url = urlController.text.trim();
-              if (url.isNotEmpty) {
-                setState(() => _selectedPhotoUrl = url);
-                Navigator.of(dialogContext).pop();
-                _showSnack('Photo attached!');
-              } else {
-                _showSnack('Please select a photo or enter a valid URL.');
-              }
-            },
-            child: const Text('Use URL'),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildPhotoOption(
-    BuildContext dialogContext,
-    String label,
-    String url,
-  ) {
-    return InkWell(
-      onTap: () {
-        setState(() => _selectedPhotoUrl = url);
-        Navigator.of(dialogContext).pop();
-        _showSnack('$label photo attached!');
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        width: 125,
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.outlineVariant),
-        ),
-        child: Column(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: Image.network(
-                url,
-                height: 65,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 65,
-                  color: AppColors.surfaceContainer,
-                  child: const Icon(
-                    Icons.broken_image,
-                    color: AppColors.outline,
-                  ),
-                ),
+  Widget _buildImageWidget(String pathOrUrl) {
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      return Image.network(
+        pathOrUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          color: AppColors.surfaceContainer,
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.broken_image, size: 40, color: AppColors.outline),
+              SizedBox(height: 8),
+              Text(
+                'Photo preview unavailable',
+                style: TextStyle(color: AppColors.onSurfaceVariant),
               ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    try {
+      final file = File(pathOrUrl);
+      if (file.existsSync()) {
+        return Image.file(
+          file,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: AppColors.surfaceContainer,
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.broken_image, size: 40, color: AppColors.outline),
+                SizedBox(height: 8),
+                Text(
+                  'Photo preview unavailable',
+                  style: TextStyle(color: AppColors.onSurfaceVariant),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
+          ),
+        );
+      }
+    } catch (_) {}
+
+    return Image.network(
+      pathOrUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        color: AppColors.surfaceContainer,
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.broken_image, size: 40, color: AppColors.outline),
+            SizedBox(height: 8),
             Text(
-              label,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              textAlign: TextAlign.center,
+              'Photo preview unavailable',
+              style: TextStyle(color: AppColors.onSurfaceVariant),
             ),
           ],
         ),
@@ -499,7 +529,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                       if (_availableBuses.isNotEmpty) {
                                         _selectedBus = _availableBuses.first;
                                         _locationController.text =
-                                            'Bus Route ${_selectedBus!.routeNo}';
+                                            _getBusTitle(_selectedBus!);
                                       }
                                     });
                                   }
@@ -553,7 +583,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                           DropdownButtonFormField<Bus>(
                             initialValue: _selectedBus,
                             decoration: InputDecoration(
-                              labelText: 'Select Bus Route',
+                              labelText: 'Select Bus Route / Vehicle',
                               prefixIcon: const Icon(
                                 Icons.directions_bus,
                                 color: AppColors.primary,
@@ -567,17 +597,14 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                             items: _availableBuses.map((b) {
                               return DropdownMenuItem<Bus>(
                                 value: b,
-                                child: Text(
-                                  'Bus Route ${b.routeNo} (ID: ${b.id})',
-                                ),
+                                child: Text(_getBusTitle(b)),
                               );
                             }).toList(),
                             onChanged: (val) {
                               if (val != null) {
                                 setState(() {
                                   _selectedBus = val;
-                                  _locationController.text =
-                                      'Bus Route ${val.routeNo}';
+                                  _locationController.text = _getBusTitle(val);
                                 });
                               }
                             },
@@ -912,34 +939,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  Image.network(
-                                    _selectedPhotoUrl!,
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (_, __, ___) => Container(
-                                          color: AppColors.surfaceContainer,
-                                          child: const Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.broken_image,
-                                                size: 40,
-                                                color: AppColors.outline,
-                                              ),
-                                              SizedBox(height: 8),
-                                              Text(
-                                                'Photo preview unavailable',
-                                                style: TextStyle(
-                                                  color:
-                                                      AppColors
-                                                          .onSurfaceVariant,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                  ),
+                                  _buildImageWidget(_selectedPhotoUrl!),
                                   Positioned(
                                     top: 8,
                                     right: 8,
