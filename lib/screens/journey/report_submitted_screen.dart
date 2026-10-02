@@ -143,17 +143,17 @@ class ReportSubmittedScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            if (report?.photoUrl != null &&
-                                report!.photoUrl!.isNotEmpty) ...[
+                            if (report != null &&
+                                report!.photoUrl.isNotEmpty) ...[
                               const SizedBox(height: 12),
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
                                 child: Image.network(
-                                  report!.photoUrl!,
+                                  report!.photoUrl,
                                   height: 140,
                                   width: double.infinity,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
                                 ),
                               ),
                             ],

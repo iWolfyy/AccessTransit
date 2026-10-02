@@ -501,7 +501,7 @@ class _ReportCardWidget extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (report.photoUrl != null && report.photoUrl!.isNotEmpty) ...[
+                if (report.photoUrl.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
