@@ -38,11 +38,30 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   @override
   void initState() {
     super.initState();
+    _applyUserPreferences();
+    AccessibilityPreferencesService.instance.addListener(_onPreferencesChanged);
+    _loadStations();
+  }
+
+  void _applyUserPreferences() {
     final prefs = AccessibilityPreferencesService.instance;
     _wheelchairAccess = prefs.isWheelchairOnly;
     _stepFreeOnly = prefs.isStepFree;
     _minimizeWalking = prefs.minimizeWalking;
-    _loadStations();
+  }
+
+  void _onPreferencesChanged() {
+    if (mounted) {
+      setState(() {
+        _applyUserPreferences();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    AccessibilityPreferencesService.instance.removeListener(_onPreferencesChanged);
+    super.dispose();
   }
 
   Future<void> _loadStations() async {
@@ -423,8 +442,8 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Customize bus and stop accessibility for your journey',
-                      style: TextStyle(fontSize: 15, color: AppColors.onSurfaceVariant),
+                      'Customize for this trip only. Your permanent Accessibility Preferences in settings will not be affected.',
+                      style: TextStyle(fontSize: 14, color: AppColors.onSurfaceVariant),
                     ),
                     const SizedBox(height: 16),
                     // Quick Accessibility Presets
@@ -480,20 +499,24 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(54, 48),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        Tooltip(
+                          message: 'Reset to saved accessibility preferences',
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(54, 48),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () {
+                              setSheetState(() {
+                                final prefs = AccessibilityPreferencesService.instance;
+                                _wheelchairAccess = prefs.isWheelchairOnly;
+                                _stepFreeOnly = prefs.isStepFree;
+                                _minimizeWalking = prefs.minimizeWalking;
+                              });
+                              setState(() {});
+                            },
+                            child: const Text('Reset', style: TextStyle(fontSize: 14)),
                           ),
-                          onPressed: () {
-                            setSheetState(() {
-                              _wheelchairAccess = false;
-                              _stepFreeOnly = false;
-                              _minimizeWalking = false;
-                            });
-                            setState(() {});
-                          },
-                          child: const Text('Reset', style: TextStyle(fontSize: 14)),
                         ),
                       ],
                     ),
@@ -542,7 +565,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                         ),
                         onPressed: () => Navigator.of(context).pop(),
                         child: const Text(
-                          'Save & Apply Filters',
+                          'Apply to This Trip',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -1738,20 +1761,17 @@ class _RecentSavedSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.surfaceVariant),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.onSurface.withValues(alpha: 0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
+        Material(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(18),
+          elevation: 1,
+          shadowColor: AppColors.onSurface.withValues(alpha: 0.04),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.surfaceVariant),
+            ),
+            child: Column(
             children: [
               for (var i = 0; i < _corridors.length; i++) ...[
                 if (i > 0)
@@ -1805,8 +1825,9 @@ class _RecentSavedSection extends StatelessWidget {
             ],
           ),
         ),
-      ],
-    );
+      ),
+    ],
+  );
   }
 }
 

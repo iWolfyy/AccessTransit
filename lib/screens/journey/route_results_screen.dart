@@ -10,6 +10,7 @@ import '../../models/bus_route.dart';
 import '../../models/report.dart';
 import '../../models/station.dart';
 import '../../models/trip_model.dart';
+import '../../services/accessibility_preferences_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/trip_service.dart';
 import 'live_journey_screen.dart';
@@ -88,9 +89,9 @@ class RouteResultsScreen extends StatefulWidget {
     this.origin = 'Colombo Fort Station',
     this.destination = 'Kottawa Highway Bus Station',
     this.selectedDate,
-    this.wheelchairAccessRequired = false,
-    this.stepFreeOnly = false,
-    this.minimizeWalking = false,
+    this.wheelchairAccessRequired,
+    this.stepFreeOnly,
+    this.minimizeWalking,
   });
 
   final String fromStationId;
@@ -98,9 +99,9 @@ class RouteResultsScreen extends StatefulWidget {
   final String origin;
   final String destination;
   final DateTime? selectedDate;
-  final bool wheelchairAccessRequired;
-  final bool stepFreeOnly;
-  final bool minimizeWalking;
+  final bool? wheelchairAccessRequired;
+  final bool? stepFreeOnly;
+  final bool? minimizeWalking;
 
   @override
   State<RouteResultsScreen> createState() => _RouteResultsScreenState();
@@ -114,11 +115,19 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   Map<String, BusRoute> _routesMap = {};
   Map<String, Station> _stationsMap = {};
   bool _isLoadingData = true;
-  String _selectedFilterTab = 'All'; // 'All', 'Accessible', 'Fastest'
+  late String _selectedFilterTab; // 'All', 'Accessible', 'Fastest'
+  late final bool _isWheelchair;
+  late final bool _isStepFree;
+  late final bool _isMinimizeWalking;
 
   @override
   void initState() {
     super.initState();
+    final prefs = AccessibilityPreferencesService.instance;
+    _isWheelchair = widget.wheelchairAccessRequired ?? prefs.isWheelchairOnly;
+    _isStepFree = widget.stepFreeOnly ?? prefs.isStepFree;
+    _isMinimizeWalking = widget.minimizeWalking ?? prefs.minimizeWalking;
+    _selectedFilterTab = _isWheelchair ? 'Accessible' : 'All';
     _loadInitialData();
   }
 
@@ -205,10 +214,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
     );
 
     // Filter by user's initial search query requirements
-    if (widget.wheelchairAccessRequired) {
-      matchedBuses = matchedBuses.where((bus) => bus.wheelchairAccessible).toList();
-    }
-    if (widget.stepFreeOnly) {
+    if (_isStepFree) {
       matchedBuses = matchedBuses.where((bus) => bus.lowFloor).toList();
     }
 
@@ -354,6 +360,30 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
         return a.durationMinutes.compareTo(b.durationMinutes);
       }
 
+      // Prioritize wheelchair accessible buses when wheelchair access is required
+      // or when the Accessible tab is selected
+      if (_isWheelchair || _selectedFilterTab == 'Accessible') {
+        final aAcc = (a.rawBus?.wheelchairAccessible == true || a.rawBus?.hasRamp == true);
+        final bAcc = (b.rawBus?.wheelchairAccessible == true || b.rawBus?.hasRamp == true);
+        if (aAcc != bAcc) {
+          return aAcc ? -1 : 1; // Accessible buses first
+        }
+
+        final rankA = _statusRank(a.accessibilityStatus);
+        final rankB = _statusRank(b.accessibilityStatus);
+        if (rankA != rankB) {
+          return rankA.compareTo(rankB); // Verified accessible status first
+        }
+      }
+
+      // Prioritize fewer stops / shortest walking distance when minimize walking is enabled
+      if (_isMinimizeWalking) {
+        final stopsComp = a.intermediateStops.length.compareTo(b.intermediateStops.length);
+        if (stopsComp != 0) {
+          return stopsComp;
+        }
+      }
+
       // Default: Earliest upcoming bus first
       final timeA = a.nextDepartureDateTime ?? DateTime.now();
       final timeB = b.nextDepartureDateTime ?? DateTime.now();
@@ -362,7 +392,6 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
         return timeComp;
       }
 
-      // Secondary: Accessibility priority
       final rankA = _statusRank(a.accessibilityStatus);
       final rankB = _statusRank(b.accessibilityStatus);
       return rankA.compareTo(rankB);
@@ -497,8 +526,8 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 
   Widget _buildEmptyState() {
     final isFiltered = _selectedFilterTab == 'Accessible' ||
-        widget.wheelchairAccessRequired ||
-        widget.stepFreeOnly;
+        _isWheelchair ||
+        _isStepFree;
 
     final emptyTitle = isFiltered
         ? 'No Accessible Buses Found'

@@ -208,7 +208,10 @@ class _AccessibilityPreferencesScreenState
                       label: 'Wheelchair access required',
                       subtitle: 'Only show buses with deployed ramps & designated spaces',
                       value: _wheelchairAccess,
-                      onChanged: (v) => setState(() => _wheelchairAccess = v),
+                      onChanged: (v) {
+                        setState(() => _wheelchairAccess = v);
+                        AccessibilityPreferencesService.instance.setWheelchairOnly(v);
+                      },
                     ),
                     const Divider(height: 1, indent: 64),
                     _PreferenceToggle(
@@ -216,7 +219,10 @@ class _AccessibilityPreferencesScreenState
                       label: 'Step-free routes only',
                       subtitle: 'Avoid stops and terminals requiring stairs',
                       value: _stepFree,
-                      onChanged: (v) => setState(() => _stepFree = v),
+                      onChanged: (v) {
+                        setState(() => _stepFree = v);
+                        AccessibilityPreferencesService.instance.setStepFree(v);
+                      },
                     ),
                     const Divider(height: 1, indent: 64),
                     _PreferenceToggle(
@@ -224,7 +230,10 @@ class _AccessibilityPreferencesScreenState
                       label: 'Minimize walking distance',
                       subtitle: 'Prioritize connections closest to entry points',
                       value: _minimizeWalking,
-                      onChanged: (v) => setState(() => _minimizeWalking = v),
+                      onChanged: (v) {
+                        setState(() => _minimizeWalking = v);
+                        AccessibilityPreferencesService.instance.setMinimizeWalking(v);
+                      },
                     ),
                     const Divider(height: 1, indent: 64),
                     _PreferenceToggle(
@@ -232,7 +241,10 @@ class _AccessibilityPreferencesScreenState
                       label: 'Large tap targets (48dp+)',
                       subtitle: 'Enforce minimum 48dp touch targets across buttons & controls',
                       value: _hasLargeTargets,
-                      onChanged: (v) => setState(() => _hasLargeTargets = v),
+                      onChanged: (v) {
+                        setState(() => _hasLargeTargets = v);
+                        AccessibilityPreferencesService.instance.setLargeTargets(v);
+                      },
                     ),
                   ],
                 ),
@@ -248,7 +260,10 @@ class _AccessibilityPreferencesScreenState
                       label: 'High contrast mode',
                       subtitle: 'Enhance text clarity and strong border lines (WCAG AAA)',
                       value: _highContrast,
-                      onChanged: (v) => setState(() => _highContrast = v),
+                      onChanged: (v) {
+                        setState(() => _highContrast = v);
+                        AccessibilityPreferencesService.instance.setHighContrast(v);
+                      },
                     ),
                     const Divider(height: 1, indent: 64),
                     _PreferenceToggle(
@@ -256,7 +271,10 @@ class _AccessibilityPreferencesScreenState
                       label: 'Voice guidance for navigation',
                       subtitle: 'Spoken stop announcements and transfer cues',
                       value: _voiceGuidance,
-                      onChanged: (v) => setState(() => _voiceGuidance = v),
+                      onChanged: (v) {
+                        setState(() => _voiceGuidance = v);
+                        AccessibilityPreferencesService.instance.setVoiceGuidance(v);
+                      },
                     ),
                     const Divider(height: 1, indent: 64),
                     _PreferenceToggle(
@@ -264,7 +282,10 @@ class _AccessibilityPreferencesScreenState
                       label: 'Haptic alerts for stops',
                       subtitle: 'Vibrate device when approaching destination',
                       value: _hapticAlerts,
-                      onChanged: (v) => setState(() => _hapticAlerts = v),
+                      onChanged: (v) {
+                        setState(() => _hapticAlerts = v);
+                        AccessibilityPreferencesService.instance.setHapticAlerts(v);
+                      },
                     ),
                   ],
                 ),
@@ -280,7 +301,10 @@ class _AccessibilityPreferencesScreenState
                       label: 'Boarding assistance required',
                       subtitle: 'Notify driver in advance to assist with ramp deployment',
                       value: _boardingAssistance,
-                      onChanged: (v) => setState(() => _boardingAssistance = v),
+                      onChanged: (v) {
+                        setState(() => _boardingAssistance = v);
+                        AccessibilityPreferencesService.instance.setBoardingAssistance(v);
+                      },
                     ),
                     const Divider(height: 1, indent: 64),
                     _PreferenceToggle(
@@ -288,7 +312,10 @@ class _AccessibilityPreferencesScreenState
                       label: 'Show quiet routes',
                       subtitle: 'Prioritize lower crowd levels and quieter transit options',
                       value: _quietRoutes,
-                      onChanged: (v) => setState(() => _quietRoutes = v),
+                      onChanged: (v) {
+                        setState(() => _quietRoutes = v);
+                        AccessibilityPreferencesService.instance.setQuietRoutes(v);
+                      },
                     ),
                   ],
                 ),
