@@ -187,5 +187,20 @@ void main() {
 
       expect(AccessibilityPreferencesService.instance.minimizeWalking, isTrue);
     });
+
+    testWidgets('JourneySearchScreen renders title and no back button in top bar',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: JourneySearchScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Plan Journey'), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
+      expect(find.byIcon(Icons.arrow_back), findsNothing);
+      expect(find.byTooltip('Back'), findsNothing);
+    });
   });
 }
