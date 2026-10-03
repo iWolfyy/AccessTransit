@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/enums/user_role.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/user_service.dart';
 import '../../widgets/logout_confirmation_dialog.dart';
 import '../auth/login_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
@@ -105,6 +106,165 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
+  Future<void> _showEditProfileDialog() async {
+    if (_user == null) return;
+
+    final nameController = TextEditingController(text: _user!.name);
+    final emailController = TextEditingController(text: _user!.email);
+    final phoneController = TextEditingController(text: _user!.phone ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    final isSaved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final isHC = context.isHighContrast;
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isHC ? Colors.white : context.surfaceColor,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(20)),
+              border: isHC ? Border.all(color: Colors.black, width: 2.0) : null,
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Edit Profile',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: context.textColor,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context, false),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name',
+                        prefixIcon: Icon(Icons.person_outline),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Please enter your name';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Email Address',
+                        prefixIcon: Icon(Icons.email_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'Phone Number',
+                        prefixIcon: Icon(Icons.phone_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: context.buttonHeight,
+                      child: FilledButton(
+                        onPressed: () {
+                          if (!formKey.currentState!.validate()) return;
+                          Navigator.pop(context, true);
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: isHC
+                              ? const Color(0xFF001F3F)
+                              : AppColors.primaryContainer,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text(
+                          'Save Changes',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (isSaved == true) {
+      final newName = nameController.text.trim();
+      final newEmail = emailController.text.trim();
+      final newPhone = phoneController.text.trim();
+
+      final updatedUser = _user!.copyWith(
+        name: newName,
+        email: newEmail,
+        phone: newPhone,
+      );
+
+      setState(() {
+        _user = updatedUser;
+      });
+
+      try {
+        await UserService().updateUser(updatedUser);
+        final fbUser = _authService.currentUser;
+        if (fbUser != null) {
+          await fbUser.updateDisplayName(newName);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile updated successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save profile: $e'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _logout() async {
     final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
@@ -187,7 +347,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               email: user.email,
               roleLabel: _roleLabel,
               onMenu: widget.onMenu,
-              onEdit: () => _showComingSoon(context, 'Edit Profile'),
+              onEdit: _showEditProfileDialog,
             ),
           ),
 
@@ -601,7 +761,7 @@ class _PersonalInfoCard extends StatelessWidget {
         ),
       _InfoRowData(
         icon: Icons.email_outlined,
-        title: email,
+        title: email.isNotEmpty ? email : 'Not set',
         subtitle: 'Email address',
       ),
     ];
@@ -1400,17 +1560,6 @@ class _VersionFooter extends StatelessWidget {
               color: isHighContrast
                   ? const Color(0xFF1A1A1A)
                   : AppColors.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Lanka MetroTransit',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.w400,
-              color: isHighContrast
-                  ? const Color(0xFF1A1A1A)
-                  : AppColors.onSurfaceVariant.withValues(alpha: 0.70),
             ),
           ),
         ],

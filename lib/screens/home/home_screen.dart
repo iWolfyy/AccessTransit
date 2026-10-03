@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
@@ -314,6 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const SizedBox(height: 24),
                                   _RecentJourneyCard(
                                     onReplan: _openJourneySearch,
+                                    passengerId: _user?.uid,
                                   ),
                                 ],
                               ),
@@ -1546,7 +1548,7 @@ class _RecentReportsSection extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         StreamBuilder<List<Report>>(
           stream: FirestoreService().streamReports(),
           builder: (context, snapshot) {
@@ -1591,6 +1593,7 @@ class _RecentReportsSection extends StatelessWidget {
             return ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
               itemCount: activeReports.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
@@ -1873,14 +1876,19 @@ class _ActiveJourneyBanner extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _RecentJourneyCard extends StatelessWidget {
-  const _RecentJourneyCard({required this.onReplan});
+  const _RecentJourneyCard({
+    required this.onReplan,
+    this.passengerId,
+  });
 
   final VoidCallback onReplan;
+  final String? passengerId;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
     final hasLargeTargets = context.hasLargeTargets;
+    final pid = passengerId ?? '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1894,8 +1902,85 @@ class _RecentJourneyCard extends StatelessWidget {
             color: isHighContrast ? Colors.black : AppColors.onSurface,
           ),
         ),
-        const SizedBox(height: 16),
-        Container(
+        const SizedBox(height: 12),
+        if (pid.isEmpty)
+          _buildCardContent(
+            context,
+            title: 'Pettah Station to Kottawa',
+            subtitle: 'Yesterday, 2:45 PM',
+            isHighContrast: isHighContrast,
+            hasLargeTargets: hasLargeTargets,
+          )
+        else
+          StreamBuilder<List<JourneyModel>>(
+            stream: _getJourneysStream(pid),
+            builder: (context, snapshot) {
+              String title = 'Pettah Station to Kottawa';
+              String subtitle = 'Yesterday, 2:45 PM';
+
+              final docs = snapshot.data ?? [];
+              if (docs.isNotEmpty) {
+                final sortedDocs = List<JourneyModel>.from(docs)
+                  ..sort((a, b) {
+                    final aTime =
+                        a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                    final bTime =
+                        b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                    return bTime.compareTo(aTime);
+                  });
+
+                final latest = sortedDocs.first;
+                final orig =
+                    latest.origin.isNotEmpty ? latest.origin : 'Origin';
+                final dest = latest.destination.isNotEmpty
+                    ? latest.destination
+                    : 'Destination';
+                title = '$orig to $dest';
+                if (latest.createdAt != null) {
+                  subtitle = TimeUtils.formatRelativeTime(latest.createdAt!);
+                } else {
+                  subtitle = 'Recent';
+                }
+              }
+
+              return _buildCardContent(
+                context,
+                title: title,
+                subtitle: subtitle,
+                isHighContrast: isHighContrast,
+                hasLargeTargets: hasLargeTargets,
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Stream<List<JourneyModel>> _getJourneysStream(String pid) {
+    if (pid.isEmpty) return Stream.value([]);
+    try {
+      return FirebaseFirestore.instance
+          .collection('journeys')
+          .where('passengerId', isEqualTo: pid)
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs
+            .map((doc) => JourneyModel.fromMap(doc.data(), documentId: doc.id))
+            .toList();
+      });
+    } catch (_) {
+      return Stream.value([]);
+    }
+  }
+
+  Widget _buildCardContent(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required bool isHighContrast,
+    required bool hasLargeTargets,
+  }) {
+    return Container(
           width: double.infinity,
           padding: EdgeInsets.all(hasLargeTargets ? 20 : 16),
           decoration: BoxDecoration(
@@ -1934,8 +2019,8 @@ class _RecentJourneyCard extends StatelessWidget {
                     stacked ? CrossAxisAlignment.center : CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Central Station to Library',
-                    textAlign: TextAlign.center,
+                    title,
+                    textAlign: stacked ? TextAlign.center : TextAlign.start,
                     style: TextStyle(
                       fontSize: hasLargeTargets ? 20 : 18,
                       height: 24 / 18,
@@ -1945,7 +2030,7 @@ class _RecentJourneyCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Yesterday, 2:45 PM',
+                    subtitle,
                     style: TextStyle(
                       fontSize: hasLargeTargets ? 15 : 14,
                       height: 20 / 14,
@@ -2001,9 +2086,7 @@ class _RecentJourneyCard extends StatelessWidget {
               );
             },
           ),
-        ),
-      ],
-    );
+        );
   }
 }
 

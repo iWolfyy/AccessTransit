@@ -127,17 +127,35 @@ class AuthService {
     try {
       final profile = await _userService.getUser(firebaseUser.uid);
       if (profile != null) {
-        return profile;
+        final mergedName = profile.name.trim().isNotEmpty
+            ? profile.name.trim()
+            : (firebaseUser.displayName?.trim().isNotEmpty == true
+                ? firebaseUser.displayName!.trim()
+                : (firebaseUser.email?.split('@').first.isNotEmpty == true
+                    ? firebaseUser.email!.split('@').first
+                    : 'Passenger'));
+        final mergedEmail = profile.email.trim().isNotEmpty
+            ? profile.email.trim()
+            : (firebaseUser.email ?? '');
+
+        return profile.copyWith(
+          name: mergedName,
+          email: mergedEmail,
+        );
       }
     } catch (_) {
       // Fall through to Auth-based profile below.
     }
 
+    final authName = firebaseUser.displayName?.trim().isNotEmpty == true
+        ? firebaseUser.displayName!.trim()
+        : (firebaseUser.email?.split('@').first.isNotEmpty == true
+            ? firebaseUser.email!.split('@').first
+            : 'Passenger');
+
     return UserModel(
       uid: firebaseUser.uid,
-      name: firebaseUser.displayName?.trim().isNotEmpty == true
-          ? firebaseUser.displayName!.trim()
-          : (firebaseUser.email?.split('@').first ?? 'Passenger'),
+      name: authName,
       email: firebaseUser.email ?? '',
       phone: firebaseUser.phoneNumber,
     );

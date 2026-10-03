@@ -53,7 +53,7 @@ class UserService {
     try {
       final doc = userDocument(user.uid);
       if (doc != null) {
-        await doc.update(user.toMap());
+        await doc.set(user.toMap(), SetOptions(merge: true));
       }
     } catch (e) {
       debugPrint('UserService.updateUser fallback: $e');
