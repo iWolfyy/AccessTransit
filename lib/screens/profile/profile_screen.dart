@@ -207,15 +207,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 20),
 
                   // ── Stats Row ──
-                  const _StatsSection(),
+                  _StatsSection(
+                    reportsCount: user.reportsSubmitted,
+                    verificationsCount: user.verifiedCount,
+                    badgesCount: user.badges,
+                  ),
                   const SizedBox(height: 20),
 
                   // ── Rewards & Contributions Card (merged Impact + Badges) ──
                   _RewardsCard(
+                    user: user,
                     onSeeAll: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const RewardsContributionsScreen(),
+                          builder: (_) => RewardsContributionsScreen(user: user),
                         ),
                       );
                     },
@@ -735,35 +740,43 @@ class _InfoRow extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _StatsSection extends StatelessWidget {
-  const _StatsSection();
+  const _StatsSection({
+    this.reportsCount = 0,
+    this.verificationsCount = 0,
+    this.badgesCount = 0,
+  });
+
+  final int reportsCount;
+  final int verificationsCount;
+  final int badgesCount;
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
         Expanded(
           child: _StatCard(
             icon: Icons.campaign,
             iconColor: AppColors.primary,
-            value: '42',
+            value: '$reportsCount',
             label: 'Reports',
           ),
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Expanded(
           child: _StatCard(
             icon: Icons.verified,
             iconColor: AppColors.secondary,
-            value: '128',
+            value: '$verificationsCount',
             label: 'Verifications',
           ),
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Expanded(
           child: _StatCard(
             icon: Icons.workspace_premium,
             iconColor: AppColors.tertiary,
-            value: '12',
+            value: '$badgesCount',
             label: 'Badges',
           ),
         ),
@@ -844,14 +857,21 @@ class _StatCard extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _RewardsCard extends StatelessWidget {
-  const _RewardsCard({this.onSeeAll});
+  const _RewardsCard({
+    this.user,
+    this.onSeeAll,
+  });
 
+  final UserModel? user;
   final VoidCallback? onSeeAll;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
     final hasLargeTargets = context.hasLargeTargets;
+    final points = user?.points ?? 0;
+    final reports = user?.reportsSubmitted ?? 0;
+    final badges = user?.badges ?? 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -931,7 +951,7 @@ class _RewardsCard extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(left: 32),
                           child: Text(
-                            'Level 3 • 42 reports',
+                            '$points Points • $reports reports • $badges badges',
                             style: TextStyle(
                               fontSize: hasLargeTargets ? 14 : 13,
                               color: Colors.white.withValues(alpha: 0.80),

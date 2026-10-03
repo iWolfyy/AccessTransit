@@ -2,23 +2,60 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/user_model.dart';
+import '../../services/auth_service.dart';
 
 /// Digital Membership Card — QR, points, member benefits.
-class MembershipCardScreen extends StatelessWidget {
+class MembershipCardScreen extends StatefulWidget {
   const MembershipCardScreen({
     super.key,
-    this.memberName = 'PASINDU',
-    this.memberTier = 'Gold Member',
-    this.roleLabel = 'Community Contributor',
-    this.points = 125,
-    this.memberId = 'AT-4821-7936',
+    this.user,
+    this.memberName,
+    this.memberTier,
+    this.roleLabel,
+    this.points,
+    this.memberId,
   });
 
-  final String memberName;
-  final String memberTier;
-  final String roleLabel;
-  final int points;
-  final String memberId;
+  final UserModel? user;
+  final String? memberName;
+  final String? memberTier;
+  final String? roleLabel;
+  final int? points;
+  final String? memberId;
+
+  @override
+  State<MembershipCardScreen> createState() => _MembershipCardScreenState();
+}
+
+class _MembershipCardScreenState extends State<MembershipCardScreen> {
+  final AuthService _authService = AuthService();
+  UserModel? _user;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = widget.user;
+    if (_user == null && widget.memberName == null) {
+      _loadProfile();
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _isLoading = true);
+    try {
+      final profile = await _authService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _user = profile;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   static const double _desktopBreakpoint = 768;
   static const Color _tertiaryFixed = Color(0xFFFFDBCA);
@@ -29,11 +66,23 @@ class MembershipCardScreen extends StatelessWidget {
   static const _qrImageUrl =
       'https://lh3.googleusercontent.com/aida-public/AB6AXuD2EQGr3mG0xmxMRtptwz2DxqjbTc0HOrxCPch-Fo9geg1Pw_IJ3nmXV-UPsNBAgZvJSJfKqLABsvPK1_RVKKh4mh5_ac6pmS3PwobkhPwvmSVN_TrRFeN6i0f-seR7xHBdv__RERvnbGphw-h9qeTu_cj9Z80Izax_vDtRyTsRzf-ByxyLP7tPOWf6Ld66B3PhHmIH6sO5eNryEaDB-RNoST4MMKNhZvUzhaMhZCRo1FbmMscPpjX0YA';
 
-
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
     final isHC = context.isHighContrast;
+
+    final resolvedName = widget.memberName ??
+        (_user?.name.trim().isNotEmpty == true ? _user!.name : 'Commuter');
+    final resolvedPoints = widget.points ?? _user?.points ?? 0;
+    final badges = _user?.badges ?? (resolvedPoints ~/ 100);
+    final resolvedTier = widget.memberTier ??
+        (badges >= 3
+            ? 'Gold Member'
+            : (badges >= 1 ? 'Silver Member' : 'Bronze Member'));
+    final resolvedRole = widget.roleLabel ?? 'Community Contributor';
+    final rawUid = _user?.uid ?? '';
+    final shortUid = rawUid.length > 8 ? rawUid.substring(0, 8).toUpperCase() : (rawUid.isNotEmpty ? rawUid.toUpperCase() : '4821-7936');
+    final resolvedMemberId = widget.memberId ?? 'AT-$shortUid';
 
     return Scaffold(
       backgroundColor: context.surfaceColor,
@@ -51,11 +100,11 @@ class MembershipCardScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _MembershipCard(
-                          memberName: memberName,
-                          memberTier: memberTier,
-                          roleLabel: roleLabel,
-                          points: points,
-                          memberId: memberId,
+                          memberName: resolvedName,
+                          memberTier: resolvedTier,
+                          roleLabel: resolvedRole,
+                          points: resolvedPoints,
+                          memberId: resolvedMemberId,
                           qrImageUrl: _qrImageUrl,
                           tertiaryFixed: _tertiaryFixed,
                           onTertiaryFixed: _onTertiaryFixed,

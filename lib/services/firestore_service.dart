@@ -8,6 +8,7 @@ import '../models/bus.dart';
 import '../models/bus_route.dart';
 import '../models/report.dart';
 import '../models/station.dart';
+import 'user_service.dart';
 
 /// Repository service for accessing stations, static bus routes, and reports in Firestore.
 class FirestoreService {
@@ -280,6 +281,15 @@ class FirestoreService {
     _localReportsFallback.add(newReport);
     _localStreamController.add(_localReportsFallback);
 
+    // Award +10 points and +1 report count to submitting user
+    if (newReport.userId.isNotEmpty) {
+      UserService().updateUserStats(
+        newReport.userId,
+        pointsDelta: 10,
+        reportsDelta: 1,
+      );
+    }
+
     try {
       final docRef = _reportsRef.doc(reportId);
       final data = newReport.toMap(isServerTimestamp: true);
@@ -350,6 +360,10 @@ class FirestoreService {
         );
         _localReportsFallback[idx] = updated;
         _localStreamController.add(_localReportsFallback);
+
+        if (userId.isNotEmpty) {
+          UserService().updateUserStats(userId, pointsDelta: 5, verificationsDelta: 1);
+        }
       }
     }
 
@@ -373,6 +387,10 @@ class FirestoreService {
             FirestoreConstants.fieldConfirmCount: updatedConfirmedBy.length,
             FirestoreConstants.fieldLastConfirmedAt: FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
+
+          if (userId.isNotEmpty && idx == -1) {
+            UserService().updateUserStats(userId, pointsDelta: 5, verificationsDelta: 1);
+          }
         }
       }
     } catch (e) {
@@ -402,11 +420,14 @@ class FirestoreService {
   /// Flags a report as false (AC-83).
   ///
   /// Adds [userId] to `flaggedBy` and increments `falseCount`.
-  /// If `falseCount` reaches 3, DELETES the report document from Firestore and local store.
+  /// If `falseCount` reaches 3, DELETES the report document from Firestore and local store,
+  /// AND deducts 10 points from the user who submitted the report (author).
   Future<void> flagReport(String reportId, String userId) async {
     final idx = _localReportsFallback.indexWhere((r) => r.id == reportId);
+    String? authorId;
     if (idx != -1) {
       final r = _localReportsFallback[idx];
+      authorId = r.userId;
       if (!r.flaggedBy.contains(userId)) {
         final wasConfirmed = r.confirmedBy.contains(userId);
         final updatedConfirmedBy = List<String>.from(r.confirmedBy)..remove(userId);
@@ -420,6 +441,9 @@ class FirestoreService {
 
         if (shouldDelete) {
           _localReportsFallback.removeAt(idx);
+          if (authorId.isNotEmpty) {
+            UserService().updateUserStats(authorId, pointsDelta: -10, reportsDelta: -1);
+          }
         } else {
           final updated = r.copyWith(
             confirmedBy: updatedConfirmedBy,
@@ -450,6 +474,9 @@ class FirestoreService {
 
           if (newFalseCount >= 3) {
             await docRef.delete();
+            if (report.userId.isNotEmpty && (authorId == null || authorId.isEmpty)) {
+              UserService().updateUserStats(report.userId, pointsDelta: -10, reportsDelta: -1);
+            }
           } else {
             await docRef.set({
               FirestoreConstants.fieldConfirmedBy: updatedConfirmedBy,

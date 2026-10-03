@@ -145,7 +145,7 @@ void main() {
       await service.flagReport(flagReportId, 'flagger_3');
 
       final flaggedDoc = await service.streamReportById(flagReportId).first;
-      expect(flaggedDoc?.status, equals('hidden'));
+      expect(flaggedDoc, isNull);
     });
   });
 }

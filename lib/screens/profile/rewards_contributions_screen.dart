@@ -2,22 +2,61 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/user_model.dart';
+import '../../services/auth_service.dart';
 import 'membership_card_screen.dart';
 
 /// Rewards & Contributions — points, level, and contribution stats.
-class RewardsContributionsScreen extends StatelessWidget {
+class RewardsContributionsScreen extends StatefulWidget {
   const RewardsContributionsScreen({
     super.key,
-    this.totalPoints = 125,
-    this.levelLabel = 'Gold Contributor',
-    this.reportsSubmitted = 12,
-    this.verifiedSpots = 8,
+    this.user,
+    this.totalPoints,
+    this.levelLabel,
+    this.reportsSubmitted,
+    this.verifiedSpots,
   });
 
-  final int totalPoints;
-  final String levelLabel;
-  final int reportsSubmitted;
-  final int verifiedSpots;
+  final UserModel? user;
+  final int? totalPoints;
+  final String? levelLabel;
+  final int? reportsSubmitted;
+  final int? verifiedSpots;
+
+  @override
+  State<RewardsContributionsScreen> createState() =>
+      _RewardsContributionsScreenState();
+}
+
+class _RewardsContributionsScreenState
+    extends State<RewardsContributionsScreen> {
+  final AuthService _authService = AuthService();
+  UserModel? _user;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = widget.user;
+    if (_user == null && widget.totalPoints == null) {
+      _loadProfile();
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _isLoading = true);
+    try {
+      final profile = await _authService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _user = profile;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   void _showSnack(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -29,6 +68,16 @@ class RewardsContributionsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isHC = context.isHighContrast;
 
+    final points = widget.totalPoints ?? _user?.points ?? 0;
+    final reports = widget.reportsSubmitted ?? _user?.reportsSubmitted ?? 0;
+    final verified = widget.verifiedSpots ?? _user?.verifiedCount ?? 0;
+    final badges = _user?.badges ?? (points ~/ 100);
+
+    final String level = widget.levelLabel ??
+        (badges >= 3
+            ? 'Gold Contributor'
+            : (badges >= 1 ? 'Silver Contributor' : 'Bronze Contributor'));
+
     return Scaffold(
       backgroundColor: context.surfaceColor,
       body: Column(
@@ -39,87 +88,97 @@ class RewardsContributionsScreen extends StatelessWidget {
                 _showSnack(context, 'Settings will be available soon.'),
           ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
-              children: [
-                Text(
-                  'My Contributions',
-                  style: TextStyle(
-                    fontSize: 22,
-                    height: 28 / 22,
-                    fontWeight: FontWeight.w700,
-                    color: context.textColor,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _PointsHeroCard(
-                  totalPoints: totalPoints,
-                  levelLabel: levelLabel,
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatTile(
-                        icon: Icons.description_outlined,
-                        iconBg: AppColors.primaryFixed,
-                        iconColor: AppColors.primaryContainer,
-                        value: '$reportsSubmitted',
-                        label: 'Reports Submitted',
-                      ),
+            child: _isLoading
+                ? Center(
+                    child: CircularProgressIndicator(
+                      color: isHC ? Colors.black : AppColors.primary,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatTile(
-                        icon: Icons.verified,
-                        iconBg: AppColors.secondaryContainer,
-                        iconColor: AppColors.onSecondaryContainer,
-                        value: '$verifiedSpots',
-                        label: 'Verified Spots',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  height: context.buttonHeight,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => MembershipCardScreen(
-                            points: totalPoints,
-                            memberTier: levelLabel.contains('Gold')
-                                ? 'Gold Member'
-                                : levelLabel,
-                          ),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+                    children: [
+                      Text(
+                        'My Contributions',
+                        style: TextStyle(
+                          fontSize: 22,
+                          height: 28 / 22,
+                          fontWeight: FontWeight.w700,
+                          color: context.textColor,
                         ),
-                      );
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: isHC
-                          ? const Color(0xFF001F3F)
-                          : AppColors.primaryContainer,
-                      foregroundColor: AppColors.onPrimary,
-                      side: isHC
-                          ? const BorderSide(color: Colors.black, width: 2)
-                          : null,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
                       ),
-                      textStyle: TextStyle(
-                        fontSize: context.buttonFontSize,
-                        height: 20 / 14,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.1,
+                      const SizedBox(height: 24),
+                      _PointsHeroCard(
+                        totalPoints: points,
+                        levelLabel: level,
                       ),
-                    ),
-                    icon: Icon(Icons.badge_outlined, size: context.tapIconSize),
-                    label: const Text('View Membership Card'),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _StatTile(
+                              icon: Icons.description_outlined,
+                              iconBg: AppColors.primaryFixed,
+                              iconColor: AppColors.primaryContainer,
+                              value: '$reports',
+                              label: 'Reports Submitted',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _StatTile(
+                              icon: Icons.verified,
+                              iconBg: AppColors.secondaryContainer,
+                              iconColor: AppColors.onSecondaryContainer,
+                              value: '$verified',
+                              label: 'Verified Spots',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        height: context.buttonHeight,
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => MembershipCardScreen(
+                                  user: _user,
+                                  points: points,
+                                  memberTier: level.contains('Gold')
+                                      ? 'Gold Member'
+                                      : (level.contains('Silver')
+                                          ? 'Silver Member'
+                                          : 'Bronze Member'),
+                                ),
+                              ),
+                            );
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: isHC
+                                ? const Color(0xFF001F3F)
+                                : AppColors.primaryContainer,
+                            foregroundColor: AppColors.onPrimary,
+                            side: isHC
+                                ? const BorderSide(color: Colors.black, width: 2)
+                                : null,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            textStyle: TextStyle(
+                              fontSize: context.buttonFontSize,
+                              height: 20 / 14,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.1,
+                            ),
+                          ),
+                          icon: Icon(Icons.badge_outlined,
+                              size: context.tapIconSize),
+                          label: const Text('View Membership Card'),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
