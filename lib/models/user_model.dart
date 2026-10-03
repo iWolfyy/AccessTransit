@@ -12,6 +12,9 @@ class UserModel {
     this.phone,
     this.role = UserRole.passenger,
     this.createdAt,
+    this.points = 0,
+    this.reportsSubmitted = 0,
+    this.verifiedCount = 0,
   });
 
   final String uid;
@@ -20,6 +23,12 @@ class UserModel {
   final String? phone;
   final UserRole role;
   final DateTime? createdAt;
+  final int points;
+  final int reportsSubmitted;
+  final int verifiedCount;
+
+  /// Calculates badges earned (1 badge per 100 points).
+  int get badges => points ~/ 100;
 
   /// Builds a profile from Firebase Auth registration data.
   factory UserModel.fromAuth({
@@ -28,6 +37,9 @@ class UserModel {
     required String email,
     String? phone,
     UserRole role = UserRole.passenger,
+    int points = 0,
+    int reportsSubmitted = 0,
+    int verifiedCount = 0,
   }) {
     return UserModel(
       uid: uid,
@@ -35,6 +47,9 @@ class UserModel {
       email: email,
       phone: phone,
       role: role,
+      points: points,
+      reportsSubmitted: reportsSubmitted,
+      verifiedCount: verifiedCount,
     );
   }
 
@@ -46,6 +61,9 @@ class UserModel {
       phone: map[FirestoreConstants.fieldPhone]?.toString(),
       role: UserRole.fromString(map[FirestoreConstants.fieldRole]?.toString()),
       createdAt: _parseTimestamp(map[FirestoreConstants.fieldCreatedAt]),
+      points: (map[FirestoreConstants.fieldPoints] as num?)?.toInt() ?? 0,
+      reportsSubmitted: (map[FirestoreConstants.fieldReportsSubmitted] as num?)?.toInt() ?? 0,
+      verifiedCount: (map[FirestoreConstants.fieldVerifiedCount] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -65,6 +83,9 @@ class UserModel {
           : createdAt != null
               ? Timestamp.fromDate(createdAt!)
               : null,
+      FirestoreConstants.fieldPoints: points,
+      FirestoreConstants.fieldReportsSubmitted: reportsSubmitted,
+      FirestoreConstants.fieldVerifiedCount: verifiedCount,
     };
   }
 
@@ -74,6 +95,9 @@ class UserModel {
     String? phone,
     UserRole? role,
     DateTime? createdAt,
+    int? points,
+    int? reportsSubmitted,
+    int? verifiedCount,
   }) {
     return UserModel(
       uid: uid,
@@ -82,6 +106,9 @@ class UserModel {
       phone: phone ?? this.phone,
       role: role ?? this.role,
       createdAt: createdAt ?? this.createdAt,
+      points: points ?? this.points,
+      reportsSubmitted: reportsSubmitted ?? this.reportsSubmitted,
+      verifiedCount: verifiedCount ?? this.verifiedCount,
     );
   }
 

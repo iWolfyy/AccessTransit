@@ -40,13 +40,16 @@ class StatusLogic {
     if (report.status.trim().toLowerCase() != 'active') {
       return false;
     }
+    if (report.falseCount >= 3 || report.flaggedBy.length >= 3) {
+      return false;
+    }
 
     final now = currentTime ?? DateTime.now();
     final timestamp = report.lastConfirmedAt ?? report.createdAt;
     final difference = now.difference(timestamp);
 
-    // Active if created/confirmed within the last 12 hours
-    return difference >= Duration.zero && difference <= const Duration(hours: 12);
+    // Active if created/confirmed within the last 24 hours
+    return difference >= Duration.zero && difference <= const Duration(hours: 24);
   }
 
   /// Calculates the dynamic [BusStatusResult] for a [Bus] route (AC-74).

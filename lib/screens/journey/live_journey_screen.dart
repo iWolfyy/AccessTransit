@@ -3505,15 +3505,17 @@ class _LiveAccessibilitySection extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(
-                'Live Accessibility',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
-                  color: context.textColor,
+              Expanded(
+                child: Text(
+                  'Live Accessibility',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                    color: context.textColor,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Semantics(
                 label: 'Wheelchair seats occupancy level: $occupancyLevel',
                 child: Container(

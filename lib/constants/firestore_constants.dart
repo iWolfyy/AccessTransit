@@ -41,6 +41,9 @@ class FirestoreConstants {
   static const String fieldPhone = 'phone';
   static const String fieldRole = 'role';
   static const String fieldCreatedAt = 'createdAt';
+  static const String fieldPoints = 'points';
+  static const String fieldReportsSubmitted = 'reportsSubmitted';
+  static const String fieldVerifiedCount = 'verifiedCount';
 
   // --- stations/{stationId} document fields ---
 

@@ -147,7 +147,7 @@ void main() {
       await service.flagReport(flagReportId, 'flagger_3');
 
       final flaggedDoc = await service.streamReportById(flagReportId).first;
-      expect(flaggedDoc?.status, equals('hidden'));
+      expect(flaggedDoc, isNull);
     });
 
     testWidgets('ReportConditionScreen target selection and photo upload sheet rendering test', (tester) async {

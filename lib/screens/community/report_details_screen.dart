@@ -909,7 +909,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Community Trust & History',
+            'Community Trust & Verification Metrics',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
@@ -917,38 +917,83 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          // True Count Row
+          Row(
+            children: [
+              Icon(
+                Icons.thumb_up_alt_rounded,
+                size: 16,
+                color: isHC ? const Color(0xFF003833) : AppColors.success,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'True Flags (Confirmed): ${report.confirmCount} rider${report.confirmCount == 1 ? "" : "s"}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isHC ? const Color(0xFF003833) : AppColors.success,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // False Count Row
+          Row(
+            children: [
+              Icon(
+                Icons.flag_rounded,
+                size: 16,
+                color: isHC ? const Color(0xFF8B0000) : (report.falseCount > 0 ? AppColors.error : AppColors.outline),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'False Flags: ${report.falseCount} / 3 (Report deletes/hides at 3 false flags)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isHC ? const Color(0xFF8B0000) : (report.falseCount > 0 ? AppColors.error : context.textColor),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Divider(color: isHC ? Colors.black : AppColors.outlineVariant, height: 1),
+          const SizedBox(height: 10),
           Row(
             children: [
               Icon(
                 Icons.schedule_rounded,
-                size: 16,
+                size: 15,
                 color: isHC ? Colors.black : AppColors.primary,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Originally reported: $reportedAgo',
-                  style: TextStyle(fontSize: 13, color: context.textColor),
+                  style: TextStyle(fontSize: 12, color: context.subtextColor),
                 ),
               ),
             ],
           ),
           if (confirmedAgo != null && report.confirmCount > 0) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Icon(
                   Icons.verified_rounded,
-                  size: 16,
+                  size: 15,
                   color: isHC ? const Color(0xFF003833) : AppColors.success,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Last confirmed: $confirmedAgo (${report.confirmCount} rider${report.confirmCount == 1 ? "" : "s"})',
+                    'Last confirmed: $confirmedAgo',
                     style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
                       color: isHC ? const Color(0xFF003833) : AppColors.success,
                     ),
                   ),
@@ -961,7 +1006,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     );
   }
 
-  /// Action buttons: Confirm condition, Mark Resolved, Report as False
+  /// Action buttons: Confirm condition (True Flag), Report as False (False Flag), Mark Resolved
   Widget _buildActionPanel({
     required Report report,
     required bool isReportActive,
@@ -994,7 +1039,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Help Fellow Commuters',
+            'Vote Report Accuracy',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -1003,7 +1048,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Confirm if this condition is still present or if it has been fixed.',
+            'Click True if the issue exists, or False flag if it is inaccurate. 3 False flags will delete the report.',
             style: TextStyle(
               fontSize: 13,
               color: context.subtextColor,
@@ -1011,15 +1056,15 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Primary Actions Row: Confirm (+1) vs Mark Resolved
+          // Primary Flag Buttons Row: True Flag vs False Flag
           Row(
             children: [
-              // 1. Confirm Condition Button
+              // 1. True Flag Button
               Expanded(
                 child: SizedBox(
                   height: context.buttonHeight,
                   child: FilledButton.icon(
-                    onPressed: (hasConfirmed || _isLoadingAction || isResolved)
+                    onPressed: (hasConfirmed || _isLoadingAction)
                         ? null
                         : () => _handleConfirm(report),
                     style: FilledButton.styleFrom(
@@ -1042,7 +1087,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       size: 18,
                     ),
                     label: Text(
-                      hasConfirmed ? 'Confirmed' : 'Still Broken (+1)',
+                      hasConfirmed ? 'True (${report.confirmCount})' : 'True Flag (${report.confirmCount})',
                       style: TextStyle(
                         fontSize: context.hasLargeTargets ? 14 : 13,
                         fontWeight: FontWeight.w700,
@@ -1053,32 +1098,30 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               ),
               const SizedBox(width: 10),
 
-              // 2. Mark Resolved Button
+              // 2. False Flag Button
               Expanded(
                 child: SizedBox(
                   height: context.buttonHeight,
                   child: OutlinedButton.icon(
-                    onPressed: (isResolved || _isLoadingAction)
+                    onPressed: (hasFlagged || _isLoadingAction || isResolved)
                         ? null
-                        : () => _handleResolve(report),
+                        : () => _handleFlag(report),
                     style: OutlinedButton.styleFrom(
                       backgroundColor: isHC ? Colors.white : null,
-                      foregroundColor: isHC
-                          ? const Color(0xFF003833)
-                          : AppColors.success,
+                      foregroundColor: isHC ? const Color(0xFF8B0000) : AppColors.error,
                       side: BorderSide(
-                        color: isResolved
+                        color: hasFlagged
                             ? (isHC ? Colors.grey : AppColors.outlineVariant)
-                            : (isHC ? const Color(0xFF003833) : AppColors.success),
+                            : (isHC ? const Color(0xFF8B0000) : AppColors.error),
                         width: isHC ? 2 : 1.5,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                    icon: Icon(hasFlagged ? Icons.flag_rounded : Icons.flag_outlined, size: 18),
                     label: Text(
-                      isResolved ? 'Resolved' : 'Mark Fixed',
+                      hasFlagged ? 'False (${report.falseCount}/3)' : 'False Flag (${report.falseCount}/3)',
                       style: TextStyle(
                         fontSize: context.hasLargeTargets ? 14 : 13,
                         fontWeight: FontWeight.w700,
@@ -1092,23 +1135,32 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
           const SizedBox(height: 14),
 
-          // Flag false button
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: (hasFlagged || _isLoadingAction)
+          // Mark Resolved Button
+          SizedBox(
+            height: context.buttonHeight - 4,
+            child: OutlinedButton.icon(
+              onPressed: (isResolved || _isLoadingAction)
                   ? null
-                  : () => _handleFlag(report),
-              style: TextButton.styleFrom(
-                foregroundColor: isHC ? const Color(0xFF8B0000) : AppColors.error,
-                minimumSize: Size(0, context.minTapHeight),
+                  : () => _handleResolve(report),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: isHC ? Colors.white : null,
+                foregroundColor: isHC ? const Color(0xFF003833) : AppColors.success,
+                side: BorderSide(
+                  color: isResolved
+                      ? (isHC ? Colors.grey : AppColors.outlineVariant)
+                      : (isHC ? const Color(0xFF003833) : AppColors.success),
+                  width: isHC ? 2 : 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              icon: Icon(Icons.flag_outlined, size: context.hasLargeTargets ? 18 : 16),
+              icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
               label: Text(
-                hasFlagged ? 'Flagged as Inaccurate' : 'Report as Inaccurate',
+                isResolved ? 'Condition Marked Fixed' : 'Mark Condition as Fixed / Resolved',
                 style: TextStyle(
-                  fontSize: context.hasLargeTargets ? 13 : 12,
-                  fontWeight: FontWeight.w600,
+                  fontSize: context.hasLargeTargets ? 14 : 13,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
