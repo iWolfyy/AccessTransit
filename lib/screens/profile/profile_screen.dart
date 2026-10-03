@@ -5,6 +5,8 @@ import '../../core/theme/app_theme.dart';
 import '../../models/enums/user_role.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/logout_confirmation_dialog.dart';
+import '../auth/login_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import 'rewards_contributions_screen.dart';
 
@@ -103,28 +105,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
+  Future<void> _logout() async {
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final isHighContrast = context.isHighContrast;
+
+    final confirmed = await showLogoutConfirmationDialog(context);
+    if (confirmed != true) return;
+
+    await _authService.logout();
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+    showLogoutSuccessSnackBar(
+      messenger: messenger,
+      isHighContrast: isHighContrast,
+    );
+  }
+
+  void _showComingSoon(BuildContext context, String feature) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text('$feature will be available in a future update.')),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.surfaceColor,
-      body: Column(
-        children: [
-          _TopBar(
-            initials: _initials,
-            onMenu: widget.onMenu,
-          ),
-          Expanded(child: _buildBody(context)),
-        ],
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _buildBody(context),
       bottomNavigationBar: null,
     );
   }
 
   Widget _buildBody(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
     if (_error != null || _user == null) {
       return Center(
         child: Padding(
@@ -158,110 +177,188 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return RefreshIndicator(
       onRefresh: _loadProfile,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: [
-          _ProfileHeader(
-            initials: _initials,
-            name: _displayName,
-            subtitle: _roleLabel,
-            email: user.email,
-            phone: user.phone,
+      child: CustomScrollView(
+        slivers: [
+          // ── Gradient Profile Header ──
+          SliverToBoxAdapter(
+            child: _GradientProfileHeader(
+              initials: _initials,
+              name: _displayName,
+              email: user.email,
+              roleLabel: _roleLabel,
+              onMenu: widget.onMenu,
+              onEdit: () => _showComingSoon(context, 'Edit Profile'),
+            ),
           ),
-          const SizedBox(height: 24),
-          const _StatsSection(),
-          const SizedBox(height: 24),
-          _ImpactCard(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const RewardsContributionsScreen(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          _BadgesSection(
-            onSeeAll: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const RewardsContributionsScreen(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          const _RecentActivitySection(),
-          const SizedBox(height: 24),
-          _AccountSection(
-            onItemTap: (label) {
-              if (label == 'Accessibility Preferences') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => AccessibilityPreferencesScreen(
-                      initialUser: _user,
-                    ),
+
+          // ── Body Content ──
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Personal Information Card ──
+                  _PersonalInfoCard(
+                    name: _displayName,
+                    email: user.email,
+                    phone: user.phone,
                   ),
-                );
-                return;
-              }
-              if (label == 'Rewards & Contributions') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const RewardsContributionsScreen(),
+                  const SizedBox(height: 20),
+
+                  // ── Stats Row ──
+                  const _StatsSection(),
+                  const SizedBox(height: 20),
+
+                  // ── Rewards & Contributions Card (merged Impact + Badges) ──
+                  _RewardsCard(
+                    onSeeAll: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const RewardsContributionsScreen(),
+                        ),
+                      );
+                    },
                   ),
-                );
-                return;
-              }
-              if (widget.onNavTap != null) {
-                widget.onNavTap!(label);
-              } else {
-                _showComingSoon(context, label);
-              }
-            },
+                  const SizedBox(height: 24),
+
+                  // ── Settings Section (LMT Go style) ──
+                  _SectionTitle(title: 'SETTINGS'),
+                  const SizedBox(height: 8),
+                  _GroupedCardList(
+                    items: [
+                      _GroupedCardItem(
+                        icon: Icons.accessibility_new_rounded,
+                        title: 'Accessibility Preferences',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => AccessibilityPreferencesScreen(
+                                initialUser: _user,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      _GroupedCardItem(
+                        icon: Icons.notifications_rounded,
+                        title: 'Push Notifications',
+                        trailing: _NotificationToggle(),
+                        onTap: () =>
+                            _showComingSoon(context, 'Push Notifications'),
+                      ),
+                      _GroupedCardItem(
+                        icon: Icons.lock_rounded,
+                        title: 'Change Password',
+                        onTap: () =>
+                            _showComingSoon(context, 'Change Password'),
+                      ),
+                      _GroupedCardItem(
+                        icon: Icons.bookmark_rounded,
+                        title: 'Saved Places',
+                        onTap: () => _showComingSoon(context, 'Saved Places'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Support Section (LMT Go style) ──
+                  _SectionTitle(title: 'SUPPORT'),
+                  const SizedBox(height: 8),
+                  _GroupedCardList(
+                    items: [
+                      _GroupedCardItem(
+                        icon: Icons.star_rounded,
+                        title: 'Rate Us',
+                        onTap: () => _showComingSoon(context, 'Rate Us'),
+                      ),
+                      _GroupedCardItem(
+                        icon: Icons.help_outline_rounded,
+                        title: 'Help Center',
+                        onTap: () => _showComingSoon(context, 'Help Center'),
+                      ),
+                      _GroupedCardItem(
+                        icon: Icons.system_update_rounded,
+                        title: 'Check for Updates',
+                        onTap: () =>
+                            _showComingSoon(context, 'Check for Updates'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Danger Zone ──
+                  _DangerZoneSection(
+                    onSignOut: _logout,
+                    onDeleteAccount: () =>
+                        _showComingSoon(context, 'Delete Account'),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // ── Version Footer ──
+                  const _VersionFooter(),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
         ],
       ),
     );
   }
-
-  void _showComingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text('$feature will be available in a future update.')),
-      );
-  }
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.initials, this.onMenu});
+// ═══════════════════════════════════════════════════════════════════════════
+// GRADIENT PROFILE HEADER (Phase 2.1 — LMT Go inspired)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _GradientProfileHeader extends StatelessWidget {
+  const _GradientProfileHeader({
+    required this.initials,
+    required this.name,
+    required this.email,
+    required this.roleLabel,
+    this.onMenu,
+    this.onEdit,
+  });
 
   final String initials;
+  final String name;
+  final String email;
+  final String roleLabel;
   final VoidCallback? onMenu;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
     final canPop = ModalRoute.of(context)?.canPop ?? false;
 
-    return Material(
-      color: context.surfaceColor,
-      elevation: isHighContrast ? 0 : 1,
-      shadowColor: Colors.black26,
-      child: Container(
-        decoration: BoxDecoration(
-          border: isHighContrast
-              ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
-              : null,
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: SizedBox(
-            height: 48,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: isHighContrast
+            ? null
+            : const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary,
+                  AppColors.primaryContainer,
+                ],
+              ),
+        color: isHighContrast ? const Color(0xFF001F3F) : null,
+        border: isHighContrast
+            ? const Border(
+                bottom: BorderSide(color: Colors.black, width: 2.0))
+            : null,
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            // ── Top bar: Back/Menu + Edit ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
                 children: [
                   SizedBox(
@@ -272,7 +369,7 @@ class _TopBar extends StatelessWidget {
                             onPressed: () => Navigator.of(context).maybePop(),
                             icon: Icon(
                               Icons.arrow_back_rounded,
-                              color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                              color: Colors.white,
                               size: context.tapIconSize,
                             ),
                           )
@@ -281,64 +378,203 @@ class _TopBar extends StatelessWidget {
                                 onPressed: onMenu,
                                 icon: Icon(
                                   Icons.menu_rounded,
-                                  color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                                  color: Colors.white,
                                   size: context.tapIconSize,
                                 ),
                               )
-                            : null),
+                            : const SizedBox.shrink()),
                   ),
-                  Expanded(
-                    child: Text(
-                      'Access Transit',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 22,
-                        height: 28 / 22,
-                        fontWeight: FontWeight.w700,
-                        color: isHighContrast ? Colors.black : AppColors.primary,
+                  const Spacer(),
+                  if (onEdit != null)
+                    Material(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: onEdit,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hasLargeTargets ? 16 : 12,
+                            vertical: hasLargeTargets ? 10 : 8,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.edit_rounded,
+                                color: Colors.white,
+                                size: hasLargeTargets ? 18 : 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Edit',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: hasLargeTargets ? 15 : 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  SizedBox(
-                    width: context.minTapHeight,
-                    height: context.minTapHeight,
-                    child: Center(
-                      child: CircleAvatar(
-                        radius: 16,
-                        backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
-                        foregroundColor: isHighContrast ? Colors.white : AppColors.onPrimaryContainer,
+                ],
+              ),
+            ),
+
+            // ── Avatar + Name + Email + Role Badge ──
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                24, 8, 24, hasLargeTargets ? 28 : 24,
+              ),
+              child: Column(
+                children: [
+                  // Avatar with verified badge
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: hasLargeTargets ? 110 : 100,
+                        height: hasLargeTargets ? 110 : 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isHighContrast
+                              ? Colors.white
+                              : AppColors.primaryContainer.withValues(alpha: 0.6),
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 3,
+                          ),
+                          boxShadow: isHighContrast
+                              ? null
+                              : const [
+                                  BoxShadow(
+                                    color: Color(0x33000000),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
+                        ),
+                        alignment: Alignment.center,
                         child: Text(
                           initials,
-                          style: const TextStyle(
-                            fontSize: 12,
+                          style: TextStyle(
+                            color: isHighContrast ? Colors.black : Colors.white,
+                            fontSize: hasLargeTargets ? 36 : 32,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                      ),
+                      // Verified badge
+                      Positioned(
+                        right: 0,
+                        bottom: 2,
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: isHighContrast
+                                ? Colors.white
+                                : AppColors.success,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isHighContrast
+                                  ? Colors.black
+                                  : Colors.white,
+                              width: 2.5,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.check_rounded,
+                            color: isHighContrast ? Colors.black : Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Name
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: hasLargeTargets ? 26 : 22,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+
+                  // Email
+                  if (email.isNotEmpty)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.email_outlined,
+                          color: Colors.white.withValues(alpha: 0.70),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          email,
+                          style: TextStyle(
+                            fontSize: hasLargeTargets ? 15 : 14,
+                            color: Colors.white.withValues(alpha: 0.70),
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 12),
+
+                  // Role badge chip
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: hasLargeTargets ? 16 : 12,
+                      vertical: hasLargeTargets ? 7 : 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.30),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      roleLabel,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: hasLargeTargets ? 14 : 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({
-    required this.initials,
+// ═══════════════════════════════════════════════════════════════════════════
+// PERSONAL INFORMATION CARD (Phase 2.2 — LMT Go style)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _PersonalInfoCard extends StatelessWidget {
+  const _PersonalInfoCard({
     required this.name,
-    required this.subtitle,
     required this.email,
     this.phone,
   });
 
-  final String initials;
   final String name;
-  final String subtitle;
   final String email;
   final String? phone;
 
@@ -346,121 +582,157 @@ class _ProfileHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
 
+    final rows = <_InfoRowData>[
+      _InfoRowData(
+        icon: Icons.person_outlined,
+        title: name,
+        subtitle: 'Full name',
+      ),
+      if (phone != null && phone!.trim().isNotEmpty)
+        _InfoRowData(
+          icon: Icons.phone_outlined,
+          title: phone!.trim(),
+          subtitle: 'Phone number',
+        ),
+      _InfoRowData(
+        icon: Icons.email_outlined,
+        title: email,
+        subtitle: 'Email address',
+      ),
+    ];
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 16),
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
-                border: Border.all(
-                  color: isHighContrast ? Colors.black : AppColors.surface,
-                  width: isHighContrast ? 3 : 4,
-                ),
-                boxShadow: isHighContrast
-                    ? null
-                    : const [
-                        BoxShadow(
-                          color: Color(0x14000000),
-                          blurRadius: 4,
-                          offset: Offset(0, 1),
-                        ),
-                      ],
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                initials,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            Positioned(
-              right: -8,
-              bottom: -8,
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: isHighContrast ? Colors.white : AppColors.secondary,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isHighContrast ? Colors.black : AppColors.surface,
-                    width: 2,
-                  ),
-                  boxShadow: isHighContrast
-                      ? null
-                      : const [
-                          BoxShadow(
-                            color: Color(0x33000000),
-                            blurRadius: 4,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                ),
-                child: Icon(
-                  Icons.stars,
-                  color: isHighContrast ? Colors.black : AppColors.onSecondary,
-                  size: 18,
-                ),
-              ),
-            ),
-          ],
-        ),
+        _SectionTitle(title: 'PERSONAL INFORMATION'),
         const SizedBox(height: 8),
-        Text(
-          name,
-          style: TextStyle(
-            fontSize: 22,
-            height: 28 / 22,
-            fontWeight: FontWeight.w700,
-            color: isHighContrast ? Colors.black : AppColors.onSurface,
+        Container(
+          decoration: BoxDecoration(
+            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: isHighContrast
+                ? Border.all(color: Colors.black, width: 2.0)
+                : null,
+            boxShadow: isHighContrast
+                ? null
+                : const [
+                    BoxShadow(
+                      color: Color(0x0A000000),
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+          ),
+          child: Column(
+            children: [
+              for (var i = 0; i < rows.length; i++) ...[
+                if (i > 0)
+                  Divider(
+                    height: 1,
+                    indent: 56,
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.outlineVariant.withValues(alpha: 0.30),
+                  ),
+                _InfoRow(data: rows[i]),
+              ],
+            ],
           ),
         ),
-        Text(
-          subtitle,
-          style: TextStyle(
-            fontSize: 14,
-            height: 20 / 14,
-            fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
-            color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-          ),
-        ),
-        if (email.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(
-            email,
-            style: TextStyle(
-              fontSize: 14,
-              height: 20 / 14,
-              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
-              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-            ),
-          ),
-        ],
-        if (phone != null && phone!.trim().isNotEmpty) ...[
-          const SizedBox(height: 2),
-          Text(
-            phone!.trim(),
-            style: TextStyle(
-              fontSize: 14,
-              height: 20 / 14,
-              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
-              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-            ),
-          ),
-        ],
       ],
     );
   }
 }
+
+class _InfoRowData {
+  const _InfoRowData({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.data});
+
+  final _InfoRowData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: hasLargeTargets ? 16 : 14,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: hasLargeTargets ? 42 : 36,
+            height: hasLargeTargets ? 42 : 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isHighContrast
+                  ? const Color(0xFFE5E5E5)
+                  : AppColors.primaryContainer.withValues(alpha: 0.10),
+              border: isHighContrast
+                  ? Border.all(color: Colors.black, width: 1.5)
+                  : null,
+            ),
+            child: Icon(
+              data.icon,
+              size: hasLargeTargets ? 20 : 18,
+              color: isHighContrast
+                  ? Colors.black
+                  : AppColors.primaryContainer,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  data.title,
+                  style: TextStyle(
+                    fontSize: hasLargeTargets ? 17 : 15,
+                    fontWeight:
+                        isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  data.subtitle,
+                  style: TextStyle(
+                    fontSize: hasLargeTargets ? 13 : 12,
+                    fontWeight:
+                        isHighContrast ? FontWeight.w600 : FontWeight.w400,
+                    color: isHighContrast
+                        ? const Color(0xFF1A1A1A)
+                        : AppColors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATS SECTION (Phase 2.3 — kept)
+// ═══════════════════════════════════════════════════════════════════════════
 
 class _StatsSection extends StatelessWidget {
   const _StatsSection();
@@ -521,16 +793,16 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(hasLargeTargets ? 20 : 16),
       decoration: BoxDecoration(
-        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
         border: isHighContrast ? Border.all(color: Colors.black, width: 2.0) : null,
         boxShadow: isHighContrast
             ? null
             : const [
                 BoxShadow(
-                  color: Color(0x14000000),
-                  blurRadius: 4,
-                  offset: Offset(0, 1),
+                  color: Color(0x0A000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
                 ),
               ],
       ),
@@ -567,381 +839,173 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _ImpactCard extends StatelessWidget {
-  const _ImpactCard({this.onTap});
+// ═══════════════════════════════════════════════════════════════════════════
+// REWARDS & CONTRIBUTIONS CARD (Phase 2.4 — merged Impact + Badges)
+// ═══════════════════════════════════════════════════════════════════════════
 
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isHighContrast = context.isHighContrast;
-    final hasLargeTargets = context.hasLargeTargets;
-
-    return Material(
-      color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(hasLargeTargets ? 28 : 24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isHighContrast ? Colors.black : Colors.transparent,
-              width: isHighContrast ? 2 : 0,
-            ),
-            boxShadow: isHighContrast
-                ? const []
-                : const [
-                    BoxShadow(
-                      color: Color(0x14000000),
-                      blurRadius: 4,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
-          ),
-          clipBehavior: Clip.hardEdge,
-          child: Stack(
-            children: [
-              Positioned(
-                right: -32,
-                top: -32,
-                child: Icon(
-                  Icons.diversity_3,
-                  size: 120,
-                  color: isHighContrast
-                      ? Colors.white.withValues(alpha: 0.15)
-                      : AppColors.onPrimaryContainer.withValues(alpha: 0.20),
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.favorite,
-                        size: hasLargeTargets ? 26 : 22,
-                        color: isHighContrast ? Colors.white : AppColors.onPrimary,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Your Impact',
-                        style: TextStyle(
-                          fontSize: hasLargeTargets ? 21 : 18,
-                          height: 24 / 18,
-                          fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-                          color: isHighContrast ? Colors.white : AppColors.onPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text.rich(
-                    TextSpan(
-                      style: TextStyle(
-                        fontSize: hasLargeTargets ? 17.5 : 16,
-                        height: 24 / 16,
-                        color: isHighContrast ? Colors.white : AppColors.onPrimary,
-                      ),
-                      children: [
-                        const TextSpan(text: 'Your reports have helped '),
-                        TextSpan(
-                          text: '1,200+',
-                          style: TextStyle(
-                            fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
-                          ),
-                        ),
-                        const TextSpan(text: ' commuters this month.'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BadgesSection extends StatelessWidget {
-  const _BadgesSection({this.onSeeAll});
+class _RewardsCard extends StatelessWidget {
+  const _RewardsCard({this.onSeeAll});
 
   final VoidCallback? onSeeAll;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
-    const badges = [
-      _BadgeData(
-        icon: Icons.rocket_launch,
-        label: 'Early Adopter',
-        accent: Color(0xFFFFD700),
-      ),
-      _BadgeData(
-        icon: Icons.accessible_forward,
-        label: 'Ramp Specialist',
-        accent: Color(0xFFC0C0C0),
-      ),
-      _BadgeData(
-        icon: Icons.elevator,
-        label: 'Elevator Scout',
-        accent: Color(0xFFCD7F32),
-      ),
-      _BadgeData(
-        icon: Icons.security,
-        label: 'Safety Sentinel',
-        accent: Color(0xFFC0C0C0),
-      ),
-    ];
+    final hasLargeTargets = context.hasLargeTargets;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Badges & Achievements',
-                style: TextStyle(
-                  fontSize: 18,
-                  height: 24 / 18,
-                  fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-                  color: context.textColor,
-                ),
-              ),
-            ),
-            if (onSeeAll != null)
-              TextButton(
-                onPressed: onSeeAll,
-                style: TextButton.styleFrom(
-                  minimumSize: Size(0, context.minTapHeight),
-                ),
-                child: Text(
-                  'See all',
-                  style: TextStyle(
-                    color: isHighContrast ? const Color(0xFF001F3F) : null,
-                    fontWeight: isHighContrast ? FontWeight.w800 : null,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 142,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: badges.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 16),
-            itemBuilder: (context, index) {
-              final badge = badges[index];
-              return Container(
-                width: 128,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                decoration: BoxDecoration(
-                  color: context.cardColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isHighContrast
-                        ? Colors.black
-                        : AppColors.outlineVariant.withValues(alpha: 0.30),
-                    width: isHighContrast ? 2 : 1,
-                  ),
-                  boxShadow: isHighContrast
-                      ? const []
-                      : const [
-                          BoxShadow(
-                            color: Color(0x14000000),
-                            blurRadius: 4,
-                            offset: Offset(0, 1),
-                          ),
-                        ],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: context.cardColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isHighContrast ? Colors.black : badge.accent,
-                          width: 2,
-                        ),
-                        boxShadow: isHighContrast
-                            ? const []
-                            : const [
-                                BoxShadow(
-                                  color: Color(0x14000000),
-                                  blurRadius: 4,
-                                  offset: Offset(0, 1),
-                                ),
-                              ],
-                      ),
-                      child: Icon(
-                        badge.icon,
-                        color: isHighContrast
-                            ? (badge.accent == const Color(0xFFFFD700)
-                                ? const Color(0xFF8B6508)
-                                : (badge.accent == const Color(0xFFCD7F32)
-                                    ? const Color(0xFF8B4513)
-                                    : Colors.black))
-                            : badge.accent,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      badge.label,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 16 / 12,
-                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
-                        color: context.textColor,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BadgeData {
-  const _BadgeData({
-    required this.icon,
-    required this.label,
-    required this.accent,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color accent;
-}
-
-class _RecentActivitySection extends StatelessWidget {
-  const _RecentActivitySection();
-
-  @override
-  Widget build(BuildContext context) {
-    final isHighContrast = context.isHighContrast;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Recent Activity',
-          style: TextStyle(
-            fontSize: 18,
-            height: 24 / 18,
-            fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-            color: context.textColor,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _ActivityItem(
-          icon: Icons.check_circle,
-          iconBackground: isHighContrast
-              ? const Color(0xFF003833)
-              : AppColors.secondaryContainer,
-          iconColor: isHighContrast ? Colors.white : AppColors.onSecondaryContainer,
-          title: 'Verified Ramp on Bus 42',
-          time: '2 hours ago',
-        ),
-        const SizedBox(height: 8),
-        _ActivityItem(
-          icon: Icons.warning,
-          iconBackground: isHighContrast
-              ? const Color(0xFF8B0000)
-              : AppColors.errorContainer,
-          iconColor: isHighContrast ? Colors.white : AppColors.onErrorContainer,
-          title: 'Reported Elevator Out at Central',
-          time: 'Yesterday',
-        ),
-      ],
-    );
-  }
-}
-
-class _ActivityItem extends StatelessWidget {
-  const _ActivityItem({
-    required this.icon,
-    required this.iconBackground,
-    required this.iconColor,
-    required this.title,
-    required this.time,
-  });
-
-  final IconData icon;
-  final Color iconBackground;
-  final Color iconColor;
-  final String title;
-  final String time;
-
-  @override
-  Widget build(BuildContext context) {
-    final isHighContrast = context.isHighContrast;
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: context.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isHighContrast
-              ? Colors.black
-              : AppColors.outlineVariant.withValues(alpha: 0.20),
-          width: isHighContrast ? 2 : 1,
-        ),
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 2.0)
+            : null,
         boxShadow: isHighContrast
-            ? const []
+            ? null
             : const [
                 BoxShadow(
-                  color: Color(0x14000000),
-                  blurRadius: 4,
-                  offset: Offset(0, 1),
+                  color: Color(0x0A000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
                 ),
               ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: iconBackground,
-            child: Icon(icon, color: iconColor),
+          // Impact section
+          Material(
+            color: isHighContrast
+                ? const Color(0xFF001F3F)
+                : AppColors.primaryContainer,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: InkWell(
+              onTap: onSeeAll,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(hasLargeTargets ? 22 : 18),
+                decoration: BoxDecoration(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(16)),
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 2)
+                      : null,
+                ),
+                clipBehavior: Clip.hardEdge,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      right: -24,
+                      top: -24,
+                      child: Icon(
+                        Icons.emoji_events_rounded,
+                        size: 100,
+                        color: Colors.white.withValues(alpha: 0.12),
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.emoji_events_rounded,
+                              size: hasLargeTargets ? 24 : 20,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Community Impact Score',
+                                style: TextStyle(
+                                  fontSize: hasLargeTargets ? 18 : 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 32),
+                          child: Text(
+                            'Level 3 • 42 reports',
+                            style: TextStyle(
+                              fontSize: hasLargeTargets ? 14 : 13,
+                              color: Colors.white.withValues(alpha: 0.80),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'See All →',
+                            style: TextStyle(
+                              fontSize: hasLargeTargets ? 14 : 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+
+          // Badges row
+          Padding(
+            padding: EdgeInsets.all(hasLargeTargets ? 18 : 14),
+            child: Row(
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 20 / 14,
-                    fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
-                    color: context.textColor,
+                ...[
+                  Icons.rocket_launch_rounded,
+                  Icons.accessible_forward_rounded,
+                  Icons.elevator_rounded,
+                ].map(
+                  (icon) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Container(
+                      width: hasLargeTargets ? 42 : 36,
+                      height: hasLargeTargets ? 42 : 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isHighContrast
+                            ? const Color(0xFFE5E5E5)
+                            : AppColors.primaryContainer
+                                .withValues(alpha: 0.10),
+                        border: isHighContrast
+                            ? Border.all(color: Colors.black, width: 1.5)
+                            : Border.all(
+                                color: AppColors.outlineVariant
+                                    .withValues(alpha: 0.5),
+                              ),
+                      ),
+                      child: Icon(
+                        icon,
+                        size: hasLargeTargets ? 20 : 18,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.primaryContainer,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(width: 4),
                 Text(
-                  time,
+                  '+ 9 more badges',
                   style: TextStyle(
-                    fontSize: 12,
-                    height: 16 / 12,
-                    fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.w500,
-                    color: context.subtextColor,
+                    fontSize: hasLargeTargets ? 14 : 12,
+                    fontWeight:
+                        isHighContrast ? FontWeight.w700 : FontWeight.w500,
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -953,114 +1017,340 @@ class _ActivityItem extends StatelessWidget {
   }
 }
 
-class _AccountSection extends StatelessWidget {
-  const _AccountSection({required this.onItemTap});
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION TITLE (Shared component)
+// ═══════════════════════════════════════════════════════════════════════════
 
-  final void Function(String label) onItemTap;
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
-    const items = [
-      (Icons.stars, 'Rewards & Contributions'),
-      (Icons.settings_accessibility, 'Accessibility Preferences'),
-      (Icons.history, 'Route History'),
-      (Icons.bookmark, 'Saved Places'),
-      (Icons.help_outline, 'Help & Support'),
-    ];
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+        letterSpacing: 0.8,
+        color: isHighContrast
+            ? Colors.black
+            : AppColors.onSurfaceVariant,
+      ),
+    );
+  }
+}
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Account',
-          style: TextStyle(
-            fontSize: 18,
-            height: 24 / 18,
-            fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-            color: context.textColor,
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUPED CARD LIST (Phase 2.5 — LMT Go style sections)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _GroupedCardItem {
+  const _GroupedCardItem({
+    required this.icon,
+    required this.title,
+    this.trailing,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+}
+
+class _GroupedCardList extends StatelessWidget {
+  const _GroupedCardList({required this.items});
+
+  final List<_GroupedCardItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 2.0)
+            : null,
+        boxShadow: isHighContrast
+            ? null
+            : const [
+                BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                indent: 56,
+                color: isHighContrast
+                    ? Colors.black
+                    : AppColors.outlineVariant.withValues(alpha: 0.25),
+              ),
+            _GroupedCardTile(item: items[i]),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _GroupedCardTile extends StatelessWidget {
+  const _GroupedCardTile({required this.item});
+
+  final _GroupedCardItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: context.minTapHeight),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: hasLargeTargets ? 16 : 14,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: hasLargeTargets ? 40 : 34,
+                  height: hasLargeTargets ? 40 : 34,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isHighContrast
+                        ? const Color(0xFFE5E5E5)
+                        : AppColors.primaryContainer
+                            .withValues(alpha: 0.08),
+                    border: isHighContrast
+                        ? Border.all(color: Colors.black, width: 1.5)
+                        : null,
+                  ),
+                  child: Icon(
+                    item.icon,
+                    size: hasLargeTargets ? 20 : 18,
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    item.title,
+                    style: TextStyle(
+                      fontSize: hasLargeTargets ? 17 : 15,
+                      fontWeight: isHighContrast
+                          ? FontWeight.w700
+                          : (hasLargeTargets
+                              ? FontWeight.w600
+                              : FontWeight.w500),
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurface,
+                    ),
+                  ),
+                ),
+                item.trailing ??
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: hasLargeTargets ? 24 : 20,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurfaceVariant,
+                    ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 16),
+      ),
+    );
+  }
+}
+
+class _NotificationToggle extends StatefulWidget {
+  @override
+  State<_NotificationToggle> createState() => _NotificationToggleState();
+}
+
+class _NotificationToggleState extends State<_NotificationToggle> {
+  bool _enabled = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Switch(
+      value: _enabled,
+      onChanged: (value) => setState(() => _enabled = value),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DANGER ZONE (Phase 2.6 — LMT Go style)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _DangerZoneSection extends StatelessWidget {
+  const _DangerZoneSection({
+    required this.onSignOut,
+    required this.onDeleteAccount,
+  });
+
+  final VoidCallback onSignOut;
+  final VoidCallback onDeleteAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+    final dangerColor = isHighContrast ? const Color(0xFF8B0000) : AppColors.error;
+
+    return Column(
+      children: [
+        // Sign Out
         Container(
           decoration: BoxDecoration(
-            color: context.cardColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isHighContrast
-                  ? Colors.black
-                  : AppColors.outlineVariant.withValues(alpha: 0.20),
-              width: isHighContrast ? 2 : 1,
-            ),
+            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: isHighContrast
+                ? Border.all(color: Colors.black, width: 2.0)
+                : null,
             boxShadow: isHighContrast
-                ? const []
+                ? null
                 : const [
                     BoxShadow(
-                      color: Color(0x14000000),
-                      blurRadius: 4,
-                      offset: Offset(0, 1),
+                      color: Color(0x0A000000),
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
                     ),
                   ],
           ),
-          child: Column(
-            children: [
-              for (var i = 0; i < items.length; i++) ...[
-                if (i > 0)
-                  Divider(
-                    height: 1,
-                    color: isHighContrast
-                        ? Colors.black
-                        : AppColors.outlineVariant.withValues(alpha: 0.20),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              onTap: onSignOut,
+              borderRadius: BorderRadius.circular(16),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: context.minTapHeight),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: hasLargeTargets ? 16 : 14,
                   ),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => onItemTap(items[i].$2),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: context.minTapHeight),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: context.hasLargeTargets ? 20 : 14,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.logout_rounded,
+                        size: hasLargeTargets ? 24 : 20,
+                        color: dangerColor,
+                      ),
+                      const SizedBox(width: 14),
+                      Text(
+                        'Sign Out',
+                        style: TextStyle(
+                          fontSize: hasLargeTargets ? 17 : 15,
+                          fontWeight: FontWeight.w600,
+                          color: dangerColor,
                         ),
-                        child: Row(
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Delete Account
+        Container(
+          decoration: BoxDecoration(
+            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: isHighContrast
+                ? Border.all(color: Colors.black, width: 2.0)
+                : null,
+            boxShadow: isHighContrast
+                ? null
+                : const [
+                    BoxShadow(
+                      color: Color(0x0A000000),
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              onTap: onDeleteAccount,
+              borderRadius: BorderRadius.circular(16),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: context.minTapHeight),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: hasLargeTargets ? 16 : 14,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.delete_outline_rounded,
+                        size: hasLargeTargets ? 24 : 20,
+                        color: dangerColor,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              items[i].$1,
-                              size: context.tapIconSize,
-                              color: isHighContrast
-                                  ? Colors.black
-                                  : AppColors.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Text(
-                                items[i].$2,
-                                style: TextStyle(
-                                  fontSize: context.hasLargeTargets ? 18 : 16,
-                                  height: 24 / 16,
-                                  fontWeight: isHighContrast
-                                      ? FontWeight.w700
-                                      : (context.hasLargeTargets ? FontWeight.w600 : FontWeight.normal),
-                                  color: context.textColor,
-                                ),
+                            Text(
+                              'Delete Account',
+                              style: TextStyle(
+                                fontSize: hasLargeTargets ? 17 : 15,
+                                fontWeight: FontWeight.w600,
+                                color: dangerColor,
                               ),
                             ),
-                            Icon(
-                              Icons.chevron_right,
-                              size: context.tapIconSize,
-                              color: isHighContrast
-                                  ? Colors.black
-                                  : AppColors.onSurfaceVariant,
+                            const SizedBox(height: 2),
+                            Text(
+                              'Permanently remove your account',
+                              style: TextStyle(
+                                fontSize: hasLargeTargets ? 13 : 12,
+                                color: isHighContrast
+                                    ? const Color(0xFF1A1A1A)
+                                    : AppColors.onSurfaceVariant,
+                                fontWeight: isHighContrast
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
-              ],
-            ],
+              ),
+            ),
           ),
         ),
       ],
@@ -1068,6 +1358,43 @@ class _AccountSection extends StatelessWidget {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// VERSION FOOTER (Phase 2.7)
+// ═══════════════════════════════════════════════════════════════════════════
 
+class _VersionFooter extends StatelessWidget {
+  const _VersionFooter();
 
+  @override
+  Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
 
+    return Center(
+      child: Column(
+        children: [
+          Text(
+            'AccessTransit v1.0.0',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
+              color: isHighContrast
+                  ? const Color(0xFF1A1A1A)
+                  : AppColors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Lanka MetroTransit',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.w400,
+              color: isHighContrast
+                  ? const Color(0xFF1A1A1A)
+                  : AppColors.onSurfaceVariant.withValues(alpha: 0.70),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
