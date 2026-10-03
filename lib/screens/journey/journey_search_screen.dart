@@ -761,8 +761,6 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
       body: Column(
         children: [
           _TopBar(
-            isDesktop: isDesktop,
-            onMenu: () => Navigator.of(context).maybePop(),
             onProfile: () => AppNavigation.openProfile(context),
             onSync: _resyncDatabase,
           ),
@@ -873,14 +871,10 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
 
 class _TopBar extends StatelessWidget {
   const _TopBar({
-    required this.isDesktop,
-    required this.onMenu,
     required this.onProfile,
     this.onSync,
   });
 
-  final bool isDesktop;
-  final VoidCallback onMenu;
   final VoidCallback onProfile;
   final VoidCallback? onSync;
 
@@ -907,16 +901,6 @@ class _TopBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: onMenu,
-                    icon: Icon(
-                      isDesktop ? Icons.menu : Icons.arrow_back_rounded,
-                    ),
-                    color: isHighContrast ? Colors.black : AppColors.primary,
-                    tooltip: isDesktop ? 'Menu' : 'Back',
-                    iconSize: 26,
-                  ),
-                  const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       'Plan Journey',

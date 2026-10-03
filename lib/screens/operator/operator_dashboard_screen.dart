@@ -22,6 +22,7 @@ import '../../services/trip_service.dart';
 import '../../models/trip_model.dart';
 import '../../models/station.dart';
 import '../../widgets/add_station_dialog.dart';
+import '../../widgets/logout_confirmation_dialog.dart';
 import '../auth/login_screen.dart';
 
 
@@ -626,14 +627,23 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             ),
             onPressed: () async {
               final nav = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+              final isHighContrast = context.isHighContrast;
+
+              final confirmed = await showLogoutConfirmationDialog(context);
+              if (confirmed != true) return;
+
               if (_isTripActive) {
                 await _stopTrip();
               }
               await _authService.logout();
-              if (!mounted) return;
               nav.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
+              );
+              showLogoutSuccessSnackBar(
+                messenger: messenger,
+                isHighContrast: isHighContrast,
               );
             },
             tooltip: 'Sign out',
