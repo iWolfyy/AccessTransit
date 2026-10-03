@@ -261,8 +261,8 @@ void main() {
       final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
       expect(scaffold.backgroundColor, equals(Colors.white));
 
-      // Where to search input decorator is rendered
-      expect(find.text('Where to?'), findsWidgets);
+      // Search card in gradient hero header
+      expect(find.text('Where are you going?'), findsOneWidget);
 
       // Reset
       await AccessibilityPreferencesService.instance.setHighContrast(false);
@@ -370,18 +370,15 @@ void main() {
       final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
       expect(scaffold.backgroundColor, equals(Colors.white));
 
-      // Check User details
-      expect(find.text('Alex Perera'), findsOneWidget);
-      expect(find.text('alex@example.com'), findsOneWidget);
+      // Check User details (present in header and personal information card)
+      expect(find.text('Alex Perera'), findsAtLeastNWidgets(1));
+      expect(find.text('alex@example.com'), findsAtLeastNWidgets(1));
 
-      // Check Impact Card
-      expect(find.text('Your Impact'), findsOneWidget);
+      // Check Rewards & Contributions Card (merged Impact + Badges)
+      expect(find.text('Community Impact Score'), findsOneWidget);
 
-      // Check Badges & Achievements section
-      expect(find.text('Badges & Achievements'), findsOneWidget);
-
-      // Check Account section
-      expect(find.text('Account'), findsOneWidget);
+      // Check Settings section (replaces old Account section)
+      expect(find.text('SETTINGS'), findsOneWidget);
       expect(find.text('Accessibility Preferences'), findsOneWidget);
 
       // Reset
