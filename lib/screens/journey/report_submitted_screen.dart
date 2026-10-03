@@ -276,7 +276,6 @@ class ReportSubmittedScreen extends StatelessWidget {
                                 child: _buildImageWidget(report!.photoUrl!),
                               ),
                             ],
-                            ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [

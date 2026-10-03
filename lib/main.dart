@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
+
 import 'core/routing/password_reset_link_handler.dart';
 import 'core/theme/app_theme.dart';
 import 'data/seed_data.dart';
@@ -13,6 +16,9 @@ import 'firebase_options.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'services/accessibility_preferences_service.dart';
+import 'services/locale_provider.dart';
+
+final LocaleProvider localeProvider = LocaleProvider();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -89,32 +95,45 @@ class _AccessTransitAppState extends State<AccessTransitApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: _navigatorKey,
-      title: 'AccessTransit',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      home: const SplashScreen(),
-      builder: (context, child) {
-        return ListenableBuilder(
-          listenable: AccessibilityPreferencesService.instance,
-          builder: (context, _) {
-            final prefs = AccessibilityPreferencesService.instance;
-            final isHighContrast = prefs.isHighContrast;
-            final hasLargeTargets = prefs.hasLargeTargets;
-            final baseTheme = isHighContrast
-                ? AppTheme.highContrastTheme
-                : AppTheme.lightTheme;
-            return Theme(
-              data: baseTheme.copyWith(
-                extensions: [
-                  AccessibilityTokens(
-                    hasLargeTargets: hasLargeTargets,
-                    isHighContrast: isHighContrast,
+    return ListenableBuilder(
+      listenable: localeProvider,
+      builder: (context, _) {
+        return MaterialApp(
+          navigatorKey: _navigatorKey,
+          title: 'AccessTransit',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          locale: localeProvider.locale,
+          supportedLocales: LocaleProvider.supportedLocales,
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: const SplashScreen(),
+          builder: (context, child) {
+            return ListenableBuilder(
+              listenable: AccessibilityPreferencesService.instance,
+              builder: (context, _) {
+                final prefs = AccessibilityPreferencesService.instance;
+                final isHighContrast = prefs.isHighContrast;
+                final hasLargeTargets = prefs.hasLargeTargets;
+                final baseTheme = isHighContrast
+                    ? AppTheme.highContrastTheme
+                    : AppTheme.lightTheme;
+                return Theme(
+                  data: baseTheme.copyWith(
+                    extensions: [
+                      AccessibilityTokens(
+                        hasLargeTargets: hasLargeTargets,
+                        isHighContrast: isHighContrast,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: child!,
+                  child: child!,
+                );
+              },
             );
           },
         );

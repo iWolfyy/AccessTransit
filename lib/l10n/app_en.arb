@@ -1,0 +1,45 @@
+{
+  "@@locale": "en",
+  "appTitle": "AccessTransit",
+  "selectLanguageTitle": "Select Language",
+  "english": "English",
+  "sinhala": "Sinhala (සිංහල)",
+  "tamil": "Tamil (தமிழ்)",
+  "reportConditionTitle": "Report Route Condition",
+  "selectBusRouteLabel": "Bus Route",
+  "selectBusRouteHint": "Select your route (e.g., 138 Pettah - Homagama)",
+  "errSelectBusRoute": "Please select a bus route",
+  "targetLocationLabel": "Reporting Location",
+  "targetOnBus": "On the Bus",
+  "targetAtStation": "At Bus Stop / Station",
+  "crowdingLevelTitle": "Crowding Level",
+  "crowdingLow": "Low Crowd",
+  "crowdingLowDesc": "Plenty of room & wheelchair bay free",
+  "crowdingModerate": "Moderate",
+  "crowdingModerateDesc": "Seats full, standing room available",
+  "crowdingPacked": "Crowded / Packed",
+  "crowdingPackedDesc": "Wheelchair space or aisle blocked",
+  "additionalNotesLabel": "Additional Notes (Optional)",
+  "additionalNotesHint": "Describe accessibility barriers, broken ramps, etc.",
+  "errNoteTooShort": "Please enter at least 10 characters",
+  "submitReportBtn": "Submit Report (+10 Points)",
+  "confirmSubmitTitle": "Submit Accessibility Report?",
+  "confirmSubmitContent": "Your report helps passengers with visual or mobility impairments navigate Sri Lankan public transit safely.",
+  "cancelBtn": "Cancel",
+  "confirmBtn": "Confirm & Send",
+  "successReportSubmitted": "Thank you! Report submitted successfully.",
+  "rewardPointsMessage": "You earned {points} Community Points!",
+  "@rewardPointsMessage": {
+    "description": "Notification message when community points are awarded",
+    "placeholders": {
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "communityScreenTitle": "Community Updates",
+  "navHome": "Home",
+  "navJourney": "Journey",
+  "navCommunity": "Community",
+  "navProfile": "Profile"
+}

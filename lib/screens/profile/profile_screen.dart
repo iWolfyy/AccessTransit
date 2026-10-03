@@ -10,6 +10,8 @@ import '../../widgets/logout_confirmation_dialog.dart';
 import '../auth/login_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import 'rewards_contributions_screen.dart';
+import '../../widgets/language_selector_bottom_sheet.dart';
+import '../../main.dart';
 
 
 class ProfileScreen extends StatefulWidget {
@@ -392,6 +394,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 8),
                   _GroupedCardList(
                     items: [
+                      _GroupedCardItem(
+                        icon: Icons.language_rounded,
+                        title: 'App Language',
+                        trailing: const _LanguageTrailingBadge(),
+                        onTap: () => LanguageSelectorBottomSheet.show(context),
+                      ),
                       _GroupedCardItem(
                         icon: Icons.accessibility_new_rounded,
                         title: 'Accessibility Preferences',
@@ -1378,6 +1386,61 @@ class _NotificationToggleState extends State<_NotificationToggle> {
     return Switch(
       value: _enabled,
       onChanged: (value) => setState(() => _enabled = value),
+    );
+  }
+}
+
+class _LanguageTrailingBadge extends StatelessWidget {
+  const _LanguageTrailingBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: localeProvider,
+      builder: (context, _) {
+        final code = localeProvider.locale.languageCode;
+        String langName;
+        switch (code) {
+          case 'si':
+            langName = 'සිංහල';
+            break;
+          case 'ta':
+            langName = 'தமிழ்';
+            break;
+          default:
+            langName = 'English';
+        }
+        final isHC = context.isHighContrast;
+        final hasLargeTargets = context.hasLargeTargets;
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: isHC ? Border.all(color: Colors.black) : null,
+              ),
+              child: Text(
+                langName,
+                style: TextStyle(
+                  fontSize: hasLargeTargets ? 14 : 13,
+                  fontWeight: FontWeight.w700,
+                  color: isHC ? Colors.white : AppColors.primary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: hasLargeTargets ? 24 : 20,
+              color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+            ),
+          ],
+        );
+      },
     );
   }
 }
