@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../services/accessibility_preferences_service.dart';
 import 'app_colors.dart';
 
 /// Central theme configuration supporting standard and high contrast (WCAG AAA) themes.
@@ -103,6 +104,7 @@ class AppTheme {
             fontSize: 16,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.3,
+            inherit: false,
           ),
         ),
       ),
@@ -113,9 +115,69 @@ class AppTheme {
           textStyle: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
+            inherit: false,
           ),
         ),
       ),
     );
   }
+}
+
+/// Extension on [BuildContext] providing convenient, consistent high-contrast tokens.
+extension HighContrastX on BuildContext {
+  /// Whether the app is currently rendering in WCAG AAA High Contrast mode.
+  bool get isHighContrast =>
+      Theme.of(this).colorScheme.outline == const Color(0xFF000000) ||
+      AccessibilityPreferencesService.instance.isHighContrast;
+
+  /// Background color for full screen scaffolds.
+  Color get surfaceColor =>
+      isHighContrast ? Colors.white : AppColors.surface;
+
+  /// Background color for elevated containers and cards.
+  Color get cardColor =>
+      isHighContrast ? Colors.white : AppColors.surfaceContainerLowest;
+
+  /// Primary high-contrast text color (pure black in high contrast).
+  Color get textColor =>
+      isHighContrast ? Colors.black : AppColors.onSurface;
+
+  /// Secondary/subtext color (very dark gray #1A1A1A in high contrast).
+  Color get subtextColor =>
+      isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant;
+
+  /// Primary interactive brand color (high-contrast navy).
+  Color get primaryColor =>
+      isHighContrast ? const Color(0xFF001F3F) : AppColors.primary;
+
+  /// Primary container color for highlights and chips.
+  Color get primaryContainerColor =>
+      isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer;
+
+  /// On-primary-container text/icon color.
+  Color get onPrimaryContainerColor =>
+      isHighContrast ? Colors.white : AppColors.onPrimaryContainer;
+
+  /// High contrast border for cards, buttons, and inputs.
+  Border cardBorder({double width = 2.0}) => isHighContrast
+      ? Border.all(color: Colors.black, width: width)
+      : Border.all(color: AppColors.surfaceVariant);
+
+  /// Solid border for dividers or containers.
+  BorderSide get borderSide => isHighContrast
+      ? const BorderSide(color: Colors.black, width: 2.0)
+      : const BorderSide(color: AppColors.surfaceVariant);
+
+  /// Shadows are eliminated in high contrast mode to avoid blurry edges.
+  List<BoxShadow> cardShadow([List<BoxShadow>? normalShadow]) =>
+      isHighContrast
+          ? const []
+          : (normalShadow ??
+              const [
+                BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ]);
 }

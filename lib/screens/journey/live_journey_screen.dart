@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/seed_data.dart';
 import '../../logic/delay_eta_logic.dart';
 import '../../models/bus.dart';
@@ -246,7 +247,12 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
               Expanded(
                 flex: 2,
                 child: Container(
-                  color: AppColors.surface,
+                  decoration: BoxDecoration(
+                    color: context.surfaceColor,
+                    border: context.isHighContrast
+                        ? const Border(left: BorderSide(color: Colors.black, width: 2.0))
+                        : null,
+                  ),
                   child: _DraggableJourneySheetContent(
                     busId: resolvedBusId,
                     busName: busName,
@@ -311,17 +317,27 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
               snap: true,
               snapSizes: const [0.16, 0.38, 0.90],
               builder: (context, scrollController) {
+                final isHighContrast = context.isHighContrast;
                 return Container(
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: context.surfaceColor,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.18),
-                        blurRadius: 20,
-                        offset: const Offset(0, -4),
-                      ),
-                    ],
+                    border: isHighContrast
+                        ? const Border(
+                            top: BorderSide(color: Colors.black, width: 2.0),
+                            left: BorderSide(color: Colors.black, width: 2.0),
+                            right: BorderSide(color: Colors.black, width: 2.0),
+                          )
+                        : null,
+                    boxShadow: isHighContrast
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.18),
+                              blurRadius: 20,
+                              offset: const Offset(0, -4),
+                            ),
+                          ],
                   ),
                   child: _DraggableJourneySheetContent(
                     busId: resolvedBusId,
@@ -363,7 +379,7 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
     // ── Path A: passenger has authenticated UID → read from journeys collection
     if (widget.passengerId.isNotEmpty) {
       return Scaffold(
-        backgroundColor: AppColors.surface,
+        backgroundColor: context.surfaceColor,
         body: StreamBuilder<JourneyModel?>(
           stream: _journeyService.watchActiveJourney(widget.passengerId),
           builder: (context, journeySnapshot) {
@@ -412,7 +428,7 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
 
             // ── State: journey found with busId → subscribe to live location
             return Scaffold(
-              backgroundColor: AppColors.surface,
+              backgroundColor: context.surfaceColor,
               body: _buildBody(
                 context,
                 isDesktop: isDesktop,
@@ -429,7 +445,7 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
 
     // ── Path B: no passengerId (direct nav / unauthenticated) → busId fallback
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       body: _buildBody(
         context,
         isDesktop: isDesktop,
@@ -651,47 +667,55 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Material(
-      color: AppColors.surface,
-      elevation: 2,
+      color: context.surfaceColor,
+      elevation: isHighContrast ? 0 : 2,
       shadowColor: AppColors.onSurface.withValues(alpha: 0.1),
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 52,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                Semantics(
-                  button: true,
-                  label: 'Close Live Navigation',
-                  child: IconButton(
-                    onPressed: onClose,
-                    icon: const Icon(Icons.close_rounded, size: 28),
-                    color: AppColors.onSurface,
-                    tooltip: 'Close Live Navigation',
+      child: Container(
+        decoration: BoxDecoration(
+          border: isHighContrast
+              ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+              : null,
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 52,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Semantics(
+                    button: true,
+                    label: 'Close Live Navigation',
+                    child: IconButton(
+                      onPressed: onClose,
+                      icon: const Icon(Icons.close_rounded, size: 28),
+                      color: isHighContrast ? Colors.black : AppColors.onSurface,
+                      tooltip: 'Close Live Navigation',
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Semantics(
-                      header: true,
-                      child: const Text(
-                        'Live Navigation',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 20,
-                          height: 28 / 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
+                  Expanded(
+                    child: Center(
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          'Live Navigation',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 20,
+                            height: 28 / 20,
+                            fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                            color: isHighContrast ? Colors.black : AppColors.primary,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 48),
-              ],
+                  const SizedBox(width: 48),
+                ],
+              ),
             ),
           ),
         ),
@@ -719,6 +743,7 @@ class _FloatingTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return SafeArea(
       bottom: false,
       child: Padding(
@@ -726,19 +751,21 @@ class _FloatingTopBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.surface.withValues(alpha: 0.95),
+            color: isHighContrast ? Colors.white : AppColors.surface.withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: AppColors.outlineVariant.withValues(alpha: 0.5),
-              width: 1,
+              color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.5),
+              width: isHighContrast ? 2.0 : 1.0,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            boxShadow: isHighContrast
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
           ),
           child: Row(
             children: [
@@ -748,7 +775,7 @@ class _FloatingTopBar extends StatelessWidget {
                 child: IconButton(
                   onPressed: onClose,
                   icon: const Icon(Icons.arrow_back_rounded, size: 24),
-                  color: AppColors.onSurface,
+                  color: isHighContrast ? Colors.black : AppColors.onSurface,
                   tooltip: 'Back',
                   style: IconButton.styleFrom(
                     minimumSize: const Size(48, 48),
@@ -761,6 +788,7 @@ class _FloatingTopBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFFC2185B), // LMT Go Crimson badge
                   borderRadius: BorderRadius.circular(8),
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
                 child: Text(
                   routeNumber,
@@ -778,22 +806,22 @@ class _FloatingTopBar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Live Tracking to',
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
+                        color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
                       ),
                     ),
                     Text(
                       destination,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
+                        color: isHighContrast ? Colors.black : AppColors.onSurface,
                       ),
                     ),
                   ],
@@ -803,14 +831,19 @@ class _FloatingTopBar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isLiveGps
-                      ? const Color(0xFFE8F5E9)
-                      : const Color(0xFFFFF3E0),
+                  color: isHighContrast
+                      ? Colors.white
+                      : (isLiveGps
+                          ? const Color(0xFFE8F5E9)
+                          : const Color(0xFFFFF3E0)),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isLiveGps
-                        ? const Color(0xFF81C784)
-                        : const Color(0xFFFFB74D),
+                    color: isHighContrast
+                        ? Colors.black
+                        : (isLiveGps
+                            ? const Color(0xFF81C784)
+                            : const Color(0xFFFFB74D)),
+                    width: isHighContrast ? 1.5 : 1.0,
                   ),
                 ),
                 child: Row(
@@ -820,9 +853,11 @@ class _FloatingTopBar extends StatelessWidget {
                       width: 7,
                       height: 7,
                       decoration: BoxDecoration(
-                        color: isLiveGps
-                            ? const Color(0xFF2E7D32)
-                            : Colors.orange.shade800,
+                        color: isHighContrast
+                            ? (isLiveGps ? const Color(0xFF003833) : const Color(0xFF8B4500))
+                            : (isLiveGps
+                                ? const Color(0xFF2E7D32)
+                                : Colors.orange.shade800),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -831,10 +866,12 @@ class _FloatingTopBar extends StatelessWidget {
                       isLiveGps ? 'LIVE' : 'SCHED',
                       style: TextStyle(
                         fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: isLiveGps
-                            ? const Color(0xFF1B5E20)
-                            : Colors.orange.shade900,
+                        fontWeight: FontWeight.w900,
+                        color: isHighContrast
+                            ? (isLiveGps ? const Color(0xFF003833) : const Color(0xFF8B4500))
+                            : (isLiveGps
+                                ? const Color(0xFF1B5E20)
+                                : Colors.orange.shade900),
                       ),
                     ),
                   ],
@@ -867,13 +904,18 @@ class _EnhancedStopsTimelineCard extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final isHighContrast = context.isHighContrast;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppColors.outlineVariant.withValues(alpha: 0.35),
+          color: isHighContrast
+              ? Colors.black
+              : AppColors.outlineVariant.withValues(alpha: 0.35),
+          width: isHighContrast ? 2.0 : 1.0,
         ),
       ),
       child: Column(
@@ -884,50 +926,63 @@ class _EnhancedStopsTimelineCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: isHighContrast
+                      ? const Color(0xFF001F3F)
+                      : AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.alt_route_rounded,
                   size: 20,
-                  color: AppColors.primary,
+                  color: isHighContrast ? Colors.white : AppColors.primary,
                 ),
               ),
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Upcoming Stops (${stopsTimeline.length})',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.onSurface,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Upcoming Stops (${stopsTimeline.length})',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w800,
+                        color: context.textColor,
+                      ),
                     ),
-                  ),
-                  const Text(
-                    'Real-time stop progression & ETA',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.onSurfaceVariant,
+                    Text(
+                      'Real-time stop progression & ETA',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.normal,
+                        color: context.subtextColor,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
+                  color: isHighContrast ? Colors.white : const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFF81C784)),
+                  border: Border.all(
+                    color: isHighContrast ? Colors.black : const Color(0xFF81C784),
+                    width: isHighContrast ? 1.5 : 1.0,
+                  ),
                 ),
-                child: const Text(
+                child: Text(
                   'Live Stops',
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1B5E20),
+                    fontWeight: FontWeight.w900,
+                    color: isHighContrast ? const Color(0xFF003833) : const Color(0xFF1B5E20),
                   ),
                 ),
               ),
@@ -969,6 +1024,7 @@ class _StopTimelineItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     final isPassed = stop.isPassed;
     final isCurrent = stop.isCurrent;
     final isTarget = stop.isTargetStop;
@@ -977,34 +1033,63 @@ class _StopTimelineItem extends StatelessWidget {
     final Color borderColor;
     final Widget nodeIcon;
 
-    if (isPassed) {
-      nodeColor = const Color(0xFFE8F5E9);
-      borderColor = const Color(0xFF4CAF50);
-      nodeIcon = const Icon(Icons.check_rounded, size: 12, color: Color(0xFF2E7D32));
-    } else if (isCurrent) {
-      nodeColor = AppColors.primary;
-      borderColor = AppColors.primary;
-      nodeIcon = const Icon(Icons.directions_bus_rounded, size: 14, color: Colors.white);
-    } else if (isTarget) {
-      nodeColor = const Color(0xFFFF9800);
-      borderColor = const Color(0xFFE65100);
-      nodeIcon = const Icon(Icons.star_rounded, size: 14, color: Colors.white);
+    if (isHighContrast) {
+      if (isCurrent) {
+        nodeColor = const Color(0xFF001F3F);
+        borderColor = Colors.black;
+        nodeIcon = const Icon(Icons.directions_bus_rounded, size: 14, color: Colors.white);
+      } else if (isPassed) {
+        nodeColor = Colors.white;
+        borderColor = Colors.black;
+        nodeIcon = const Icon(Icons.check_rounded, size: 12, color: Colors.black);
+      } else if (isTarget) {
+        nodeColor = const Color(0xFF8B4500);
+        borderColor = Colors.black;
+        nodeIcon = const Icon(Icons.star_rounded, size: 14, color: Colors.white);
+      } else {
+        nodeColor = Colors.white;
+        borderColor = Colors.black;
+        nodeIcon = Container(
+          width: 6,
+          height: 6,
+          decoration: const BoxDecoration(
+            color: Colors.black,
+            shape: BoxShape.circle,
+          ),
+        );
+      }
     } else {
-      nodeColor = Colors.white;
-      borderColor = AppColors.outlineVariant;
-      nodeIcon = Container(
-        width: 6,
-        height: 6,
-        decoration: BoxDecoration(
-          color: AppColors.outlineVariant,
-          shape: BoxShape.circle,
-        ),
-      );
+      if (isPassed) {
+        nodeColor = const Color(0xFFE8F5E9);
+        borderColor = const Color(0xFF4CAF50);
+        nodeIcon = const Icon(Icons.check_rounded, size: 12, color: Color(0xFF2E7D32));
+      } else if (isCurrent) {
+        nodeColor = AppColors.primary;
+        borderColor = AppColors.primary;
+        nodeIcon = const Icon(Icons.directions_bus_rounded, size: 14, color: Colors.white);
+      } else if (isTarget) {
+        nodeColor = const Color(0xFFFF9800);
+        borderColor = const Color(0xFFE65100);
+        nodeIcon = const Icon(Icons.star_rounded, size: 14, color: Colors.white);
+      } else {
+        nodeColor = Colors.white;
+        borderColor = AppColors.outlineVariant;
+        nodeIcon = Container(
+          width: 6,
+          height: 6,
+          decoration: const BoxDecoration(
+            color: AppColors.outlineVariant,
+            shape: BoxShape.circle,
+          ),
+        );
+      }
     }
 
-    final Color lineColor = isPassed
-        ? const Color(0xFF81C784)
-        : AppColors.outlineVariant.withValues(alpha: 0.5);
+    final Color lineColor = isHighContrast
+        ? (isPassed ? Colors.black54 : Colors.black)
+        : (isPassed
+            ? const Color(0xFF81C784)
+            : AppColors.outlineVariant.withValues(alpha: 0.5));
 
     return IntrinsicHeight(
       child: Row(
@@ -1027,7 +1112,7 @@ class _StopTimelineItem extends StatelessWidget {
                     color: nodeColor,
                     shape: BoxShape.circle,
                     border: Border.all(color: borderColor, width: 2),
-                    boxShadow: (isCurrent || isTarget)
+                    boxShadow: (isCurrent || isTarget) && !isHighContrast
                         ? [
                             BoxShadow(
                               color: (isCurrent ? AppColors.primary : Colors.orange)
@@ -1072,9 +1157,11 @@ class _StopTimelineItem extends StatelessWidget {
                                       : (isPassed
                                           ? FontWeight.w500
                                           : FontWeight.w600),
-                                  color: isPassed
-                                      ? AppColors.onSurfaceVariant
-                                      : AppColors.onSurface,
+                                  color: isHighContrast
+                                      ? Colors.black
+                                      : (isPassed
+                                          ? AppColors.onSurfaceVariant
+                                          : AppColors.onSurface),
                                 ),
                               ),
                             ),
@@ -1086,18 +1173,25 @@ class _StopTimelineItem extends StatelessWidget {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF3E0),
+                                  color: isHighContrast
+                                      ? Colors.white
+                                      : const Color(0xFFFFF3E0),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                    color: const Color(0xFFFFB74D),
+                                    color: isHighContrast
+                                        ? Colors.black
+                                        : const Color(0xFFFFB74D),
+                                    width: isHighContrast ? 1.5 : 1.0,
                                   ),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'YOUR STOP',
                                   style: TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.w900,
-                                    color: Color(0xFFE65100),
+                                    color: isHighContrast
+                                        ? Colors.black
+                                        : const Color(0xFFE65100),
                                     letterSpacing: 0.5,
                                   ),
                                 ),
@@ -1114,10 +1208,12 @@ class _StopTimelineItem extends StatelessWidget {
                                   : 'Scheduled: ${stop.scheduledTimeStr}'),
                           style: TextStyle(
                             fontSize: 11,
-                            fontWeight: isCurrent ? FontWeight.w700 : FontWeight.normal,
-                            color: isCurrent
-                                ? AppColors.primary
-                                : AppColors.onSurfaceVariant,
+                            fontWeight: isHighContrast ? FontWeight.w700 : (isCurrent ? FontWeight.w700 : FontWeight.normal),
+                            color: isHighContrast
+                                ? const Color(0xFF1A1A1A)
+                                : (isCurrent
+                                    ? AppColors.primary
+                                    : AppColors.onSurfaceVariant),
                           ),
                         ),
                       ],
@@ -1134,9 +1230,11 @@ class _StopTimelineItem extends StatelessWidget {
                           fontWeight: isCurrent || isTarget
                               ? FontWeight.w800
                               : FontWeight.w600,
-                          color: isPassed
-                              ? AppColors.onSurfaceVariant
-                              : AppColors.onSurface,
+                          color: isHighContrast
+                              ? Colors.black
+                              : (isPassed
+                                  ? AppColors.onSurfaceVariant
+                                  : AppColors.onSurface),
                         ),
                       ),
                       if (stop.delayLabel.isNotEmpty &&
@@ -1148,9 +1246,13 @@ class _StopTimelineItem extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: stop.delayType == DelayType.delayed
-                                ? const Color(0xFFD84315)
-                                : const Color(0xFF0277BD),
+                            color: isHighContrast
+                                ? (stop.delayType == DelayType.delayed
+                                    ? const Color(0xFF8B0000)
+                                    : const Color(0xFF003833))
+                                : (stop.delayType == DelayType.delayed
+                                    ? const Color(0xFFD84315)
+                                    : const Color(0xFF0277BD)),
                           ),
                         ),
                       ],
@@ -1219,6 +1321,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return ListView(
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -1230,7 +1333,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
               height: 4.5,
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade400,
+                color: isHighContrast ? Colors.black : Colors.grey.shade400,
                 borderRadius: BorderRadius.circular(2.5),
               ),
             ),
@@ -1245,6 +1348,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFC2185B),
                 borderRadius: BorderRadius.circular(8),
+                border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
               ),
               child: Text(
                 routeNumber,
@@ -1259,24 +1363,29 @@ class _DraggableJourneySheetContent extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               busPlate,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 14,
-                color: AppColors.onSurface,
+                color: context.textColor,
               ),
             ),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: isBroadcasting
-                    ? const Color(0xFFE8F5E9)
-                    : const Color(0xFFFFF3E0),
+                color: isHighContrast
+                    ? Colors.white
+                    : (isBroadcasting
+                        ? const Color(0xFFE8F5E9)
+                        : const Color(0xFFFFF3E0)),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isBroadcasting
-                      ? const Color(0xFF81C784)
-                      : const Color(0xFFFFB74D),
+                  color: isHighContrast
+                      ? Colors.black
+                      : (isBroadcasting
+                          ? const Color(0xFF81C784)
+                          : const Color(0xFFFFB74D)),
+                  width: isHighContrast ? 1.5 : 1.0,
                 ),
               ),
               child: Text(
@@ -1284,9 +1393,11 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  color: isBroadcasting
-                      ? const Color(0xFF1B5E20)
-                      : Colors.orange.shade900,
+                  color: isHighContrast
+                      ? (isBroadcasting ? const Color(0xFF003833) : const Color(0xFF8B4500))
+                      : (isBroadcasting
+                          ? const Color(0xFF1B5E20)
+                          : Colors.orange.shade900),
                 ),
               ),
             ),
@@ -1294,20 +1405,20 @@ class _DraggableJourneySheetContent extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 '${speed.toStringAsFixed(0)} km/h',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.onSurfaceVariant,
+                  fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                  color: context.subtextColor,
                 ),
               ),
             ],
             const Spacer(),
             Text(
               'LKR $fareLkr',
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w900,
                 fontSize: 16,
-                color: AppColors.primary,
+                color: isHighContrast ? Colors.black : AppColors.primary,
               ),
             ),
           ],
@@ -1319,10 +1430,11 @@ class _DraggableJourneySheetContent extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.08),
+            color: isHighContrast ? Colors.white : AppColors.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.2),
+              color: isHighContrast ? Colors.black : AppColors.primary.withValues(alpha: 0.2),
+              width: isHighContrast ? 2.0 : 1.0,
             ),
           ),
           child: Row(
@@ -1331,8 +1443,9 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
                   shape: BoxShape.circle,
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
                 child: const Icon(
                   Icons.directions_bus_rounded,
@@ -1349,10 +1462,10 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                       etaResult.countdownText.isNotEmpty
                           ? etaResult.countdownText
                           : 'Arriving in ${etaResult.countdownMinutes} min',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.onSurface,
+                        fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w800,
+                        color: context.textColor,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1360,9 +1473,10 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                       'Destination: $effectiveDestination',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.normal,
+                        color: context.subtextColor,
                       ),
                     ),
                   ],
@@ -1372,19 +1486,28 @@ class _DraggableJourneySheetContent extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: etaResult.delayType == DelayType.delayed
-                      ? const Color(0xFFFFECE0)
-                      : const Color(0xFFE8F5E9),
+                  color: isHighContrast
+                      ? Colors.white
+                      : (etaResult.delayType == DelayType.delayed
+                          ? const Color(0xFFFFECE0)
+                          : const Color(0xFFE8F5E9)),
                   borderRadius: BorderRadius.circular(10),
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: Text(
                   etaResult.delayLabel,
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: etaResult.delayType == DelayType.delayed
-                        ? const Color(0xFFD84315)
-                        : const Color(0xFF2E7D32),
+                    fontWeight: FontWeight.w900,
+                    color: isHighContrast
+                        ? (etaResult.delayType == DelayType.delayed
+                            ? const Color(0xFF8B0000)
+                            : const Color(0xFF003833))
+                        : (etaResult.delayType == DelayType.delayed
+                            ? const Color(0xFFD84315)
+                            : const Color(0xFF2E7D32)),
                   ),
                 ),
               ),
@@ -1405,25 +1528,34 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                       ? Icons.notifications_active_rounded
                       : Icons.add_alert_rounded,
                   size: 18,
-                  color: isAlertActive ? Colors.white : const Color(0xFFE65100),
+                  color: isHighContrast
+                      ? (isAlertActive ? Colors.white : Colors.black)
+                      : (isAlertActive ? Colors.white : const Color(0xFFE65100)),
                 ),
                 label: Text(
                   isAlertActive ? 'Alert Active' : 'Alert When Near',
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: isAlertActive ? Colors.white : const Color(0xFFE65100),
+                    color: isHighContrast
+                        ? (isAlertActive ? Colors.white : Colors.black)
+                        : (isAlertActive ? Colors.white : const Color(0xFFE65100)),
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isAlertActive
-                      ? const Color(0xFFE65100)
-                      : const Color(0xFFFFF3E0),
-                  elevation: isAlertActive ? 2 : 0,
+                  backgroundColor: isHighContrast
+                      ? (isAlertActive ? const Color(0xFF001F3F) : Colors.white)
+                      : (isAlertActive
+                          ? const Color(0xFFE65100)
+                          : const Color(0xFFFFF3E0)),
+                  elevation: isHighContrast ? 0 : (isAlertActive ? 2 : 0),
                   minimumSize: const Size(0, 48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: const BorderSide(color: Color(0xFFFFB74D)),
+                    side: BorderSide(
+                      color: isHighContrast ? Colors.black : const Color(0xFFFFB74D),
+                      width: isHighContrast ? 2.0 : 1.0,
+                    ),
                   ),
                 ),
               ),
@@ -1452,11 +1584,12 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  elevation: 1,
+                  backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                  elevation: isHighContrast ? 0 : 1,
                   minimumSize: const Size(0, 48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
+                    side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : BorderSide.none,
                   ),
                 ),
               ),
@@ -1517,18 +1650,25 @@ class _DraggableJourneySheetContent extends StatelessWidget {
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
             tilePadding: EdgeInsets.zero,
-            leading: const Icon(Icons.info_outline_rounded, color: AppColors.primary),
-            title: const Text(
+            leading: Icon(
+              Icons.info_outline_rounded,
+              color: isHighContrast ? Colors.black : AppColors.primary,
+            ),
+            title: Text(
               'Detailed Vehicle Telemetry',
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
+                fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                color: context.textColor,
               ),
             ),
-            subtitle: const Text(
+            subtitle: Text(
               'Speed, GPS signals and raw trip data',
-              style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 12,
+                color: context.subtextColor,
+                fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+              ),
             ),
             children: [
               _StatusCard(
@@ -2510,16 +2650,20 @@ class _MapActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Semantics(
       button: true,
       label: tooltip,
       child: Material(
-        color: Colors.white.withValues(alpha: 0.95),
-        elevation: 3,
+        color: Colors.white,
+        elevation: isHighContrast ? 0 : 3,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: BorderSide(
-            color: AppColors.outlineVariant.withValues(alpha: 0.4),
+            color: isHighContrast
+                ? Colors.black
+                : AppColors.outlineVariant.withValues(alpha: 0.4),
+            width: isHighContrast ? 2.0 : 1.0,
           ),
         ),
         child: InkWell(
@@ -2531,7 +2675,7 @@ class _MapActionButton extends StatelessWidget {
             child: Icon(
               icon,
               size: 20,
-              color: AppColors.primary,
+              color: isHighContrast ? Colors.black : AppColors.primary,
             ),
           ),
         ),
@@ -2620,6 +2764,7 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     final updatedText =
         _formatTimestamp(liveBus?.timestamp ?? liveBus?.lastUpdated);
     final busStatusText = _getBusStatusText(liveBus?.status, isStale);
@@ -2628,18 +2773,23 @@ class _StatusCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppColors.outlineVariant.withValues(alpha: 0.3),
+          color: isHighContrast
+              ? Colors.black
+              : AppColors.outlineVariant.withValues(alpha: 0.3),
+          width: isHighContrast ? 2.0 : 1.0,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: isHighContrast
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.onSurface.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2652,12 +2802,15 @@ class _StatusCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryContainer,
+                  color: isHighContrast
+                      ? const Color(0xFF001F3F)
+                      : AppColors.primaryContainer,
                   shape: BoxShape.circle,
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.directions_bus_filled_rounded,
-                  color: AppColors.onPrimaryContainer,
+                  color: isHighContrast ? Colors.white : AppColors.onPrimaryContainer,
                   size: 26,
                 ),
               ),
@@ -2668,21 +2821,21 @@ class _StatusCard extends StatelessWidget {
                   children: [
                     Text(
                       busName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         height: 28 / 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.onSurface,
+                        fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w800,
+                        color: context.textColor,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       routeName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         height: 20 / 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                        color: context.subtextColor,
                       ),
                     ),
                   ],
@@ -2699,10 +2852,13 @@ class _StatusCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isBroadcasting
-                        ? AppColors.primaryContainer
-                        : AppColors.errorContainer,
+                    color: isHighContrast
+                        ? Colors.white
+                        : (isBroadcasting
+                            ? AppColors.primaryContainer
+                            : AppColors.errorContainer),
                     borderRadius: BorderRadius.circular(20),
+                    border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -2712,9 +2868,11 @@ class _StatusCard extends StatelessWidget {
                             ? Icons.sensors_rounded
                             : Icons.sensors_off_rounded,
                         size: 16,
-                        color: isBroadcasting
-                            ? AppColors.onPrimaryContainer
-                            : AppColors.onErrorContainer,
+                        color: isHighContrast
+                            ? (isBroadcasting ? const Color(0xFF003833) : const Color(0xFF8B0000))
+                            : (isBroadcasting
+                                ? AppColors.onPrimaryContainer
+                                : AppColors.onErrorContainer),
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -2723,9 +2881,11 @@ class _StatusCard extends StatelessWidget {
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.5,
-                          color: isBroadcasting
-                              ? AppColors.onPrimaryContainer
-                              : AppColors.onErrorContainer,
+                          color: isHighContrast
+                              ? (isBroadcasting ? const Color(0xFF003833) : const Color(0xFF8B0000))
+                              : (isBroadcasting
+                                  ? AppColors.onPrimaryContainer
+                                  : AppColors.onErrorContainer),
                         ),
                       ),
                     ],
@@ -2846,10 +3006,15 @@ class _InfoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: iconColor),
+        Icon(
+          icon,
+          size: 20,
+          color: isHighContrast ? Colors.black : iconColor,
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -2857,10 +3022,10 @@ class _InfoTile extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.onSurfaceVariant,
+                  fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
+                  color: context.subtextColor,
                 ),
               ),
               const SizedBox(height: 2),
@@ -2870,8 +3035,8 @@ class _InfoTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: valueColor,
+                  fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                  color: isHighContrast ? Colors.black : valueColor,
                 ),
               ),
             ],
@@ -2895,11 +3060,17 @@ class _EtaBannerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     if (arrivalEta != null) {
       final arrival = arrivalEta!;
       final Color badgeColor;
       final Color badgeTextColor;
-      if (arrival.delayType == DelayType.delayed) {
+      if (isHighContrast) {
+        badgeColor = Colors.white;
+        badgeTextColor = arrival.delayType == DelayType.delayed
+            ? const Color(0xFF8B0000)
+            : const Color(0xFF003833);
+      } else if (arrival.delayType == DelayType.delayed) {
         badgeColor = const Color(0xFFFFECE0);
         badgeTextColor = const Color(0xFFD84315);
       } else if (arrival.delayType == DelayType.early) {
@@ -2917,11 +3088,11 @@ class _EtaBannerCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.primaryContainer.withValues(alpha: 0.15),
+            color: isHighContrast ? Colors.white : AppColors.primaryContainer.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: AppColors.primaryContainer.withValues(alpha: 0.4),
-              width: 1.5,
+              color: isHighContrast ? Colors.black : AppColors.primaryContainer.withValues(alpha: 0.4),
+              width: isHighContrast ? 2.0 : 1.5,
             ),
           ),
           child: Column(
@@ -2932,13 +3103,14 @@ class _EtaBannerCard extends StatelessWidget {
                   Container(
                     width: 40,
                     height: 40,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primaryContainer,
+                    decoration: BoxDecoration(
+                      color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
                       shape: BoxShape.circle,
+                      border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.schedule_rounded,
-                      color: AppColors.onPrimaryContainer,
+                      color: isHighContrast ? Colors.white : AppColors.onPrimaryContainer,
                       size: 22,
                     ),
                   ),
@@ -2949,19 +3121,19 @@ class _EtaBannerCard extends StatelessWidget {
                       children: [
                         Text(
                           arrival.countdownText,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
+                            fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w800,
+                            color: isHighContrast ? Colors.black : AppColors.primary,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           'at $targetStop',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.onSurfaceVariant,
+                            fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                            color: context.subtextColor,
                           ),
                         ),
                       ],
@@ -2975,12 +3147,13 @@ class _EtaBannerCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: badgeColor,
                       borderRadius: BorderRadius.circular(12),
+                      border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                     ),
                     child: Text(
                       arrival.delayLabel,
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w900,
                         color: badgeTextColor,
                       ),
                     ),
@@ -2994,28 +3167,31 @@ class _EtaBannerCard extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLow,
+                  color: context.cardColor,
                   borderRadius: BorderRadius.circular(10),
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'Scheduled: ${arrival.scheduledArrivalStr}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                        color: context.subtextColor,
                       ),
                     ),
                     Text(
                       'Expected: ${arrival.estimatedArrivalStr}',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: arrival.delayType == DelayType.delayed
-                            ? const Color(0xFFD84315)
-                            : AppColors.primary,
+                        fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                        color: isHighContrast
+                            ? Colors.black
+                            : (arrival.delayType == DelayType.delayed
+                                ? const Color(0xFFD84315)
+                                : AppColors.primary),
                       ),
                     ),
                   ],
@@ -3030,25 +3206,28 @@ class _EtaBannerCard extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF3E0),
+                    color: isHighContrast ? Colors.white : const Color(0xFFFFF3E0),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFFFB74D)),
+                    border: Border.all(
+                      color: isHighContrast ? Colors.black : const Color(0xFFFFB74D),
+                      width: isHighContrast ? 1.5 : 1.0,
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.info_outline,
                         size: 14,
-                        color: Color(0xFFD84315),
+                        color: isHighContrast ? Colors.black : const Color(0xFFD84315),
                       ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           'Driver Notice: ${arrival.delayReason} (+${arrival.addedDelayMinutes} mins)',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFFD84315),
+                            color: isHighContrast ? Colors.black : const Color(0xFFD84315),
                           ),
                         ),
                       ),
@@ -3071,11 +3250,11 @@ class _EtaBannerCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.primaryContainer.withValues(alpha: 0.15),
+            color: isHighContrast ? Colors.white : AppColors.primaryContainer.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: AppColors.primaryContainer.withValues(alpha: 0.4),
-              width: 1.5,
+              color: isHighContrast ? Colors.black : AppColors.primaryContainer.withValues(alpha: 0.4),
+              width: isHighContrast ? 2.0 : 1.5,
             ),
           ),
           child: Row(
@@ -3083,13 +3262,14 @@ class _EtaBannerCard extends StatelessWidget {
               Container(
                 width: 42,
                 height: 42,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryContainer,
+                decoration: BoxDecoration(
+                  color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
                   shape: BoxShape.circle,
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.schedule_rounded,
-                  color: AppColors.onPrimaryContainer,
+                  color: isHighContrast ? Colors.white : AppColors.onPrimaryContainer,
                   size: 24,
                 ),
               ),
@@ -3100,19 +3280,19 @@ class _EtaBannerCard extends StatelessWidget {
                   children: [
                     Text(
                       etaResult.displayText,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primary,
+                        fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w800,
+                        color: isHighContrast ? Colors.black : AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Distance: $distanceKm km to $targetStop',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                        color: context.subtextColor,
                       ),
                     ),
                   ],
@@ -3132,18 +3312,21 @@ class _EtaBannerCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: AppColors.outlineVariant.withValues(alpha: 0.4),
+            color: isHighContrast
+                ? Colors.black
+                : AppColors.outlineVariant.withValues(alpha: 0.4),
+            width: isHighContrast ? 2.0 : 1.0,
           ),
         ),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.schedule_outlined,
               size: 22,
-              color: AppColors.onSurfaceVariant,
+              color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -3152,17 +3335,18 @@ class _EtaBannerCard extends StatelessWidget {
                 children: [
                   Text(
                     etaResult.displayText,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
+                      fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                      color: context.textColor,
                     ),
                   ),
                   Text(
                     etaResult.reason,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.onSurfaceVariant,
+                      fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                      color: context.subtextColor,
                     ),
                   ),
                 ],
@@ -3186,20 +3370,25 @@ class _TimelineProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Semantics(
       container: true,
       label: 'Journey progress: Bus approaching next stop $nextStop towards destination $destination',
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isHighContrast ? Colors.black : Colors.transparent,
+            width: isHighContrast ? 2.0 : 0.0,
+          ),
         ),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.route_rounded,
-              color: AppColors.primaryContainer,
+              color: isHighContrast ? Colors.black : AppColors.primaryContainer,
               size: 22,
             ),
             const SizedBox(width: 12),
@@ -3209,12 +3398,12 @@ class _TimelineProgress extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Text(
+                      Text(
                         'Next: ',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.onSurfaceVariant,
+                          fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                          color: context.subtextColor,
                         ),
                       ),
                       Expanded(
@@ -3222,10 +3411,10 @@ class _TimelineProgress extends StatelessWidget {
                           nextStop,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onSurface,
+                            fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                            color: context.textColor,
                           ),
                         ),
                       ),
@@ -3234,12 +3423,12 @@ class _TimelineProgress extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Text(
+                      Text(
                         'Final: ',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.onSurfaceVariant,
+                          fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                          color: context.subtextColor,
                         ),
                       ),
                       Expanded(
@@ -3247,10 +3436,10 @@ class _TimelineProgress extends StatelessWidget {
                           destination,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
+                            fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w700,
+                            color: isHighContrast ? Colors.black : AppColors.primary,
                           ),
                         ),
                       ),
@@ -3283,33 +3472,39 @@ class _LiveAccessibilitySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppColors.outlineVariant.withValues(alpha: 0.3),
+          color: isHighContrast
+              ? Colors.black
+              : AppColors.outlineVariant.withValues(alpha: 0.3),
+          width: isHighContrast ? 2.0 : 1.0,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: isHighContrast
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.onSurface.withValues(alpha: 0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Live Accessibility',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onSurface,
+                  fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                  color: context.textColor,
                 ),
               ),
               const Spacer(),
@@ -3319,15 +3514,18 @@ class _LiveAccessibilitySection extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceContainer,
+                    color: isHighContrast ? Colors.white : AppColors.surfaceContainer,
                     borderRadius: BorderRadius.circular(8),
+                    border: isHighContrast
+                        ? Border.all(color: Colors.black, width: 1.5)
+                        : null,
                   ),
                   child: Text(
                     'Seats: $occupancyLevel',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primaryContainer,
+                      color: isHighContrast ? Colors.black : AppColors.primaryContainer,
                     ),
                   ),
                 ),
@@ -3377,14 +3575,21 @@ class _A11yItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Semantics(
       container: true,
       label: '$title: $subtitle',
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isHighContrast
+                ? Colors.black
+                : AppColors.outlineVariant.withValues(alpha: 0.2),
+            width: isHighContrast ? 2.0 : 1.0,
+          ),
         ),
         child: Row(
           children: [
@@ -3392,18 +3597,23 @@ class _A11yItem extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: isWorking
-                    ? AppColors.secondary
-                    : AppColors.errorContainer,
+                color: isHighContrast
+                    ? (isWorking ? const Color(0xFF003833) : const Color(0xFF8B0000))
+                    : (isWorking
+                        ? AppColors.secondary
+                        : AppColors.errorContainer),
                 shape: BoxShape.circle,
+                border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
               ),
               child: Icon(
                 isWorking
                     ? Icons.check_circle_rounded
                     : Icons.warning_amber_rounded,
-                color: isWorking
-                    ? AppColors.onPrimary
-                    : AppColors.onErrorContainer,
+                color: isHighContrast
+                    ? Colors.white
+                    : (isWorking
+                        ? AppColors.onPrimary
+                        : AppColors.onErrorContainer),
                 size: 24,
               ),
             ),
@@ -3414,10 +3624,10 @@ class _A11yItem extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
+                      fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                      color: context.textColor,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -3425,16 +3635,22 @@ class _A11yItem extends StatelessWidget {
                     subtitle,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: isWorking
-                          ? AppColors.secondary
-                          : AppColors.error,
+                      fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
+                      color: isHighContrast
+                          ? (isWorking ? const Color(0xFF003833) : const Color(0xFF8B0000))
+                          : (isWorking
+                              ? AppColors.secondary
+                              : AppColors.error),
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(icon, color: AppColors.onSurfaceVariant, size: 24),
+            Icon(
+              icon,
+              color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+              size: 24,
+            ),
           ],
         ),
       ),
@@ -3457,6 +3673,7 @@ class _AssistanceSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Column(
       children: [
         Semantics(
@@ -3468,9 +3685,10 @@ class _AssistanceSection extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: onRequest,
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryContainer,
-                side: const BorderSide(
-                  color: AppColors.primaryContainer,
+                foregroundColor: isHighContrast ? Colors.black : AppColors.primaryContainer,
+                backgroundColor: isHighContrast ? Colors.white : null,
+                side: BorderSide(
+                  color: isHighContrast ? Colors.black : AppColors.primaryContainer,
                   width: 2,
                 ),
                 shape: RoundedRectangleBorder(
@@ -3490,10 +3708,11 @@ class _AssistanceSection extends StatelessWidget {
         Text(
           'Notify driver you need extra time or ramp deployment at $destination.',
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             height: 20 / 14,
-            color: AppColors.onSurfaceVariant,
+            fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+            color: context.subtextColor,
           ),
         ),
       ],
@@ -3512,6 +3731,7 @@ class _EmergencyActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Row(
       children: [
         Expanded(
@@ -3523,10 +3743,13 @@ class _EmergencyActions extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: onEmergency,
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.error,
+                  backgroundColor: isHighContrast ? const Color(0xFF8B0000) : AppColors.error,
                   foregroundColor: AppColors.onError,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
+                    side: isHighContrast
+                        ? const BorderSide(color: Colors.black, width: 2.0)
+                        : BorderSide.none,
                   ),
                   textStyle: const TextStyle(
                     fontSize: 15,
@@ -3549,8 +3772,12 @@ class _EmergencyActions extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onReport,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.onSurface,
-                  side: const BorderSide(color: AppColors.outline, width: 1.5),
+                  foregroundColor: isHighContrast ? Colors.black : AppColors.onSurface,
+                  backgroundColor: isHighContrast ? Colors.white : null,
+                  side: BorderSide(
+                    color: isHighContrast ? Colors.black : AppColors.outline,
+                    width: isHighContrast ? 2.0 : 1.5,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),

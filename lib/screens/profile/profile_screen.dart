@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../models/enums/user_role.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
@@ -104,7 +105,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       body: Column(
         children: [
           _TopBar(
@@ -240,57 +241,69 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Material(
-      color: AppColors.surface,
-      elevation: 1,
+      color: context.surfaceColor,
+      elevation: isHighContrast ? 0 : 1,
       shadowColor: Colors.black26,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 48,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: IconButton(
-                    onPressed: onMenu,
-                    icon: const Icon(Icons.menu, color: AppColors.onSurfaceVariant),
-                  ),
-                ),
-                const Expanded(
-                  child: Text(
-                    'Access Transit',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      height: 28 / 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+      child: Container(
+        decoration: BoxDecoration(
+          border: isHighContrast
+              ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+              : null,
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 48,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: IconButton(
+                      onPressed: onMenu,
+                      icon: Icon(
+                        Icons.menu,
+                        color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: Center(
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: AppColors.primaryContainer,
-                      foregroundColor: AppColors.onPrimaryContainer,
-                      child: Text(
-                        initials,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                  Expanded(
+                    child: Text(
+                      'Access Transit',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 22,
+                        height: 28 / 22,
+                        fontWeight: FontWeight.w700,
+                        color: isHighContrast ? Colors.black : AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Center(
+                      child: CircleAvatar(
+                        radius: 16,
+                        backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                        foregroundColor: isHighContrast ? Colors.white : AppColors.onPrimaryContainer,
+                        child: Text(
+                          initials,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -316,6 +329,8 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Column(
       children: [
         const SizedBox(height: 16),
@@ -327,21 +342,26 @@ class _ProfileHeader extends StatelessWidget {
               height: 96,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primaryContainer,
-                border: Border.all(color: AppColors.surface, width: 4),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x14000000),
-                    blurRadius: 4,
-                    offset: Offset(0, 1),
-                  ),
-                ],
+                color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                border: Border.all(
+                  color: isHighContrast ? Colors.black : AppColors.surface,
+                  width: isHighContrast ? 3 : 4,
+                ),
+                boxShadow: isHighContrast
+                    ? null
+                    : const [
+                        BoxShadow(
+                          color: Color(0x14000000),
+                          blurRadius: 4,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
               ),
               alignment: Alignment.center,
               child: Text(
                 initials,
                 style: const TextStyle(
-                  color: AppColors.onPrimary,
+                  color: Colors.white,
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
                 ),
@@ -354,18 +374,27 @@ class _ProfileHeader extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: AppColors.secondary,
+                  color: isHighContrast ? Colors.white : AppColors.secondary,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.surface, width: 2),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x33000000),
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
+                  border: Border.all(
+                    color: isHighContrast ? Colors.black : AppColors.surface,
+                    width: 2,
+                  ),
+                  boxShadow: isHighContrast
+                      ? null
+                      : const [
+                          BoxShadow(
+                            color: Color(0x33000000),
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
                 ),
-                child: const Icon(Icons.stars, color: AppColors.onSecondary, size: 18),
+                child: Icon(
+                  Icons.stars,
+                  color: isHighContrast ? Colors.black : AppColors.onSecondary,
+                  size: 18,
+                ),
               ),
             ),
           ],
@@ -373,29 +402,31 @@ class _ProfileHeader extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           name,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 22,
             height: 28 / 22,
             fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
+            color: isHighContrast ? Colors.black : AppColors.onSurface,
           ),
         ),
         Text(
           subtitle,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             height: 20 / 14,
-            color: AppColors.onSurfaceVariant,
+            fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+            color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
           ),
         ),
         if (email.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(
             email,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               height: 20 / 14,
-              color: AppColors.onSurfaceVariant,
+              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
             ),
           ),
         ],
@@ -403,10 +434,11 @@ class _ProfileHeader extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             phone!.trim(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               height: 20 / 14,
-              color: AppColors.onSurfaceVariant,
+              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
             ),
           ),
         ],
@@ -468,40 +500,45 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 4,
-            offset: Offset(0, 1),
-          ),
-        ],
+        border: isHighContrast ? Border.all(color: Colors.black, width: 2.0) : null,
+        boxShadow: isHighContrast
+            ? null
+            : const [
+                BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                ),
+              ],
       ),
       child: Column(
         children: [
-          Icon(icon, color: iconColor),
+          Icon(icon, color: isHighContrast ? Colors.black : iconColor),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               height: 24 / 18,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onSurface,
+              fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+              color: isHighContrast ? Colors.black : AppColors.onSurface,
             ),
           ),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               height: 16 / 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.onSurfaceVariant,
+              fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
+              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
             ),
           ),
         ],
@@ -517,8 +554,9 @@ class _ImpactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Material(
-      color: AppColors.primaryContainer,
+      color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -528,13 +566,19 @@ class _ImpactCard extends StatelessWidget {
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x14000000),
-                blurRadius: 4,
-                offset: Offset(0, 1),
-              ),
-            ],
+            border: Border.all(
+              color: isHighContrast ? Colors.black : Colors.transparent,
+              width: isHighContrast ? 2 : 0,
+            ),
+            boxShadow: isHighContrast
+                ? const []
+                : const [
+                    BoxShadow(
+                      color: Color(0x14000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
           ),
           clipBehavior: Clip.hardEdge,
           child: Stack(
@@ -545,42 +589,49 @@ class _ImpactCard extends StatelessWidget {
                 child: Icon(
                   Icons.diversity_3,
                   size: 120,
-                  color: AppColors.onPrimaryContainer.withValues(alpha: 0.20),
+                  color: isHighContrast
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : AppColors.onPrimaryContainer.withValues(alpha: 0.20),
                 ),
               ),
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.favorite, color: AppColors.onPrimary),
-                      SizedBox(width: 8),
+                      Icon(
+                        Icons.favorite,
+                        color: isHighContrast ? Colors.white : AppColors.onPrimary,
+                      ),
+                      const SizedBox(width: 8),
                       Text(
                         'Your Impact',
                         style: TextStyle(
                           fontSize: 18,
                           height: 24 / 18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.onPrimary,
+                          fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                          color: isHighContrast ? Colors.white : AppColors.onPrimary,
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text.rich(
                     TextSpan(
                       style: TextStyle(
                         fontSize: 16,
                         height: 24 / 16,
-                        color: AppColors.onPrimary,
+                        color: isHighContrast ? Colors.white : AppColors.onPrimary,
                       ),
                       children: [
-                        TextSpan(text: 'Your reports have helped '),
+                        const TextSpan(text: 'Your reports have helped '),
                         TextSpan(
                           text: '1,200+',
-                          style: TextStyle(fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                          ),
                         ),
-                        TextSpan(text: ' commuters this month.'),
+                        const TextSpan(text: ' commuters this month.'),
                       ],
                     ),
                   ),
@@ -601,6 +652,7 @@ class _BadgesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     const badges = [
       _BadgeData(
         icon: Icons.rocket_launch,
@@ -629,27 +681,33 @@ class _BadgesSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Badges & Achievements',
                 style: TextStyle(
                   fontSize: 18,
                   height: 24 / 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.onSurface,
+                  fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                  color: context.textColor,
                 ),
               ),
             ),
             if (onSeeAll != null)
               TextButton(
                 onPressed: onSeeAll,
-                child: const Text('See all'),
+                child: Text(
+                  'See all',
+                  style: TextStyle(
+                    color: isHighContrast ? const Color(0xFF001F3F) : null,
+                    fontWeight: isHighContrast ? FontWeight.w800 : null,
+                  ),
+                ),
               ),
           ],
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 128,
+          height: 142,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: badges.length,
@@ -658,20 +716,25 @@ class _BadgesSection extends StatelessWidget {
               final badge = badges[index];
               return Container(
                 width: 128,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLow,
+                  color: context.cardColor,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppColors.outlineVariant.withValues(alpha: 0.30),
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.outlineVariant.withValues(alpha: 0.30),
+                    width: isHighContrast ? 2 : 1,
                   ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x14000000),
-                      blurRadius: 4,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
+                  boxShadow: isHighContrast
+                      ? const []
+                      : const [
+                          BoxShadow(
+                            color: Color(0x14000000),
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -680,28 +743,42 @@ class _BadgesSection extends StatelessWidget {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: context.cardColor,
                         shape: BoxShape.circle,
-                        border: Border.all(color: badge.accent, width: 2),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x14000000),
-                            blurRadius: 4,
-                            offset: Offset(0, 1),
-                          ),
-                        ],
+                        border: Border.all(
+                          color: isHighContrast ? Colors.black : badge.accent,
+                          width: 2,
+                        ),
+                        boxShadow: isHighContrast
+                            ? const []
+                            : const [
+                                BoxShadow(
+                                  color: Color(0x14000000),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 1),
+                                ),
+                              ],
                       ),
-                      child: Icon(badge.icon, color: badge.accent),
+                      child: Icon(
+                        badge.icon,
+                        color: isHighContrast
+                            ? (badge.accent == const Color(0xFFFFD700)
+                                ? const Color(0xFF8B6508)
+                                : (badge.accent == const Color(0xFFCD7F32)
+                                    ? const Color(0xFF8B4513)
+                                    : Colors.black))
+                            : badge.accent,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       badge.label,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         height: 16 / 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.onSurface,
+                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
+                        color: context.textColor,
                       ),
                     ),
                   ],
@@ -732,7 +809,8 @@ class _RecentActivitySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    final isHighContrast = context.isHighContrast;
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -740,23 +818,27 @@ class _RecentActivitySection extends StatelessWidget {
           style: TextStyle(
             fontSize: 18,
             height: 24 / 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurface,
+            fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+            color: context.textColor,
           ),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         _ActivityItem(
           icon: Icons.check_circle,
-          iconBackground: AppColors.secondaryContainer,
-          iconColor: AppColors.onSecondaryContainer,
+          iconBackground: isHighContrast
+              ? const Color(0xFF003833)
+              : AppColors.secondaryContainer,
+          iconColor: isHighContrast ? Colors.white : AppColors.onSecondaryContainer,
           title: 'Verified Ramp on Bus 42',
           time: '2 hours ago',
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         _ActivityItem(
           icon: Icons.warning,
-          iconBackground: AppColors.errorContainer,
-          iconColor: AppColors.onErrorContainer,
+          iconBackground: isHighContrast
+              ? const Color(0xFF8B0000)
+              : AppColors.errorContainer,
+          iconColor: isHighContrast ? Colors.white : AppColors.onErrorContainer,
           title: 'Reported Elevator Out at Central',
           time: 'Yesterday',
         ),
@@ -782,21 +864,27 @@ class _ActivityItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.outlineVariant.withValues(alpha: 0.20),
+          color: isHighContrast
+              ? Colors.black
+              : AppColors.outlineVariant.withValues(alpha: 0.20),
+          width: isHighContrast ? 2 : 1,
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 4,
-            offset: Offset(0, 1),
-          ),
-        ],
+        boxShadow: isHighContrast
+            ? const []
+            : const [
+                BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                ),
+              ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -813,21 +901,21 @@ class _ActivityItem extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     height: 20 / 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.onSurface,
+                    fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
+                    color: context.textColor,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   time,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     height: 16 / 12,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.onSurfaceVariant,
+                    fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.w500,
+                    color: context.subtextColor,
                   ),
                 ),
               ],
@@ -846,6 +934,7 @@ class _AccountSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     const items = [
       (Icons.stars, 'Rewards & Contributions'),
       (Icons.settings_accessibility, 'Accessibility Preferences'),
@@ -857,30 +946,35 @@ class _AccountSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Account',
           style: TextStyle(
             fontSize: 18,
             height: 24 / 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurface,
+            fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+            color: context.textColor,
           ),
         ),
         const SizedBox(height: 16),
         Container(
           decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
+            color: context.cardColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppColors.outlineVariant.withValues(alpha: 0.20),
+              color: isHighContrast
+                  ? Colors.black
+                  : AppColors.outlineVariant.withValues(alpha: 0.20),
+              width: isHighContrast ? 2 : 1,
             ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x14000000),
-                blurRadius: 4,
-                offset: Offset(0, 1),
-              ),
-            ],
+            boxShadow: isHighContrast
+                ? const []
+                : const [
+                    BoxShadow(
+                      color: Color(0x14000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
           ),
           child: Column(
             children: [
@@ -888,7 +982,9 @@ class _AccountSection extends StatelessWidget {
                 if (i > 0)
                   Divider(
                     height: 1,
-                    color: AppColors.outlineVariant.withValues(alpha: 0.20),
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.outlineVariant.withValues(alpha: 0.20),
                   ),
                 Material(
                   color: Colors.transparent,
@@ -903,21 +999,31 @@ class _AccountSection extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            Icon(items[i].$1, color: AppColors.onSurfaceVariant),
+                            Icon(
+                              items[i].$1,
+                              color: isHighContrast
+                                  ? Colors.black
+                                  : AppColors.onSurfaceVariant,
+                            ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: Text(
                                 items[i].$2,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 16,
                                   height: 24 / 16,
-                                  color: AppColors.onSurface,
+                                  fontWeight: isHighContrast
+                                      ? FontWeight.w700
+                                      : FontWeight.normal,
+                                  color: context.textColor,
                                 ),
                               ),
                             ),
-                            const Icon(
+                            Icon(
                               Icons.chevron_right,
-                              color: AppColors.onSurfaceVariant,
+                              color: isHighContrast
+                                  ? Colors.black
+                                  : AppColors.onSurfaceVariant,
                             ),
                           ],
                         ),
@@ -933,4 +1039,5 @@ class _AccountSection extends StatelessWidget {
     );
   }
 }
+
 

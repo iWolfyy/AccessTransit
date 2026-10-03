@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 import '../../logic/status_logic.dart';
 import '../../models/bus.dart';
@@ -88,14 +89,15 @@ class _CommunityScreenState extends State<CommunityScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    final isHC = context.isHighContrast;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: context.surfaceColor,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -103,7 +105,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
+                color: context.textColor,
               ),
             ),
             Text(
@@ -111,7 +113,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.normal,
-                color: AppColors.onSurfaceVariant,
+                color: context.subtextColor,
               ),
             ),
           ],
@@ -120,7 +122,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
           IconButton(
             onPressed: _openReportIssue,
             tooltip: 'Report Issue',
-            icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
+            icon: Icon(
+              Icons.add_circle_outline_rounded,
+              color: isHC ? Colors.black : AppColors.primary,
+            ),
           ),
           const SizedBox(width: 8),
         ],
@@ -130,11 +135,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
         padding: const EdgeInsets.only(bottom: 8),
         child: FloatingActionButton.extended(
           onPressed: _openReportIssue,
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.onPrimary,
-          elevation: 4,
+          backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+          foregroundColor: isHC ? Colors.white : AppColors.onPrimary,
+          elevation: isHC ? 0 : 4,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
+            side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
           ),
           icon: const Icon(Icons.add_alert_rounded, size: 20),
           label: const Text(
@@ -165,8 +171,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData) {
-                    return const Center(
-                      child: CircularProgressIndicator(color: AppColors.primary),
+                    return Center(
+                      child: CircularProgressIndicator(
+                        color: isHC ? Colors.black : AppColors.primary,
+                      ),
                     );
                   }
 
@@ -203,7 +211,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               ],
 
                               if (reports.isEmpty)
-                                _buildEmptyState()
+                                _buildEmptyState(context)
                               else ...[
                                 // Active reports section
                                 if (activeReports.isNotEmpty) ...[
@@ -221,21 +229,29 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 // Inactive / Resolved section header
                                 if (inactiveReports.isNotEmpty) ...[
                                   const SizedBox(height: 24),
-                                  const Row(
+                                  Row(
                                     children: [
-                                      Expanded(child: Divider(color: AppColors.outlineVariant)),
+                                      Expanded(
+                                        child: Divider(
+                                          color: isHC ? Colors.black : AppColors.outlineVariant,
+                                        ),
+                                      ),
                                       Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 12),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
                                         child: Text(
                                           'Resolved & Past Reports',
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
-                                            color: AppColors.onSurfaceVariant,
+                                            color: context.subtextColor,
                                           ),
                                         ),
                                       ),
-                                      Expanded(child: Divider(color: AppColors.outlineVariant)),
+                                      Expanded(
+                                        child: Divider(
+                                          color: isHC ? Colors.black : AppColors.outlineVariant,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   const SizedBox(height: 12),
@@ -265,8 +281,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     final isMyReports = _tab == _CommunityTab.myReports;
+    final isHC = context.isHighContrast;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 16),
@@ -278,22 +295,25 @@ class _CommunityScreenState extends State<CommunityScreen> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppColors.primaryContainer.withValues(alpha: 0.3),
+                color: isHC
+                    ? Colors.white
+                    : AppColors.primaryContainer.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
+                border: isHC ? Border.all(color: Colors.black, width: 2) : null,
               ),
               child: Icon(
                 isMyReports ? Icons.assignment_turned_in_outlined : Icons.check_circle_outline_rounded,
                 size: 40,
-                color: AppColors.primary,
+                color: isHC ? Colors.black : AppColors.primary,
               ),
             ),
             const SizedBox(height: 16),
             Text(
               isMyReports ? 'No Reports Yet' : 'All Clear on the Corridors',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
+                color: context.textColor,
               ),
             ),
             const SizedBox(height: 6),
@@ -302,9 +322,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   ? 'Reports you submit about wheelchair access, crowding, or lifts will show up here.'
                   : 'No active accessibility issues reported right now. Help fellow commuters by reporting any hazards.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppColors.onSurfaceVariant,
+                color: context.subtextColor,
                 height: 1.3,
               ),
             ),
@@ -312,11 +332,20 @@ class _CommunityScreenState extends State<CommunityScreen> {
             OutlinedButton.icon(
               onPressed: _openReportIssue,
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.primary),
+                backgroundColor: isHC ? Colors.white : null,
+                foregroundColor: isHC ? Colors.black : AppColors.primary,
+                side: BorderSide(
+                  color: isHC ? Colors.black : AppColors.primary,
+                  width: isHC ? 2 : 1,
+                ),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
-              icon: const Icon(Icons.add_alert_rounded, size: 18, color: AppColors.primary),
+              icon: Icon(
+                Icons.add_alert_rounded,
+                size: 18,
+                color: isHC ? Colors.black : AppColors.primary,
+              ),
               label: const Text(
                 'Submit a Condition Report',
                 style: TextStyle(fontWeight: FontWeight.w700),
@@ -341,13 +370,17 @@ class _ModernFilterTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
+
     return Container(
       constraints: const BoxConstraints(maxWidth: 720),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outlineVariant),
+        border: isHC
+            ? Border.all(color: Colors.black, width: 2)
+            : Border.all(color: AppColors.outlineVariant),
       ),
       child: Row(
         children: [
@@ -389,15 +422,33 @@ class _TabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
+
+    final Color bgColor;
+    final Color contentColor;
+    Border? border;
+
+    if (isSelected) {
+      bgColor = isHC ? const Color(0xFF001F3F) : AppColors.primary;
+      contentColor = isHC ? Colors.white : AppColors.onPrimary;
+      if (isHC) {
+        border = Border.all(color: Colors.black, width: 2);
+      }
+    } else {
+      bgColor = Colors.transparent;
+      contentColor = isHC ? Colors.black : AppColors.onSurfaceVariant;
+    }
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
+          color: bgColor,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: isSelected
+          border: border,
+          boxShadow: (isSelected && !isHC)
               ? [
                   BoxShadow(
                     color: AppColors.primary.withValues(alpha: 0.2),
@@ -413,7 +464,7 @@ class _TabButton extends StatelessWidget {
             Icon(
               icon,
               size: 18,
-              color: isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant,
+              color: contentColor,
             ),
             const SizedBox(width: 8),
             Text(
@@ -421,7 +472,7 @@ class _TabButton extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant,
+                color: contentColor,
               ),
             ),
           ],
@@ -443,14 +494,19 @@ class _MyContributionsBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
     final earnedPoints = reportCount * 10;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primaryContainer.withValues(alpha: 0.35),
+        color: isHC
+            ? Colors.white
+            : AppColors.primaryContainer.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        border: isHC
+            ? Border.all(color: Colors.black, width: 2)
+            : Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -458,31 +514,32 @@ class _MyContributionsBanner extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
               borderRadius: BorderRadius.circular(12),
+              border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
             ),
-            child: const Icon(Icons.emoji_events_rounded, color: AppColors.onPrimary, size: 24),
+            child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Community Contributor',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                    color: context.textColor,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '$reportCount reports submitted • $earnedPoints Contribution Points',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.onSurfaceVariant,
+                    color: context.subtextColor,
                   ),
                 ),
               ],
@@ -510,6 +567,7 @@ class _ModernReportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
     final isResolved = report.status.toLowerCase() == 'resolved';
     final isExpired = !isActive && !isResolved;
 
@@ -528,27 +586,31 @@ class _ModernReportCard extends StatelessWidget {
     final timeAgo = TimeUtils.formatRelativeTime(report.createdAt);
 
     return Opacity(
-      opacity: isActive ? 1.0 : 0.65,
+      opacity: isActive ? 1.0 : (isHC ? 0.85 : 0.65),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
+            color: context.cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isActive
-                  ? AppColors.outlineVariant.withValues(alpha: 0.6)
-                  : AppColors.outlineVariant.withValues(alpha: 0.3),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: isHC
+                ? Border.all(color: Colors.black, width: 2)
+                : Border.all(
+                    color: isActive
+                        ? AppColors.outlineVariant.withValues(alpha: 0.6)
+                        : AppColors.outlineVariant.withValues(alpha: 0.3),
+                  ),
+            boxShadow: isHC
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,13 +622,16 @@ class _ModernReportCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryContainer.withValues(alpha: 0.3),
+                      color: isHC
+                          ? Colors.white
+                          : AppColors.primaryContainer.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(10),
+                      border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
                     ),
                     child: Icon(
                       isBus ? Icons.directions_bus_rounded : Icons.store_mall_directory_rounded,
                       size: 20,
-                      color: AppColors.primary,
+                      color: isHC ? Colors.black : AppColors.primary,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -576,24 +641,24 @@ class _ModernReportCard extends StatelessWidget {
                       children: [
                         Text(
                           targetTitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.onSurface,
+                            color: context.textColor,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           timeAgo,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.onSurfaceVariant,
+                            color: context.subtextColor,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  _buildBadgeWidget(badgeType),
+                  _buildBadgeWidget(badgeType, context),
                 ],
               ),
 
@@ -602,11 +667,11 @@ class _ModernReportCard extends StatelessWidget {
               // Problem Condition Title
               Text(
                 report.problemType,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   height: 1.25,
-                  color: AppColors.onSurface,
+                  color: context.textColor,
                 ),
               ),
 
@@ -616,10 +681,10 @@ class _ModernReportCard extends StatelessWidget {
                   '“${report.description.trim()}”',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontStyle: FontStyle.italic,
-                    color: AppColors.onSurfaceVariant,
+                    color: isHC ? Colors.black : AppColors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -633,20 +698,27 @@ class _ModernReportCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
+                        color: isHC
+                            ? Colors.white
+                            : AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
+                        border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.photo_camera_rounded, size: 14, color: AppColors.primary),
-                          SizedBox(width: 4),
+                          Icon(
+                            Icons.photo_camera_rounded,
+                            size: 14,
+                            color: isHC ? Colors.black : AppColors.primary,
+                          ),
+                          const SizedBox(width: 4),
                           Text(
                             'Photo',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
+                              color: isHC ? Colors.black : AppColors.primary,
                             ),
                           ),
                         ],
@@ -663,7 +735,9 @@ class _ModernReportCard extends StatelessWidget {
                               ? Icons.verified_rounded
                               : Icons.schedule_rounded,
                           size: 15,
-                          color: report.confirmCount > 0 ? AppColors.success : AppColors.outline,
+                          color: isHC
+                              ? (report.confirmCount > 0 ? const Color(0xFF003833) : Colors.black)
+                              : (report.confirmCount > 0 ? AppColors.success : AppColors.outline),
                         ),
                         const SizedBox(width: 5),
                         Expanded(
@@ -675,9 +749,11 @@ class _ModernReportCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: report.confirmCount > 0
-                                  ? AppColors.success
-                                  : AppColors.outline,
+                              color: isHC
+                                  ? (report.confirmCount > 0 ? const Color(0xFF003833) : Colors.black)
+                                  : (report.confirmCount > 0
+                                      ? AppColors.success
+                                      : AppColors.outline),
                             ),
                           ),
                         ),
@@ -685,10 +761,10 @@ class _ModernReportCard extends StatelessWidget {
                     ),
                   ),
 
-                  const Icon(
+                  Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 14,
-                    color: AppColors.onSurfaceVariant,
+                    color: isHC ? Colors.black : AppColors.onSurfaceVariant,
                   ),
                 ],
               ),
@@ -699,7 +775,62 @@ class _ModernReportCard extends StatelessWidget {
     );
   }
 
-  Widget _buildBadgeWidget(_ReportBadge badge) {
+  Widget _buildBadgeWidget(_ReportBadge badge, BuildContext context) {
+    final isHC = context.isHighContrast;
+
+    if (isHC) {
+      final (borderClr, fgClr, icon, label) = switch (badge) {
+        _ReportBadge.active => (
+            const Color(0xFF8B0000),
+            const Color(0xFF8B0000),
+            Icons.error_outline_rounded,
+            'Active',
+          ),
+        _ReportBadge.verified => (
+            const Color(0xFF003833),
+            const Color(0xFF003833),
+            Icons.verified_rounded,
+            'Verified',
+          ),
+        _ReportBadge.resolved => (
+            const Color(0xFF001F3F),
+            const Color(0xFF001F3F),
+            Icons.check_circle_rounded,
+            'Resolved',
+          ),
+        _ReportBadge.expired => (
+            Colors.black,
+            Colors.black,
+            Icons.history_rounded,
+            'Past',
+          ),
+      };
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderClr, width: 2),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: fgClr),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: fgClr,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final (bg, fg, icon, label) = switch (badge) {
       _ReportBadge.active => (
           AppColors.errorContainer,

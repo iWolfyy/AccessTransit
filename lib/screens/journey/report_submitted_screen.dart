@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 import '../../models/report.dart';
 import '../main_shell.dart';
@@ -39,26 +40,30 @@ class ReportSubmittedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 768;
+    final isHC = context.isHighContrast;
     final timeFormatted = report != null
         ? TimeUtils.formatRelativeTime(report!.createdAt)
         : 'Just now';
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: context.surfaceColor,
         elevation: 0,
+        shape: isHC
+            ? const Border(bottom: BorderSide(color: Colors.black, width: 2))
+            : null,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: AppColors.onSurface),
+          icon: Icon(Icons.close_rounded, color: isHC ? Colors.black : AppColors.onSurface),
           onPressed: () => _goToHome(context),
           tooltip: 'Close',
         ),
-        title: const Text(
+        title: Text(
           'Submission Confirmation',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
+            color: context.textColor,
           ),
         ),
       ),
@@ -79,25 +84,30 @@ class ReportSubmittedScreen extends StatelessWidget {
                     height: 88,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.success.withValues(alpha: 0.15),
+                      color: isHC
+                          ? Colors.white
+                          : AppColors.success.withValues(alpha: 0.15),
+                      border: isHC
+                          ? Border.all(color: const Color(0xFF003833), width: 3)
+                          : null,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.check_circle_rounded,
                       size: 58,
-                      color: AppColors.success,
+                      color: isHC ? const Color(0xFF003833) : AppColors.success,
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
 
                 // Main Title
-                const Text(
+                Text(
                   'Report Submitted!',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.onSurface,
+                    color: context.textColor,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -107,21 +117,29 @@ class ReportSubmittedScreen extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryContainer.withValues(alpha: 0.4),
+                      color: isHC
+                          ? Colors.white
+                          : AppColors.primaryContainer.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                      border: isHC
+                          ? Border.all(color: Colors.black, width: 2)
+                          : Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.stars_rounded, color: AppColors.primary, size: 18),
-                        SizedBox(width: 6),
+                        Icon(
+                          Icons.stars_rounded,
+                          color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 6),
                         Text(
                           '+10 Community Points Earned 🎉',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
+                            color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
                           ),
                         ),
                       ],
@@ -130,12 +148,12 @@ class ReportSubmittedScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                const Text(
+                Text(
                   'Thank you for reporting. Your real-time update helps wheelchair and elderly commuters navigate with confidence.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: AppColors.onSurfaceVariant,
+                    color: context.subtextColor,
                     height: 1.4,
                   ),
                 ),
@@ -145,16 +163,20 @@ class ReportSubmittedScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLowest,
+                    color: context.cardColor,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppColors.outlineVariant),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    border: isHC
+                        ? Border.all(color: Colors.black, width: 2)
+                        : Border.all(color: AppColors.outlineVariant),
+                    boxShadow: isHC
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,15 +187,20 @@ class ReportSubmittedScreen extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryContainer.withValues(alpha: 0.3),
+                              color: isHC
+                                  ? Colors.white
+                                  : AppColors.primaryContainer.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(10),
+                              border: isHC
+                                  ? Border.all(color: Colors.black, width: 1.5)
+                                  : null,
                             ),
                             child: Icon(
                               report?.targetType == 'bus'
                                   ? Icons.directions_bus_rounded
                                   : Icons.store_mall_directory_rounded,
                               size: 20,
-                              color: AppColors.primary,
+                              color: isHC ? Colors.black : AppColors.primary,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -183,18 +210,18 @@ class ReportSubmittedScreen extends StatelessWidget {
                               children: [
                                 Text(
                                   targetName,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.onSurface,
+                                    color: context.textColor,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   'Submitted $timeFormatted',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
-                                    color: AppColors.onSurfaceVariant,
+                                    color: context.subtextColor,
                                   ),
                                 ),
                               ],
@@ -203,20 +230,29 @@ class ReportSubmittedScreen extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppColors.success.withValues(alpha: 0.15),
+                              color: isHC
+                                  ? Colors.white
+                                  : AppColors.success.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
+                              border: isHC
+                                  ? Border.all(color: const Color(0xFF003833), width: 1.5)
+                                  : null,
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.bolt_rounded, size: 14, color: AppColors.success),
-                                SizedBox(width: 4),
+                                Icon(
+                                  Icons.bolt_rounded,
+                                  size: 14,
+                                  color: isHC ? const Color(0xFF003833) : AppColors.success,
+                                ),
+                                const SizedBox(width: 4),
                                 Text(
                                   'Live',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.success,
+                                    color: isHC ? const Color(0xFF003833) : AppColors.success,
                                   ),
                                 ),
                               ],
@@ -225,16 +261,19 @@ class ReportSubmittedScreen extends StatelessWidget {
                         ],
                       ),
 
-                      const Divider(height: 24),
+                      Divider(
+                        height: 24,
+                        color: isHC ? Colors.black : null,
+                      ),
 
                       // Issue Title
                       Text(
                         report != null ? report!.problemType : 'Accessibility Issue Reported',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           height: 1.3,
-                          color: AppColors.onSurface,
+                          color: context.textColor,
                         ),
                       ),
                       if (report != null) ...[
@@ -247,15 +286,20 @@ class ReportSubmittedScreen extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primaryContainer.withValues(alpha: 0.35),
+                                  color: isHC
+                                      ? Colors.white
+                                      : AppColors.primaryContainer.withValues(alpha: 0.35),
                                   borderRadius: BorderRadius.circular(6),
+                                  border: isHC
+                                      ? Border.all(color: const Color(0xFF001F3F), width: 1.5)
+                                      : null,
                                 ),
                                 child: Text(
                                   _formatCategory(report!.category),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.primary,
+                                    color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
                                   ),
                                 ),
                               ),
@@ -263,15 +307,23 @@ class ReportSubmittedScreen extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: _severityColor(report!.severity).withValues(alpha: 0.15),
+                                  color: isHC
+                                      ? Colors.white
+                                      : _severityColor(report!.severity).withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
+                                  border: isHC
+                                      ? Border.all(
+                                          color: _severityColor(report!.severity, isHC: true),
+                                          width: 1.5,
+                                        )
+                                      : null,
                                 ),
                                 child: Text(
                                   '${report!.severity[0].toUpperCase()}${report!.severity.substring(1)} Severity',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: _severityColor(report!.severity),
+                                    color: _severityColor(report!.severity, isHC: isHC),
                                   ),
                                 ),
                               ),
@@ -285,15 +337,16 @@ class ReportSubmittedScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppColors.surfaceContainer,
+                            color: isHC ? Colors.white : AppColors.surfaceContainer,
                             borderRadius: BorderRadius.circular(10),
+                            border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
                           ),
                           child: Text(
                             '“${report!.description.trim()}”',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               fontStyle: FontStyle.italic,
-                              color: AppColors.onSurfaceVariant,
+                              color: context.textColor,
                             ),
                           ),
                         ),
@@ -302,23 +355,29 @@ class ReportSubmittedScreen extends StatelessWidget {
                       // Attached Photo Preview
                       if (report != null && report!.photoUrl.isNotEmpty) ...[
                         const SizedBox(height: 14),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: report!.photoUrl.startsWith('http')
-                              ? Image.network(
-                                  report!.photoUrl,
-                                  height: 160,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                                )
-                              : Image.file(
-                                  File(report!.photoUrl),
-                                  height: 160,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                                ),
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: isHC ? Border.all(color: Colors.black, width: 2) : null,
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: report!.photoUrl.startsWith('http')
+                                ? Image.network(
+                                    report!.photoUrl,
+                                    height: 160,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                                  )
+                                : Image.file(
+                                    File(report!.photoUrl),
+                                    height: 160,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                                  ),
+                          ),
                         ),
                       ],
                     ],
@@ -333,8 +392,11 @@ class ReportSubmittedScreen extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: () => _goToCommunity(context),
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: isHC
+                          ? const Color(0xFF001F3F)
+                          : AppColors.primary,
                       foregroundColor: AppColors.onPrimary,
+                      side: isHC ? const BorderSide(color: Colors.black, width: 2) : null,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -357,18 +419,26 @@ class ReportSubmittedScreen extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: () => _goToHome(context),
                     style: OutlinedButton.styleFrom(
+                      backgroundColor: isHC ? Colors.white : null,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      side: const BorderSide(color: AppColors.outlineVariant),
+                      side: BorderSide(
+                        color: isHC ? Colors.black : AppColors.outlineVariant,
+                        width: isHC ? 2 : 1,
+                      ),
                     ),
-                    icon: const Icon(Icons.home_rounded, size: 20, color: AppColors.onSurface),
-                    label: const Text(
+                    icon: Icon(
+                      Icons.home_rounded,
+                      size: 20,
+                      color: isHC ? Colors.black : AppColors.onSurface,
+                    ),
+                    label: Text(
                       'Back to Home',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.onSurface,
+                        color: isHC ? Colors.black : AppColors.onSurface,
                       ),
                     ),
                   ),
@@ -399,15 +469,15 @@ class ReportSubmittedScreen extends StatelessWidget {
     }
   }
 
-  Color _severityColor(String severity) {
+  Color _severityColor(String severity, {bool isHC = false}) {
     switch (severity.toLowerCase()) {
       case 'major':
-        return AppColors.error;
+        return isHC ? const Color(0xFF8B0000) : AppColors.error;
       case 'minor':
-        return AppColors.success;
+        return isHC ? const Color(0xFF003833) : AppColors.success;
       case 'moderate':
       default:
-        return const Color(0xFFF57F17);
+        return isHC ? const Color(0xFF8B4500) : const Color(0xFFF57F17);
     }
   }
 }

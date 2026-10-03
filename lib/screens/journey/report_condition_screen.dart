@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/seed_data.dart';
 import '../../models/bus.dart';
 import '../../models/bus_route.dart';
@@ -695,18 +696,22 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+    final isHC = context.isHighContrast;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: context.surfaceColor,
         elevation: 0,
+        shape: isHC
+            ? const Border(bottom: BorderSide(color: Colors.black, width: 2))
+            : null,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.onSurface),
+          icon: Icon(Icons.arrow_back_rounded, color: context.textColor),
           onPressed: () => Navigator.of(context).maybePop(),
           tooltip: 'Back',
         ),
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -714,7 +719,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
+                color: context.textColor,
               ),
             ),
             Text(
@@ -722,7 +727,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.normal,
-                color: AppColors.onSurfaceVariant,
+                color: context.subtextColor,
               ),
             ),
           ],
@@ -807,25 +812,35 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       TextField(
                         controller: _noteController,
                         maxLines: 2,
+                        style: TextStyle(color: context.textColor),
                         decoration: InputDecoration(
                           hintText: 'e.g. Ramp was lowered but driver needed bystander help',
-                          hintStyle: const TextStyle(
-                            color: AppColors.onSurfaceVariant,
+                          hintStyle: TextStyle(
+                            color: isHC ? Colors.black54 : AppColors.onSurfaceVariant,
                             fontSize: 14,
                           ),
                           filled: true,
-                          fillColor: AppColors.surfaceContainerLowest,
+                          fillColor: context.cardColor,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.outlineVariant),
+                            borderSide: BorderSide(
+                              color: isHC ? Colors.black : AppColors.outlineVariant,
+                              width: isHC ? 2 : 1,
+                            ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.outlineVariant),
+                            borderSide: BorderSide(
+                              color: isHC ? Colors.black : AppColors.outlineVariant,
+                              width: isHC ? 2 : 1,
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                            borderSide: BorderSide(
+                              color: isHC ? Colors.black : AppColors.primary,
+                              width: 2,
+                            ),
                           ),
                         ),
                       ),
@@ -843,12 +858,17 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                         child: FilledButton.icon(
                           onPressed: _isSubmitting ? null : _submitReport,
                           style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.primary,
+                            backgroundColor: isHC
+                                ? const Color(0xFF001F3F)
+                                : AppColors.primary,
                             foregroundColor: AppColors.onPrimary,
+                            side: isHC
+                                ? const BorderSide(color: Colors.black, width: 2)
+                                : null,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            elevation: 2,
+                            elevation: isHC ? 0 : 2,
                           ),
                           icon: _isSubmitting
                               ? const SizedBox(
@@ -886,15 +906,18 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     required String title,
     required String subtitle,
   }) {
+    final isHC = context.isHighContrast;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: 28,
           height: 28,
-          decoration: const BoxDecoration(
-            color: AppColors.primaryContainer,
+          decoration: BoxDecoration(
+            color: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
             shape: BoxShape.circle,
+            border: isHC ? Border.all(color: Colors.black, width: 2) : null,
           ),
           alignment: Alignment.center,
           child: Text(
@@ -902,7 +925,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: AppColors.onPrimary,
+              color: Colors.white,
             ),
           ),
         ),
@@ -913,18 +936,18 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.onSurface,
+                  color: context.textColor,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.onSurfaceVariant,
+                  color: context.subtextColor,
                 ),
               ),
             ],
@@ -935,18 +958,26 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   }
 
   Widget _buildRouteSelector() {
+    final isHC = context.isHighContrast;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outlineVariant),
+        border: isHC
+            ? Border.all(color: Colors.black, width: 2)
+            : Border.all(color: AppColors.outlineVariant),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<BusRoute>(
           isExpanded: true,
           value: _selectedRoute,
-          icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.primary, size: 30),
+          icon: Icon(
+            Icons.arrow_drop_down_rounded,
+            color: isHC ? Colors.black : AppColors.primary,
+            size: 30,
+          ),
           items: _allRoutes.map((r) {
             return DropdownMenuItem<BusRoute>(
               value: r,
@@ -955,14 +986,19 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.12),
+                      color: isHC
+                          ? Colors.white
+                          : AppColors.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
+                      border: isHC
+                          ? Border.all(color: Colors.black, width: 1.5)
+                          : null,
                     ),
                     child: Text(
                       'Bus ${r.routeNo}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+                        color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
                         fontSize: 13,
                       ),
                     ),
@@ -972,10 +1008,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                     child: Text(
                       r.routeName,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
-                        color: AppColors.onSurface,
+                        color: context.textColor,
                       ),
                     ),
                   ),
@@ -1038,31 +1074,45 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
   Widget _buildSpecificTargetDropdown() {
     final isBus = _targetType == ReportTargetType.bus;
+    final isHC = context.isHighContrast;
 
     if (isBus) {
       final buses = _getBusesForSelectedRoute();
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.outlineVariant),
+          border: isHC
+              ? Border.all(color: Colors.black, width: 2)
+              : Border.all(color: AppColors.outlineVariant),
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<Bus>(
             isExpanded: true,
-            hint: const Text('Select Specific Bus / License Plate'),
+            hint: Text(
+              'Select Specific Bus / License Plate',
+              style: TextStyle(color: context.subtextColor),
+            ),
             value: buses.contains(_selectedBus) ? _selectedBus : null,
             items: buses.map((b) {
               return DropdownMenuItem<Bus>(
                 value: b,
                 child: Row(
                   children: [
-                    const Icon(Icons.tag_rounded, size: 18, color: AppColors.primary),
+                    Icon(
+                      Icons.tag_rounded,
+                      size: 18,
+                      color: isHC ? Colors.black : AppColors.primary,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       '${b.busNo} ${b.hasRamp ? "♿ (Ramp)" : ""}',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: context.textColor,
+                      ),
                     ),
                   ],
                 ),
@@ -1081,27 +1131,40 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.outlineVariant),
+          border: isHC
+              ? Border.all(color: Colors.black, width: 2)
+              : Border.all(color: AppColors.outlineVariant),
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<Station>(
             isExpanded: true,
-            hint: const Text('Select Stop along this route'),
+            hint: Text(
+              'Select Stop along this route',
+              style: TextStyle(color: context.subtextColor),
+            ),
             value: stations.contains(_selectedStation) ? _selectedStation : null,
             items: stations.map((s) {
               return DropdownMenuItem<Station>(
                 value: s,
                 child: Row(
                   children: [
-                    const Icon(Icons.place_rounded, size: 18, color: AppColors.primary),
+                    Icon(
+                      Icons.place_rounded,
+                      size: 18,
+                      color: isHC ? Colors.black : AppColors.primary,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         '${s.name} ${s.hasElevator ? "🛗" : ""} ${s.hasRamp ? "♿" : ""}',
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: context.textColor,
+                        ),
                       ),
                     ),
                   ],
@@ -1120,21 +1183,29 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   }
 
   Widget _buildCrowdingSelector() {
+    final isHC = context.isHighContrast;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Crowding Level',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
+            color: context.textColor,
           ),
         ),
         const SizedBox(height: 8),
         Row(
           children: CrowdingLevel.values.map((lvl) {
             final isSelected = _selectedCrowding == lvl;
+            final hcColor = lvl == CrowdingLevel.low
+                ? const Color(0xFF003833)
+                : (lvl == CrowdingLevel.medium
+                    ? const Color(0xFF8B4500)
+                    : const Color(0xFF8B0000));
+
             return Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1145,19 +1216,32 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                     constraints: const BoxConstraints(minHeight: 74),
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? lvl.color.withValues(alpha: 0.15)
-                          : AppColors.surfaceContainerLowest,
+                      color: isHC
+                          ? (isSelected ? hcColor : Colors.white)
+                          : (isSelected
+                              ? lvl.color.withValues(alpha: 0.15)
+                              : AppColors.surfaceContainerLowest),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isSelected ? lvl.color : AppColors.outlineVariant,
-                        width: isSelected ? 2 : 1,
-                      ),
+                      border: isHC
+                          ? Border.all(
+                              color: Colors.black,
+                              width: isSelected ? 3 : 2,
+                            )
+                          : Border.all(
+                              color: isSelected ? lvl.color : AppColors.outlineVariant,
+                              width: isSelected ? 2 : 1,
+                            ),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(lvl.icon, color: lvl.color, size: 24),
+                        Icon(
+                          lvl.icon,
+                          color: isHC
+                              ? (isSelected ? Colors.white : Colors.black)
+                              : lvl.color,
+                          size: 24,
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           lvl.label,
@@ -1167,7 +1251,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: isSelected ? lvl.color : AppColors.onSurface,
+                            color: isHC
+                                ? (isSelected ? Colors.white : Colors.black)
+                                : (isSelected ? lvl.color : AppColors.onSurface),
                           ),
                         ),
                       ],
@@ -1184,8 +1270,14 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             _selectedCrowding.subtitle,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: _selectedCrowding.color,
+              fontWeight: FontWeight.w600,
+              color: isHC
+                  ? (_selectedCrowding == CrowdingLevel.low
+                      ? const Color(0xFF003833)
+                      : (_selectedCrowding == CrowdingLevel.medium
+                          ? const Color(0xFF8B4500)
+                          : const Color(0xFF8B0000)))
+                  : _selectedCrowding.color,
             ),
           ),
         ),
@@ -1196,16 +1288,17 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   // Equal 3-segmented Category bar for Bus (Never cuts off)
   Widget _buildBusCategorySection() {
     final activeCat = _busCategories[_activeBusCategoryIndex];
+    final isHC = context.isHighContrast;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Accessibility Issue Category',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
+            color: context.textColor,
           ),
         ),
         const SizedBox(height: 10),
@@ -1232,11 +1325,22 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primary : AppColors.surfaceContainerLowest,
+                      color: isHC
+                          ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
+                          : (isSelected
+                              ? AppColors.primary
+                              : AppColors.surfaceContainerLowest),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected ? AppColors.primary : AppColors.outlineVariant,
-                      ),
+                      border: isHC
+                          ? Border.all(
+                              color: Colors.black,
+                              width: isSelected ? 3 : 2,
+                            )
+                          : Border.all(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.outlineVariant,
+                            ),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1244,7 +1348,11 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                         Icon(
                           cat.icon,
                           size: 20,
-                          color: isSelected ? AppColors.onPrimary : AppColors.primary,
+                          color: isHC
+                              ? (isSelected ? Colors.white : Colors.black)
+                              : (isSelected
+                                  ? AppColors.onPrimary
+                                  : AppColors.primary),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -1255,7 +1363,11 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: isSelected ? AppColors.onPrimary : AppColors.onSurface,
+                            color: isHC
+                                ? (isSelected ? Colors.white : Colors.black)
+                                : (isSelected
+                                    ? AppColors.onPrimary
+                                    : AppColors.onSurface),
                           ),
                         ),
                       ],
@@ -1276,16 +1388,17 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   // 2x2 Equal Grid Category bar for Station (Never cuts off)
   Widget _buildStationCategorySection() {
     final activeCat = _stationCategories[_activeStationCategoryIndex];
+    final isHC = context.isHighContrast;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Station Facility Category',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
+            color: context.textColor,
           ),
         ),
         const SizedBox(height: 10),
@@ -1312,18 +1425,33 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : AppColors.surfaceContainerLowest,
+                  color: isHC
+                      ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
+                      : (isSelected
+                          ? AppColors.primary
+                          : AppColors.surfaceContainerLowest),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected ? AppColors.primary : AppColors.outlineVariant,
-                  ),
+                  border: isHC
+                      ? Border.all(
+                          color: Colors.black,
+                          width: isSelected ? 3 : 2,
+                        )
+                      : Border.all(
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.outlineVariant,
+                        ),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       cat.icon,
                       size: 20,
-                      color: isSelected ? AppColors.onPrimary : AppColors.primary,
+                      color: isHC
+                          ? (isSelected ? Colors.white : Colors.black)
+                          : (isSelected
+                              ? AppColors.onPrimary
+                              : AppColors.primary),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -1334,7 +1462,11 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: isSelected ? AppColors.onPrimary : AppColors.onSurface,
+                          color: isHC
+                              ? (isSelected ? Colors.white : Colors.black)
+                              : (isSelected
+                                  ? AppColors.onPrimary
+                                  : AppColors.onSurface),
                         ),
                       ),
                     ),
@@ -1352,6 +1484,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   }
 
   Widget _buildSubCardsGrid(List<ReportIssueOption> options) {
+    final isHC = context.isHighContrast;
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -1365,6 +1499,11 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       itemBuilder: (context, optIdx) {
         final opt = options[optIdx];
         final isOptSelected = _selectedOption.id == opt.id;
+        final hcColor = opt.severity == 'major'
+            ? const Color(0xFF8B0000)
+            : (opt.severity == 'moderate'
+                ? const Color(0xFF8B4500)
+                : const Color(0xFF003833));
 
         return InkWell(
           onTap: () => setState(() => _selectedOption = opt),
@@ -1372,23 +1511,32 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isOptSelected
-                  ? opt.color.withValues(alpha: 0.12)
-                  : AppColors.surfaceContainerLowest,
+              color: isHC
+                  ? Colors.white
+                  : (isOptSelected
+                      ? opt.color.withValues(alpha: 0.12)
+                      : AppColors.surfaceContainerLowest),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isOptSelected ? opt.color : AppColors.outlineVariant,
-                width: isOptSelected ? 2 : 1,
-              ),
-              boxShadow: isOptSelected
-                  ? [
-                      BoxShadow(
-                        color: opt.color.withValues(alpha: 0.15),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null,
+              border: isHC
+                  ? Border.all(
+                      color: Colors.black,
+                      width: isOptSelected ? 3 : 2,
+                    )
+                  : Border.all(
+                      color: isOptSelected ? opt.color : AppColors.outlineVariant,
+                      width: isOptSelected ? 2 : 1,
+                    ),
+              boxShadow: isHC
+                  ? null
+                  : (isOptSelected
+                      ? [
+                          BoxShadow(
+                            color: opt.color.withValues(alpha: 0.15),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1396,10 +1544,20 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(opt.icon, color: opt.color, size: 22),
+                    Icon(
+                      opt.icon,
+                      color: isHC
+                          ? (isOptSelected ? hcColor : Colors.black)
+                          : opt.color,
+                      size: 22,
+                    ),
                     const Spacer(),
                     if (isOptSelected)
-                      Icon(Icons.check_circle_rounded, color: opt.color, size: 16),
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: isHC ? hcColor : opt.color,
+                        size: 16,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -1409,8 +1567,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: isOptSelected ? opt.color : AppColors.onSurface,
+                    fontWeight: isOptSelected ? FontWeight.w800 : FontWeight.w700,
+                    color: isHC
+                        ? (isOptSelected ? hcColor : Colors.black)
+                        : (isOptSelected ? opt.color : AppColors.onSurface),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1418,9 +1578,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                   opt.subtitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
-                    color: AppColors.onSurfaceVariant,
+                    color: isHC ? Colors.black : AppColors.onSurfaceVariant,
                     height: 1.2,
                   ),
                 ),
@@ -1433,13 +1593,17 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   }
 
   Widget _buildPhotoUploadSection() {
+    final isHC = context.isHighContrast;
+
     if (_pickedImage != null) {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.outlineVariant),
+          border: isHC
+              ? Border.all(color: Colors.black, width: 2)
+              : Border.all(color: AppColors.outlineVariant),
         ),
         child: Row(
           children: [
@@ -1453,7 +1617,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               ),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1462,15 +1626,15 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
-                      color: AppColors.onSurface,
+                      color: context.textColor,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
                     'Will be uploaded with report',
                     style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.onSurfaceVariant,
+                      color: context.subtextColor,
                     ),
                   ),
                 ],
@@ -1478,7 +1642,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             ),
             IconButton(
               onPressed: () => setState(() => _pickedImage = null),
-              icon: const Icon(Icons.cancel_rounded, color: AppColors.error),
+              icon: Icon(
+                Icons.cancel_rounded,
+                color: isHC ? const Color(0xFF8B0000) : AppColors.error,
+              ),
               tooltip: 'Remove photo',
             ),
           ],
@@ -1493,18 +1660,29 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         height: 72,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.outlineVariant, style: BorderStyle.solid),
+          border: isHC
+              ? Border.all(color: Colors.black, width: 2)
+              : Border.all(color: AppColors.outlineVariant, style: BorderStyle.solid),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: AppColors.primaryContainer,
-              child: Icon(Icons.add_a_photo_rounded, size: 20, color: AppColors.primary),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isHC ? Colors.white : AppColors.primaryContainer,
+                border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+              ),
+              child: Icon(
+                Icons.add_a_photo_rounded,
+                size: 20,
+                color: isHC ? Colors.black : AppColors.primary,
+              ),
             ),
-            SizedBox(width: 14),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1515,21 +1693,24 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
+                      color: context.textColor,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
                     'Tap to take photo or choose from device',
                     style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.onSurfaceVariant,
+                      color: context.subtextColor,
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: AppColors.onSurfaceVariant),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+            ),
           ],
         ),
       ),
@@ -1537,6 +1718,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   }
 
   Widget _buildReportSummaryCard() {
+    final isHC = context.isHighContrast;
     final isBus = _targetType == ReportTargetType.bus;
     final targetTitle = isBus
         ? (_selectedBus != null
@@ -1547,40 +1729,51 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: isHC
+            ? Border.all(color: Colors.black, width: 2)
+            : Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        boxShadow: isHC
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.assignment_turned_in_rounded, size: 20, color: AppColors.primary),
-              SizedBox(width: 8),
+              Icon(
+                Icons.assignment_turned_in_rounded,
+                size: 20,
+                color: isHC ? Colors.black : AppColors.primary,
+              ),
+              const SizedBox(width: 8),
               Text(
                 'Report Summary',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.onSurface,
+                  color: context.textColor,
                 ),
               ),
             ],
           ),
-          const Divider(height: 20),
+          Divider(
+            height: 20,
+            color: isHC ? Colors.black : null,
+          ),
           _buildSummaryRow(
             icon: isBus ? Icons.directions_bus_rounded : Icons.place_rounded,
             label: 'Location / Vehicle',
             value: targetTitle,
-            color: AppColors.primary,
+            color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
           ),
           if (isBus) ...[
             const SizedBox(height: 8),
@@ -1588,7 +1781,13 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               icon: _selectedCrowding.icon,
               label: 'Crowding Level',
               value: '${_selectedCrowding.label} — ${_selectedCrowding.subtitle}',
-              color: _selectedCrowding.color,
+              color: isHC
+                  ? (_selectedCrowding == CrowdingLevel.low
+                      ? const Color(0xFF003833)
+                      : (_selectedCrowding == CrowdingLevel.medium
+                          ? const Color(0xFF8B4500)
+                          : const Color(0xFF8B0000)))
+                  : _selectedCrowding.color,
             ),
           ],
           const SizedBox(height: 8),
@@ -1596,7 +1795,13 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             icon: _selectedOption.icon,
             label: 'Accessibility Status',
             value: '${_selectedOption.title} — ${_selectedOption.subtitle}',
-            color: _selectedOption.color,
+            color: isHC
+                ? (_selectedOption.severity == 'major'
+                    ? const Color(0xFF8B0000)
+                    : (_selectedOption.severity == 'moderate'
+                        ? const Color(0xFF8B4500)
+                        : const Color(0xFF003833)))
+                : _selectedOption.color,
           ),
           if (_pickedImage != null) ...[
             const SizedBox(height: 8),
@@ -1604,7 +1809,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               icon: Icons.camera_alt_rounded,
               label: 'Photo Evidence',
               value: '1 photo attached',
-              color: AppColors.success,
+              color: isHC ? const Color(0xFF003833) : AppColors.success,
             ),
           ],
         ],
@@ -1618,6 +1823,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     required String value,
     required Color color,
   }) {
+    final isHC = context.isHighContrast;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1626,7 +1833,11 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: const TextStyle(fontSize: 12, height: 1.3, color: AppColors.onSurface),
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.3,
+                color: isHC ? Colors.black : AppColors.onSurface,
+              ),
               children: [
                 TextSpan(
                   text: '$label: ',
@@ -1663,6 +1874,8 @@ class _TargetChoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -1670,21 +1883,32 @@ class _TargetChoiceCard extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 96),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerLowest,
+          color: isHC
+              ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
+              : (isSelected
+                  ? AppColors.primaryContainer
+                  : AppColors.surfaceContainerLowest),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.outlineVariant,
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : null,
+          border: isHC
+              ? Border.all(
+                  color: Colors.black,
+                  width: isSelected ? 3 : 2,
+                )
+              : Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.outlineVariant,
+                  width: isSelected ? 2 : 1,
+                ),
+          boxShadow: isHC
+              ? null
+              : (isSelected
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : null),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1695,14 +1919,16 @@ class _TargetChoiceCard extends StatelessWidget {
                 Icon(
                   icon,
                   size: 24,
-                  color: isSelected ? AppColors.onPrimary : AppColors.primary,
+                  color: isHC
+                      ? (isSelected ? Colors.white : Colors.black)
+                      : (isSelected ? AppColors.onPrimary : AppColors.primary),
                 ),
                 const Spacer(),
                 if (isSelected)
-                  const Icon(
+                  Icon(
                     Icons.check_circle_rounded,
                     size: 18,
-                    color: AppColors.onPrimary,
+                    color: isHC ? Colors.white : AppColors.onPrimary,
                   ),
               ],
             ),
@@ -1714,7 +1940,9 @@ class _TargetChoiceCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: isSelected ? AppColors.onPrimary : AppColors.onSurface,
+                color: isHC
+                    ? (isSelected ? Colors.white : Colors.black)
+                    : (isSelected ? AppColors.onPrimary : AppColors.onSurface),
               ),
             ),
             const SizedBox(height: 2),
@@ -1724,9 +1952,12 @@ class _TargetChoiceCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
-                color: isSelected
-                    ? AppColors.primaryFixed
-                    : AppColors.onSurfaceVariant,
+                fontWeight: isHC && isSelected ? FontWeight.w600 : FontWeight.normal,
+                color: isHC
+                    ? (isSelected ? Colors.white : Colors.black)
+                    : (isSelected
+                        ? AppColors.primaryFixed
+                        : AppColors.onSurfaceVariant),
               ),
             ),
           ],

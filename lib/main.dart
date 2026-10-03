@@ -89,19 +89,25 @@ class _AccessTransitAppState extends State<AccessTransitApp> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: AccessibilityPreferencesService.instance,
-      builder: (context, _) {
-        final isHighContrast =
-            AccessibilityPreferencesService.instance.isHighContrast;
-        return MaterialApp(
-          navigatorKey: _navigatorKey,
-          title: 'AccessTransit',
-          debugShowCheckedModeBanner: false,
-          theme: isHighContrast
-              ? AppTheme.highContrastTheme
-              : AppTheme.lightTheme,
-          home: const SplashScreen(),
+    return MaterialApp(
+      navigatorKey: _navigatorKey,
+      title: 'AccessTransit',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: const SplashScreen(),
+      builder: (context, child) {
+        return ListenableBuilder(
+          listenable: AccessibilityPreferencesService.instance,
+          builder: (context, _) {
+            final isHighContrast =
+                AccessibilityPreferencesService.instance.isHighContrast;
+            return Theme(
+              data: isHighContrast
+                  ? AppTheme.highContrastTheme
+                  : AppTheme.lightTheme,
+              child: child!,
+            );
+          },
         );
       },
     );

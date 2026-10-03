@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 import '../../logic/status_logic.dart';
 import '../../models/report.dart';
@@ -220,27 +221,32 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         : widget.targetTitle;
     final isBus = report?.targetType.toLowerCase() == 'bus';
 
+    final isHC = context.isHighContrast;
+
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: context.surfaceColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.onSurface),
+          icon: Icon(Icons.arrow_back_rounded, color: context.textColor),
           onPressed: () => Navigator.of(context).maybePop(),
           tooltip: 'Back',
         ),
-        title: const Text(
+        title: Text(
           'Report Details',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
+            color: context.textColor,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.share_outlined, color: AppColors.primary),
+            icon: Icon(
+              Icons.share_outlined,
+              color: isHC ? Colors.black : AppColors.primary,
+            ),
             onPressed: () => _shareReport(report, targetTitle),
             tooltip: 'Share alert',
           ),
@@ -306,19 +312,25 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.errorContainer.withValues(alpha: 0.3),
+                      color: isHC ? Colors.white : AppColors.errorContainer.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: isHC ? const Color(0xFF8B0000) : AppColors.error.withValues(alpha: 0.4),
+                        width: isHC ? 2 : 1,
+                      ),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.visibility_off_rounded, color: AppColors.error),
-                        SizedBox(width: 12),
+                        Icon(
+                          Icons.visibility_off_rounded,
+                          color: isHC ? const Color(0xFF8B0000) : AppColors.error,
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'This report has been hidden due to multiple false reports from commuters.',
                             style: TextStyle(
-                              color: AppColors.error,
+                              color: isHC ? const Color(0xFF8B0000) : AppColors.error,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
@@ -343,6 +355,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     required int confirmCount,
     required bool isAuthor,
   }) {
+    final isHC = context.isHighContrast;
     final Color bgColor;
     final Color fgColor;
     final IconData icon;
@@ -350,26 +363,26 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     final String statusSubtitle;
 
     if (isResolved) {
-      bgColor = AppColors.success.withValues(alpha: 0.12);
-      fgColor = AppColors.success;
+      bgColor = isHC ? Colors.white : AppColors.success.withValues(alpha: 0.12);
+      fgColor = isHC ? const Color(0xFF003833) : AppColors.success;
       icon = Icons.check_circle_rounded;
       statusTitle = 'Condition Resolved';
       statusSubtitle = 'This accessibility issue has been marked fixed.';
     } else if (confirmCount > 0 && isReportActive) {
-      bgColor = AppColors.primaryContainer.withValues(alpha: 0.35);
-      fgColor = AppColors.primary;
+      bgColor = isHC ? Colors.white : AppColors.primaryContainer.withValues(alpha: 0.35);
+      fgColor = isHC ? const Color(0xFF001F3F) : AppColors.primary;
       icon = Icons.verified_rounded;
       statusTitle = 'Community Verified Live';
       statusSubtitle = 'Confirmed by $confirmCount fellow rider${confirmCount == 1 ? "" : "s"}.';
     } else if (isReportActive) {
-      bgColor = const Color(0xFFFFF3E0);
-      fgColor = const Color(0xFFE65100);
+      bgColor = isHC ? Colors.white : const Color(0xFFFFF3E0);
+      fgColor = isHC ? const Color(0xFF8B0000) : const Color(0xFFE65100);
       icon = Icons.bolt_rounded;
       statusTitle = 'Active Transit Alert';
       statusSubtitle = 'Recently reported by a commuter. Real-time active.';
     } else {
-      bgColor = AppColors.surfaceContainer;
-      fgColor = AppColors.outline;
+      bgColor = isHC ? Colors.white : AppColors.surfaceContainer;
+      fgColor = isHC ? Colors.black : AppColors.outline;
       icon = Icons.history_rounded;
       statusTitle = 'Past Report (Expired)';
       statusSubtitle = 'This report was active earlier and is now archived.';
@@ -380,7 +393,10 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: fgColor.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: isHC ? fgColor : fgColor.withValues(alpha: 0.3),
+          width: isHC ? 2 : 1,
+        ),
       ),
       child: Row(
         children: [
@@ -388,8 +404,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: fgColor.withValues(alpha: 0.15),
+              color: isHC ? Colors.white : fgColor.withValues(alpha: 0.15),
               shape: BoxShape.circle,
+              border: isHC ? Border.all(color: fgColor, width: 1.5) : null,
             ),
             child: Icon(icon, color: fgColor, size: 24),
           ),
@@ -413,15 +430,16 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
+                          color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
                           borderRadius: BorderRadius.circular(6),
+                          border: isHC ? Border.all(color: Colors.black, width: 1) : null,
                         ),
                         child: const Text(
                           'YOUR REPORT',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.onPrimary,
+                            color: Colors.white,
                             letterSpacing: 0.4,
                           ),
                         ),
@@ -434,7 +452,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   statusSubtitle,
                   style: TextStyle(
                     fontSize: 13,
-                    color: fgColor.withValues(alpha: 0.85),
+                    color: isHC ? Colors.black : fgColor.withValues(alpha: 0.85),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -453,19 +471,25 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     required bool isBus,
     required bool isAuthor,
   }) {
+    final isHC = context.isHighContrast;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: isHC
+            ? Border.all(color: Colors.black, width: 2)
+            : Border.all(color: AppColors.outlineVariant),
+        boxShadow: isHC
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -475,13 +499,16 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryContainer.withValues(alpha: 0.3),
+                  color: isHC
+                      ? Colors.white
+                      : AppColors.primaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
+                  border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
                 child: Icon(
                   isBus ? Icons.directions_bus_rounded : Icons.store_mall_directory_rounded,
                   size: 24,
-                  color: AppColors.primary,
+                  color: isHC ? Colors.black : AppColors.primary,
                 ),
               ),
               const SizedBox(width: 14),
@@ -491,10 +518,10 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   children: [
                     Text(
                       targetTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
+                        color: context.textColor,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -502,9 +529,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       isBus
                           ? 'Transit Vehicle • ${report?.targetId ?? widget.vehicleLabel}'
                           : 'Transit Station • ${report?.targetId ?? "Central Corridor"}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.onSurfaceVariant,
+                        color: context.subtextColor,
                       ),
                     ),
                   ],
@@ -513,16 +540,17 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
+                  color: isHC ? Colors.white : AppColors.surfaceContainer,
                   borderRadius: BorderRadius.circular(8),
+                  border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
                 child: Text(
                   isBus ? 'BUS' : 'STATION',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.5,
-                    color: AppColors.onSurfaceVariant,
+                    color: isHC ? Colors.black : AppColors.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -539,22 +567,23 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     required String displayTitle,
     required bool isBus,
   }) {
+    final isHC = context.isHighContrast;
     final severity = report?.severity.toLowerCase() ?? 'moderate';
     final Color severityColor;
     final String severityLabel;
 
     switch (severity) {
       case 'major':
-        severityColor = AppColors.error;
+        severityColor = isHC ? const Color(0xFF8B0000) : AppColors.error;
         severityLabel = 'High Severity';
         break;
       case 'minor':
-        severityColor = AppColors.success;
+        severityColor = isHC ? const Color(0xFF003833) : AppColors.success;
         severityLabel = 'Minor Issue';
         break;
       case 'moderate':
       default:
-        severityColor = const Color(0xFFF57F17);
+        severityColor = isHC ? const Color(0xFF8B4500) : const Color(0xFFF57F17);
         severityLabel = 'Moderate';
         break;
     }
@@ -562,27 +591,31 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: isHC
+            ? Border.all(color: Colors.black, width: 2)
+            : Border.all(color: AppColors.outlineVariant),
+        boxShadow: isHC
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Reported Condition Details',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.2,
-              color: AppColors.onSurfaceVariant,
+              color: context.subtextColor,
             ),
           ),
           const SizedBox(height: 8),
@@ -590,11 +623,11 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           // Main Issue Name
           Text(
             displayTitle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
               height: 1.3,
-              color: AppColors.onSurface,
+              color: context.textColor,
             ),
           ),
           const SizedBox(height: 12),
@@ -608,9 +641,12 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: severityColor.withValues(alpha: 0.12),
+                  color: isHC ? Colors.white : severityColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: severityColor.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: severityColor,
+                    width: isHC ? 2 : 1,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -634,20 +670,29 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryContainer.withValues(alpha: 0.3),
+                    color: isHC
+                        ? Colors.white
+                        : AppColors.primaryContainer.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(8),
+                    border: isHC
+                        ? Border.all(color: const Color(0xFF001F3F), width: 2)
+                        : null,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.category_rounded, size: 14, color: AppColors.primary),
+                      Icon(
+                        Icons.category_rounded,
+                        size: 14,
+                        color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         _formatCategoryName(report.category),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
+                          color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
                         ),
                       ),
                     ],
@@ -664,23 +709,32 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.surfaceContainer,
+                color: isHC ? Colors.white : AppColors.surfaceContainer,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+                border: Border.all(
+                  color: isHC
+                      ? Colors.black
+                      : AppColors.outlineVariant.withValues(alpha: 0.5),
+                  width: isHC ? 1.5 : 1,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.format_quote_rounded, size: 16, color: AppColors.onSurfaceVariant),
-                      SizedBox(width: 4),
+                      Icon(
+                        Icons.format_quote_rounded,
+                        size: 16,
+                        color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
                       Text(
                         'Rider Note:',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.onSurfaceVariant,
+                          color: isHC ? Colors.black : AppColors.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -688,11 +742,11 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   const SizedBox(height: 4),
                   Text(
                     '“${report.description.trim()}”',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       height: 1.4,
                       fontStyle: FontStyle.italic,
-                      color: AppColors.onSurface,
+                      color: context.textColor,
                     ),
                   ),
                 ],
@@ -706,33 +760,43 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
   /// Photo Evidence Card supporting local files and network URLs
   Widget _buildPhotoEvidenceCard(String photoPath) {
+    final isHC = context.isHighContrast;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: isHC
+            ? Border.all(color: Colors.black, width: 2)
+            : Border.all(color: AppColors.outlineVariant),
+        boxShadow: isHC
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.photo_camera_rounded, size: 18, color: AppColors.primary),
-              SizedBox(width: 8),
+              Icon(
+                Icons.photo_camera_rounded,
+                size: 18,
+                color: isHC ? Colors.black : AppColors.primary,
+              ),
+              const SizedBox(width: 8),
               Text(
                 'Attached Photo Evidence',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.onSurface,
+                  color: context.textColor,
                 ),
               ),
             ],
@@ -765,8 +829,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.65),
+                        color: Colors.black.withValues(alpha: 0.75),
                         borderRadius: BorderRadius.circular(6),
+                        border: isHC ? Border.all(color: Colors.white, width: 1) : null,
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
@@ -795,18 +860,29 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   }
 
   Widget _buildImageFallback() {
+    final isHC = context.isHighContrast;
+
     return Container(
       height: 100,
-      color: AppColors.surfaceContainer,
+      decoration: BoxDecoration(
+        color: isHC ? Colors.white : AppColors.surfaceContainer,
+        border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+      ),
       alignment: Alignment.center,
-      child: const Row(
+      child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.broken_image_rounded, color: AppColors.outline),
-          SizedBox(width: 8),
+          Icon(
+            Icons.broken_image_rounded,
+            color: isHC ? Colors.black : AppColors.outline,
+          ),
+          const SizedBox(width: 8),
           Text(
             'Photo unavailable',
-            style: TextStyle(color: AppColors.onSurfaceVariant, fontSize: 13),
+            style: TextStyle(
+              color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+              fontSize: 13,
+            ),
           ),
         ],
       ),
@@ -815,6 +891,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
   /// Trust & verification timeline card
   Widget _buildTrustTimelineCard(Report report) {
+    final isHC = context.isHighContrast;
     final reportedAgo = TimeUtils.formatRelativeTime(report.createdAt);
     final confirmedAgo = report.lastConfirmedAt != null
         ? TimeUtils.formatRelativeTime(report.lastConfirmedAt!)
@@ -823,30 +900,36 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outlineVariant),
+        border: isHC
+            ? Border.all(color: Colors.black, width: 2)
+            : Border.all(color: AppColors.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Community Trust & History',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: AppColors.onSurfaceVariant,
+              color: context.subtextColor,
             ),
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(Icons.schedule_rounded, size: 16, color: AppColors.primary),
+              Icon(
+                Icons.schedule_rounded,
+                size: 16,
+                color: isHC ? Colors.black : AppColors.primary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Originally reported: $reportedAgo',
-                  style: const TextStyle(fontSize: 13, color: AppColors.onSurface),
+                  style: TextStyle(fontSize: 13, color: context.textColor),
                 ),
               ),
             ],
@@ -855,15 +938,19 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.verified_rounded, size: 16, color: AppColors.success),
+                Icon(
+                  Icons.verified_rounded,
+                  size: 16,
+                  color: isHC ? const Color(0xFF003833) : AppColors.success,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Last confirmed: $confirmedAgo (${report.confirmCount} rider${report.confirmCount == 1 ? "" : "s"})',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.success,
+                      color: isHC ? const Color(0xFF003833) : AppColors.success,
                     ),
                   ),
                 ),
@@ -884,37 +971,43 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     required bool hasFlagged,
     required bool isAuthor,
   }) {
+    final isHC = context.isHighContrast;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: isHC
+            ? Border.all(color: Colors.black, width: 2)
+            : Border.all(color: AppColors.outlineVariant),
+        boxShadow: isHC
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Help Fellow Commuters',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: AppColors.onSurface,
+              color: context.textColor,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Confirm if this condition is still present or if it has been fixed.',
             style: TextStyle(
               fontSize: 13,
-              color: AppColors.onSurfaceVariant,
+              color: context.subtextColor,
             ),
           ),
           const SizedBox(height: 16),
@@ -931,10 +1024,16 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                         ? null
                         : () => _handleConfirm(report),
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.onPrimary,
-                      disabledBackgroundColor: AppColors.surfaceContainer,
-                      disabledForegroundColor: AppColors.outline,
+                      backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: isHC ? Colors.white : AppColors.surfaceContainer,
+                      disabledForegroundColor: isHC ? Colors.grey : AppColors.outline,
+                      side: isHC
+                          ? BorderSide(
+                              color: (hasConfirmed || isResolved) ? Colors.grey : Colors.black,
+                              width: 2,
+                            )
+                          : BorderSide.none,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -964,12 +1063,15 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                         ? null
                         : () => _handleResolve(report),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.success,
+                      backgroundColor: isHC ? Colors.white : null,
+                      foregroundColor: isHC
+                          ? const Color(0xFF003833)
+                          : AppColors.success,
                       side: BorderSide(
                         color: isResolved
-                            ? AppColors.outlineVariant
-                            : AppColors.success,
-                        width: 1.5,
+                            ? (isHC ? Colors.grey : AppColors.outlineVariant)
+                            : (isHC ? const Color(0xFF003833) : AppColors.success),
+                        width: isHC ? 2 : 1.5,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -999,7 +1101,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   ? null
                   : () => _handleFlag(report),
               style: TextButton.styleFrom(
-                foregroundColor: AppColors.error,
+                foregroundColor: isHC ? const Color(0xFF8B0000) : AppColors.error,
               ),
               icon: const Icon(Icons.flag_outlined, size: 16),
               label: Text(

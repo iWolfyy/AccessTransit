@@ -1,7 +1,9 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../models/journey_model.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
@@ -22,8 +24,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   static const double _desktopBreakpoint = 768;
 
-  final AuthService _authService = AuthService();
-  final JourneyService _journeyService = JourneyService();
+  late final AuthService? _authService;
+  late final JourneyService? _journeyService;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   UserModel? _user;
@@ -33,12 +35,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    final hasFirebase = Firebase.apps.isNotEmpty;
+    _authService = hasFirebase ? AuthService() : null;
+    _journeyService = hasFirebase ? JourneyService() : null;
     _user = widget.initialUser;
     _isLoading = widget.initialUser == null;
-    _loadUser();
+    if (hasFirebase) {
+      _loadUser();
+    }
   }
 
   Future<void> _loadUser() async {
+    if (_authService == null) return;
     try {
       final user = await _authService.getCurrentUserProfile();
       if (!mounted) return;
@@ -60,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Checks Firestore for an active/confirmed journey for the current user.
   Future<void> _checkActiveJourney() async {
+    if (_authService == null || _journeyService == null) return;
     final uid = _authService.currentUser?.uid;
     if (uid == null || uid.isEmpty) return;
     try {
@@ -76,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _logout() async {
-    await _authService.logout();
+    await _authService?.logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -100,7 +109,9 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const JourneySearchScreen()),
     );
-  }  void _onNavTap(String label) {
+  }
+
+  void _onNavTap(String label) {
     final shell = context.findAncestorStateOfType<MainShellState>();
     if (shell != null) {
       shell.switchToTab(label);
@@ -108,7 +119,6 @@ class _HomeScreenState extends State<HomeScreen> {
       AppNavigation.handleBottomNav(context, label);
     }
   }
-
 
   String get _initials {
     final name = _user?.name.trim() ?? '';
@@ -126,7 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       drawer: _HomeDrawer(
         user: _user,
         initials: _initials,
@@ -228,20 +238,28 @@ class _HomeDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Drawer(
+      backgroundColor: isHighContrast ? Colors.white : null,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DrawerHeader(
-              decoration: const BoxDecoration(color: AppColors.primary),
+              decoration: BoxDecoration(
+                color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                border: isHighContrast
+                    ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+                    : null,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundColor: AppColors.primaryContainer,
-                    foregroundColor: AppColors.onPrimaryContainer,
+                    backgroundColor: isHighContrast ? Colors.white : AppColors.primaryContainer,
+                    foregroundColor: isHighContrast ? Colors.black : AppColors.onPrimaryContainer,
                     child: Text(
                       initials,
                       style: const TextStyle(fontWeight: FontWeight.w700),
@@ -264,20 +282,48 @@ class _HomeDrawer extends StatelessWidget {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.home, color: AppColors.primary),
-              title: const Text('Home'),
+              leading: Icon(
+                Icons.home,
+                color: isHighContrast ? Colors.black : AppColors.primary,
+              ),
+              title: Text(
+                'Home',
+                style: TextStyle(
+                  color: isHighContrast ? Colors.black : null,
+                  fontWeight: isHighContrast ? FontWeight.w800 : null,
+                ),
+              ),
               selected: true,
+              selectedTileColor: isHighContrast ? const Color(0xFFE5E5E5) : null,
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.person_outline, color: AppColors.primary),
-              title: const Text('Profile'),
+              leading: Icon(
+                Icons.person_outline,
+                color: isHighContrast ? Colors.black : AppColors.primary,
+              ),
+              title: Text(
+                'Profile',
+                style: TextStyle(
+                  color: isHighContrast ? Colors.black : null,
+                  fontWeight: isHighContrast ? FontWeight.w700 : null,
+                ),
+              ),
               onTap: onProfile,
             ),
             const Spacer(),
             ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Log out'),
+              leading: Icon(
+                Icons.logout,
+                color: isHighContrast ? Colors.black : null,
+              ),
+              title: Text(
+                'Log out',
+                style: TextStyle(
+                  color: isHighContrast ? Colors.black : null,
+                  fontWeight: isHighContrast ? FontWeight.w700 : null,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 onLogout();
@@ -303,33 +349,51 @@ class _MobileTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surfaceContainerLow,
-      elevation: 1,
-      shadowColor: Colors.black26,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 48,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _IconCircleButton(icon: Icons.menu, onPressed: onMenu),
-                const Expanded(
-                  child: Text(
-                    'Access Transit',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      height: 28 / 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+    final isHighContrast = context.isHighContrast;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+        border: isHighContrast
+            ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        elevation: isHighContrast ? 0 : 1,
+        shadowColor: Colors.black26,
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 48,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  _IconCircleButton(
+                    icon: Icons.menu,
+                    onPressed: onMenu,
+                    isHighContrast: isHighContrast,
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Access Transit',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 22,
+                        height: 28 / 22,
+                        fontWeight: FontWeight.w700,
+                        color: isHighContrast ? Colors.black : AppColors.primary,
+                      ),
                     ),
                   ),
-                ),
-                _AvatarButton(initials: initials, onPressed: onProfileTap),
-              ],
+                  _AvatarButton(
+                    initials: initials,
+                    onPressed: onProfileTap,
+                    isHighContrast: isHighContrast,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -353,53 +417,86 @@ class _DesktopTopNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 1,
-      shadowColor: Colors.black26,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 72,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              children: [
-                _IconCircleButton(icon: Icons.menu, onPressed: onMenu),
-                const SizedBox(width: 16),
-                const Text(
-                  'Access Transit',
-                  style: TextStyle(
-                    fontSize: 24,
-                    height: 32 / 24,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+    final isHighContrast = context.isHighContrast;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isHighContrast ? Colors.white : AppColors.surface,
+        border: isHighContrast
+            ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        elevation: isHighContrast ? 0 : 1,
+        shadowColor: Colors.black26,
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 72,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  _IconCircleButton(
+                    icon: Icons.menu,
+                    onPressed: onMenu,
+                    isHighContrast: isHighContrast,
                   ),
-                ),
-                const Spacer(),
-                const _DesktopNavChip(icon: Icons.home, label: 'Home', selected: true),
-                _DesktopNavChip(
-                  icon: Icons.directions_bus,
-                  label: 'Plan',
-                  onTap: () => onNavTap('Plan'),
-                ),
-                _DesktopNavChip(
-                  icon: Icons.groups,
-                  label: 'Community',
-                  onTap: () => onNavTap('Community'),
-                ),
-                _DesktopNavChip(
-                  icon: Icons.person,
-                  label: 'Profile',
-                  onTap: () => onNavTap('Profile'),
-                ),
-                const Spacer(),
-                _AvatarButton(
-                  initials: initials,
-                  onPressed: onProfileTap,
-                  bordered: true,
-                ),
-              ],
+                  const SizedBox(width: 16),
+                  Text(
+                    'Access Transit',
+                    style: TextStyle(
+                      fontSize: 24,
+                      height: 32 / 24,
+                      fontWeight: FontWeight.w700,
+                      color: isHighContrast ? Colors.black : AppColors.primary,
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(width: 16),
+                          _DesktopNavChip(
+                            icon: Icons.home,
+                            label: 'Home',
+                            selected: true,
+                            isHighContrast: isHighContrast,
+                          ),
+                          _DesktopNavChip(
+                            icon: Icons.directions_bus,
+                            label: 'Plan',
+                            isHighContrast: isHighContrast,
+                            onTap: () => onNavTap('Plan'),
+                          ),
+                          _DesktopNavChip(
+                            icon: Icons.groups,
+                            label: 'Community',
+                            isHighContrast: isHighContrast,
+                            onTap: () => onNavTap('Community'),
+                          ),
+                          _DesktopNavChip(
+                            icon: Icons.person,
+                            label: 'Profile',
+                            isHighContrast: isHighContrast,
+                            onTap: () => onNavTap('Profile'),
+                          ),
+                          const SizedBox(width: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                  _AvatarButton(
+                    initials: initials,
+                    onPressed: onProfileTap,
+                    bordered: true,
+                    isHighContrast: isHighContrast,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -413,34 +510,44 @@ class _DesktopNavChip extends StatelessWidget {
     required this.icon,
     required this.label,
     this.selected = false,
+    this.isHighContrast = false,
     this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
+  final bool isHighContrast;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final activeBg = isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer;
+    final activeFg = Colors.white;
+    final inactiveFg = isHighContrast ? Colors.black : AppColors.onSurfaceVariant;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Material(
-        color: selected ? AppColors.primaryContainer : Colors.transparent,
+        color: selected ? activeBg : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          child: Padding(
+          child: Container(
+            decoration: (selected && isHighContrast)
+                ? BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.black, width: 2),
+                  )
+                : null,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 Icon(
                   icon,
                   size: 22,
-                  color: selected
-                      ? AppColors.onPrimary
-                      : AppColors.onSurfaceVariant,
+                  color: selected ? activeFg : inactiveFg,
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -448,11 +555,9 @@ class _DesktopNavChip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     height: 20 / 14,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: selected ? FontWeight.w800 : (isHighContrast ? FontWeight.w700 : FontWeight.w600),
                     letterSpacing: 0.1,
-                    color: selected
-                        ? AppColors.onPrimary
-                        : AppColors.onSurfaceVariant,
+                    color: selected ? activeFg : inactiveFg,
                   ),
                 ),
               ],
@@ -465,10 +570,15 @@ class _DesktopNavChip extends StatelessWidget {
 }
 
 class _IconCircleButton extends StatelessWidget {
-  const _IconCircleButton({required this.icon, required this.onPressed});
+  const _IconCircleButton({
+    required this.icon,
+    required this.onPressed,
+    this.isHighContrast = false,
+  });
 
   final IconData icon;
   final VoidCallback onPressed;
+  final bool isHighContrast;
 
   @override
   Widget build(BuildContext context) {
@@ -477,7 +587,10 @@ class _IconCircleButton extends StatelessWidget {
       height: 48,
       child: IconButton(
         onPressed: onPressed,
-        icon: Icon(icon, color: AppColors.primary),
+        icon: Icon(
+          icon,
+          color: isHighContrast ? Colors.black : AppColors.primary,
+        ),
       ),
     );
   }
@@ -488,11 +601,13 @@ class _AvatarButton extends StatelessWidget {
     required this.initials,
     required this.onPressed,
     this.bordered = false,
+    this.isHighContrast = false,
   });
 
   final String initials;
   final VoidCallback onPressed;
   final bool bordered;
+  final bool isHighContrast;
 
   @override
   Widget build(BuildContext context) {
@@ -507,16 +622,19 @@ class _AvatarButton extends StatelessWidget {
           height: 32,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppColors.primaryContainer,
-            border: bordered
-                ? Border.all(color: AppColors.outlineVariant, width: 2)
+            color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+            border: (bordered || isHighContrast)
+                ? Border.all(
+                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                    width: 2,
+                  )
                 : null,
           ),
           alignment: Alignment.center,
           child: Text(
             initials,
             style: const TextStyle(
-              color: AppColors.onPrimary,
+              color: Colors.white,
               fontWeight: FontWeight.w700,
               fontSize: 12,
             ),
@@ -534,8 +652,10 @@ class _WhereToSearch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Material(
-      color: AppColors.surfaceContainerLowest,
+      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -543,32 +663,41 @@ class _WhereToSearch extends StatelessWidget {
         child: InputDecorator(
           decoration: InputDecoration(
             hintText: 'Where to?',
-            hintStyle: const TextStyle(
+            hintStyle: TextStyle(
               fontSize: 16,
               height: 24 / 16,
-              color: AppColors.onSurfaceVariant,
+              color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
             ),
-            prefixIcon:
-                const Icon(Icons.search, color: AppColors.onSurfaceVariant),
+            prefixIcon: Icon(
+              Icons.search,
+              color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+              size: isHighContrast ? 26 : 24,
+            ),
             filled: true,
             fillColor: Colors.transparent,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.outline),
+              borderSide: isHighContrast
+                  ? const BorderSide(color: Colors.black, width: 2.0)
+                  : const BorderSide(color: AppColors.outline),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+              borderSide: isHighContrast
+                  ? const BorderSide(color: Colors.black, width: 2.5)
+                  : const BorderSide(color: AppColors.primary, width: 2),
             ),
           ),
-          child: const Text(
+          child: Text(
             'Where to?',
             style: TextStyle(
               fontSize: 16,
               height: 24 / 16,
-              color: AppColors.onSurfaceVariant,
+              color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
         ),
@@ -588,13 +717,13 @@ class _FavoritesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Your Favorites',
           style: TextStyle(
             fontSize: 18,
             height: 24 / 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurface,
+            fontWeight: FontWeight.w700,
+            color: context.textColor,
           ),
         ),
         const SizedBox(height: 16),
@@ -662,59 +791,82 @@ class _FavoriteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Material(
-      color: dashed ? AppColors.surfaceContainer : AppColors.surfaceContainerLowest,
-      elevation: 1,
+      color: isHighContrast
+          ? Colors.white
+          : (dashed ? AppColors.surfaceContainer : AppColors.surfaceContainerLowest),
+      elevation: isHighContrast ? 0 : 1,
       shadowColor: Colors.black12,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: CustomPaint(
-          painter: dashed ? const _DashedBorderPainter() : null,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: dashed
-                        ? Colors.transparent
-                        : AppColors.primaryContainer.withValues(alpha: 0.10),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: dashed ? AppColors.onSurfaceVariant : AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 20 / 14,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.1,
-                    color: dashed ? AppColors.onSurfaceVariant : AppColors.onSurface,
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 16 / 12,
-                      fontWeight: FontWeight.w500,
-                      color: subtitleColor ?? AppColors.onSurfaceVariant,
+        child: Container(
+          decoration: isHighContrast
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.black, width: 2.0),
+                )
+              : null,
+          child: CustomPaint(
+            painter: (dashed && !isHighContrast) ? const _DashedBorderPainter() : null,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isHighContrast
+                          ? (dashed ? Colors.transparent : const Color(0xFFE5E5E5))
+                          : (dashed
+                              ? Colors.transparent
+                              : AppColors.primaryContainer.withValues(alpha: 0.10)),
+                      border: (isHighContrast && !dashed)
+                          ? Border.all(color: Colors.black, width: 1.5)
+                          : null,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: isHighContrast
+                          ? Colors.black
+                          : (dashed ? AppColors.onSurfaceVariant : AppColors.primary),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 20 / 14,
+                      fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                      letterSpacing: 0.1,
+                      color: isHighContrast
+                          ? Colors.black
+                          : (dashed ? AppColors.onSurfaceVariant : AppColors.onSurface),
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 16 / 12,
+                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
+                        color: isHighContrast
+                            ? const Color(0xFF1A1A1A)
+                            : (subtitleColor ?? AppColors.onSurfaceVariant),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -764,7 +916,7 @@ class _AlertsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -772,19 +924,19 @@ class _AlertsSection extends StatelessWidget {
           style: TextStyle(
             fontSize: 18,
             height: 24 / 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurface,
+            fontWeight: FontWeight.w700,
+            color: context.textColor,
           ),
         ),
-        SizedBox(height: 16),
-        _AlertCard(
+        const SizedBox(height: 16),
+        const _AlertCard(
           accent: AppColors.error,
           icon: Icons.warning,
           title: 'Red Line Delays',
           body: 'Expect up to 15 minute delays due to signal issues.',
         ),
-        SizedBox(height: 8),
-        _StatusCard(
+        const SizedBox(height: 8),
+        const _StatusCard(
           title: 'Bus 42',
           body: 'On time. Arriving in 4 min.',
           badge: 'Good',
@@ -809,23 +961,31 @@ class _AlertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final effectiveAccent = isHighContrast ? const Color(0xFF8B0000) : accent;
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
-        ],
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 2.0)
+            : null,
+        boxShadow: isHighContrast
+            ? null
+            : const [
+                BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
+              ],
       ),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              width: 4,
+              width: isHighContrast ? 6 : 4,
               decoration: BoxDecoration(
-                color: accent,
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+                color: effectiveAccent,
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
               ),
             ),
             Expanded(
@@ -834,7 +994,7 @@ class _AlertCard extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(icon, color: accent),
+                    Icon(icon, color: effectiveAccent),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -842,20 +1002,21 @@ class _AlertCard extends StatelessWidget {
                         children: [
                           Text(
                             title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               height: 24 / 18,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.onSurface,
+                              fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                              color: isHighContrast ? Colors.black : AppColors.onSurface,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             body,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               height: 20 / 14,
-                              color: AppColors.onSurfaceVariant,
+                              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -885,23 +1046,31 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final accent = isHighContrast ? const Color(0xFF003833) : AppColors.secondary;
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
-        ],
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 2.0)
+            : null,
+        boxShadow: isHighContrast
+            ? null
+            : const [
+                BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
+              ],
       ),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              width: 4,
-              decoration: const BoxDecoration(
-                color: AppColors.secondary,
-                borderRadius: BorderRadius.horizontal(left: Radius.circular(12)),
+              width: isHighContrast ? 6 : 4,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
               ),
             ),
             Expanded(
@@ -909,7 +1078,7 @@ class _StatusCard extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    const Icon(Icons.check_circle, color: AppColors.secondary),
+                    Icon(Icons.check_circle, color: accent),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -917,20 +1086,21 @@ class _StatusCard extends StatelessWidget {
                         children: [
                           Text(
                             title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               height: 24 / 18,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.onSurface,
+                              fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                              color: isHighContrast ? Colors.black : AppColors.onSurface,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             body,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               height: 20 / 14,
-                              color: AppColors.onSurfaceVariant,
+                              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -939,16 +1109,21 @@ class _StatusCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.secondary.withValues(alpha: 0.10),
+                        color: isHighContrast
+                            ? const Color(0xFF003833)
+                            : AppColors.secondary.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(999),
+                        border: isHighContrast
+                            ? Border.all(color: Colors.black, width: 1.5)
+                            : null,
                       ),
                       child: Text(
                         badge,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           height: 16 / 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.secondary,
+                          fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w500,
+                          color: isHighContrast ? Colors.white : AppColors.secondary,
                         ),
                       ),
                     ),
@@ -974,8 +1149,12 @@ class _ActiveJourneyBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Material(
-      color: AppColors.primaryContainer.withValues(alpha: 0.15),
+      color: isHighContrast
+          ? Colors.white
+          : AppColors.primaryContainer.withValues(alpha: 0.15),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onResume,
@@ -986,8 +1165,10 @@ class _ActiveJourneyBanner extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.3),
-              width: 1.5,
+              color: isHighContrast
+                  ? Colors.black
+                  : AppColors.primary.withValues(alpha: 0.3),
+              width: isHighContrast ? 2.0 : 1.5,
             ),
           ),
           child: Row(
@@ -996,12 +1177,15 @@ class _ActiveJourneyBanner extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryContainer,
+                  color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: const Icon(
                   Icons.directions_bus_rounded,
-                  color: AppColors.onPrimary,
+                  color: Colors.white,
                   size: 28,
                 ),
               ),
@@ -1018,10 +1202,10 @@ class _ActiveJourneyBanner extends StatelessWidget {
                                 ? journey.routeTitle
                                 : 'Active Journey',
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.onSurface,
+                              color: isHighContrast ? Colors.black : AppColors.onSurface,
                             ),
                           ),
                         ),
@@ -1032,15 +1216,18 @@ class _ActiveJourneyBanner extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primary,
+                            color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
                             borderRadius: BorderRadius.circular(999),
+                            border: isHighContrast
+                                ? Border.all(color: Colors.black, width: 1.5)
+                                : null,
                           ),
                           child: const Text(
                             'LIVE',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.onPrimary,
+                              color: Colors.white,
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -1051,18 +1238,19 @@ class _ActiveJourneyBanner extends StatelessWidget {
                     Text(
                       '${journey.origin} → ${journey.destination}',
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.onSurfaceVariant,
+                        color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Tap to resume live tracking →',
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                        color: isHighContrast ? Colors.black : AppColors.primary,
                       ),
                     ),
                   ],
@@ -1083,16 +1271,18 @@ class _RecentJourneyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Recent Journey',
           style: TextStyle(
             fontSize: 18,
             height: 24 / 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurface,
+            fontWeight: FontWeight.w700,
+            color: isHighContrast ? Colors.black : AppColors.onSurface,
           ),
         ),
         const SizedBox(height: 16),
@@ -1100,11 +1290,16 @@ class _RecentJourneyCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
+            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
-              BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
-            ],
+            border: isHighContrast
+                ? Border.all(color: Colors.black, width: 2.0)
+                : null,
+            boxShadow: isHighContrast
+                ? null
+                : const [
+                    BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
+                  ],
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -1113,24 +1308,29 @@ class _RecentJourneyCard extends StatelessWidget {
                 width: stacked ? double.infinity : 96,
                 height: 96,
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
+                  color: isHighContrast ? const Color(0xFFE5E5E5) : AppColors.surfaceContainer,
                   borderRadius: BorderRadius.circular(8),
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
-                child: const Icon(Icons.map, color: AppColors.primary, size: 36),
+                child: Icon(
+                  Icons.map,
+                  color: isHighContrast ? Colors.black : AppColors.primary,
+                  size: 36,
+                ),
               );
 
               final details = Column(
                 crossAxisAlignment:
                     stacked ? CrossAxisAlignment.center : CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Central Station to Library',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 18,
                       height: 24 / 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.onSurface,
+                      fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                      color: isHighContrast ? Colors.black : AppColors.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1139,7 +1339,8 @@ class _RecentJourneyCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       height: 20 / 14,
-                      color: AppColors.onSurfaceVariant,
+                      color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                      fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
                     ),
                   ),
                 ],
@@ -1151,15 +1352,16 @@ class _RecentJourneyCard extends StatelessWidget {
                 child: FilledButton(
                   onPressed: onReplan,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primaryContainer,
-                    foregroundColor: AppColors.onPrimary,
+                    backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                    foregroundColor: Colors.white,
+                    side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : null,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: const Text(
                     'Re-plan',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
               );
@@ -1200,28 +1402,36 @@ class _AssistanceFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Material(
-      color: AppColors.error,
-      elevation: 6,
+      color: isHighContrast ? const Color(0xFF8B0000) : AppColors.error,
+      elevation: isHighContrast ? 0 : 6,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
+        child: Container(
+          decoration: isHighContrast
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.black, width: 2.0),
+                )
+              : null,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.support_agent, color: AppColors.onError),
+              const Icon(Icons.support_agent, color: Colors.white),
               if (showLabel) ...[
                 const SizedBox(width: 8),
                 const Text(
                   'Assistance',
                   style: TextStyle(
-                    color: AppColors.onError,
+                    color: Colors.white,
                     fontSize: 14,
                     height: 20 / 14,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 0.1,
                   ),
                 ),

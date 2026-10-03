@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 import '../../data/seed_data.dart';
 import '../../logic/bus_matcher.dart';
@@ -403,9 +404,10 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+    final isHighContrast = context.isHighContrast;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       body: Column(
         children: [
           _TopBar(
@@ -480,18 +482,18 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                                       ] else ...[
                                         Row(
                                           children: [
-                                            const Icon(
+                                            Icon(
                                               Icons.directions_bus_rounded,
                                               size: 18,
-                                              color: AppColors.primary,
+                                              color: isHighContrast ? Colors.black : AppColors.primary,
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
                                               'Available Buses (${routes.length})',
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w700,
-                                                color: AppColors.onSurface,
+                                                color: isHighContrast ? Colors.black : AppColors.onSurface,
                                               ),
                                             ),
                                           ],
@@ -525,6 +527,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   }
 
   Widget _buildEmptyState() {
+    final isHighContrast = context.isHighContrast;
     final isFiltered = _selectedFilterTab == 'Accessible' ||
         _isWheelchair ||
         _isStepFree;
@@ -539,8 +542,11 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: AppColors.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : BorderSide.none,
+      ),
+      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Column(
@@ -548,24 +554,25 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
             Icon(
               isFiltered ? Icons.accessible_forward : Icons.directions_bus_outlined,
               size: 56,
-              color: AppColors.onSurfaceVariant,
+              color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
             ),
             const SizedBox(height: 16),
             Text(
               emptyTitle,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.onSurface,
+                color: isHighContrast ? Colors.black : AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               emptyDesc,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppColors.onSurfaceVariant,
+                color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
             if (isFiltered && _selectedFilterTab == '♿ Accessible') ...[
@@ -589,49 +596,59 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Material(
-      color: AppColors.surfaceContainerLow,
-      elevation: 1,
+      color: context.surfaceColor,
+      elevation: isHighContrast ? 0 : 1,
       shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 56,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: onBack,
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  color: AppColors.primary,
-                  tooltip: 'Back',
-                  iconSize: 26,
-                  constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                ),
-                const SizedBox(width: 6),
-                const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Available Buses',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+      child: Container(
+        decoration: BoxDecoration(
+          border: isHighContrast
+              ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+              : null,
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 56,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: isHighContrast ? Colors.black : AppColors.primary,
+                    tooltip: 'Back',
+                    iconSize: 26,
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                  ),
+                  const SizedBox(width: 6),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Available Buses',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: isHighContrast ? Colors.black : AppColors.primary,
+                        ),
                       ),
-                    ),
-                    Text(
-                      'Select a bus to track live journey',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.onSurfaceVariant,
+                      Text(
+                        'Select a bus to track live journey',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                          fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -656,21 +673,26 @@ class _TripSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     final dateStr = TimeUtils.formatDateString(selectedDate ?? DateTime.now());
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.surfaceVariant),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 2.0)
+            : Border.all(color: AppColors.surfaceVariant),
+        boxShadow: isHighContrast
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.onSurface.withValues(alpha: 0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -678,33 +700,33 @@ class _TripSummaryCard extends StatelessWidget {
           // Origin to Destination Row
           Row(
             children: [
-              const Icon(Icons.trip_origin_rounded, size: 16, color: AppColors.secondary),
+              Icon(Icons.trip_origin_rounded, size: 16, color: isHighContrast ? Colors.black : AppColors.secondary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   origin,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                    color: isHighContrast ? Colors.black : AppColors.onSurface,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6),
-                child: Icon(Icons.arrow_forward_rounded, size: 16, color: AppColors.primary),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Icon(Icons.arrow_forward_rounded, size: 16, color: isHighContrast ? Colors.black : AppColors.primary),
               ),
-              const Icon(Icons.location_on_rounded, size: 16, color: AppColors.error),
+              Icon(Icons.location_on_rounded, size: 16, color: isHighContrast ? const Color(0xFF8B0000) : AppColors.error),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   destination,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                    color: isHighContrast ? Colors.black : AppColors.onSurface,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -713,30 +735,39 @@ class _TripSummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          const Divider(height: 1, color: AppColors.surfaceVariant),
+          Divider(height: 1, color: isHighContrast ? Colors.black : AppColors.surfaceVariant),
           const SizedBox(height: 8),
           // Info row: Date & status
           Row(
             children: [
-              const Icon(Icons.event_note_rounded, size: 15, color: AppColors.onSurfaceVariant),
+              Icon(Icons.event_note_rounded, size: 15, color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant),
               const SizedBox(width: 6),
-              Text(
-                dateStr,
-                style: const TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+              Expanded(
+                child: Text(
+                  dateStr,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                    fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryFixed,
+                  color: isHighContrast ? Colors.white : AppColors.primaryFixed,
                   borderRadius: BorderRadius.circular(6),
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
                 child: Text(
                   '$matchedCount buses available',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: isHighContrast ? Colors.black : AppColors.primary,
                   ),
                 ),
               ),
@@ -808,6 +839,21 @@ class _TabItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final Color bgColor;
+    final Color borderColor;
+    final Color contentColor;
+
+    if (isHighContrast) {
+      bgColor = isSelected ? const Color(0xFF001F3F) : Colors.white;
+      borderColor = Colors.black;
+      contentColor = isSelected ? Colors.white : Colors.black;
+    } else {
+      bgColor = isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerLowest;
+      borderColor = isSelected ? AppColors.primaryContainer : AppColors.outlineVariant;
+      contentColor = isSelected ? AppColors.onPrimary : AppColors.onSurface;
+    }
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
@@ -816,13 +862,13 @@ class _TabItem extends StatelessWidget {
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerLowest,
+          color: bgColor,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: isSelected ? AppColors.primaryContainer : AppColors.outlineVariant,
-            width: isSelected ? 1.5 : 1,
+            color: borderColor,
+            width: isHighContrast ? 2.0 : (isSelected ? 1.5 : 1.0),
           ),
-          boxShadow: isSelected
+          boxShadow: (isSelected && !isHighContrast)
               ? [
                   BoxShadow(
                     color: AppColors.primaryContainer.withValues(alpha: 0.25),
@@ -839,7 +885,7 @@ class _TabItem extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant,
+                color: isHighContrast ? contentColor : (isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant),
               ),
               const SizedBox(width: 6),
             ],
@@ -847,8 +893,8 @@ class _TabItem extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: isSelected ? AppColors.onPrimary : AppColors.onSurface,
+                fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                color: contentColor,
               ),
             ),
           ],
@@ -870,22 +916,23 @@ class _LmtGoRouteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     final rawBus = route.rawBus;
     final hasRamp = rawBus?.wheelchairAccessible == true || rawBus?.hasRamp == true;
     final hasLowFloor = rawBus?.lowFloor == true;
 
     // LMT Go Status Pill Color (WCAG AA/AAA compliant contrast)
     final (statusBg, statusFg) = switch (route.liveStatusLabel.toLowerCase()) {
-      'ongoing' => (const Color(0xFFE8F5E9), const Color(0xFF1B5E20)), // 6.7:1 on #E8F5E9
-      'approaching' => (const Color(0xFFE3F2FD), const Color(0xFF0D47A1)), // 8.2:1 on #E3F2FD
-      'delayed' => (const Color(0xFFFFEBEE), const Color(0xFFB71C1C)), // 7.0:1 on #FFEBEE
-      _ => (AppColors.surfaceContainer, AppColors.onSurfaceVariant),
+      'ongoing' => (isHighContrast ? const Color(0xFF003833) : const Color(0xFFE8F5E9), isHighContrast ? Colors.white : const Color(0xFF1B5E20)),
+      'approaching' => (isHighContrast ? const Color(0xFF001F3F) : const Color(0xFFE3F2FD), isHighContrast ? Colors.white : const Color(0xFF0D47A1)),
+      'delayed' => (isHighContrast ? const Color(0xFF8B0000) : const Color(0xFFFFEBEE), isHighContrast ? Colors.white : const Color(0xFFB71C1C)),
+      _ => (isHighContrast ? const Color(0xFF1A1A1A) : AppColors.surfaceContainer, isHighContrast ? Colors.white : AppColors.onSurfaceVariant),
     };
 
     return Material(
-      color: AppColors.surfaceContainerLowest,
+      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
       borderRadius: BorderRadius.circular(16),
-      elevation: 1,
+      elevation: isHighContrast ? 0 : 1,
       shadowColor: AppColors.onSurface.withValues(alpha: 0.06),
       child: InkWell(
         onTap: onTap,
@@ -895,22 +942,25 @@ class _LmtGoRouteCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: route.recommended ? AppColors.secondary : AppColors.surfaceVariant,
-              width: route.recommended ? 1.5 : 1,
+              color: isHighContrast
+                  ? Colors.black
+                  : (route.recommended ? AppColors.secondary : AppColors.surfaceVariant),
+              width: isHighContrast ? 2.0 : (route.recommended ? 1.5 : 1),
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Top Row: Route Badge (like LMT Go's red "CM01"), Bus Number, Status Pill, and Bold Price
+              // 1. Top Row: Route Badge, Bus Number, Status Pill, and Bold Price
               Row(
                 children: [
-                  // Prominent Route Code Badge (LMT Go style red badge)
+                  // Prominent Route Code Badge
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFC62828), // High-visibility crimson
+                      color: isHighContrast ? const Color(0xFF8B0000) : const Color(0xFFC62828),
                       borderRadius: BorderRadius.circular(8),
+                      border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                     ),
                     child: Text(
                       route.routeNo ?? 'Route',
@@ -928,21 +978,28 @@ class _LmtGoRouteCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLow,
+                      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+                      border: Border.all(
+                        color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.5),
+                        width: isHighContrast ? 1.5 : 1.0,
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.directions_bus, size: 14, color: AppColors.onSurfaceVariant),
+                        Icon(
+                          Icons.directions_bus,
+                          size: 14,
+                          color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           route.busNo ?? route.busId,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.onSurface,
+                            color: isHighContrast ? Colors.black : AppColors.onSurface,
                           ),
                         ),
                       ],
@@ -956,6 +1013,7 @@ class _LmtGoRouteCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: statusBg,
                       borderRadius: BorderRadius.circular(999),
+                      border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -964,7 +1022,7 @@ class _LmtGoRouteCard extends StatelessWidget {
                           width: 6,
                           height: 6,
                           decoration: BoxDecoration(
-                            color: statusFg,
+                            color: isHighContrast ? Colors.white : statusFg,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -986,10 +1044,10 @@ class _LmtGoRouteCard extends StatelessWidget {
                   // Estimated Price in LKR (Right-aligned, bold)
                   Text(
                     'LKR ${route.estimatedPriceLkr}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
+                      color: isHighContrast ? Colors.black : AppColors.primary,
                     ),
                   ),
                 ],
@@ -1002,10 +1060,10 @@ class _LmtGoRouteCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       '${route.origin} ➔ ${route.destination}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
+                        color: isHighContrast ? Colors.black : AppColors.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1019,8 +1077,9 @@ class _LmtGoRouteCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLow,
+                  color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(12),
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
                 child: Row(
                   children: [
@@ -1028,21 +1087,21 @@ class _LmtGoRouteCard extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Departs at',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.onSurfaceVariant,
+                            color: isHighContrast ? const Color(0xFF2B2B2B) : AppColors.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           route.departureTimeStr,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.onSurface,
+                            color: isHighContrast ? Colors.black : AppColors.onSurface,
                           ),
                         ),
                       ],
@@ -1056,10 +1115,10 @@ class _LmtGoRouteCard extends StatelessWidget {
                           children: [
                             Text(
                               '~${route.durationMinutes} min',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
+                                color: isHighContrast ? Colors.black : AppColors.primary,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -1068,21 +1127,21 @@ class _LmtGoRouteCard extends StatelessWidget {
                                 Container(
                                   width: 6,
                                   height: 6,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.secondary,
+                                  decoration: BoxDecoration(
+                                    color: isHighContrast ? Colors.black : AppColors.secondary,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
-                                const Expanded(
+                                Expanded(
                                   child: Divider(
                                     thickness: 1.5,
-                                    color: AppColors.outlineVariant,
+                                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
                                   ),
                                 ),
-                                const Icon(
+                                Icon(
                                   Icons.arrow_forward_rounded,
                                   size: 16,
-                                  color: AppColors.primary,
+                                  color: isHighContrast ? Colors.black : AppColors.primary,
                                 ),
                               ],
                             ),
@@ -1095,21 +1154,21 @@ class _LmtGoRouteCard extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text(
+                        Text(
                           'Arrives at',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.onSurfaceVariant,
+                            color: isHighContrast ? const Color(0xFF2B2B2B) : AppColors.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           route.arrivalTimeStr,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.onSurface,
+                            color: isHighContrast ? Colors.black : AppColors.onSurface,
                           ),
                         ),
                       ],
@@ -1128,25 +1187,25 @@ class _LmtGoRouteCard extends StatelessWidget {
                       _MiniFeatureBadge(
                         icon: Icons.accessible_rounded,
                         label: 'Ramp Available',
-                        color: AppColors.secondary,
-                        bgColor: AppColors.secondaryContainer.withValues(alpha: 0.4),
+                        color: isHighContrast ? Colors.black : AppColors.secondary,
+                        bgColor: isHighContrast ? Colors.white : AppColors.secondaryContainer.withValues(alpha: 0.4),
                       ),
                       const SizedBox(width: 6),
                     ],
                     if (hasLowFloor) ...[
-                      const _MiniFeatureBadge(
+                      _MiniFeatureBadge(
                         icon: Icons.elevator_outlined,
                         label: 'Low Floor',
-                        color: AppColors.primary,
-                        bgColor: AppColors.primaryFixed,
+                        color: isHighContrast ? Colors.black : AppColors.primary,
+                        bgColor: isHighContrast ? Colors.white : AppColors.primaryFixed,
                       ),
                       const SizedBox(width: 6),
                     ],
                     _MiniFeatureBadge(
                       icon: Icons.people_outline_rounded,
                       label: '${route.crowdLevel} Crowd',
-                      color: AppColors.onSurfaceVariant,
-                      bgColor: AppColors.surfaceContainer,
+                      color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                      bgColor: isHighContrast ? Colors.white : AppColors.surfaceContainer,
                     ),
                     const SizedBox(width: 6),
                     if (route.isLive)
@@ -1177,23 +1236,25 @@ class _MiniFeatureBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: isHighContrast ? Colors.white : bgColor,
         borderRadius: BorderRadius.circular(8),
+        border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
+          Icon(icon, size: 14, color: isHighContrast ? Colors.black : color),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: color,
+              fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+              color: isHighContrast ? Colors.black : color,
             ),
           ),
         ],
@@ -1202,7 +1263,6 @@ class _MiniFeatureBadge extends StatelessWidget {
   }
 }
 
-
 class _LiveTripBadge extends StatelessWidget {
   const _LiveTripBadge({required this.busId});
 
@@ -1210,6 +1270,7 @@ class _LiveTripBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return StreamBuilder<TripModel?>(
       stream: TripService().watchActiveTripForBus(busId),
       builder: (context, snapshot) {
@@ -1223,21 +1284,24 @@ class _LiveTripBadge extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.green.withValues(alpha: 0.15),
+            color: isHighContrast ? Colors.white : Colors.green.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.green.shade600, width: 1),
+            border: Border.all(
+              color: isHighContrast ? Colors.black : Colors.green.shade600,
+              width: isHighContrast ? 1.5 : 1.0,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.directions_bus_filled, size: 14, color: Colors.green.shade800),
+              Icon(Icons.directions_bus_filled, size: 14, color: isHighContrast ? Colors.black : Colors.green.shade800),
               const SizedBox(width: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: Colors.green.shade900,
+                  color: isHighContrast ? Colors.black : Colors.green.shade900,
                 ),
               ),
             ],

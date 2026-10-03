@@ -105,30 +105,39 @@ class _AccessibilityPreferencesScreenState
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 768;
+    final isHighContrast =
+        Theme.of(context).colorScheme.outline == const Color(0xFF000000) ||
+        AccessibilityPreferencesService.instance.isHighContrast;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: isHighContrast ? Colors.white : AppColors.surface,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        elevation: 0,
+        backgroundColor: isHighContrast ? Colors.white : AppColors.surface,
+        elevation: isHighContrast ? 1 : 0,
         leading: IconButton(
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.primary),
+          icon: Icon(
+            Icons.arrow_back_rounded,
+            color: isHighContrast ? Colors.black : AppColors.primary,
+          ),
           onPressed: () => Navigator.of(context).maybePop(),
           tooltip: 'Back',
         ),
-        title: const Text(
+        title: Text(
           'Accessibility Preferences',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
+            color: isHighContrast ? Colors.black : AppColors.onSurface,
           ),
         ),
         actions: [
           IconButton(
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            icon: const Icon(Icons.account_circle, color: AppColors.primary),
+            icon: Icon(
+              Icons.account_circle,
+              color: isHighContrast ? Colors.black : AppColors.primary,
+            ),
             onPressed: _openProfile,
             tooltip: 'User profile',
           ),
@@ -151,24 +160,31 @@ class _AccessibilityPreferencesScreenState
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryContainer.withValues(alpha: 0.15),
+                    color: isHighContrast
+                        ? Colors.white
+                        : AppColors.primaryContainer.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.25),
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.primary.withValues(alpha: 0.25),
+                      width: isHighContrast ? 2.0 : 1.0,
                     ),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
                       CircleAvatar(
                         radius: 22,
-                        backgroundColor: AppColors.primary,
-                        child: Icon(
+                        backgroundColor: isHighContrast
+                            ? const Color(0xFF001F3F)
+                            : AppColors.primary,
+                        child: const Icon(
                           Icons.accessibility_new_rounded,
-                          color: AppColors.onPrimary,
+                          color: Colors.white,
                           size: 24,
                         ),
                       ),
-                      SizedBox(width: 14),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,15 +194,19 @@ class _AccessibilityPreferencesScreenState
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.onSurface,
+                                color: isHighContrast
+                                    ? Colors.black
+                                    : AppColors.onSurface,
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
                               'These preferences prioritize ramps, step-free routes, and comfortable transit for your trips.',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: AppColors.onSurfaceVariant,
+                                color: isHighContrast
+                                    ? const Color(0xFF1A1A1A)
+                                    : AppColors.onSurfaceVariant,
                                 height: 1.3,
                               ),
                             ),
@@ -328,12 +348,17 @@ class _AccessibilityPreferencesScreenState
                   child: FilledButton.icon(
                     onPressed: _save,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.onPrimary,
+                      backgroundColor: isHighContrast
+                          ? const Color(0xFF001F3F)
+                          : AppColors.primary,
+                      foregroundColor: Colors.white,
+                      side: isHighContrast
+                          ? const BorderSide(color: Colors.black, width: 2)
+                          : null,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      elevation: 2,
+                      elevation: isHighContrast ? 0 : 2,
                     ),
                     icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
                     label: const Text(
@@ -368,19 +393,28 @@ class _PreferenceCategory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast =
+        Theme.of(context).colorScheme.outline == const Color(0xFF000000) ||
+        AccessibilityPreferencesService.instance.isHighContrast;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(
+          color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+          width: isHighContrast ? 2.0 : 1.0,
+        ),
+        boxShadow: isHighContrast
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -390,20 +424,28 @@ class _PreferenceCategory extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
               children: [
-                Icon(icon, size: 20, color: AppColors.primary),
+                Icon(
+                  icon,
+                  size: 20,
+                  color: isHighContrast ? Colors.black : AppColors.primary,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                    color: isHighContrast ? Colors.black : AppColors.onSurface,
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: AppColors.outlineVariant),
+          Divider(
+            height: 1,
+            color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+            thickness: isHighContrast ? 1.5 : 1.0,
+          ),
           ...children,
         ],
       ),
@@ -429,6 +471,10 @@ class _PreferenceToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast =
+        Theme.of(context).colorScheme.outline == const Color(0xFF000000) ||
+        AccessibilityPreferencesService.instance.isHighContrast;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -443,15 +489,22 @@ class _PreferenceToggle extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: value
-                        ? AppColors.primaryContainer.withValues(alpha: 0.25)
-                        : AppColors.surfaceContainer,
+                    color: isHighContrast
+                        ? (value ? const Color(0xFF001F3F) : const Color(0xFFE5E5E5))
+                        : (value
+                            ? AppColors.primaryContainer.withValues(alpha: 0.25)
+                            : AppColors.surfaceContainer),
                     borderRadius: BorderRadius.circular(10),
+                    border: isHighContrast
+                        ? Border.all(color: Colors.black, width: 1.5)
+                        : null,
                   ),
                   child: Icon(
                     icon,
                     size: 22,
-                    color: value ? AppColors.primary : AppColors.onSurfaceVariant,
+                    color: isHighContrast
+                        ? (value ? Colors.white : Colors.black)
+                        : (value ? AppColors.primary : AppColors.onSurfaceVariant),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -462,18 +515,20 @@ class _PreferenceToggle extends StatelessWidget {
                     children: [
                       Text(
                         label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.onSurface,
+                          fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                          color: isHighContrast ? Colors.black : AppColors.onSurface,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.onSurfaceVariant,
+                          color: isHighContrast
+                              ? const Color(0xFF1A1A1A)
+                              : AppColors.onSurfaceVariant,
                           height: 1.25,
                         ),
                       ),
@@ -487,10 +542,22 @@ class _PreferenceToggle extends StatelessWidget {
                     value: value,
                     onChanged: onChanged,
                     materialTapTargetSize: MaterialTapTargetSize.padded,
-                    activeThumbColor: AppColors.onPrimary,
-                    activeTrackColor: AppColors.primary,
-                    inactiveThumbColor: AppColors.onSurfaceVariant,
-                    inactiveTrackColor: AppColors.surfaceVariant,
+                    activeThumbColor: Colors.white,
+                    activeTrackColor: isHighContrast
+                        ? const Color(0xFF001F3F)
+                        : AppColors.primary,
+                    inactiveThumbColor: isHighContrast
+                        ? Colors.black
+                        : AppColors.onSurfaceVariant,
+                    inactiveTrackColor: isHighContrast
+                        ? const Color(0xFFE5E5E5)
+                        : AppColors.surfaceVariant,
+                    trackOutlineColor: isHighContrast
+                        ? const WidgetStatePropertyAll(Colors.black)
+                        : null,
+                    trackOutlineWidth: isHighContrast
+                        ? const WidgetStatePropertyAll(2.0)
+                        : null,
                   ),
                 ),
               ],
