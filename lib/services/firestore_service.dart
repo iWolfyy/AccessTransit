@@ -195,7 +195,7 @@ class FirestoreService {
       }
 
       final filtered = mergedMap.values.where((r) {
-        if (r.status.toLowerCase() == 'hidden') return false;
+        if (r.status.toLowerCase() == 'hidden' || r.falseCount >= 3 || r.flaggedBy.length >= 3) return false;
         if (status != null && status.isNotEmpty && r.status != status) {
           return false;
         }
@@ -327,16 +327,25 @@ class FirestoreService {
 
   /// Confirms a report as "Still broken" (AC-79).
   ///
-  /// Uses a Firestore transaction to atomically add [userId] to `confirmedBy`,
+  /// Uses a Firestore transaction/doc update to atomically add [userId] to `confirmedBy`,
   /// increment `confirmCount`, and reset `lastConfirmedAt` to current timestamp.
   Future<void> confirmReport(String reportId, String userId) async {
     final idx = _localReportsFallback.indexWhere((r) => r.id == reportId);
     if (idx != -1) {
       final r = _localReportsFallback[idx];
       if (!r.confirmedBy.contains(userId)) {
+        final wasFlagged = r.flaggedBy.contains(userId);
+        final updatedFlaggedBy = List<String>.from(r.flaggedBy)..remove(userId);
+        final newFalseCount = wasFlagged
+            ? (r.falseCount - 1).clamp(0, 999)
+            : r.falseCount;
+        final updatedConfirmedBy = [...r.confirmedBy, userId];
+
         final updated = r.copyWith(
-          confirmedBy: [...r.confirmedBy, userId],
-          confirmCount: r.confirmCount + 1,
+          confirmedBy: updatedConfirmedBy,
+          confirmCount: updatedConfirmedBy.length,
+          flaggedBy: updatedFlaggedBy,
+          falseCount: newFalseCount,
           lastConfirmedAt: DateTime.now(),
         );
         _localReportsFallback[idx] = updated;
@@ -345,25 +354,27 @@ class FirestoreService {
     }
 
     try {
-      await _db.runTransaction((transaction) async {
-        final docRef = _reportsRef.doc(reportId);
-        final snapshot = await transaction.get(docRef);
-        if (!snapshot.exists) {
-          return;
-        }
+      final docRef = _reportsRef.doc(reportId);
+      final snapshot = await docRef.get();
+      if (snapshot.exists && snapshot.data() != null) {
         final report = Report.fromFirestore(snapshot);
+        if (!report.confirmedBy.contains(userId)) {
+          final wasFlagged = report.flaggedBy.contains(userId);
+          final updatedFlaggedBy = List<String>.from(report.flaggedBy)..remove(userId);
+          final newFalseCount = wasFlagged
+              ? (report.falseCount - 1).clamp(0, 999)
+              : report.falseCount;
+          final updatedConfirmedBy = [...report.confirmedBy, userId];
 
-        if (report.confirmedBy.contains(userId)) {
-          throw Exception('You already confirmed this report.');
+          await docRef.set({
+            FirestoreConstants.fieldFlaggedBy: updatedFlaggedBy,
+            FirestoreConstants.fieldFalseCount: newFalseCount,
+            FirestoreConstants.fieldConfirmedBy: updatedConfirmedBy,
+            FirestoreConstants.fieldConfirmCount: updatedConfirmedBy.length,
+            FirestoreConstants.fieldLastConfirmedAt: FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
         }
-
-        final updatedConfirmedBy = [...report.confirmedBy, userId];
-        transaction.update(docRef, {
-          FirestoreConstants.fieldConfirmedBy: updatedConfirmedBy,
-          FirestoreConstants.fieldConfirmCount: FieldValue.increment(1),
-          FirestoreConstants.fieldLastConfirmedAt: FieldValue.serverTimestamp(),
-        });
-      });
+      }
     } catch (e) {
       debugPrint('Firestore confirmReport warning: $e');
     }
@@ -390,50 +401,65 @@ class FirestoreService {
 
   /// Flags a report as false (AC-83).
   ///
-  /// Uses a Firestore transaction to atomically add [userId] to `flaggedBy` and increment `falseCount`.
-  /// If `falseCount` reaches 3, sets status to 'hidden'.
+  /// Adds [userId] to `flaggedBy` and increments `falseCount`.
+  /// If `falseCount` reaches 3, DELETES the report document from Firestore and local store.
   Future<void> flagReport(String reportId, String userId) async {
     final idx = _localReportsFallback.indexWhere((r) => r.id == reportId);
     if (idx != -1) {
       final r = _localReportsFallback[idx];
       if (!r.flaggedBy.contains(userId)) {
-        final newFalseCount = r.falseCount + 1;
-        final updated = r.copyWith(
-          flaggedBy: [...r.flaggedBy, userId],
-          falseCount: newFalseCount,
-          status: newFalseCount >= 3 ? 'hidden' : r.status,
-        );
-        _localReportsFallback[idx] = updated;
+        final wasConfirmed = r.confirmedBy.contains(userId);
+        final updatedConfirmedBy = List<String>.from(r.confirmedBy)..remove(userId);
+        final newConfirmCount = wasConfirmed
+            ? (r.confirmCount - 1).clamp(0, 999)
+            : r.confirmCount;
+
+        final updatedFlaggedBy = [...r.flaggedBy, userId];
+        final newFalseCount = updatedFlaggedBy.length;
+        final shouldDelete = newFalseCount >= 3;
+
+        if (shouldDelete) {
+          _localReportsFallback.removeAt(idx);
+        } else {
+          final updated = r.copyWith(
+            confirmedBy: updatedConfirmedBy,
+            confirmCount: newConfirmCount,
+            flaggedBy: updatedFlaggedBy,
+            falseCount: newFalseCount,
+          );
+          _localReportsFallback[idx] = updated;
+        }
         _localStreamController.add(_localReportsFallback);
       }
     }
 
     try {
-      await _db.runTransaction((transaction) async {
-        final docRef = _reportsRef.doc(reportId);
-        final snapshot = await transaction.get(docRef);
-        if (!snapshot.exists) {
-          return;
-        }
+      final docRef = _reportsRef.doc(reportId);
+      final snapshot = await docRef.get();
+      if (snapshot.exists && snapshot.data() != null) {
         final report = Report.fromFirestore(snapshot);
+        if (!report.flaggedBy.contains(userId)) {
+          final wasConfirmed = report.confirmedBy.contains(userId);
+          final updatedConfirmedBy = List<String>.from(report.confirmedBy)..remove(userId);
+          final newConfirmCount = wasConfirmed
+              ? (report.confirmCount - 1).clamp(0, 999)
+              : report.confirmCount;
 
-        if (report.flaggedBy.contains(userId)) {
-          throw Exception('You already flagged this report.');
+          final updatedFlaggedBy = [...report.flaggedBy, userId];
+          final newFalseCount = updatedFlaggedBy.length;
+
+          if (newFalseCount >= 3) {
+            await docRef.delete();
+          } else {
+            await docRef.set({
+              FirestoreConstants.fieldConfirmedBy: updatedConfirmedBy,
+              FirestoreConstants.fieldConfirmCount: newConfirmCount,
+              FirestoreConstants.fieldFlaggedBy: updatedFlaggedBy,
+              FirestoreConstants.fieldFalseCount: newFalseCount,
+            }, SetOptions(merge: true));
+          }
         }
-
-        final updatedFlaggedBy = [...report.flaggedBy, userId];
-        final newFalseCount = report.falseCount + 1;
-        final Map<String, dynamic> updates = {
-          FirestoreConstants.fieldFlaggedBy: updatedFlaggedBy,
-          FirestoreConstants.fieldFalseCount: newFalseCount,
-        };
-
-        if (newFalseCount >= 3) {
-          updates[FirestoreConstants.fieldStatus] = 'hidden';
-        }
-
-        transaction.update(docRef, updates);
-      });
+      }
     } catch (e) {
       debugPrint('Firestore flagReport warning: $e');
     }

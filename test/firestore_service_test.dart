@@ -143,5 +143,47 @@ void main() {
       // Hidden reports are excluded from stream
       expect(reports.any((r) => r.id == reportId), isFalse);
     });
+
+    test('true flag increments confirmCount and switching from false to true flag updates counts correctly', () async {
+      final reportId = 'test_report_tf_${DateTime.now().millisecondsSinceEpoch}';
+      final report = Report(
+        id: reportId,
+        targetType: 'station',
+        targetId: 'st_fort',
+        problemType: 'Elevator maintenance',
+        status: 'active',
+        createdAt: DateTime.now(),
+        confirmCount: 0,
+        falseCount: 0,
+        confirmedBy: const [],
+        flaggedBy: const [],
+        userId: 'creator_tf',
+      );
+
+      await service.createReport(report);
+
+      // User 1 & User 2 click True Flag
+      await service.confirmReport(reportId, 'user_tf_1');
+      await service.confirmReport(reportId, 'user_tf_2');
+
+      var reports = await service.streamReports().first;
+      var updated = reports.firstWhere((r) => r.id == reportId);
+      expect(updated.confirmCount, equals(2));
+      expect(updated.falseCount, equals(0));
+
+      // User 3 clicks False Flag
+      await service.flagReport(reportId, 'user_tf_3');
+      reports = await service.streamReports().first;
+      updated = reports.firstWhere((r) => r.id == reportId);
+      expect(updated.confirmCount, equals(2));
+      expect(updated.falseCount, equals(1));
+
+      // User 3 switches to True Flag
+      await service.confirmReport(reportId, 'user_tf_3');
+      reports = await service.streamReports().first;
+      updated = reports.firstWhere((r) => r.id == reportId);
+      expect(updated.confirmCount, equals(3));
+      expect(updated.falseCount, equals(0));
+    });
   });
 }
