@@ -1,8 +1,4 @@
 import 'dart:io';
-import 'dart:io';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -101,7 +97,6 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
   final FirestoreService _firestoreService = FirestoreService();
   final TextEditingController _noteController = TextEditingController();
-  final ImagePicker _picker = ImagePicker();
 
   // Data loaded from Firestore / SeedData
   List<BusRoute> _allRoutes = [];
@@ -414,31 +409,6 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       final stations = await _firestoreService.getStations();
       final buses = await _firestoreService.getBuses();
 
-      if (mounted) {
-        setState(() {
-          _availableRoutes = routes;
-          _availableStations = stations;
-          _availableBuses = buses;
-          _setupInitialSelection();
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _allRoutes = SeedData.sampleRoutes;
-          _allStations = SeedData.colomboStations;
-          _allBuses = SeedData.sampleBuses;
-          _setupInitialSelection();
-          _isLoadingData = false;
-        });
-      }
-    }
-  }
-    try {
-      final routes = await _firestoreService.getRoutes();
-      final stations = await _firestoreService.getStations();
-      final buses = await _firestoreService.getBuses();
-
       if (!mounted) return;
 
       setState(() {
@@ -452,28 +422,6 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _availableStations = stations;
-          _availableBuses = buses;
-
-          if (widget.targetId.isNotEmpty) {
-            if (_targetType == 'station') {
-              try {
-                _selectedStation = stations.firstWhere(
-                  (s) => s.id == widget.targetId,
-                );
-                _locationController.text = _selectedStation!.name;
-              } catch (_) {}
-            } else {
-              try {
-                _selectedBus = buses.firstWhere((b) => b.id == widget.targetId);
-                _locationController.text = _getBusTitle(_selectedBus!);
-              } catch (_) {}
-            }
-          } else if (_locationController.text.isEmpty && stations.isNotEmpty) {
-            _selectedStation = stations.first;
-            _locationController.text = stations.first.name;
-          }
-
           _allRoutes = SeedData.sampleRoutes;
           _allStations = SeedData.colomboStations;
           _allBuses = SeedData.sampleBuses;
@@ -563,8 +511,6 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-  Future<void> _pickImage(ImageSource source) async {
-    try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
         maxWidth: 1200,
@@ -573,7 +519,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       );
       if (pickedFile != null && mounted) {
         setState(() {
-          _selectedPhotoUrl = pickedFile.path;
+          _pickedImage = File(pickedFile.path);
         });
         _showSnack(
           source == ImageSource.camera
@@ -585,8 +531,6 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       if (mounted) {
         _showSnack('Unable to access device photo: ${e.toString()}');
       }
-    }
-  }
     }
   }
 

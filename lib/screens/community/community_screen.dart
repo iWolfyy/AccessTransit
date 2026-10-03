@@ -96,10 +96,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
     try {
       await _firestoreService.confirmReport(report.id, userId);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('True flag recorded! Thank you.')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Action failed: ${e.toString().replaceAll('Exception: ', '')}')),
       );
@@ -117,6 +119,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     try {
       final newCount = report.falseCount + 1;
       await _firestoreService.flagReport(report.id, userId);
+      if (!mounted) return;
       if (newCount >= 3) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -130,6 +133,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Action failed: ${e.toString().replaceAll('Exception: ', '')}')),
       );

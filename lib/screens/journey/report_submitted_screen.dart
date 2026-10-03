@@ -1,8 +1,4 @@
 import 'dart:io';
-import 'dart:io';
-import 'package:flutter/material.dart';
-
-import '../../core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -48,7 +44,7 @@ class ReportSubmittedScreen extends StatelessWidget {
         height: 140,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
       );
     }
 
@@ -60,7 +56,7 @@ class ReportSubmittedScreen extends StatelessWidget {
           height: 140,
           width: double.infinity,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
         );
       }
     } catch (_) {}
@@ -70,7 +66,7 @@ class ReportSubmittedScreen extends StatelessWidget {
       height: 140,
       width: double.infinity,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      errorBuilder: (_, _, _) => const SizedBox.shrink(),
     );
   }
 
@@ -268,15 +264,15 @@ class ReportSubmittedScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            if (report?.photoUrl != null &&
-                                report!.photoUrl!.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              ClipRRect(
+                          ),
+                          Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isHC ? Colors.white : AppColors.success.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(8),
-                                child: _buildImageWidget(report!.photoUrl!),
+                                border: isHC ? Border.all(color: Colors.black) : null,
                               ),
-                            ],
-                            child: Row(
+                              child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
@@ -400,21 +396,7 @@ class ReportSubmittedScreen extends StatelessWidget {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(10),
-                            child: report!.photoUrl.startsWith('http')
-                                ? Image.network(
-                                    report!.photoUrl,
-                                    height: 160,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                                  )
-                                : Image.file(
-                                    File(report!.photoUrl),
-                                    height: 160,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                                  ),
+                            child: _buildImageWidget(report!.photoUrl),
                           ),
                         ),
                       ],

@@ -1,6 +1,8 @@
 import 'package:access_transit/models/report.dart';
 import 'package:access_transit/screens/journey/report_condition_screen.dart';
 import 'package:access_transit/services/firestore_service.dart';
+import 'package:access_transit/l10n/app_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -153,6 +155,17 @@ void main() {
     testWidgets('ReportConditionScreen target selection and photo upload sheet rendering test', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: [
+            Locale('en'),
+            Locale('si'),
+            Locale('ta'),
+          ],
           home: ReportConditionScreen(
             targetType: 'bus',
             initialLocation: 'Bus Route 100',
@@ -161,13 +174,10 @@ void main() {
       );
       await tester.pump();
 
-      // Check title and target chips
-      expect(find.text('Report a Condition'), findsOneWidget);
-      expect(find.text('Station / Stop'), findsOneWidget);
-      expect(find.text('Bus Route / Vehicle'), findsOneWidget);
-
-      // Check Location textfield
-      expect(find.text('Bus Route 100'), findsOneWidget);
+      // Check title and section headers
+      expect(find.text('Community Report'), findsOneWidget);
+      expect(find.text('Select Bus Route'), findsOneWidget);
+      expect(find.text('Where is the Issue?'), findsOneWidget);
     });
   });
 }

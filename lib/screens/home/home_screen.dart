@@ -70,9 +70,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       if (_user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to load profile: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Unable to load profile: $e')));
       }
     }
   }
@@ -118,7 +118,9 @@ class _HomeScreenState extends State<HomeScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text('$feature will be available in a future update.')),
+        SnackBar(
+          content: Text('$feature will be available in a future update.'),
+        ),
       );
   }
 
@@ -132,17 +134,14 @@ class _HomeScreenState extends State<HomeScreen> {
       shell.switchToTab('Plan');
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const JourneySearchScreen()),
-    );
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const JourneySearchScreen()));
   }
 
   void _openAccessibilityPreferences() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => AccessibilityPreferencesScreen(
-          initialUser: _user,
-        ),
+        builder: (_) => AccessibilityPreferencesScreen(initialUser: _user),
       ),
     );
   }
@@ -159,7 +158,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String get _initials {
     final name = _user?.name.trim() ?? '';
     if (name.isEmpty) return 'AT';
-    final parts = name.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = name
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.length == 1) {
       return parts.first.substring(0, 1).toUpperCase();
     }
@@ -169,7 +171,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String get _firstName {
     final name = _user?.name.trim() ?? '';
     if (name.isEmpty) return 'Passenger';
-    final parts = name.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = name
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
     return parts.first;
   }
 
@@ -219,9 +224,8 @@ class _HomeScreenState extends State<HomeScreen> {
         onAccessibilityTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => AccessibilityPreferencesScreen(
-                initialUser: _user,
-              ),
+              builder: (_) =>
+                  AccessibilityPreferencesScreen(initialUser: _user),
             ),
           );
         },
@@ -234,9 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         onOperatorTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const OperatorDashboardScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const OperatorDashboardScreen()),
           );
         },
         onFeatureTap: _showComingSoon,
@@ -280,11 +282,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         sliver: SliverToBoxAdapter(
                           child: Center(
                             child: ConstrainedBox(
-                              constraints:
-                                  const BoxConstraints(maxWidth: 1280),
+                              constraints: const BoxConstraints(maxWidth: 1280),
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // ── Quick Actions Row ──
                                   _QuickActionsRow(
@@ -374,14 +374,13 @@ class _HeroHeader extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  AppColors.primary,        // #003466
+                  AppColors.primary, // #003466
                   AppColors.primaryContainer, // #1A4B84
                 ],
               ),
         color: isHighContrast ? const Color(0xFF001F3F) : null,
         border: isHighContrast
-            ? const Border(
-                bottom: BorderSide(color: Colors.black, width: 2.0))
+            ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
             : null,
       ),
       child: SafeArea(
@@ -416,10 +415,7 @@ class _HeroHeader extends StatelessWidget {
                         shadows: isHighContrast
                             ? null
                             : const [
-                                Shadow(
-                                  color: Color(0x40000000),
-                                  blurRadius: 4,
-                                ),
+                                Shadow(color: Color(0x40000000), blurRadius: 4),
                               ],
                       ),
                     ),
@@ -499,8 +495,9 @@ class _HeroHeader extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: isHighContrast
                                 ? const Color(0xFFE5E5E5)
-                                : AppColors.primaryContainer
-                                    .withValues(alpha: 0.10),
+                                : AppColors.primaryContainer.withValues(
+                                    alpha: 0.10,
+                                  ),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -581,21 +578,14 @@ class _HeaderIconButton extends StatelessWidget {
       child: IconButton(
         onPressed: onPressed,
         tooltip: semanticLabel,
-        icon: Icon(
-          icon,
-          color: Colors.white,
-          size: context.tapIconSize,
-        ),
+        icon: Icon(icon, color: Colors.white, size: context.tapIconSize),
       ),
     );
   }
 }
 
 class _HeaderAvatarButton extends StatelessWidget {
-  const _HeaderAvatarButton({
-    required this.initials,
-    required this.onPressed,
-  });
+  const _HeaderAvatarButton({required this.initials, required this.onPressed});
 
   final String initials;
   final VoidCallback onPressed;
@@ -706,15 +696,14 @@ class _QuickActionCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          constraints: BoxConstraints(
-            minHeight: hasLargeTargets ? 120 : 108,
-          ),
+          constraints: BoxConstraints(minHeight: hasLargeTargets ? 120 : 108),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: isHighContrast
                 ? Border.all(color: Colors.black, width: 2.0)
                 : Border.all(
-                    color: AppColors.outlineVariant.withValues(alpha: 0.3)),
+                    color: AppColors.outlineVariant.withValues(alpha: 0.3),
+                  ),
           ),
           padding: EdgeInsets.symmetric(
             vertical: hasLargeTargets ? 16 : 14,
@@ -749,7 +738,9 @@ class _QuickActionCard extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: hasLargeTargets ? 14 : 12,
-                  fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                  fontWeight: isHighContrast
+                      ? FontWeight.w800
+                      : FontWeight.w600,
                   color: isHighContrast ? Colors.black : AppColors.onSurface,
                   height: 1.3,
                 ),
@@ -761,7 +752,6 @@ class _QuickActionCard extends StatelessWidget {
     );
   }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DRAWER (preserved from original)
@@ -794,7 +784,8 @@ class _HomeDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
     final hasLargeTargets = context.hasLargeTargets;
-    final isOperatorOrAdmin = user?.role == UserRole.operator || user?.role == UserRole.admin;
+    final isOperatorOrAdmin =
+        user?.role == UserRole.operator || user?.role == UserRole.admin;
 
     return Drawer(
       backgroundColor: isHighContrast ? Colors.white : context.surfaceColor,
@@ -808,9 +799,16 @@ class _HomeDrawer extends StatelessWidget {
                   // Drawer Header
                   DrawerHeader(
                     decoration: BoxDecoration(
-                      color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                      color: isHighContrast
+                          ? const Color(0xFF001F3F)
+                          : AppColors.primary,
                       border: isHighContrast
-                          ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+                          ? const Border(
+                              bottom: BorderSide(
+                                color: Colors.black,
+                                width: 2.0,
+                              ),
+                            )
                           : null,
                     ),
                     child: Column(
@@ -821,8 +819,12 @@ class _HomeDrawer extends StatelessWidget {
                           children: [
                             CircleAvatar(
                               radius: hasLargeTargets ? 30 : 26,
-                              backgroundColor: isHighContrast ? Colors.white : AppColors.primaryContainer,
-                              foregroundColor: isHighContrast ? Colors.black : AppColors.onPrimaryContainer,
+                              backgroundColor: isHighContrast
+                                  ? Colors.white
+                                  : AppColors.primaryContainer,
+                              foregroundColor: isHighContrast
+                                  ? Colors.black
+                                  : AppColors.onPrimaryContainer,
                               child: Text(
                                 initials,
                                 style: TextStyle(
@@ -833,11 +835,19 @@ class _HomeDrawer extends StatelessWidget {
                             ),
                             const Spacer(),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.20),
                                 borderRadius: BorderRadius.circular(12),
-                                border: isHighContrast ? Border.all(color: Colors.white, width: 1.5) : null,
+                                border: isHighContrast
+                                    ? Border.all(
+                                        color: Colors.white,
+                                        width: 1.5,
+                                      )
+                                    : null,
                               ),
                               child: Text(
                                 roleLabel,
@@ -852,7 +862,9 @@ class _HomeDrawer extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          user?.name.isNotEmpty == true ? user!.name : 'Passenger',
+                          user?.name.isNotEmpty == true
+                              ? user!.name
+                              : 'Passenger',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: hasLargeTargets ? 20 : 18,
@@ -914,7 +926,9 @@ class _HomeDrawer extends StatelessWidget {
                   Divider(
                     height: 1,
                     thickness: isHighContrast ? 2.0 : 1.0,
-                    color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.3),
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.outlineVariant.withValues(alpha: 0.3),
                   ),
 
                   // Settings & Features
@@ -972,7 +986,9 @@ class _HomeDrawer extends StatelessWidget {
             Divider(
               height: 1,
               thickness: isHighContrast ? 2.0 : 1.0,
-              color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.3),
+              color: isHighContrast
+                  ? Colors.black
+                  : AppColors.outlineVariant.withValues(alpha: 0.3),
             ),
             _buildDrawerTile(
               context,
@@ -1004,12 +1020,14 @@ class _HomeDrawer extends StatelessWidget {
     final isHighContrast = context.isHighContrast;
     final hasLargeTargets = context.hasLargeTargets;
 
-    final effectiveIconColor = iconColor ??
+    final effectiveIconColor =
+        iconColor ??
         (isHighContrast
             ? Colors.black
             : (selected ? AppColors.primary : AppColors.onSurfaceVariant));
 
-    final effectiveTitleColor = titleColor ??
+    final effectiveTitleColor =
+        titleColor ??
         (isHighContrast
             ? Colors.black
             : (selected ? AppColors.primary : context.textColor));
@@ -1169,9 +1187,13 @@ class _DesktopNavChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeBg = isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer;
+    final activeBg = isHighContrast
+        ? const Color(0xFF001F3F)
+        : AppColors.primaryContainer;
     final activeFg = Colors.white;
-    final inactiveFg = isHighContrast ? Colors.black : AppColors.onSurfaceVariant;
+    final inactiveFg = isHighContrast
+        ? Colors.black
+        : AppColors.onSurfaceVariant;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1191,18 +1213,16 @@ class _DesktopNavChip extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  size: 22,
-                  color: selected ? activeFg : inactiveFg,
-                ),
+                Icon(icon, size: 22, color: selected ? activeFg : inactiveFg),
                 const SizedBox(width: 8),
                 Text(
                   label,
                   style: TextStyle(
                     fontSize: 14,
                     height: 20 / 14,
-                    fontWeight: selected ? FontWeight.w800 : (isHighContrast ? FontWeight.w700 : FontWeight.w600),
+                    fontWeight: selected
+                        ? FontWeight.w800
+                        : (isHighContrast ? FontWeight.w700 : FontWeight.w600),
                     letterSpacing: 0.1,
                     color: selected ? activeFg : inactiveFg,
                   ),
@@ -1270,10 +1290,14 @@ class _AvatarButton extends StatelessWidget {
           height: 32,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+            color: isHighContrast
+                ? const Color(0xFF001F3F)
+                : AppColors.primaryContainer,
             border: (bordered || isHighContrast)
                 ? Border.all(
-                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.outlineVariant,
                     width: 2,
                   )
                 : null,
@@ -1389,7 +1413,7 @@ class _RecentReportsSection extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
               itemCount: activeReports.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final report = activeReports[index];
                 return _RecentReportCard(report: report);
@@ -1533,16 +1557,12 @@ class _RecentReportCard extends StatelessWidget {
   }
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════════
 // ACTIVE JOURNEY BANNER (Phase 1.3 — kept as-is)
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _ActiveJourneyBanner extends StatelessWidget {
-  const _ActiveJourneyBanner({
-    required this.journey,
-    required this.onResume,
-  });
+  const _ActiveJourneyBanner({required this.journey, required this.onResume});
 
   final JourneyModel journey;
   final VoidCallback onResume;
@@ -1578,7 +1598,9 @@ class _ActiveJourneyBanner extends StatelessWidget {
                 width: hasLargeTargets ? 54 : 48,
                 height: hasLargeTargets ? 54 : 48,
                 decoration: BoxDecoration(
-                  color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                  color: isHighContrast
+                      ? const Color(0xFF001F3F)
+                      : AppColors.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
                   border: isHighContrast
                       ? Border.all(color: Colors.black, width: 1.5)
@@ -1606,7 +1628,9 @@ class _ActiveJourneyBanner extends StatelessWidget {
                             style: TextStyle(
                               fontSize: hasLargeTargets ? 18 : 16,
                               fontWeight: FontWeight.w700,
-                              color: isHighContrast ? Colors.black : AppColors.onSurface,
+                              color: isHighContrast
+                                  ? Colors.black
+                                  : AppColors.onSurface,
                             ),
                           ),
                         ),
@@ -1617,7 +1641,9 @@ class _ActiveJourneyBanner extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                            color: isHighContrast
+                                ? const Color(0xFF001F3F)
+                                : AppColors.primary,
                             borderRadius: BorderRadius.circular(999),
                             border: isHighContrast
                                 ? Border.all(color: Colors.black, width: 1.5)
@@ -1641,8 +1667,12 @@ class _ActiveJourneyBanner extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: hasLargeTargets ? 15 : 14,
-                        color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                        fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                        color: isHighContrast
+                            ? const Color(0xFF1A1A1A)
+                            : AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1651,7 +1681,9 @@ class _ActiveJourneyBanner extends StatelessWidget {
                       style: TextStyle(
                         fontSize: hasLargeTargets ? 14 : 13,
                         fontWeight: FontWeight.w700,
-                        color: isHighContrast ? Colors.black : AppColors.primary,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.primary,
                       ),
                     ),
                   ],
@@ -1670,10 +1702,7 @@ class _ActiveJourneyBanner extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _RecentJourneyCard extends StatelessWidget {
-  const _RecentJourneyCard({
-    required this.onReplan,
-    this.passengerId,
-  });
+  const _RecentJourneyCard({required this.onReplan, this.passengerId});
 
   final VoidCallback onReplan;
   final String? passengerId;
@@ -1724,8 +1753,9 @@ class _RecentJourneyCard extends StatelessWidget {
                   });
 
                 final latest = sortedDocs.first;
-                final orig =
-                    latest.origin.isNotEmpty ? latest.origin : 'Origin';
+                final orig = latest.origin.isNotEmpty
+                    ? latest.origin
+                    : 'Origin';
                 final dest = latest.destination.isNotEmpty
                     ? latest.destination
                     : 'Destination';
@@ -1758,10 +1788,12 @@ class _RecentJourneyCard extends StatelessWidget {
           .where('passengerId', isEqualTo: pid)
           .snapshots()
           .map((snapshot) {
-        return snapshot.docs
-            .map((doc) => JourneyModel.fromMap(doc.data(), documentId: doc.id))
-            .toList();
-      });
+            return snapshot.docs
+                .map(
+                  (doc) => JourneyModel.fromMap(doc.data(), documentId: doc.id),
+                )
+                .toList();
+          });
     } catch (_) {
       return Stream.value([]);
     }
@@ -1775,112 +1807,131 @@ class _RecentJourneyCard extends StatelessWidget {
     required bool hasLargeTargets,
   }) {
     return Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(hasLargeTargets ? 20 : 16),
-          decoration: BoxDecoration(
-            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(12),
-            border: isHighContrast
-                ? Border.all(color: Colors.black, width: 2.0)
-                : null,
-            boxShadow: isHighContrast
-                ? null
-                : const [
-                    BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
-                  ],
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final stacked = constraints.maxWidth < 520;
-              final mapBoxSize = hasLargeTargets ? 108.0 : 96.0;
-              final map = Container(
-                width: stacked ? double.infinity : mapBoxSize,
-                height: mapBoxSize,
-                decoration: BoxDecoration(
-                  color: isHighContrast ? const Color(0xFFE5E5E5) : AppColors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(8),
-                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+      width: double.infinity,
+      padding: EdgeInsets.all(hasLargeTargets ? 20 : 16),
+      decoration: BoxDecoration(
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 2.0)
+            : null,
+        boxShadow: isHighContrast
+            ? null
+            : const [
+                BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
                 ),
-                child: Icon(
-                  Icons.map,
-                  color: isHighContrast ? Colors.black : AppColors.primary,
-                  size: hasLargeTargets ? 42 : 36,
+              ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = constraints.maxWidth < 520;
+          final mapBoxSize = hasLargeTargets ? 108.0 : 96.0;
+          final map = Container(
+            width: stacked ? double.infinity : mapBoxSize,
+            height: mapBoxSize,
+            decoration: BoxDecoration(
+              color: isHighContrast
+                  ? const Color(0xFFE5E5E5)
+                  : AppColors.surfaceContainer,
+              borderRadius: BorderRadius.circular(8),
+              border: isHighContrast
+                  ? Border.all(color: Colors.black, width: 1.5)
+                  : null,
+            ),
+            child: Icon(
+              Icons.map,
+              color: isHighContrast ? Colors.black : AppColors.primary,
+              size: hasLargeTargets ? 42 : 36,
+            ),
+          );
+
+          final details = Column(
+            crossAxisAlignment: stacked
+                ? CrossAxisAlignment.center
+                : CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                textAlign: stacked ? TextAlign.center : TextAlign.start,
+                style: TextStyle(
+                  fontSize: hasLargeTargets ? 20 : 18,
+                  height: 24 / 18,
+                  fontWeight: isHighContrast
+                      ? FontWeight.w800
+                      : FontWeight.w600,
+                  color: isHighContrast ? Colors.black : AppColors.onSurface,
                 ),
-              );
-
-              final details = Column(
-                crossAxisAlignment:
-                    stacked ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    textAlign: stacked ? TextAlign.center : TextAlign.start,
-                    style: TextStyle(
-                      fontSize: hasLargeTargets ? 20 : 18,
-                      height: 24 / 18,
-                      fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-                      color: isHighContrast ? Colors.black : AppColors.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: hasLargeTargets ? 15 : 14,
-                      height: 20 / 14,
-                      color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                      fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                  ),
-                ],
-              );
-
-              final button = SizedBox(
-                height: context.buttonHeight,
-                width: stacked ? double.infinity : null,
-                child: FilledButton(
-                  onPressed: onReplan,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
-                    foregroundColor: Colors.white,
-                    side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : null,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    'Re-plan',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: context.buttonFontSize,
-                    ),
-                  ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: hasLargeTargets ? 15 : 14,
+                  height: 20 / 14,
+                  color: isHighContrast
+                      ? const Color(0xFF1A1A1A)
+                      : AppColors.onSurfaceVariant,
+                  fontWeight: isHighContrast
+                      ? FontWeight.w600
+                      : FontWeight.normal,
                 ),
-              );
+              ),
+            ],
+          );
 
-              if (stacked) {
-                return Column(
-                  children: [
-                    map,
-                    const SizedBox(height: 16),
-                    details,
-                    const SizedBox(height: 16),
-                    button,
-                  ],
-                );
-              }
+          final button = SizedBox(
+            height: context.buttonHeight,
+            width: stacked ? double.infinity : null,
+            child: FilledButton(
+              onPressed: onReplan,
+              style: FilledButton.styleFrom(
+                backgroundColor: isHighContrast
+                    ? const Color(0xFF001F3F)
+                    : AppColors.primaryContainer,
+                foregroundColor: Colors.white,
+                side: isHighContrast
+                    ? const BorderSide(color: Colors.black, width: 2.0)
+                    : null,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                'Re-plan',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: context.buttonFontSize,
+                ),
+              ),
+            ),
+          );
 
-              return Row(
-                children: [
-                  map,
-                  const SizedBox(width: 16),
-                  Expanded(child: details),
-                  button,
-                ],
-              );
-            },
-          ),
-        );
+          if (stacked) {
+            return Column(
+              children: [
+                map,
+                const SizedBox(height: 16),
+                details,
+                const SizedBox(height: 16),
+                button,
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              map,
+              const SizedBox(width: 16),
+              Expanded(child: details),
+              button,
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -1920,7 +1971,11 @@ class _AssistanceFab extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.support_agent, color: Colors.white, size: context.tapIconSize),
+              Icon(
+                Icons.support_agent,
+                color: Colors.white,
+                size: context.tapIconSize,
+              ),
               if (showLabel) ...[
                 const SizedBox(width: 8),
                 Text(

@@ -1,8 +1,4 @@
 import 'dart:io';
-import 'dart:io';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -760,7 +756,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                 ],
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -772,7 +768,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         height: 200,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildImageFallback(),
+        errorBuilder: (_, _, _) => _buildImageFallback(),
       );
     }
 
@@ -784,7 +780,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           height: 200,
           width: double.infinity,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildImageFallback(),
+          errorBuilder: (_, _, _) => _buildImageFallback(),
         );
       }
     } catch (_) {}
@@ -794,7 +790,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
       height: 200,
       width: double.infinity,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _buildImageFallback(),
+      errorBuilder: (_, _, _) => _buildImageFallback(),
     );
   }
 
@@ -814,21 +810,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         onTap: () => _showFullPhotoDialog(photoPath),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: photoPath.startsWith('http')
-              ? Image.network(
-                  photoPath,
-                  height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _buildImageFallback(),
-                )
-              : Image.file(
-                  File(photoPath),
-                  height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _buildImageFallback(),
-                ),
+          child: _buildImageWidget(photoPath),
         ),
       ),
     );
@@ -849,36 +831,6 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           Text(
             'Image preview unavailable',
             style: TextStyle(color: isHC ? Colors.black : AppColors.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildImageFallback() {
-    final isHC = context.isHighContrast;
-
-    return Container(
-      height: 100,
-      decoration: BoxDecoration(
-        color: isHC ? Colors.white : AppColors.surfaceContainer,
-        border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
-      ),
-      alignment: Alignment.center,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.broken_image_rounded,
-            color: isHC ? Colors.black : AppColors.outline,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'Photo unavailable',
-            style: TextStyle(
-              color: isHC ? Colors.black : AppColors.onSurfaceVariant,
-              fontSize: 13,
-            ),
           ),
         ],
       ),
