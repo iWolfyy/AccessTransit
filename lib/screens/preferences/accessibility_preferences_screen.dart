@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/user_model.dart';
-import '../home/home_screen.dart';
+import '../../services/accessibility_preferences_service.dart';
+import '../main_shell.dart';
 
+/// Modern Accessible Preferences Screen adhering to WCAG 2.2 Level AA (48dp+ tap targets).
 class AccessibilityPreferencesScreen extends StatefulWidget {
   const AccessibilityPreferencesScreen({
     super.key,
@@ -24,24 +26,74 @@ class AccessibilityPreferencesScreen extends StatefulWidget {
 
 class _AccessibilityPreferencesScreenState
     extends State<AccessibilityPreferencesScreen> {
-  bool _wheelchairAccess = true;
-  bool _stepFree = false;
-  bool _minimizeWalking = false;
-  bool _highContrast = false;
-  bool _voiceGuidance = true;
-  bool _hapticAlerts = false;
-  bool _boardingAssistance = false;
-  bool _quietRoutes = false;
+  late bool _wheelchairAccess;
+  late bool _stepFree;
+  late bool _minimizeWalking;
+  late bool _highContrast;
+  late bool _voiceGuidance;
+  late bool _hapticAlerts;
+  late bool _boardingAssistance;
+  late bool _quietRoutes;
+  late bool _hasLargeTargets;
+
+  @override
+  void initState() {
+    super.initState();
+    final prefs = AccessibilityPreferencesService.instance;
+    _wheelchairAccess = prefs.isWheelchairOnly;
+    _stepFree = prefs.isStepFree;
+    _minimizeWalking = prefs.minimizeWalking;
+    _highContrast = prefs.isHighContrast;
+    _voiceGuidance = prefs.voiceGuidance;
+    _hapticAlerts = prefs.hapticAlerts;
+    _boardingAssistance = prefs.boardingAssistance;
+    _quietRoutes = prefs.quietRoutes;
+    _hasLargeTargets = prefs.hasLargeTargets;
+  }
 
   void _openProfile() {
     AppNavigation.openProfile(context, initialUser: widget.initialUser);
   }
 
-  void _save() {
+  Future<void> _save() async {
+    await AccessibilityPreferencesService.instance.savePreferences(
+      isWheelchairOnly: _wheelchairAccess,
+      isStepFree: _stepFree,
+      minimizeWalking: _minimizeWalking,
+      isHighContrast: _highContrast,
+      voiceGuidance: _voiceGuidance,
+      hapticAlerts: _hapticAlerts,
+      boardingAssistance: _boardingAssistance,
+      quietRoutes: _quietRoutes,
+      hasLargeTargets: _hasLargeTargets,
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Text(
+                'Accessibility preferences saved!',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+
     if (widget.continueToHome) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => HomeScreen(initialUser: widget.initialUser),
+          builder: (_) => MainShell(initialUser: widget.initialUser),
         ),
       );
       return;
@@ -53,257 +105,273 @@ class _AccessibilityPreferencesScreenState
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 768;
+    final isHighContrast =
+        Theme.of(context).colorScheme.outline == const Color(0xFF000000) ||
+        AccessibilityPreferencesService.instance.isHighContrast;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
-      body: Column(
-        children: [
-          if (isDesktop)
-            const _DesktopTopBar()
-          else
-            _MobileTopBar(onProfile: _openProfile),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                isDesktop ? 24 : 16,
-                24,
-                isDesktop ? 24 : 16,
-                isDesktop ? 24 : 112,
-              ),
-              children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 600),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Accessibility Preferences',
-                          style: TextStyle(
-                            fontSize: 32,
-                            height: 40 / 32,
-                            letterSpacing: -0.64,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Personalize your travel experience. These settings will help us find the best routes for you.',
-                          style: TextStyle(
-                            fontSize: 16,
-                            height: 24 / 16,
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        _PreferenceCategory(
-                          title: 'Mobility',
-                          children: [
-                            _PreferenceToggle(
-                              icon: Icons.accessible,
-                              label: 'Wheelchair access required',
-                              value: _wheelchairAccess,
-                              onChanged: (v) =>
-                                  setState(() => _wheelchairAccess = v),
-                            ),
-                            _PreferenceToggle(
-                              icon: Icons.stairs,
-                              label: 'Step-free routes only',
-                              value: _stepFree,
-                              onChanged: (v) => setState(() => _stepFree = v),
-                            ),
-                            _PreferenceToggle(
-                              icon: Icons.directions_walk,
-                              label: 'Minimize walking distance',
-                              value: _minimizeWalking,
-                              onChanged: (v) =>
-                                  setState(() => _minimizeWalking = v),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        _PreferenceCategory(
-                          title: 'Sensory',
-                          children: [
-                            _PreferenceToggle(
-                              icon: Icons.contrast,
-                              label: 'High contrast mode',
-                              value: _highContrast,
-                              onChanged: (v) =>
-                                  setState(() => _highContrast = v),
-                            ),
-                            _PreferenceToggle(
-                              icon: Icons.volume_up,
-                              label: 'Voice guidance for navigation',
-                              value: _voiceGuidance,
-                              onChanged: (v) =>
-                                  setState(() => _voiceGuidance = v),
-                            ),
-                            _PreferenceToggle(
-                              icon: Icons.vibration,
-                              label: 'Haptic alerts for stops',
-                              value: _hapticAlerts,
-                              onChanged: (v) =>
-                                  setState(() => _hapticAlerts = v),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        _PreferenceCategory(
-                          title: 'Assistance',
-                          children: [
-                            _PreferenceToggle(
-                              icon: Icons.diversity_3,
-                              label: 'Boarding assistance required',
-                              value: _boardingAssistance,
-                              onChanged: (v) =>
-                                  setState(() => _boardingAssistance = v),
-                            ),
-                            _PreferenceToggle(
-                              icon: Icons.hearing_disabled,
-                              label: 'Show quiet routes (lower crowd levels)',
-                              value: _quietRoutes,
-                              onChanged: (v) =>
-                                  setState(() => _quietRoutes = v),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: FilledButton(
-                            onPressed: _save,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.primaryContainer,
-                              foregroundColor: AppColors.onPrimary,
-                              shape: const StadiumBorder(),
-                            ),
-                            child: const Text(
-                              'Save Preferences',
-                              style: TextStyle(
-                                fontSize: 14,
-                                height: 20 / 14,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.1,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      backgroundColor: isHighContrast ? Colors.white : AppColors.surface,
+      appBar: AppBar(
+        backgroundColor: isHighContrast ? Colors.white : AppColors.surface,
+        elevation: isHighContrast ? 1 : 0,
+        leading: IconButton(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          icon: Icon(
+            Icons.arrow_back_rounded,
+            color: isHighContrast ? Colors.black : AppColors.primary,
           ),
-        ],
-      ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : _BottomNav(
-              onHomeTap: widget.continueToHome
-                  ? () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              HomeScreen(initialUser: widget.initialUser),
-                        ),
-                      );
-                    }
-                  : () => Navigator.of(context).pop(),
-              onProfileTap: _openProfile,
-            ),
-    );
-  }
-}
-
-class _MobileTopBar extends StatelessWidget {
-  const _MobileTopBar({required this.onProfile});
-
-  final VoidCallback onProfile;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 1,
-      shadowColor: Colors.black26,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 48,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.menu, color: AppColors.primary),
-                  ),
-                ),
-                const Expanded(
-                  child: Text(
-                    'Access Transit',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      height: 28 / 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: IconButton(
-                    onPressed: onProfile,
-                    icon: const Icon(
-                      Icons.account_circle,
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          onPressed: () => Navigator.of(context).maybePop(),
+          tooltip: 'Back',
+        ),
+        title: Text(
+          'Accessibility Preferences',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: isHighContrast ? Colors.black : AppColors.onSurface,
           ),
         ),
+        actions: [
+          IconButton(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            icon: Icon(
+              Icons.account_circle,
+              color: isHighContrast ? Colors.black : AppColors.primary,
+            ),
+            onPressed: _openProfile,
+            tooltip: 'User profile',
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-    );
-  }
-}
-
-class _DesktopTopBar extends StatelessWidget {
-  const _DesktopTopBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 1,
-      shadowColor: Colors.black26,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 72,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: const Text(
-                'Access Transit',
-                style: TextStyle(
-                  fontSize: 24,
-                  height: 32 / 24,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                isDesktop ? 20 : 12,
+                16,
+                isDesktop ? 32 : 40,
               ),
+              children: [
+                // Header Banner
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isHighContrast
+                        ? Colors.white
+                        : AppColors.primaryContainer.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.primary.withValues(alpha: 0.25),
+                      width: isHighContrast ? 2.0 : 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: isHighContrast
+                            ? const Color(0xFF001F3F)
+                            : AppColors.primary,
+                        child: const Icon(
+                          Icons.accessibility_new_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Personalized Travel Experience',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: isHighContrast
+                                    ? Colors.black
+                                    : AppColors.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'These preferences prioritize ramps, step-free routes, and comfortable transit for your trips.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isHighContrast
+                                    ? const Color(0xFF1A1A1A)
+                                    : AppColors.onSurfaceVariant,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Category 1: Mobility
+                _PreferenceCategory(
+                  title: 'Mobility & Physical Access',
+                  icon: Icons.accessible_rounded,
+                  children: [
+                    _PreferenceToggle(
+                      icon: Icons.accessible,
+                      label: 'Wheelchair access required',
+                      subtitle: 'Only show buses with deployed ramps & designated spaces',
+                      value: _wheelchairAccess,
+                      onChanged: (v) {
+                        setState(() => _wheelchairAccess = v);
+                        AccessibilityPreferencesService.instance.setWheelchairOnly(v);
+                      },
+                    ),
+                    const Divider(height: 1, indent: 64),
+                    _PreferenceToggle(
+                      icon: Icons.stairs,
+                      label: 'Step-free routes only',
+                      subtitle: 'Avoid stops and terminals requiring stairs',
+                      value: _stepFree,
+                      onChanged: (v) {
+                        setState(() => _stepFree = v);
+                        AccessibilityPreferencesService.instance.setStepFree(v);
+                      },
+                    ),
+                    const Divider(height: 1, indent: 64),
+                    _PreferenceToggle(
+                      icon: Icons.directions_walk,
+                      label: 'Minimize walking distance',
+                      subtitle: 'Prioritize connections closest to entry points',
+                      value: _minimizeWalking,
+                      onChanged: (v) {
+                        setState(() => _minimizeWalking = v);
+                        AccessibilityPreferencesService.instance.setMinimizeWalking(v);
+                      },
+                    ),
+                    const Divider(height: 1, indent: 64),
+                    _PreferenceToggle(
+                      icon: Icons.touch_app_rounded,
+                      label: 'Large tap targets (48dp+)',
+                      subtitle: 'Enforce minimum 48dp touch targets across buttons & controls',
+                      value: _hasLargeTargets,
+                      onChanged: (v) {
+                        setState(() => _hasLargeTargets = v);
+                        AccessibilityPreferencesService.instance.setLargeTargets(v);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                // Category 2: Sensory & Vision
+                _PreferenceCategory(
+                  title: 'Sensory & Vision',
+                  icon: Icons.visibility_rounded,
+                  children: [
+                    _PreferenceToggle(
+                      icon: Icons.contrast,
+                      label: 'High contrast mode',
+                      subtitle: 'Enhance text clarity and strong border lines (WCAG AAA)',
+                      value: _highContrast,
+                      onChanged: (v) {
+                        setState(() => _highContrast = v);
+                        AccessibilityPreferencesService.instance.setHighContrast(v);
+                      },
+                    ),
+                    const Divider(height: 1, indent: 64),
+                    _PreferenceToggle(
+                      icon: Icons.volume_up,
+                      label: 'Voice guidance for navigation',
+                      subtitle: 'Spoken stop announcements and transfer cues',
+                      value: _voiceGuidance,
+                      onChanged: (v) {
+                        setState(() => _voiceGuidance = v);
+                        AccessibilityPreferencesService.instance.setVoiceGuidance(v);
+                      },
+                    ),
+                    const Divider(height: 1, indent: 64),
+                    _PreferenceToggle(
+                      icon: Icons.vibration,
+                      label: 'Haptic alerts for stops',
+                      subtitle: 'Vibrate device when approaching destination',
+                      value: _hapticAlerts,
+                      onChanged: (v) {
+                        setState(() => _hapticAlerts = v);
+                        AccessibilityPreferencesService.instance.setHapticAlerts(v);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                // Category 3: Passenger Assistance
+                _PreferenceCategory(
+                  title: 'Assistance & Environment',
+                  icon: Icons.diversity_3,
+                  children: [
+                    _PreferenceToggle(
+                      icon: Icons.front_hand_rounded,
+                      label: 'Boarding assistance required',
+                      subtitle: 'Notify driver in advance to assist with ramp deployment',
+                      value: _boardingAssistance,
+                      onChanged: (v) {
+                        setState(() => _boardingAssistance = v);
+                        AccessibilityPreferencesService.instance.setBoardingAssistance(v);
+                      },
+                    ),
+                    const Divider(height: 1, indent: 64),
+                    _PreferenceToggle(
+                      icon: Icons.hearing_disabled,
+                      label: 'Show quiet routes',
+                      subtitle: 'Prioritize lower crowd levels and quieter transit options',
+                      value: _quietRoutes,
+                      onChanged: (v) {
+                        setState(() => _quietRoutes = v);
+                        AccessibilityPreferencesService.instance.setQuietRoutes(v);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Save Preferences CTA Button (52dp height for easy tapping)
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton.icon(
+                    onPressed: _save,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: isHighContrast
+                          ? const Color(0xFF001F3F)
+                          : AppColors.primary,
+                      foregroundColor: Colors.white,
+                      side: isHighContrast
+                          ? const BorderSide(color: Colors.black, width: 2)
+                          : null,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: isHighContrast ? 0 : 2,
+                    ),
+                    icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
+                    label: const Text(
+                      'Save Preferences',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
             ),
           ),
         ),
@@ -315,43 +383,69 @@ class _DesktopTopBar extends StatelessWidget {
 class _PreferenceCategory extends StatelessWidget {
   const _PreferenceCategory({
     required this.title,
+    required this.icon,
     required this.children,
   });
 
   final String title;
+  final IconData icon;
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast =
+        Theme.of(context).colorScheme.outline == const Color(0xFF000000) ||
+        AccessibilityPreferencesService.instance.isHighContrast;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.surfaceVariant),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+          width: isHighContrast ? 2.0 : 1.0,
+        ),
+        boxShadow: isHighContrast
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              height: 24 / 18,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onSurface,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: isHighContrast ? Colors.black : AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isHighContrast ? Colors.black : AppColors.onSurface,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          const Divider(color: AppColors.surfaceVariant, height: 16),
+          Divider(
+            height: 1,
+            color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+            thickness: isHighContrast ? 1.5 : 1.0,
+          ),
           ...children,
         ],
       ),
@@ -359,60 +453,112 @@ class _PreferenceCategory extends StatelessWidget {
   }
 }
 
+/// Enforces 56dp minimum touch target size (WCAG 2.2 AA compliant, exceeds 48dp).
 class _PreferenceToggle extends StatelessWidget {
   const _PreferenceToggle({
     required this.icon,
     required this.label,
+    required this.subtitle,
     required this.value,
     required this.onChanged,
   });
 
   final IconData icon;
   final String label;
+  final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast =
+        Theme.of(context).colorScheme.outline == const Color(0xFF000000) ||
+        AccessibilityPreferencesService.instance.isHighContrast;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => onChanged(!value),
-        borderRadius: BorderRadius.circular(8),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
+          constraints: const BoxConstraints(minHeight: 56),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(4),
+                    color: isHighContrast
+                        ? (value ? const Color(0xFF001F3F) : const Color(0xFFE5E5E5))
+                        : (value
+                            ? AppColors.primaryContainer.withValues(alpha: 0.25)
+                            : AppColors.surfaceContainer),
+                    borderRadius: BorderRadius.circular(10),
+                    border: isHighContrast
+                        ? Border.all(color: Colors.black, width: 1.5)
+                        : null,
                   ),
-                  child: Icon(icon, color: AppColors.onSurfaceVariant),
+                  child: Icon(
+                    icon,
+                    size: 22,
+                    color: isHighContrast
+                        ? (value ? Colors.white : Colors.black)
+                        : (value ? AppColors.primary : AppColors.onSurfaceVariant),
+                  ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      height: 24 / 16,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.onSurface,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                          color: isHighContrast ? Colors.black : AppColors.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isHighContrast
+                              ? const Color(0xFF1A1A1A)
+                              : AppColors.onSurfaceVariant,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Switch(
-                  value: value,
-                  onChanged: onChanged,
-                  activeThumbColor: AppColors.onPrimary,
-                  activeTrackColor: AppColors.primary,
-                  inactiveThumbColor: AppColors.onSurfaceVariant,
-                  inactiveTrackColor: AppColors.surfaceVariant,
+                const SizedBox(width: 8),
+                Semantics(
+                  label: label,
+                  child: Switch(
+                    value: value,
+                    onChanged: onChanged,
+                    materialTapTargetSize: MaterialTapTargetSize.padded,
+                    activeThumbColor: Colors.white,
+                    activeTrackColor: isHighContrast
+                        ? const Color(0xFF001F3F)
+                        : AppColors.primary,
+                    inactiveThumbColor: isHighContrast
+                        ? Colors.black
+                        : AppColors.onSurfaceVariant,
+                    inactiveTrackColor: isHighContrast
+                        ? const Color(0xFFE5E5E5)
+                        : AppColors.surfaceVariant,
+                    trackOutlineColor: isHighContrast
+                        ? const WidgetStatePropertyAll(Colors.black)
+                        : null,
+                    trackOutlineWidth: isHighContrast
+                        ? const WidgetStatePropertyAll(2.0)
+                        : null,
+                  ),
                 ),
               ],
             ),
@@ -420,124 +566,5 @@ class _PreferenceToggle extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({
-    required this.onHomeTap,
-    this.onProfileTap,
-  });
-
-  final VoidCallback onHomeTap;
-  final VoidCallback? onProfileTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 4,
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            children: [
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.home_outlined,
-                  label: 'Home',
-                  onTap: onHomeTap,
-                ),
-              ),
-              const Expanded(
-                child: _NavItem(
-                  icon: Icons.directions_bus,
-                  label: 'Plan',
-                ),
-              ),
-              const Expanded(
-                child: _NavItem(
-                  icon: Icons.sensors,
-                  label: 'Live',
-                ),
-              ),
-              const Expanded(
-                child: _NavItem(
-                  icon: Icons.group_outlined,
-                  label: 'Community',
-                ),
-              ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.person,
-                  label: 'Profile',
-                  selected: true,
-                  onTap: onProfileTap,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    this.selected = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Padding(
-      padding: selected
-          ? const EdgeInsets.symmetric(horizontal: 12, vertical: 4)
-          : const EdgeInsets.all(8),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: selected
-                ? AppColors.onPrimaryContainer
-                : AppColors.onSurfaceVariant,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              height: 16 / 12,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (selected) {
-      return Center(
-        child: Material(
-          color: AppColors.primaryContainer,
-          borderRadius: BorderRadius.circular(12),
-          child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(12), child: content),
-        ),
-      );
-    }
-
-    return InkWell(onTap: onTap, child: content);
   }
 }

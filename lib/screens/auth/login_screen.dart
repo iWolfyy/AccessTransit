@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/validators.dart';
 import '../../models/enums/user_role.dart';
 import '../../services/auth_service.dart';
@@ -123,8 +124,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
     return Scaffold(
-      backgroundColor: AppColors.surfaceBright,
+      backgroundColor: context.surfaceColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -133,15 +135,18 @@ class _LoginScreenState extends State<LoginScreen> {
               constraints: const BoxConstraints(maxWidth: 448),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLowest,
+                  color: context.cardColor,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x0A000000),
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
+                  border: isHC ? Border.all(color: Colors.black, width: 2) : null,
+                  boxShadow: isHC
+                      ? null
+                      : const [
+                          BoxShadow(
+                            color: Color(0x0A000000),
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(24),
@@ -153,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildHeader(),
+                        _buildHeader(isHC),
                         const SizedBox(height: 24),
                         AuthInputField(
                           controller: _emailController,
@@ -166,17 +171,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           validator: Validators.email,
                         ),
                         const SizedBox(height: 16),
-                        _buildPasswordField(),
+                        _buildPasswordField(isHC),
                         const SizedBox(height: 24),
-                        _buildSignInButton(),
+                        _buildSignInButton(isHC),
                         const SizedBox(height: 24),
-                        _buildDivider(),
+                        _buildDivider(isHC),
                         const SizedBox(height: 24),
-                        _buildBiometricButton(),
+                        _buildBiometricButton(isHC),
                         const SizedBox(height: 8),
-                        _buildGoogleButton(),
+                        _buildGoogleButton(isHC),
                         const SizedBox(height: 24),
-                        _buildSignUpLink(),
+                        _buildSignUpLink(isHC),
                       ],
                     ),
                   ),
@@ -189,10 +194,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isHC) {
     return Column(
       children: [
-        const Hero(
+        Hero(
           tag: 'access-transit-logo',
           child: Material(
             color: Colors.transparent,
@@ -201,12 +206,13 @@ class _LoginScreenState extends State<LoginScreen> {
               height: 64,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: AppColors.primaryContainer,
+                  color: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
                   shape: BoxShape.circle,
+                  border: isHC ? Border.all(color: Colors.black, width: 2) : null,
                 ),
                 child: Icon(
                   Icons.accessible_forward_rounded,
-                  color: AppColors.onPrimaryContainer,
+                  color: isHC ? Colors.white : AppColors.onPrimaryContainer,
                   size: 36,
                 ),
               ),
@@ -214,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'Access Transit',
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -222,39 +228,39 @@ class _LoginScreenState extends State<LoginScreen> {
             height: 40 / 32,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.64,
-            color: AppColors.primary,
+            color: isHC ? Colors.black : AppColors.primary,
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Welcome Back',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 18,
             height: 24 / 18,
             fontWeight: FontWeight.w600,
-            color: AppColors.onSurfaceVariant,
+            color: isHC ? Colors.black : AppColors.onSurfaceVariant,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPasswordField() {
+  Widget _buildPasswordField(bool isHC) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Password',
                 style: TextStyle(
                   fontSize: 14,
                   height: 20 / 14,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
                   letterSpacing: 0.1,
-                  color: AppColors.onSurface,
+                  color: context.textColor,
                 ),
               ),
             ),
@@ -274,14 +280,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                foregroundColor: AppColors.primary,
+                foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
               ),
-              child: const Text(
+              child: Text(
                 'Forgot Password?',
                 style: TextStyle(
                   fontSize: 12,
                   height: 16 / 12,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: isHC ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
             ),
@@ -305,7 +311,7 @@ class _LoginScreenState extends State<LoginScreen> {
               _obscurePassword
                   ? Icons.visibility_off_outlined
                   : Icons.visibility_outlined,
-              color: AppColors.onSurfaceVariant,
+              color: isHC ? Colors.black : AppColors.onSurfaceVariant,
             ),
             tooltip: _obscurePassword ? 'Show password' : 'Hide password',
           ),
@@ -314,17 +320,22 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildSignInButton() {
+  Widget _buildSignInButton(bool isHC) {
     return SizedBox(
       height: 48,
       child: FilledButton(
         onPressed: _isLoading ? null : _login,
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.primaryContainer,
-          foregroundColor: AppColors.onPrimary,
-          disabledBackgroundColor: AppColors.primaryContainer.withValues(alpha: 0.6),
-          disabledForegroundColor: AppColors.onPrimary.withValues(alpha: 0.8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: isHC
+              ? const Color(0xFF001F3F).withValues(alpha: 0.6)
+              : AppColors.primaryContainer.withValues(alpha: 0.6),
+          disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+          ),
           textStyle: const TextStyle(
             fontSize: 18,
             height: 24 / 18,
@@ -337,7 +348,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: 22,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  color: AppColors.onPrimary,
+                  color: Colors.white,
                 ),
               )
             : const Text('Sign In'),
@@ -345,10 +356,16 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildDivider() {
+  Widget _buildDivider(bool isHC) {
     return Row(
       children: [
-        const Expanded(child: Divider(color: AppColors.outlineVariant, height: 1)),
+        Expanded(
+          child: Divider(
+            color: isHC ? Colors.black : AppColors.outlineVariant,
+            thickness: isHC ? 1.5 : 1,
+            height: 1,
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
@@ -356,17 +373,23 @@ class _LoginScreenState extends State<LoginScreen> {
             style: TextStyle(
               fontSize: 12,
               height: 16 / 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.onSurfaceVariant.withValues(alpha: 0.9),
+              fontWeight: isHC ? FontWeight.w700 : FontWeight.w500,
+              color: isHC ? Colors.black : AppColors.onSurfaceVariant.withValues(alpha: 0.9),
             ),
           ),
         ),
-        const Expanded(child: Divider(color: AppColors.outlineVariant, height: 1)),
+        Expanded(
+          child: Divider(
+            color: isHC ? Colors.black : AppColors.outlineVariant,
+            thickness: isHC ? 1.5 : 1,
+            height: 1,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildBiometricButton() {
+  Widget _buildBiometricButton(bool isHC) {
     return SizedBox(
       height: 48,
       child: OutlinedButton.icon(
@@ -374,13 +397,17 @@ class _LoginScreenState extends State<LoginScreen> {
         icon: const Icon(Icons.fingerprint_rounded, size: 22),
         label: const Text('Sign in with Biometrics'),
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primaryContainer,
-          side: const BorderSide(color: AppColors.primaryContainer, width: 2),
+          backgroundColor: isHC ? Colors.white : null,
+          foregroundColor: isHC ? Colors.black : AppColors.primaryContainer,
+          side: BorderSide(
+            color: isHC ? Colors.black : AppColors.primaryContainer,
+            width: 2,
+          ),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: const TextStyle(
+          textStyle: TextStyle(
             fontSize: 14,
             height: 20 / 14,
-            fontWeight: FontWeight.w600,
+            fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
             letterSpacing: 0.1,
           ),
         ),
@@ -388,7 +415,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildGoogleButton() {
+  Widget _buildGoogleButton(bool isHC) {
     return SizedBox(
       height: 48,
       child: OutlinedButton.icon(
@@ -396,13 +423,17 @@ class _LoginScreenState extends State<LoginScreen> {
         icon: const _GoogleLogo(size: 20),
         label: const Text('Sign in with Google'),
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.onSurface,
-          side: const BorderSide(color: AppColors.outlineVariant),
+          backgroundColor: isHC ? Colors.white : null,
+          foregroundColor: isHC ? Colors.black : AppColors.onSurface,
+          side: BorderSide(
+            color: isHC ? Colors.black : AppColors.outlineVariant,
+            width: isHC ? 2 : 1,
+          ),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: const TextStyle(
+          textStyle: TextStyle(
             fontSize: 14,
             height: 20 / 14,
-            fontWeight: FontWeight.w600,
+            fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
             letterSpacing: 0.1,
           ),
         ),
@@ -410,17 +441,17 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildSignUpLink() {
+  Widget _buildSignUpLink(bool isHC) {
     return Wrap(
       alignment: WrapAlignment.center,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Text(
+        Text(
           'Don\'t have an account?',
           style: TextStyle(
             fontSize: 14,
             height: 20 / 14,
-            color: AppColors.onSurface,
+            color: context.textColor,
           ),
         ),
         TextButton(
@@ -432,17 +463,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   );
                 },
           style: TextButton.styleFrom(
-            foregroundColor: AppColors.primary,
+            foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
             padding: const EdgeInsets.symmetric(horizontal: 4),
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          child: const Text(
+          child: Text(
             'Sign up',
             style: TextStyle(
               fontSize: 14,
               height: 20 / 14,
-              fontWeight: FontWeight.w600,
+              fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
               letterSpacing: 0.1,
             ),
           ),

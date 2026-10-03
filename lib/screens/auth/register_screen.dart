@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/validators.dart';
 import '../../models/enums/user_role.dart';
 import '../../services/auth_service.dart';
@@ -215,12 +216,13 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
     return Scaffold(
-      backgroundColor: AppColors.surfaceBright,
+      backgroundColor: context.surfaceColor,
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeaderBar(),
+            _buildHeaderBar(isHC),
             Expanded(
               child: Center(
                 child: SingleChildScrollView(
@@ -238,7 +240,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _staggered(0, _buildTitleSection()),
+                          _staggered(0, _buildTitleSection(isHC)),
                           const SizedBox(height: 24),
                           _staggered(1, _buildNameField()),
                           const SizedBox(height: 16),
@@ -248,17 +250,17 @@ class _RegisterScreenState extends State<RegisterScreen>
                           const SizedBox(height: 16),
                           _staggered(4, _buildConfirmPasswordField()),
                           const SizedBox(height: 8),
-                          _staggered(5, _buildAccessibilityCheckbox()),
+                          _staggered(5, _buildAccessibilityCheckbox(isHC)),
                           const SizedBox(height: 16),
-                          _staggered(6, _buildRoleSelector()),
+                          _staggered(6, _buildRoleSelector(isHC)),
                           const SizedBox(height: 24),
-                          _staggered(7, _buildCreateAccountButton()),
+                          _staggered(7, _buildCreateAccountButton(isHC)),
                           const SizedBox(height: 24),
-                          _staggered(7, _buildDivider()),
+                          _staggered(7, _buildDivider(isHC)),
                           const SizedBox(height: 16),
-                          _staggered(8, _buildSocialButtons()),
+                          _staggered(8, _buildSocialButtons(isHC)),
                           const SizedBox(height: 24),
-                          _staggered(8, _buildLoginLink()),
+                          _staggered(8, _buildLoginLink(isHC)),
                         ],
                       ),
                     ),
@@ -272,12 +274,15 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  Widget _buildHeaderBar() {
+  Widget _buildHeaderBar(bool isHC) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceBright,
+      decoration: BoxDecoration(
+        color: context.surfaceColor,
         border: Border(
-          bottom: BorderSide(color: AppColors.outlineVariant),
+          bottom: BorderSide(
+            color: isHC ? Colors.black : AppColors.outlineVariant,
+            width: isHC ? 2 : 1,
+          ),
         ),
       ),
       child: SizedBox(
@@ -287,18 +292,18 @@ class _RegisterScreenState extends State<RegisterScreen>
             IconButton(
               onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
               icon: const Icon(Icons.arrow_back_rounded),
-              color: AppColors.onSurface,
+              color: context.textColor,
               tooltip: 'Go back',
             ),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Register',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 18,
                   height: 24 / 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.onSurface,
+                  fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
+                  color: context.textColor,
                 ),
               ),
             ),
@@ -309,10 +314,10 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  Widget _buildTitleSection() {
+  Widget _buildTitleSection(bool isHC) {
     return Column(
       children: [
-        const Text(
+        Text(
           'Join Access Transit',
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -320,7 +325,7 @@ class _RegisterScreenState extends State<RegisterScreen>
             height: 40 / 32,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.64,
-            color: AppColors.onSurface,
+            color: context.textColor,
           ),
         ),
         const SizedBox(height: 8),
@@ -330,7 +335,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           style: TextStyle(
             fontSize: 16,
             height: 24 / 16,
-            color: AppColors.onSurfaceVariant.withValues(alpha: 0.95),
+            fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
+            color: isHC ? Colors.black : AppColors.onSurfaceVariant.withValues(alpha: 0.95),
           ),
         ),
       ],
@@ -414,8 +420,8 @@ class _RegisterScreenState extends State<RegisterScreen>
         },
         icon: Icon(
           _obscureConfirmPassword
-              ? Icons.visibility_outlined
-              : Icons.visibility_off_outlined,
+            ? Icons.visibility_outlined
+            : Icons.visibility_off_outlined,
           color: AppColors.onSurfaceVariant,
           size: 20,
         ),
@@ -424,7 +430,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  Widget _buildAccessibilityCheckbox() {
+  Widget _buildAccessibilityCheckbox(bool isHC) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -441,10 +447,13 @@ class _RegisterScreenState extends State<RegisterScreen>
           curve: Curves.easeOutCubic,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
-            color: _hasAccessibilityNeeds
-                ? AppColors.surfaceContainer.withValues(alpha: 0.6)
-                : Colors.transparent,
+            color: isHC
+                ? (_hasAccessibilityNeeds ? const Color(0xFFE6F0FA) : Colors.white)
+                : (_hasAccessibilityNeeds
+                    ? AppColors.surfaceContainer.withValues(alpha: 0.6)
+                    : Colors.transparent),
             borderRadius: BorderRadius.circular(12),
+            border: isHC ? Border.all(color: Colors.black, width: 2) : null,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,14 +465,18 @@ class _RegisterScreenState extends State<RegisterScreen>
                 height: 24,
                 margin: const EdgeInsets.only(top: 4),
                 decoration: BoxDecoration(
-                  color: _hasAccessibilityNeeds
-                      ? AppColors.primary
-                      : Colors.transparent,
+                  color: isHC
+                      ? (_hasAccessibilityNeeds ? const Color(0xFF001F3F) : Colors.white)
+                      : (_hasAccessibilityNeeds
+                          ? AppColors.primary
+                          : Colors.transparent),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: _hasAccessibilityNeeds
-                        ? AppColors.primary
-                        : AppColors.outline,
+                    color: isHC
+                        ? Colors.black
+                        : (_hasAccessibilityNeeds
+                            ? AppColors.primary
+                            : AppColors.outline),
                     width: 2,
                   ),
                 ),
@@ -474,7 +487,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                   child: const Icon(
                     Icons.check_rounded,
                     size: 16,
-                    color: AppColors.onPrimary,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -483,14 +496,14 @@ class _RegisterScreenState extends State<RegisterScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'I have specific accessibility needs',
                       style: TextStyle(
                         fontSize: 14,
                         height: 20 / 14,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
                         letterSpacing: 0.1,
-                        color: AppColors.onSurface,
+                        color: context.textColor,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -499,7 +512,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                       style: TextStyle(
                         fontSize: 14,
                         height: 20 / 14,
-                        color: AppColors.onSurfaceVariant.withValues(alpha: 0.9),
+                        fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
+                        color: isHC ? Colors.black : AppColors.onSurfaceVariant.withValues(alpha: 0.9),
                       ),
                     ),
                   ],
@@ -512,18 +526,18 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  Widget _buildRoleSelector() {
+  Widget _buildRoleSelector(bool isHC) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Account Type',
           style: TextStyle(
             fontSize: 14,
             height: 20 / 14,
-            fontWeight: FontWeight.w600,
+            fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
             letterSpacing: 0.1,
-            color: AppColors.onSurface,
+            color: context.textColor,
           ),
         ),
         const SizedBox(height: 8),
@@ -535,6 +549,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 subtitle: 'Plan accessible journeys',
                 icon: Icons.directions_transit_rounded,
                 isSelected: _selectedRole == UserRole.passenger,
+                isHC: isHC,
                 onTap: _isLoading
                     ? null
                     : () => setState(() => _selectedRole = UserRole.passenger),
@@ -547,6 +562,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 subtitle: 'Report conditions',
                 icon: Icons.report_outlined,
                 isSelected: _selectedRole == UserRole.contributor,
+                isHC: isHC,
                 onTap: _isLoading
                     ? null
                     : () =>
@@ -560,6 +576,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 subtitle: 'Broadcast live GPS',
                 icon: Icons.directions_bus,
                 isSelected: _selectedRole == UserRole.operator,
+                isHC: isHC,
                 onTap: _isLoading
                     ? null
                     : () => setState(() => _selectedRole = UserRole.operator),
@@ -571,7 +588,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  Widget _buildCreateAccountButton() {
+  Widget _buildCreateAccountButton(bool isHC) {
     return GestureDetector(
       onTapDown: _isLoading
           ? null
@@ -587,17 +604,18 @@ class _RegisterScreenState extends State<RegisterScreen>
           child: FilledButton(
             onPressed: _isLoading ? null : _register,
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primaryContainer,
-              foregroundColor: AppColors.onPrimary,
-              disabledBackgroundColor:
-                  AppColors.primaryContainer.withValues(alpha: 0.6),
-              disabledForegroundColor:
-                  AppColors.onPrimary.withValues(alpha: 0.8),
+              backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: isHC
+                  ? const Color(0xFF001F3F).withValues(alpha: 0.6)
+                  : AppColors.primaryContainer.withValues(alpha: 0.6),
+              disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
+                side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
               ),
-              elevation: 1,
-              shadowColor: AppColors.primary.withValues(alpha: 0.2),
+              elevation: isHC ? 0 : 1,
+              shadowColor: isHC ? null : AppColors.primary.withValues(alpha: 0.2),
               textStyle: const TextStyle(
                 fontSize: 14,
                 height: 20 / 14,
@@ -611,7 +629,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                     height: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      color: AppColors.onPrimary,
+                      color: Colors.white,
                     ),
                   )
                 : const Row(
@@ -628,11 +646,15 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  Widget _buildDivider() {
+  Widget _buildDivider(bool isHC) {
     return Row(
       children: [
-        const Expanded(
-          child: Divider(color: AppColors.outlineVariant, height: 1),
+        Expanded(
+          child: Divider(
+            color: isHC ? Colors.black : AppColors.outlineVariant,
+            thickness: isHC ? 1.5 : 1,
+            height: 1,
+          ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -641,20 +663,24 @@ class _RegisterScreenState extends State<RegisterScreen>
             style: TextStyle(
               fontSize: 12,
               height: 16 / 12,
-              fontWeight: FontWeight.w500,
+              fontWeight: isHC ? FontWeight.w700 : FontWeight.w500,
               letterSpacing: 1.2,
-              color: AppColors.onSurfaceVariant.withValues(alpha: 0.9),
+              color: isHC ? Colors.black : AppColors.onSurfaceVariant.withValues(alpha: 0.9),
             ),
           ),
         ),
-        const Expanded(
-          child: Divider(color: AppColors.outlineVariant, height: 1),
+        Expanded(
+          child: Divider(
+            color: isHC ? Colors.black : AppColors.outlineVariant,
+            thickness: isHC ? 1.5 : 1,
+            height: 1,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildSocialButtons() {
+  Widget _buildSocialButtons(bool isHC) {
     return Column(
       children: [
         SizedBox(
@@ -665,15 +691,16 @@ class _RegisterScreenState extends State<RegisterScreen>
             icon: const _GoogleLogo(size: 20),
             label: const Text('Sign up with Google'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.onSurface,
-              side: const BorderSide(color: AppColors.outline),
+              backgroundColor: isHC ? Colors.white : null,
+              foregroundColor: isHC ? Colors.black : AppColors.onSurface,
+              side: BorderSide(color: isHC ? Colors.black : AppColors.outline, width: isHC ? 2 : 1),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
               ),
-              textStyle: const TextStyle(
+              textStyle: TextStyle(
                 fontSize: 14,
                 height: 20 / 14,
-                fontWeight: FontWeight.w600,
+                fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
                 letterSpacing: 0.1,
               ),
             ),
@@ -685,18 +712,19 @@ class _RegisterScreenState extends State<RegisterScreen>
           child: OutlinedButton.icon(
             onPressed:
                 _isLoading ? null : () => _showComingSoon('Apple sign-up'),
-            icon: const Icon(Icons.apple, size: 22),
+            icon: Icon(Icons.apple, size: 22, color: isHC ? Colors.black : null),
             label: const Text('Sign up with Apple'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.onSurface,
-              side: const BorderSide(color: AppColors.outline),
+              backgroundColor: isHC ? Colors.white : null,
+              foregroundColor: isHC ? Colors.black : AppColors.onSurface,
+              side: BorderSide(color: isHC ? Colors.black : AppColors.outline, width: isHC ? 2 : 1),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
               ),
-              textStyle: const TextStyle(
+              textStyle: TextStyle(
                 fontSize: 14,
                 height: 20 / 14,
-                fontWeight: FontWeight.w600,
+                fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
                 letterSpacing: 0.1,
               ),
             ),
@@ -706,7 +734,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  Widget _buildLoginLink() {
+  Widget _buildLoginLink(bool isHC) {
     return Wrap(
       alignment: WrapAlignment.center,
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -716,7 +744,7 @@ class _RegisterScreenState extends State<RegisterScreen>
           style: TextStyle(
             fontSize: 16,
             height: 24 / 16,
-            color: AppColors.onSurfaceVariant.withValues(alpha: 0.95),
+            color: context.textColor,
           ),
         ),
         TextButton(
@@ -728,17 +756,17 @@ class _RegisterScreenState extends State<RegisterScreen>
                   );
                 },
           style: TextButton.styleFrom(
-            foregroundColor: AppColors.primary,
+            foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
             padding: const EdgeInsets.symmetric(horizontal: 4),
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          child: const Text(
+          child: Text(
             'Log in',
             style: TextStyle(
               fontSize: 16,
               height: 24 / 16,
-              fontWeight: FontWeight.w700,
+              fontWeight: isHC ? FontWeight.w800 : FontWeight.w700,
             ),
           ),
         ),
@@ -753,6 +781,7 @@ class _RoleCard extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.isSelected,
+    this.isHC = false,
     required this.onTap,
   });
 
@@ -760,6 +789,7 @@ class _RoleCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final bool isSelected;
+  final bool isHC;
   final VoidCallback? onTap;
 
   @override
@@ -768,14 +798,18 @@ class _RoleCard extends StatelessWidget {
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
       child: Material(
-        color: isSelected
-            ? AppColors.primaryContainer.withValues(alpha: 0.12)
-            : AppColors.surfaceContainerLowest,
+        color: isHC
+            ? (isSelected ? const Color(0xFFE6F0FA) : Colors.white)
+            : (isSelected
+                ? AppColors.primaryContainer.withValues(alpha: 0.12)
+                : AppColors.surfaceContainerLowest),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
-            color: isSelected ? AppColors.primaryContainer : AppColors.outlineVariant,
-            width: isSelected ? 2 : 1,
+            color: isHC
+                ? (isSelected ? const Color(0xFF001F3F) : Colors.black)
+                : (isSelected ? AppColors.primaryContainer : AppColors.outlineVariant),
+            width: isHC ? 2 : (isSelected ? 2 : 1),
           ),
         ),
         child: InkWell(
@@ -790,17 +824,27 @@ class _RoleCard extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.primaryContainer
-                        : AppColors.surfaceContainer,
+                    color: isHC
+                        ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
+                        : (isSelected
+                            ? AppColors.primaryContainer
+                            : AppColors.surfaceContainer),
                     shape: BoxShape.circle,
+                    border: isHC
+                        ? Border.all(
+                            color: Colors.black,
+                            width: isSelected ? 2 : 1.5,
+                          )
+                        : null,
                   ),
                   child: Icon(
                     icon,
                     size: 20,
-                    color: isSelected
-                        ? AppColors.onPrimary
-                        : AppColors.onSurfaceVariant,
+                    color: isHC
+                        ? (isSelected ? Colors.white : Colors.black)
+                        : (isSelected
+                            ? AppColors.onPrimary
+                            : AppColors.onSurfaceVariant),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -809,20 +853,23 @@ class _RoleCard extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected
-                        ? AppColors.primary
-                        : AppColors.onSurface,
+                    fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
+                    color: isHC
+                        ? (isSelected ? const Color(0xFF001F3F) : Colors.black)
+                        : (isSelected
+                            ? AppColors.primary
+                            : AppColors.onSurface),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     height: 14 / 11,
-                    color: AppColors.onSurfaceVariant,
+                    fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
+                    color: isHC ? Colors.black : AppColors.onSurfaceVariant,
                   ),
                 ),
               ],

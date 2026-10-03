@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 
 /// Digital Membership Card — QR, points, member benefits.
 class MembershipCardScreen extends StatelessWidget {
@@ -29,26 +29,14 @@ class MembershipCardScreen extends StatelessWidget {
   static const _qrImageUrl =
       'https://lh3.googleusercontent.com/aida-public/AB6AXuD2EQGr3mG0xmxMRtptwz2DxqjbTc0HOrxCPch-Fo9geg1Pw_IJ3nmXV-UPsNBAgZvJSJfKqLABsvPK1_RVKKh4mh5_ac6pmS3PwobkhPwvmSVN_TrRFeN6i0f-seR7xHBdv__RERvnbGphw-h9qeTu_cj9Z80Izax_vDtRyTsRzf-ByxyLP7tPOWf6Ld66B3PhHmIH6sO5eNryEaDB-RNoST4MMKNhZvUzhaMhZCRo1FbmMscPpjX0YA';
 
-  void _showSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  void _onNavTap(BuildContext context, String label) {
-    AppNavigation.handleBottomNav(
-      context,
-      label,
-      onUnsupported: (message) => _showSnack(context, message),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+    final isHC = context.isHighContrast;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       body: Column(
         children: [
           _TopBar(onBack: () => Navigator.of(context).maybePop()),
@@ -83,8 +71,13 @@ class MembershipCardScreen extends StatelessWidget {
                           child: FilledButton.icon(
                             onPressed: () => Navigator.of(context).maybePop(),
                             style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.primaryContainer,
-                              foregroundColor: AppColors.onPrimaryContainer,
+                              backgroundColor: isHC
+                                  ? const Color(0xFF001F3F)
+                                  : AppColors.primaryContainer,
+                              foregroundColor: AppColors.onPrimary,
+                              side: isHC
+                                  ? const BorderSide(color: Colors.black, width: 2)
+                                  : null,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -108,11 +101,7 @@ class MembershipCardScreen extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : _MembershipBottomNav(
-              onNavTap: (label) => _onNavTap(context, label),
-            ),
+      bottomNavigationBar: null,
     );
   }
 }
@@ -124,10 +113,15 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
+
     return Material(
-      color: AppColors.surface,
-      elevation: 1,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
+      color: isHC ? Colors.white : AppColors.surface,
+      elevation: isHC ? 0 : 1,
+      shadowColor: isHC ? null : AppColors.onSurface.withValues(alpha: 0.08),
+      shape: isHC
+          ? const Border(bottom: BorderSide(color: Colors.black, width: 2))
+          : null,
       child: SafeArea(
         bottom: false,
         child: SizedBox(
@@ -139,9 +133,12 @@ class _TopBar extends StatelessWidget {
                 IconButton(
                   onPressed: onBack,
                   tooltip: 'Back',
-                  icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+                  icon: Icon(
+                    Icons.arrow_back,
+                    color: isHC ? Colors.black : AppColors.primary,
+                  ),
                 ),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Digital Membership Card',
                     textAlign: TextAlign.center,
@@ -151,7 +148,7 @@ class _TopBar extends StatelessWidget {
                       fontSize: 22,
                       height: 28 / 22,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: isHC ? Colors.black : AppColors.primary,
                     ),
                   ),
                 ),
@@ -189,34 +186,42 @@ class _MembershipCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.sizeOf(context).width >= 768;
+    final isHC = context.isHighContrast;
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.surfaceContainer),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        border: isHC
+            ? Border.all(color: Colors.black, width: 2)
+            : Border.all(color: AppColors.surfaceContainer),
+        boxShadow: isHC
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           Container(
-            height: 8,
+            height: isHC ? 4 : 8,
             width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.secondaryContainer,
-                  AppColors.primary,
-                  AppColors.primaryContainer,
-                ],
-              ),
+            decoration: BoxDecoration(
+              color: isHC ? const Color(0xFF001F3F) : null,
+              gradient: isHC
+                  ? null
+                  : const LinearGradient(
+                      colors: [
+                        AppColors.secondaryContainer,
+                        AppColors.primary,
+                        AppColors.primaryContainer,
+                      ],
+                    ),
             ),
           ),
           Padding(
@@ -230,14 +235,14 @@ class _MembershipCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
                             children: [
                               Icon(
                                 Icons.directions_bus,
-                                color: AppColors.primary,
+                                color: isHC ? Colors.black : AppColors.primary,
                                 size: 20,
                               ),
-                              SizedBox(width: 4),
+                              const SizedBox(width: 4),
                               Text(
                                 'ACCESS TRANSIT',
                                 style: TextStyle(
@@ -245,7 +250,7 @@ class _MembershipCard extends StatelessWidget {
                                   height: 16 / 12,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 1.2,
-                                  color: AppColors.primary,
+                                  color: isHC ? Colors.black : AppColors.primary,
                                 ),
                               ),
                             ],
@@ -253,12 +258,12 @@ class _MembershipCard extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             memberName.toUpperCase(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 32,
                               height: 40 / 32,
                               fontWeight: FontWeight.w700,
                               letterSpacing: -0.64,
-                              color: AppColors.onSurface,
+                              color: context.textColor,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -268,25 +273,34 @@ class _MembershipCard extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.secondaryContainer,
+                              color: isHC
+                                  ? Colors.white
+                                  : AppColors.secondaryContainer,
                               borderRadius: BorderRadius.circular(999),
+                              border: isHC
+                                  ? Border.all(color: Colors.black, width: 1.5)
+                                  : null,
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.workspace_premium,
                                   size: 16,
-                                  color: AppColors.onSecondaryContainer,
+                                  color: isHC
+                                      ? Colors.black
+                                      : AppColors.onSecondaryContainer,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   memberTier,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
                                     height: 16 / 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.onSecondaryContainer,
+                                    fontWeight: FontWeight.w600,
+                                    color: isHC
+                                        ? Colors.black
+                                        : AppColors.onSecondaryContainer,
                                   ),
                                 ),
                               ],
@@ -305,8 +319,11 @@ class _MembershipCard extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: tertiaryFixed,
+                            color: isHC ? Colors.white : tertiaryFixed,
                             borderRadius: BorderRadius.circular(8),
+                            border: isHC
+                                ? Border.all(color: Colors.black, width: 1.5)
+                                : null,
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -314,7 +331,7 @@ class _MembershipCard extends StatelessWidget {
                               Icon(
                                 Icons.handshake,
                                 size: 16,
-                                color: onTertiaryFixed,
+                                color: isHC ? Colors.black : onTertiaryFixed,
                               ),
                               const SizedBox(width: 4),
                               Text(
@@ -322,8 +339,8 @@ class _MembershipCard extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 12,
                                   height: 16 / 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: onTertiaryFixed,
+                                  fontWeight: FontWeight.w600,
+                                  color: isHC ? Colors.black : onTertiaryFixed,
                                 ),
                               ),
                             ],
@@ -332,11 +349,13 @@ class _MembershipCard extends StatelessWidget {
                         const SizedBox(height: 12),
                         Text(
                           '$points Points',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             height: 24 / 18,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                            color: isHC
+                                ? const Color(0xFF001F3F)
+                                : AppColors.primary,
                           ),
                         ),
                       ],
@@ -348,24 +367,32 @@ class _MembershipCard extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLow,
+                    color: isHC ? Colors.white : AppColors.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.surfaceVariant),
+                    border: Border.all(
+                      color: isHC ? Colors.black : AppColors.surfaceVariant,
+                      width: isHC ? 2 : 1,
+                    ),
                   ),
                   child: Column(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLowest,
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.outlineVariant),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 4,
-                            ),
-                          ],
+                          border: Border.all(
+                            color: isHC ? Colors.black : AppColors.outlineVariant,
+                            width: isHC ? 2 : 1,
+                          ),
+                          boxShadow: isHC
+                              ? null
+                              : [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.04),
+                                    blurRadius: 4,
+                                  ),
+                                ],
                         ),
                         child: Image.network(
                           qrImageUrl,
@@ -386,25 +413,25 @@ class _MembershipCard extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         'ID: $memberId',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           height: 20 / 14,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           fontFamily: 'monospace',
                           letterSpacing: 2,
-                          color: AppColors.onSurfaceVariant,
+                          color: context.textColor,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 24),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Text(
                           'Scan at participating partner locations or transit hubs.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
                             height: 20 / 14,
-                            color: AppColors.outline,
+                            color: context.subtextColor,
                           ),
                         ),
                       ),
@@ -460,6 +487,7 @@ class _BenefitsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
     final benefits = [
       (
         Icons.loyalty,
@@ -487,30 +515,36 @@ class _BenefitsSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: isHC ? Border.all(color: Colors.black, width: 2) : null,
+        boxShadow: isHC
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Member Benefits',
             style: TextStyle(
               fontSize: 18,
               height: 24 / 18,
               fontWeight: FontWeight.w600,
-              color: AppColors.onSurface,
+              color: context.textColor,
             ),
           ),
           const SizedBox(height: 8),
-          const Divider(height: 1, color: AppColors.surfaceVariant),
+          Divider(
+            height: 1,
+            color: isHC ? Colors.black : AppColors.surfaceVariant,
+          ),
           const SizedBox(height: 8),
           for (var i = 0; i < benefits.length; i++) ...[
             if (i > 0) const SizedBox(height: 8),
@@ -545,6 +579,8 @@ class _BenefitRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
+
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 64),
       child: Padding(
@@ -556,10 +592,15 @@ class _BenefitRow extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: iconBg,
+                color: isHC ? Colors.white : iconBg,
                 shape: BoxShape.circle,
+                border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
               ),
-              child: Icon(icon, color: iconColor, size: 22),
+              child: Icon(
+                icon,
+                color: isHC ? Colors.black : iconColor,
+                size: 22,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -568,19 +609,19 @@ class _BenefitRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       height: 24 / 18,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.onSurface,
+                      color: context.textColor,
                     ),
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       height: 20 / 14,
-                      color: AppColors.onSurfaceVariant,
+                      color: context.subtextColor,
                     ),
                   ),
                 ],
@@ -594,108 +635,3 @@ class _BenefitRow extends StatelessWidget {
 }
 
 /// App-standard nav: Home → Plan → Live → Community → Profile.
-class _MembershipBottomNav extends StatelessWidget {
-  const _MembershipBottomNav({required this.onNavTap});
-
-  final ValueChanged<String> onNavTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 8,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_outlined,
-                label: 'Home',
-                onTap: () => onNavTap('Home'),
-              ),
-              _NavItem(
-                icon: Icons.directions_bus_outlined,
-                label: 'Plan',
-                onTap: () => onNavTap('Plan'),
-              ),
-              _NavItem(
-                icon: Icons.sensors,
-                label: 'Live',
-                onTap: () => onNavTap('Live'),
-              ),
-              _NavItem(
-                icon: Icons.group_outlined,
-                label: 'Community',
-                onTap: () => onNavTap('Community'),
-              ),
-              _NavItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                selected: true,
-                onTap: () => onNavTap('Profile'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.selected = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 64,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: selected
-            ? BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                height: 16 / 12,
-                color: selected
-                    ? AppColors.onPrimaryContainer
-                    : AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import 'transit_preview.dart';
 
 /// Onboarding step 2: live updates and boarding assistance.
@@ -187,17 +188,18 @@ class _NavigateWithConfidencePageState extends State<NavigateWithConfidencePage>
                     fontSize: wide ? 24 : 22,
                     height: wide ? 32 / 24 : 28 / 22,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                    color: context.textColor,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Get real-time updates and request boarding assistance directly from the app for a stress-free journey.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
                     height: 24 / 16,
-                    color: AppColors.onSurfaceVariant,
+                    fontWeight: context.isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                    color: context.isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
                   ),
                 ),
               ],

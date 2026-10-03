@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/validators.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth/auth_input_field.dart';
@@ -183,12 +184,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
     return Scaffold(
-      backgroundColor: AppColors.surfaceBright,
+      backgroundColor: context.surfaceColor,
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeaderBar(),
+            _buildHeaderBar(isHC),
             Expanded(
               child: Center(
                 child: SingleChildScrollView(
@@ -197,15 +199,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
                     constraints: const BoxConstraints(maxWidth: 448),
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerLowest,
+                        color: context.cardColor,
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.onSurface.withValues(alpha: 0.08),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        border: isHC ? Border.all(color: Colors.black, width: 2) : null,
+                        boxShadow: isHC
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: AppColors.onSurface.withValues(alpha: 0.08),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(24),
@@ -217,15 +222,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _staggered(0, _buildTitleSection()),
+                              _staggered(0, _buildTitleSection(isHC)),
                               const SizedBox(height: 32),
                               _staggered(1, _buildPasswordField()),
                               const SizedBox(height: 16),
                               _staggered(2, _buildConfirmPasswordField()),
                               const SizedBox(height: 16),
-                              _staggered(3, _buildSecurityNote()),
+                              _staggered(3, _buildSecurityNote(isHC)),
                               const SizedBox(height: 24),
-                              _staggered(4, _buildResetButton()),
+                              _staggered(4, _buildResetButton(isHC)),
                             ],
                           ),
                         ),
@@ -241,20 +246,25 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
     );
   }
 
-  Widget _buildHeaderBar() {
+  Widget _buildHeaderBar(bool isHC) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceBright,
-        border: const Border(
-          bottom: BorderSide(color: AppColors.outlineVariant),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
+        color: context.surfaceColor,
+        border: Border(
+          bottom: BorderSide(
+            color: isHC ? Colors.black : AppColors.outlineVariant,
+            width: isHC ? 2 : 1,
           ),
-        ],
+        ),
+        boxShadow: isHC
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.onSurface.withValues(alpha: 0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
       ),
       child: SizedBox(
         height: 56,
@@ -271,10 +281,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
                       );
                     },
               icon: const Icon(Icons.arrow_back_rounded),
-              color: AppColors.primary,
+              color: isHC ? Colors.black : AppColors.primary,
               tooltip: 'Go back',
             ),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Reset Password',
                 textAlign: TextAlign.center,
@@ -283,7 +293,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
                   height: 28 / 22,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.2,
-                  color: AppColors.primary,
+                  color: isHC ? Colors.black : AppColors.primary,
                 ),
               ),
             ),
@@ -294,17 +304,17 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
     );
   }
 
-  Widget _buildTitleSection() {
+  Widget _buildTitleSection(bool isHC) {
     return Column(
       children: [
-        const Text(
+        Text(
           'Create New Password',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 24,
             height: 32 / 24,
             fontWeight: FontWeight.w700,
-            color: AppColors.primary,
+            color: context.textColor,
           ),
         ),
         const SizedBox(height: 8),
@@ -314,7 +324,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
           style: TextStyle(
             fontSize: 14,
             height: 20 / 14,
-            color: AppColors.onSurfaceVariant.withValues(alpha: 0.95),
+            fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
+            color: isHC ? Colors.black : AppColors.onSurfaceVariant.withValues(alpha: 0.95),
           ),
         ),
       ],
@@ -388,14 +399,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
     );
   }
 
-  Widget _buildSecurityNote() {
+  Widget _buildSecurityNote(bool isHC) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Icon(
           Icons.verified_user_outlined,
           size: 16,
-          color: AppColors.secondary.withValues(alpha: 0.9),
+          color: isHC
+              ? const Color(0xFF003833)
+              : AppColors.secondary.withValues(alpha: 0.9),
         ),
         const SizedBox(width: 6),
         Text(
@@ -403,15 +416,17 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
           style: TextStyle(
             fontSize: 12,
             height: 16 / 12,
-            fontWeight: FontWeight.w500,
-            color: AppColors.secondary.withValues(alpha: 0.95),
+            fontWeight: isHC ? FontWeight.w700 : FontWeight.w500,
+            color: isHC
+                ? const Color(0xFF003833)
+                : AppColors.secondary.withValues(alpha: 0.95),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildResetButton() {
+  Widget _buildResetButton(bool isHC) {
     return GestureDetector(
       onTapDown: _isLoading ? null : (_) => _buttonScaleController.forward(),
       onTapUp: _isLoading ? null : (_) => _buttonScaleController.reverse(),
@@ -423,17 +438,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
           child: FilledButton(
             onPressed: _isLoading ? null : _resetPassword,
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primaryContainer,
-              foregroundColor: AppColors.onPrimary,
-              disabledBackgroundColor:
-                  AppColors.primaryContainer.withValues(alpha: 0.6),
-              disabledForegroundColor:
-                  AppColors.onPrimary.withValues(alpha: 0.8),
+              backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: isHC
+                  ? const Color(0xFF001F3F).withValues(alpha: 0.6)
+                  : AppColors.primaryContainer.withValues(alpha: 0.6),
+              disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
+                side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
               ),
-              elevation: 1,
-              shadowColor: AppColors.primary.withValues(alpha: 0.15),
+              elevation: isHC ? 0 : 1,
+              shadowColor: isHC ? null : AppColors.primary.withValues(alpha: 0.15),
               textStyle: const TextStyle(
                 fontSize: 14,
                 height: 20 / 14,
@@ -447,7 +463,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
                     height: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      color: AppColors.onPrimary,
+                      color: Colors.white,
                     ),
                   )
                 : const Text('Reset Password'),

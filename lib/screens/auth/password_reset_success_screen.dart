@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import 'login_screen.dart';
 
 class PasswordResetSuccessScreen extends StatefulWidget {
@@ -47,8 +48,9 @@ class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
     return Scaffold(
-      backgroundColor: AppColors.surfaceBright,
+      backgroundColor: context.surfaceColor,
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -57,15 +59,18 @@ class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen>
               constraints: const BoxConstraints(maxWidth: 448),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLowest,
+                  color: context.cardColor,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.onSurface.withValues(alpha: 0.08),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  border: isHC ? Border.all(color: Colors.black, width: 2) : null,
+                  boxShadow: isHC
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: AppColors.onSurface.withValues(alpha: 0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(32),
@@ -77,21 +82,24 @@ class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen>
                         child: Container(
                           width: 96,
                           height: 96,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primaryFixed,
+                          decoration: BoxDecoration(
+                            color: isHC
+                                ? const Color(0xFF003833)
+                                : AppColors.primaryFixed,
                             shape: BoxShape.circle,
+                            border: isHC ? Border.all(color: Colors.black, width: 2) : null,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.check_circle_rounded,
                             size: 52,
-                            color: AppColors.secondary,
+                            color: isHC ? Colors.white : AppColors.secondary,
                           ),
                         ),
                       ),
                       const SizedBox(height: 24),
                       FadeTransition(
                         opacity: _fade,
-                        child: const Column(
+                        child: Column(
                           children: [
                             Text(
                               'Password Updated',
@@ -100,17 +108,18 @@ class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen>
                                 fontSize: 28,
                                 height: 36 / 28,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.onSurface,
+                                color: context.textColor,
                               ),
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Text(
                               'Your password has been reset successfully. You can now sign in with your new password.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 16,
                                 height: 24 / 16,
-                                color: AppColors.onSurfaceVariant,
+                                fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
+                                color: isHC ? Colors.black : AppColors.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -132,10 +141,11 @@ class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen>
                               );
                             },
                             style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.primaryContainer,
-                              foregroundColor: AppColors.onPrimary,
+                              backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                              foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
+                                side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
                               ),
                               textStyle: const TextStyle(
                                 fontSize: 14,

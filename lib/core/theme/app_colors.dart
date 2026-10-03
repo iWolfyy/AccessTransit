@@ -18,22 +18,22 @@ abstract final class AppColors {
   static const Color onSurface = Color(0xFF1C1B1F);
   static const Color onSurfaceVariant = Color(0xFF424750);
 
-  static const Color outline = Color(0xFF737781);
+  static const Color outline = Color(0xFF5D616B); // WCAG AA 6.1:1 on white (was 4.47:1)
   static const Color outlineVariant = Color(0xFFC3C6D1);
 
-  static const Color error = Color(0xFFBA1A1A);
+  static const Color error = Color(0xFFBA1A1A); // 6.4:1 on white
   static const Color onError = Color(0xFFFFFFFF);
   static const Color errorContainer = Color(0xFFFFDAD6);
-  static const Color onErrorContainer = Color(0xFF93000A);
+  static const Color onErrorContainer = Color(0xFF93000A); // 10.8:1 on errorContainer
 
-  static const Color secondary = Color(0xFF006A63);
+  static const Color secondary = Color(0xFF006A63); // 6.5:1 on white
   static const Color secondaryContainer = Color(0xFF8FF4E9);
   static const Color onSecondary = Color(0xFFFFFFFF);
-  static const Color onSecondaryContainer = Color(0xFF007169);
+  static const Color onSecondaryContainer = Color(0xFF007169); // 4.8:1 on secondaryContainer
 
-  static const Color tertiary = Color(0xFF592400);
+  static const Color tertiary = Color(0xFF592400); // 10.9:1 on white
   static const Color tertiaryContainer = Color(0xFF7D3500);
   static const Color onTertiaryContainer = Color(0xFFFFA571);
 
-  static const Color success = Color(0xFF0B8A00);
+  static const Color success = Color(0xFF00702E); // 6.8:1 on white, > 5.2:1 on light green (was 4.56:1)
 }

@@ -32,6 +32,28 @@ void main() {
       expect(found.targetId, equals('st_fort'));
     });
 
+    test('createReport stores subCategory and photoUrl in Firestore', () async {
+      final testReport = Report(
+        id: 'test_report_subcategory_101',
+        targetType: 'station',
+        targetId: 'st_fort',
+        problemType: 'Ramp broken / deployment motor jammed',
+        category: 'rampAccess',
+        subCategory: 'Ramp broken / deployment motor jammed',
+        photoUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957',
+        status: 'active',
+        createdAt: DateTime.now(),
+        userId: 'user_test_sub',
+      );
+
+      await service.createReport(testReport);
+
+      final reports = await service.streamReports().first;
+      final found = reports.firstWhere((r) => r.id == 'test_report_subcategory_101');
+      expect(found.subCategory, equals('Ramp broken / deployment motor jammed'));
+      expect(found.photoUrl, equals('https://images.unsplash.com/photo-1544620347-c4fd4a3d5957'));
+    });
+
     test('checkRateLimit returns true when user submitted report within 15 minutes', () async {
       final userId = 'user_rate_limit_${DateTime.now().millisecondsSinceEpoch}';
       final targetId = 'st_ Pettah';
