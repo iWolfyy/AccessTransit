@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import 'mobility_preview.dart';
 
 /// Onboarding step 1: accessibility preferences.
@@ -145,19 +146,20 @@ class _TailoredForYouPageState extends State<TailoredForYouPage>
                     height: wide ? 40 / 32 : 28 / 22,
                     fontWeight: FontWeight.w700,
                     letterSpacing: wide ? -0.64 : 0,
-                    color: AppColors.onSurface,
+                    color: context.textColor,
                   ),
                 ),
                 const SizedBox(height: 8),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 320),
-                  child: const Text(
+                  child: Text(
                     'Set your accessibility preferences to find the best routes for your specific needs, from wheelchair ramps to low-floor buses.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
                       height: 24 / 16,
-                      color: AppColors.onSurfaceVariant,
+                      fontWeight: context.isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                      color: context.isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
                     ),
                   ),
                 ),

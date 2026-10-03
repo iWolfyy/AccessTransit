@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_theme.dart';
 import '../models/bus.dart';
 import '../models/station.dart';
 import '../services/firestore_service.dart';
@@ -181,12 +182,24 @@ class _AddStationDialogState extends State<AddStationDialog> {
       ),
       actions: [
         TextButton(
+          style: TextButton.styleFrom(
+            minimumSize: Size(context.hasLargeTargets ? 88 : 64, context.buttonHeight),
+          ),
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(
+            'Cancel',
+            style: TextStyle(fontSize: context.buttonFontSize),
+          ),
         ),
         FilledButton(
+          style: FilledButton.styleFrom(
+            minimumSize: Size(context.hasLargeTargets ? 100 : 80, context.buttonHeight),
+          ),
           onPressed: _isSaving ? null : _submit,
-          child: Text(_isSaving ? 'Saving...' : 'Add Station'),
+          child: Text(
+            _isSaving ? 'Saving...' : 'Add Station',
+            style: TextStyle(fontSize: context.buttonFontSize),
+          ),
         ),
       ],
     );

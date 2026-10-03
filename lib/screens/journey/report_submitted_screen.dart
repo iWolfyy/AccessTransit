@@ -1,13 +1,17 @@
 import 'dart:io';
-
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'package:flutter/material.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 import '../../models/report.dart';
-import '../community/community_screen.dart';
+import '../main_shell.dart';
 
-/// Success state after submitting a condition report.
+/// Modern success screen after submitting a condition report, matching LMT Go design.
 class ReportSubmittedScreen extends StatelessWidget {
   const ReportSubmittedScreen({
     super.key,
@@ -18,10 +22,23 @@ class ReportSubmittedScreen extends StatelessWidget {
   final Report? report;
   final String targetName;
 
-  void _showSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+  void _goToCommunity(BuildContext context) {
+    final shell = context.findAncestorStateOfType<MainShellState>();
+    if (shell != null) {
+      shell.switchToTab('Community');
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const MainShell(),
+        ),
+        (route) => false,
+      );
+    }
+  }
+
+  void _goToHome(BuildContext context) {
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   Widget _buildImageWidget(String pathOrUrl) {
@@ -59,121 +76,194 @@ class ReportSubmittedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.sizeOf(context).width >= 768;
+    final isHC = context.isHighContrast;
+    final timeFormatted = report != null
+        ? TimeUtils.formatRelativeTime(report!.createdAt)
+        : 'Just now';
+
     return Scaffold(
-      backgroundColor: AppColors.surface,
-      body: Column(
-        children: [
-          _TopBar(
-            onMenu: () => _showSnack(context, 'Menu will be available soon.'),
-            onSearch: () =>
-                _showSnack(context, 'Search will be available soon.'),
+      backgroundColor: context.surfaceColor,
+      appBar: AppBar(
+        backgroundColor: context.surfaceColor,
+        elevation: 0,
+        shape: isHC
+            ? const Border(bottom: BorderSide(color: Colors.black, width: 2))
+            : null,
+        leading: IconButton(
+          constraints: context.appBarActionConstraints,
+          icon: Icon(
+            Icons.close_rounded,
+            color: isHC ? Colors.black : AppColors.onSurface,
+            size: context.tapIconSize,
           ),
-          Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 448),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 96,
-                        height: 96,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.success.withValues(alpha: 0.2),
+          onPressed: () => _goToHome(context),
+          tooltip: 'Close',
+        ),
+        title: Text(
+          'Submission Confirmation',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: context.textColor,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: ListView(
+              padding: EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: isDesktop ? 32 : 20,
+              ),
+              children: [
+                // Celebration Icon
+                Center(
+                  child: Container(
+                    width: 88,
+                    height: 88,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isHC
+                          ? Colors.white
+                          : AppColors.success.withValues(alpha: 0.15),
+                      border: isHC
+                          ? Border.all(color: const Color(0xFF003833), width: 3)
+                          : null,
+                    ),
+                    child: Icon(
+                      Icons.check_circle_rounded,
+                      size: 58,
+                      color: isHC ? const Color(0xFF003833) : AppColors.success,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Main Title
+                Text(
+                  'Report Submitted!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: context.textColor,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Reward Banner
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isHC
+                          ? Colors.white
+                          : AppColors.primaryContainer.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(20),
+                      border: isHC
+                          ? Border.all(color: Colors.black, width: 2)
+                          : Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.stars_rounded,
+                          color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                          size: 18,
                         ),
-                        child: const Icon(
-                          Icons.check_circle,
-                          size: 64,
-                          color: AppColors.success,
+                        const SizedBox(width: 6),
+                        Text(
+                          '+10 Community Points Earned 🎉',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Report Submitted',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 22,
-                          height: 28 / 22,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Thank you for helping other commuters.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          height: 24 / 16,
-                          color: AppColors.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLowest,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                Text(
+                  'Thank you for reporting. Your real-time update helps wheelchair and elderly commuters navigate with confidence.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: context.subtextColor,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // Summary Card
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: context.cardColor,
+                    borderRadius: BorderRadius.circular(18),
+                    border: isHC
+                        ? Border.all(color: Colors.black, width: 2)
+                        : Border.all(color: AppColors.outlineVariant),
+                    boxShadow: isHC
+                        ? null
+                        : [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 4,
+                              blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
                           ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Location Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isHC
+                                  ? Colors.white
+                                  : AppColors.primaryContainer.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(10),
+                              border: isHC
+                                  ? Border.all(color: Colors.black, width: 1.5)
+                                  : null,
+                            ),
+                            child: Icon(
+                              report?.targetType == 'bus'
+                                  ? Icons.directions_bus_rounded
+                                  : Icons.store_mall_directory_rounded,
+                              size: 20,
+                              color: isHC ? Colors.black : AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: AppColors.primaryContainer,
-                                  child: Icon(
-                                    Icons.accessible_forward,
-                                    color: AppColors.onPrimaryContainer,
+                                Text(
+                                  targetName,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.textColor,
                                   ),
                                 ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        report != null
-                                            ? report!.problemType
-                                            : 'Report Active',
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          height: 24 / 18,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.onSurface,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '$targetName • ${report != null ? TimeUtils.formatRelativeTime(report!.createdAt) : 'Just now'}',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          height: 20 / 14,
-                                          color: AppColors.onSurfaceVariant,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      const Text(
-                                        'Status: Active • Visible in Community Hub',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                    ],
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Submitted $timeFormatted',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: context.subtextColor,
                                   ),
                                 ),
                               ],
@@ -186,102 +276,213 @@ class ReportSubmittedScreen extends StatelessWidget {
                                 child: _buildImageWidget(report!.photoUrl!),
                               ),
                             ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: FilledButton(
-                          onPressed: () {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (_) => const CommunityScreen(),
-                              ),
-                              (route) => route.isFirst,
-                            );
-                          },
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.primaryContainer,
-                            foregroundColor: AppColors.onPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
                             ),
-                            textStyle: const TextStyle(
-                              fontSize: 14,
-                              height: 20 / 14,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.1,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.bolt_rounded,
+                                  size: 14,
+                                  color: isHC ? const Color(0xFF003833) : AppColors.success,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Live',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: isHC ? const Color(0xFF003833) : AppColors.success,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          child: const Text('Back to Community'),
+                        ],
+                      ),
+
+                      Divider(
+                        height: 24,
+                        color: isHC ? Colors.black : null,
+                      ),
+
+                      // Issue Title
+                      Text(
+                        report != null ? report!.problemType : 'Accessibility Issue Reported',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          height: 1.3,
+                          color: context.textColor,
                         ),
                       ),
+                      if (report != null) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            if (report!.category.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isHC
+                                      ? Colors.white
+                                      : AppColors.primaryContainer.withValues(alpha: 0.35),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: isHC
+                                      ? Border.all(color: const Color(0xFF001F3F), width: 1.5)
+                                      : null,
+                                ),
+                                child: Text(
+                                  _formatCategory(report!.category),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            if (report!.severity.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isHC
+                                      ? Colors.white
+                                      : _severityColor(report!.severity).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: isHC
+                                      ? Border.all(
+                                          color: _severityColor(report!.severity, isHC: true),
+                                          width: 1.5,
+                                        )
+                                      : null,
+                                ),
+                                child: Text(
+                                  '${report!.severity[0].toUpperCase()}${report!.severity.substring(1)} Severity',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: _severityColor(report!.severity, isHC: isHC),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+
+                      // User note if present
+                      if (report != null && report!.description.trim().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isHC ? Colors.white : AppColors.surfaceContainer,
+                            borderRadius: BorderRadius.circular(10),
+                            border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+                          ),
+                          child: Text(
+                            '“${report!.description.trim()}”',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontStyle: FontStyle.italic,
+                              color: context.textColor,
+                            ),
+                          ),
+                        ),
+                      ],
+
+                      // Attached Photo Preview
+                      if (report != null && report!.photoUrl.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: isHC ? Border.all(color: Colors.black, width: 2) : null,
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: report!.photoUrl.startsWith('http')
+                                ? Image.network(
+                                    report!.photoUrl,
+                                    height: 160,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                                  )
+                                : Image.file(
+                                    File(report!.photoUrl),
+                                    height: 160,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                                  ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: null,
-    );
-  }
-}
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.onMenu,
-    required this.onSearch,
-  });
+                const SizedBox(height: 32),
 
-  final VoidCallback onMenu;
-  final VoidCallback onSearch;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 1,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 48,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: onMenu,
-                  tooltip: 'Menu',
-                  icon: const Icon(
-                    Icons.menu,
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-                const Expanded(
-                  child: Text(
-                    'Community',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      height: 28 / 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                // Primary CTA: View in Community Feed
+                SizedBox(
+                  height: context.buttonHeight,
+                  child: FilledButton.icon(
+                    onPressed: () => _goToCommunity(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: isHC
+                          ? const Color(0xFF001F3F)
+                          : AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
+                      side: isHC ? const BorderSide(color: Colors.black, width: 2) : null,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: Icon(Icons.forum_rounded, size: context.tapIconSize),
+                    label: Text(
+                      'View in Community Feed',
+                      style: TextStyle(
+                        fontSize: context.buttonFontSize,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
-                IconButton(
-                  onPressed: onSearch,
-                  tooltip: 'Search',
-                  icon: const Icon(
-                    Icons.search,
-                    color: AppColors.onSurfaceVariant,
+                const SizedBox(height: 12),
+
+                // Secondary CTA: Back to Home
+                SizedBox(
+                  height: context.buttonHeight,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _goToHome(context),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: isHC ? Colors.white : null,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      side: BorderSide(
+                        color: isHC ? Colors.black : AppColors.outlineVariant,
+                        width: isHC ? 2 : 1,
+                      ),
+                    ),
+                    icon: Icon(
+                      Icons.home_rounded,
+                      size: context.tapIconSize,
+                      color: isHC ? Colors.black : AppColors.onSurface,
+                    ),
+                    label: Text(
+                      'Back to Home',
+                      style: TextStyle(
+                        fontSize: context.buttonFontSize,
+                        fontWeight: FontWeight.w600,
+                        color: isHC ? Colors.black : AppColors.onSurface,
+                      ),
+                    ),
                   ),
                 ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -289,6 +490,34 @@ class _TopBar extends StatelessWidget {
       ),
     );
   }
+
+  String _formatCategory(String category) {
+    switch (category) {
+      case 'rampAccess':
+        return 'Ramp & Access';
+      case 'elevatorOut':
+        return 'Elevator / Lift';
+      case 'crowding':
+        return 'Crowding';
+      case 'cleanliness':
+        return 'Cleanliness';
+      case 'safetyHazard':
+        return 'Safety Hazard';
+      default:
+        return category;
+    }
+  }
+
+  Color _severityColor(String severity, {bool isHC = false}) {
+    switch (severity.toLowerCase()) {
+      case 'major':
+        return isHC ? const Color(0xFF8B0000) : AppColors.error;
+      case 'minor':
+        return isHC ? const Color(0xFF003833) : AppColors.success;
+      case 'moderate':
+      default:
+        return isHC ? const Color(0xFF8B4500) : const Color(0xFFF57F17);
+    }
+  }
 }
 
-/// App-standard nav: Home → Plan → Live → Community → Profile.

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 import '../../data/seed_data.dart';
 import '../../models/station.dart';
+import '../../services/accessibility_preferences_service.dart';
 import '../../services/firestore_service.dart';
 import 'route_results_screen.dart';
 
@@ -29,15 +31,38 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   TimeOfDay? _selectedTime;
   bool _isLoadingStations = true;
 
-  // Accessibility requirements
-  bool _wheelchairAccess = true;
-  bool _stepFreeOnly = false;
-  bool _minimizeWalking = true;
+  // Accessibility requirements loaded from user preferences
+  late bool _wheelchairAccess;
+  late bool _stepFreeOnly;
+  late bool _minimizeWalking;
 
   @override
   void initState() {
     super.initState();
+    _applyUserPreferences();
+    AccessibilityPreferencesService.instance.addListener(_onPreferencesChanged);
     _loadStations();
+  }
+
+  void _applyUserPreferences() {
+    final prefs = AccessibilityPreferencesService.instance;
+    _wheelchairAccess = prefs.isWheelchairOnly;
+    _stepFreeOnly = prefs.isStepFree;
+    _minimizeWalking = prefs.minimizeWalking;
+  }
+
+  void _onPreferencesChanged() {
+    if (mounted) {
+      setState(() {
+        _applyUserPreferences();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    AccessibilityPreferencesService.instance.removeListener(_onPreferencesChanged);
+    super.dispose();
   }
 
   Future<void> _loadStations() async {
@@ -175,12 +200,14 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
 
   void _showStationPicker(BuildContext context, bool isFrom) {
     if (_stations.isEmpty) return;
+    final isHighContrast = context.isHighContrast;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      backgroundColor: context.surfaceColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
       ),
       builder: (context) {
         return _StationSearchModal(
@@ -205,12 +232,14 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   }
 
   void _showVoiceSearchDialog(bool isFrom) {
+    final isHighContrast = context.isHighContrast;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      backgroundColor: context.surfaceColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
       ),
       builder: (context) {
         return _VoiceSearchModal(
@@ -230,7 +259,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
               ..showSnackBar(
                 SnackBar(
                   content: Text('🎙️ Recognized: ${station.name}'),
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -241,11 +270,13 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   }
 
   void _showTravelTimeOptions() {
+    final isHighContrast = context.isHighContrast;
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      backgroundColor: context.surfaceColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
       ),
       builder: (context) {
         return SafeArea(
@@ -257,14 +288,18 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.schedule_rounded, color: AppColors.primary, size: 28),
+                    Icon(
+                      Icons.schedule_rounded,
+                      color: isHighContrast ? Colors.black : AppColors.primary,
+                      size: 28,
+                    ),
                     const SizedBox(width: 12),
-                    const Text(
+                    Text(
                       'Choose Travel Time',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.onSurface,
+                        color: isHighContrast ? Colors.black : AppColors.onSurface,
                       ),
                     ),
                     const Spacer(),
@@ -272,6 +307,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                       icon: const Icon(Icons.close),
                       iconSize: 26,
                       tooltip: 'Close',
+                      color: isHighContrast ? Colors.black : null,
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
@@ -282,30 +318,48 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
-                      color: _selectedTime == null && DateUtils.isSameDay(_selectedDate, DateTime.now())
-                          ? AppColors.primary
-                          : AppColors.outlineVariant,
-                      width: 1.5,
+                      color: isHighContrast
+                          ? Colors.black
+                          : (_selectedTime == null && DateUtils.isSameDay(_selectedDate, DateTime.now())
+                              ? AppColors.primary
+                              : AppColors.outlineVariant),
+                      width: isHighContrast ? 2.0 : 1.5,
                     ),
                   ),
-                  tileColor: _selectedTime == null && DateUtils.isSameDay(_selectedDate, DateTime.now())
-                      ? AppColors.primaryFixed.withValues(alpha: 0.3)
-                      : AppColors.surfaceContainerLowest,
-                  leading: const CircleAvatar(
-                    backgroundColor: AppColors.primary,
+                  tileColor: isHighContrast
+                      ? (_selectedTime == null && DateUtils.isSameDay(_selectedDate, DateTime.now())
+                          ? const Color(0xFF001F3F).withValues(alpha: 0.12)
+                          : Colors.white)
+                      : (_selectedTime == null && DateUtils.isSameDay(_selectedDate, DateTime.now())
+                          ? AppColors.primaryFixed.withValues(alpha: 0.3)
+                          : AppColors.surfaceContainerLowest),
+                  leading: CircleAvatar(
+                    backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
                     foregroundColor: Colors.white,
-                    child: Icon(Icons.bolt_rounded, size: 24),
+                    child: const Icon(Icons.bolt_rounded, size: 24),
                   ),
-                  title: const Text(
+                  title: Text(
                     'Leave Now',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      color: isHighContrast ? Colors.black : null,
+                    ),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'Get the very next arriving buses in real-time',
-                    style: TextStyle(fontSize: 14),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isHighContrast ? const Color(0xFF1A1A1A) : null,
+                      fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                    ),
                   ),
                   trailing: _selectedTime == null && DateUtils.isSameDay(_selectedDate, DateTime.now())
-                      ? const Icon(Icons.check_circle, color: AppColors.primary, size: 26)
+                      ? Icon(
+                          Icons.check_circle,
+                          color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                          size: 26,
+                        )
                       : null,
                   onTap: () {
                     Navigator.of(context).pop();
@@ -320,24 +374,43 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
-                    side: const BorderSide(color: AppColors.outlineVariant),
+                    side: BorderSide(
+                      color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                      width: isHighContrast ? 2.0 : 1.0,
+                    ),
                   ),
-                  tileColor: AppColors.surfaceContainerLowest,
-                  leading: const CircleAvatar(
-                    backgroundColor: AppColors.surfaceContainer,
-                    child: Icon(Icons.access_time_filled_rounded, color: AppColors.primary, size: 22),
+                  tileColor: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+                  leading: CircleAvatar(
+                    backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.surfaceContainer,
+                    child: Icon(
+                      Icons.access_time_filled_rounded,
+                      color: isHighContrast ? Colors.white : AppColors.primary,
+                      size: 22,
+                    ),
                   ),
-                  title: const Text(
+                  title: Text(
                     'Set Specific Time',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 17,
+                      color: isHighContrast ? Colors.black : null,
+                    ),
                   ),
                   subtitle: Text(
                     _selectedTime != null
                         ? 'Selected: ${_selectedTime!.format(context)}'
                         : 'Choose departure time today',
-                    style: const TextStyle(fontSize: 14),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isHighContrast ? const Color(0xFF1A1A1A) : null,
+                      fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                    ),
                   ),
-                  trailing: const Icon(Icons.chevron_right, size: 28),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    size: 28,
+                    color: isHighContrast ? Colors.black : null,
+                  ),
                   onTap: () async {
                     Navigator.of(context).pop();
                     await _pickTime();
@@ -348,22 +421,41 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
-                    side: const BorderSide(color: AppColors.outlineVariant),
+                    side: BorderSide(
+                      color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                      width: isHighContrast ? 2.0 : 1.0,
+                    ),
                   ),
-                  tileColor: AppColors.surfaceContainerLowest,
-                  leading: const CircleAvatar(
-                    backgroundColor: AppColors.surfaceContainer,
-                    child: Icon(Icons.calendar_today_rounded, color: AppColors.primary, size: 22),
+                  tileColor: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+                  leading: CircleAvatar(
+                    backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.surfaceContainer,
+                    child: Icon(
+                      Icons.calendar_today_rounded,
+                      color: isHighContrast ? Colors.white : AppColors.primary,
+                      size: 22,
+                    ),
                   ),
-                  title: const Text(
+                  title: Text(
                     'Change Travel Date',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 17,
+                      color: isHighContrast ? Colors.black : null,
+                    ),
                   ),
                   subtitle: Text(
                     TimeUtils.formatDateString(_selectedDate),
-                    style: const TextStyle(fontSize: 14),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isHighContrast ? const Color(0xFF1A1A1A) : null,
+                      fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                    ),
                   ),
-                  trailing: const Icon(Icons.chevron_right, size: 28),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    size: 28,
+                    color: isHighContrast ? Colors.black : null,
+                  ),
                   onTap: () async {
                     Navigator.of(context).pop();
                     await _pickDate();
@@ -378,12 +470,14 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   }
 
   void _showAccessibilityFilterSheet() {
+    final isHighContrast = context.isHighContrast;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      backgroundColor: context.surfaceColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
       ),
       builder: (context) {
         return StatefulBuilder(
@@ -397,14 +491,18 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.accessibility_new_rounded, color: AppColors.secondary, size: 28),
+                        Icon(
+                          Icons.accessibility_new_rounded,
+                          color: isHighContrast ? Colors.black : AppColors.secondary,
+                          size: 28,
+                        ),
                         const SizedBox(width: 10),
-                        const Text(
+                        Text(
                           'Accessibility Needs',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.onSurface,
+                            color: isHighContrast ? Colors.black : AppColors.onSurface,
                           ),
                         ),
                         const Spacer(),
@@ -412,14 +510,19 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                           icon: const Icon(Icons.close),
                           iconSize: 26,
                           tooltip: 'Close',
+                          color: isHighContrast ? Colors.black : null,
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Customize bus and stop accessibility for your journey',
-                      style: TextStyle(fontSize: 15, color: AppColors.onSurfaceVariant),
+                    Text(
+                      'Customize for this trip only. Your permanent Accessibility Preferences in settings will not be affected.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     // Quick Accessibility Presets
@@ -431,11 +534,13 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                               minimumSize: const Size(0, 48),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               side: BorderSide(
-                                color: _wheelchairAccess && _stepFreeOnly ? AppColors.secondary : AppColors.outlineVariant,
-                                width: _wheelchairAccess && _stepFreeOnly ? 2 : 1,
+                                color: isHighContrast
+                                    ? Colors.black
+                                    : (_wheelchairAccess && _stepFreeOnly ? AppColors.secondary : AppColors.outlineVariant),
+                                width: (_wheelchairAccess && _stepFreeOnly || isHighContrast) ? 2 : 1,
                               ),
                               backgroundColor: _wheelchairAccess && _stepFreeOnly
-                                  ? AppColors.secondaryContainer.withValues(alpha: 0.3)
+                                  ? (isHighContrast ? const Color(0xFF001F3F).withValues(alpha: 0.15) : AppColors.secondaryContainer.withValues(alpha: 0.3))
                                   : null,
                             ),
                             onPressed: () {
@@ -446,7 +551,14 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                               });
                               setState(() {});
                             },
-                            child: const Text('♿ Wheelchair', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                            child: Text(
+                              '♿ Wheelchair',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: isHighContrast ? Colors.black : null,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -456,11 +568,13 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                               minimumSize: const Size(0, 48),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               side: BorderSide(
-                                color: !_wheelchairAccess && _stepFreeOnly ? AppColors.secondary : AppColors.outlineVariant,
-                                width: !_wheelchairAccess && _stepFreeOnly ? 2 : 1,
+                                color: isHighContrast
+                                    ? Colors.black
+                                    : (!_wheelchairAccess && _stepFreeOnly ? AppColors.secondary : AppColors.outlineVariant),
+                                width: (!_wheelchairAccess && _stepFreeOnly || isHighContrast) ? 2 : 1,
                               ),
                               backgroundColor: !_wheelchairAccess && _stepFreeOnly
-                                  ? AppColors.secondaryContainer.withValues(alpha: 0.3)
+                                  ? (isHighContrast ? const Color(0xFF001F3F).withValues(alpha: 0.15) : AppColors.secondaryContainer.withValues(alpha: 0.3))
                                   : null,
                             ),
                             onPressed: () {
@@ -471,24 +585,42 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                               });
                               setState(() {});
                             },
-                            child: const Text('🧓 Elderly / Gentle', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                            child: Text(
+                              '🧓 Elderly / Gentle',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: isHighContrast ? Colors.black : null,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(54, 48),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        Tooltip(
+                          message: 'Reset to saved accessibility preferences',
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(54, 48),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : null,
+                            ),
+                            onPressed: () {
+                              setSheetState(() {
+                                final prefs = AccessibilityPreferencesService.instance;
+                                _wheelchairAccess = prefs.isWheelchairOnly;
+                                _stepFreeOnly = prefs.isStepFree;
+                                _minimizeWalking = prefs.minimizeWalking;
+                              });
+                              setState(() {});
+                            },
+                            child: Text(
+                              'Reset',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isHighContrast ? Colors.black : null,
+                              ),
+                            ),
                           ),
-                          onPressed: () {
-                            setSheetState(() {
-                              _wheelchairAccess = false;
-                              _stepFreeOnly = false;
-                              _minimizeWalking = false;
-                            });
-                            setState(() {});
-                          },
-                          child: const Text('Reset', style: TextStyle(fontSize: 14)),
                         ),
                       ],
                     ),
@@ -531,13 +663,14 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                       height: 56,
                       child: FilledButton(
                         style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primaryContainer,
-                          foregroundColor: AppColors.onPrimary,
+                          backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                          foregroundColor: Colors.white,
+                          side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : null,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                         onPressed: () => Navigator.of(context).pop(),
                         child: const Text(
-                          'Save & Apply Filters',
+                          'Apply to This Trip',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -615,6 +748,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+    final isHighContrast = context.isHighContrast;
 
     // Build accessibility active filters list
     final List<String> activeFilters = [];
@@ -623,12 +757,10 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
     if (_minimizeWalking) activeFilters.add('Min Walk');
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       body: Column(
         children: [
           _TopBar(
-            isDesktop: isDesktop,
-            onMenu: () => Navigator.of(context).maybePop(),
             onProfile: () => AppNavigation.openProfile(context),
             onSync: _resyncDatabase,
           ),
@@ -683,15 +815,20 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                         ),
                         const SizedBox(height: 20),
 
-                        // Full-width prominent "Find Buses" action button (56dp height)
+                        // Full-width prominent "Find Buses" action button
                         SizedBox(
-                          height: 56,
+                          height: context.hasLargeTargets ? 64 : 56,
                           child: FilledButton(
                             onPressed: _searchRoutes,
                             style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.primaryContainer,
-                              foregroundColor: AppColors.onPrimary,
-                              elevation: 2,
+                              backgroundColor: isHighContrast
+                                  ? const Color(0xFF001F3F)
+                                  : AppColors.primaryContainer,
+                              foregroundColor: Colors.white,
+                              side: isHighContrast
+                                  ? const BorderSide(color: Colors.black, width: 2.0)
+                                  : null,
+                              elevation: isHighContrast ? 0 : 2,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
@@ -734,74 +871,70 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
 
 class _TopBar extends StatelessWidget {
   const _TopBar({
-    required this.isDesktop,
-    required this.onMenu,
     required this.onProfile,
     this.onSync,
   });
 
-  final bool isDesktop;
-  final VoidCallback onMenu;
   final VoidCallback onProfile;
   final VoidCallback? onSync;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surfaceContainerLow,
-      elevation: 1,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 56,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: onMenu,
-                  icon: Icon(
-                    isDesktop ? Icons.menu : Icons.arrow_back_rounded,
-                  ),
-                  color: AppColors.primary,
-                  tooltip: isDesktop ? 'Menu' : 'Back',
-                  iconSize: 26,
-                ),
-                const SizedBox(width: 4),
-                const Expanded(
-                  child: Text(
-                    'Plan Journey',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+    final isHighContrast = context.isHighContrast;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+        border: isHighContrast
+            ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        elevation: isHighContrast ? 0 : 1,
+        shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 56,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Plan Journey',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: isHighContrast ? Colors.black : AppColors.primary,
+                      ),
                     ),
                   ),
-                ),
-                if (onSync != null)
-                  IconButton(
-                    onPressed: onSync,
-                    icon: const Icon(Icons.cloud_sync_outlined),
-                    color: AppColors.primary,
-                    tooltip: 'Reset & Sync Sri Lankan Bus Data',
-                    iconSize: 26,
-                  ),
-                const SizedBox(width: 4),
-                InkWell(
-                  onTap: onProfile,
-                  borderRadius: BorderRadius.circular(999),
-                  child: const CircleAvatar(
-                    radius: 20,
-                    backgroundColor: AppColors.surfaceContainer,
-                    child: Icon(
-                      Icons.person,
-                      color: AppColors.primaryContainer,
-                      size: 22,
+                  if (onSync != null)
+                    IconButton(
+                      onPressed: onSync,
+                      icon: const Icon(Icons.cloud_sync_outlined),
+                      color: isHighContrast ? Colors.black : AppColors.primary,
+                      tooltip: 'Reset & Sync Sri Lankan Bus Data',
+                      iconSize: 26,
+                    ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: onProfile,
+                    borderRadius: BorderRadius.circular(999),
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.surfaceContainer,
+                      child: Icon(
+                        Icons.person,
+                        color: isHighContrast ? Colors.white : AppColors.primaryContainer,
+                        size: 22,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -836,19 +969,25 @@ class _SearchInputsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.surfaceVariant),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 2.0)
+            : Border.all(color: AppColors.surfaceVariant),
+        boxShadow: isHighContrast
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.onSurface.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
       ),
       child: isLoading
           ? const SizedBox(
@@ -885,33 +1024,39 @@ class _SearchInputsCard extends StatelessWidget {
                         width: 2.5,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: AppColors.outlineVariant,
+                          color: isHighContrast ? Colors.black : AppColors.outlineVariant,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                       const SizedBox(width: 18),
-                      const Expanded(
-                        child: Divider(height: 1, color: AppColors.surfaceVariant),
+                      Expanded(
+                        child: Divider(
+                          height: 1,
+                          color: isHighContrast ? Colors.black : AppColors.surfaceVariant,
+                          thickness: isHighContrast ? 1.5 : 1,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Semantics(
                         button: true,
                         label: 'Swap boarding point and destination',
                         child: Material(
-                          color: AppColors.surfaceContainerLow,
-                          shape: const CircleBorder(),
-                          elevation: 1.5,
+                          color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+                          shape: CircleBorder(
+                            side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : BorderSide.none,
+                          ),
+                          elevation: isHighContrast ? 0 : 1.5,
                           child: InkWell(
                             onTap: onSwap,
                             customBorder: const CircleBorder(),
                             child: Container(
-                              width: 48,
-                              height: 48,
+                              width: context.minTapHeight,
+                              height: context.minTapHeight,
                               alignment: Alignment.center,
-                              child: const Icon(
+                              child: Icon(
                                 Icons.swap_vert_rounded,
-                                color: AppColors.primary,
-                                size: 26,
+                                color: isHighContrast ? Colors.black : AppColors.primary,
+                                size: context.tapIconSize + 2,
                               ),
                             ),
                           ),
@@ -969,6 +1114,11 @@ class _LocationInputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+    final effectiveHeaderColor = isHighContrast ? Colors.black : headerColor;
+    final effectiveIconColor = isHighContrast ? Colors.black : iconColor;
+
     return Semantics(
       button: true,
       label: '$headerLabel: $stationName',
@@ -976,23 +1126,33 @@ class _LocationInputField extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: hasLargeTargets ? 14 : 12,
+            vertical: hasLargeTargets ? 18 : 12,
+          ),
           decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLow,
+            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+            border: isHighContrast
+                ? Border.all(color: Colors.black, width: 2.0)
+                : Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
           ),
           child: Row(
             children: [
               // Indicator Dot / Icon
               Container(
-                width: 36,
-                height: 36,
+                width: hasLargeTargets ? 46 : 36,
+                height: hasLargeTargets ? 46 : 36,
                 decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.12),
+                  color: isHighContrast
+                      ? const Color(0xFFE5E5E5)
+                      : iconColor.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
-                child: Icon(icon, color: iconColor, size: 20),
+                child: Icon(icon, color: effectiveIconColor, size: hasLargeTargets ? 24 : 20),
               ),
               const SizedBox(width: 12),
               // Text contents
@@ -1006,10 +1166,10 @@ class _LocationInputField extends StatelessWidget {
                           child: Text(
                             headerLabel,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: hasLargeTargets ? 12 : 11,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.6,
-                              color: headerColor,
+                              color: effectiveHeaderColor,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1023,20 +1183,21 @@ class _LocationInputField extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: AppColors.primaryFixed,
+                                color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryFixed,
                                 borderRadius: BorderRadius.circular(6),
+                                border: isHighContrast ? Border.all(color: Colors.black, width: 1.0) : null,
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.my_location, size: 11, color: AppColors.primary),
-                                  SizedBox(width: 3),
+                                  Icon(Icons.my_location, size: 11, color: isHighContrast ? Colors.white : AppColors.primary),
+                                  const SizedBox(width: 3),
                                   Text(
                                     'My Location',
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
-                                      color: AppColors.primary,
+                                      color: isHighContrast ? Colors.white : AppColors.primary,
                                     ),
                                   ),
                                 ],
@@ -1049,10 +1210,10 @@ class _LocationInputField extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       stationName,
-                      style: const TextStyle(
-                        fontSize: 17,
+                      style: TextStyle(
+                        fontSize: hasLargeTargets ? 19 : 17,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
+                        color: isHighContrast ? Colors.black : AppColors.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1060,9 +1221,10 @@ class _LocationInputField extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.onSurfaceVariant,
+                      style: TextStyle(
+                        fontSize: hasLargeTargets ? 13.5 : 12,
+                        fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                        color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1077,14 +1239,17 @@ class _LocationInputField extends StatelessWidget {
                 label: isFrom ? 'Voice search for boarding point' : 'Voice search for destination',
                 child: IconButton(
                   onPressed: onVoiceTap,
-                  icon: const Icon(Icons.mic, color: AppColors.primary),
-                  iconSize: 22,
+                  icon: Icon(Icons.mic, color: isHighContrast ? Colors.black : AppColors.primary),
+                  iconSize: context.tapIconSize,
                   tooltip: 'Speak stop name',
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  constraints: BoxConstraints(
+                    minWidth: hasLargeTargets ? 48 : 38,
+                    minHeight: hasLargeTargets ? 48 : 38,
+                  ),
                 ),
               ),
-              const Icon(Icons.arrow_drop_down, color: AppColors.onSurfaceVariant, size: 22),
+              Icon(Icons.arrow_drop_down, color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant, size: hasLargeTargets ? 28 : 22),
             ],
           ),
         ),
@@ -1107,6 +1272,7 @@ class _TravelTimeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     final isToday = DateUtils.isSameDay(selectedDate, DateTime.now());
     final String timeLabel;
     final bool isDepartNow = selectedTime == null && isToday;
@@ -1127,25 +1293,31 @@ class _TravelTimeCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
+          color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.surfaceVariant),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.onSurface.withValues(alpha: 0.04),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: isHighContrast
+              ? Border.all(color: Colors.black, width: 2.0)
+              : Border.all(color: AppColors.surfaceVariant),
+          boxShadow: isHighContrast
+              ? null
+              : [
+                  BoxShadow(
+                    color: AppColors.onSurface.withValues(alpha: 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Row(
           children: [
             CircleAvatar(
               radius: 20,
-              backgroundColor: isDepartNow ? AppColors.primaryFixed : AppColors.surfaceContainer,
+              backgroundColor: isHighContrast
+                  ? const Color(0xFFE5E5E5)
+                  : (isDepartNow ? AppColors.primaryFixed : AppColors.surfaceContainer),
               child: Icon(
                 isDepartNow ? Icons.bolt_rounded : Icons.schedule_rounded,
-                color: AppColors.primary,
+                color: isHighContrast ? Colors.black : AppColors.primary,
                 size: 22,
               ),
             ),
@@ -1154,22 +1326,22 @@ class _TravelTimeCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'TRAVEL TIME',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.5,
-                      color: AppColors.onSurfaceVariant,
+                      color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     timeLabel,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
+                      color: isHighContrast ? Colors.black : AppColors.onSurface,
                     ),
                   ),
                 ],
@@ -1178,21 +1350,22 @@ class _TravelTimeCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.surfaceContainer,
+                color: isHighContrast ? const Color(0xFF001F3F) : AppColors.surfaceContainer,
                 borderRadius: BorderRadius.circular(10),
+                border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
               ),
-              child: const Row(
+              child: Row(
                 children: [
                   Text(
                     'Change',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: isHighContrast ? Colors.white : AppColors.primary,
                     ),
                   ),
-                  SizedBox(width: 2),
-                  Icon(Icons.expand_more, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 2),
+                  Icon(Icons.expand_more, size: 16, color: isHighContrast ? Colors.white : AppColors.primary),
                 ],
               ),
             ),
@@ -1217,57 +1390,69 @@ class _AccessibilityFilterRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.surfaceVariant),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 2.0)
+            : Border.all(color: AppColors.surfaceVariant),
+        boxShadow: isHighContrast
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.onSurface.withValues(alpha: 0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.accessibility_new_rounded, size: 22, color: AppColors.secondary),
+              Icon(Icons.accessibility_new_rounded, size: 22, color: isHighContrast ? Colors.black : AppColors.secondary),
               const SizedBox(width: 8),
-              const Text(
-                'Accessibility Options',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onSurface,
+              Expanded(
+                child: Text(
+                  'Accessibility Options',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isHighContrast ? Colors.black : AppColors.onSurface,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               // Accessible filter trigger chip
               InkWell(
                 onTap: onTap,
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppColors.secondaryContainer.withValues(alpha: 0.4),
+                    color: isHighContrast ? const Color(0xFF001F3F) : AppColors.secondaryContainer.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.secondary.withValues(alpha: 0.5)),
+                    border: Border.all(color: isHighContrast ? Colors.black : AppColors.secondary.withValues(alpha: 0.5), width: isHighContrast ? 2.0 : 1.0),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.tune_rounded, size: 16, color: AppColors.onSecondaryContainer),
+                      Icon(Icons.tune_rounded, size: 16, color: isHighContrast ? Colors.white : AppColors.onSecondaryContainer),
                       const SizedBox(width: 4),
                       Text(
                         activeFilters.isNotEmpty ? '${activeFilters.length} Active' : 'Configure',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.onSecondaryContainer,
+                          fontWeight: FontWeight.w800,
+                          color: isHighContrast ? Colors.white : AppColors.onSecondaryContainer,
                         ),
                       ),
                     ],
@@ -1280,34 +1465,38 @@ class _AccessibilityFilterRow extends StatelessWidget {
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
-              runSpacing: 6,
+              runSpacing: 8,
               children: activeFilters.map((f) {
                 return Chip(
-                  avatar: const Icon(Icons.check, size: 14, color: AppColors.secondary),
+                  avatar: Icon(Icons.check, size: 14, color: isHighContrast ? Colors.black : AppColors.secondary),
                   label: Text(
                     f,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.onSurface,
+                      fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                      color: isHighContrast ? Colors.black : AppColors.onSurface,
                     ),
                   ),
                   deleteIcon: const Icon(Icons.close, size: 14),
                   onDeleted: () => onClearFilter(f),
-                  backgroundColor: AppColors.surfaceContainerLow,
+                  backgroundColor: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
-                    side: const BorderSide(color: AppColors.outlineVariant),
+                    side: BorderSide(color: isHighContrast ? Colors.black : AppColors.outlineVariant, width: isHighContrast ? 1.5 : 1.0),
                   ),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  materialTapTargetSize: MaterialTapTargetSize.padded,
                 );
               }).toList(),
             ),
           ] else ...[
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'All buses shown. Tap Configure to require ramps or step-free access.',
-              style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+              ),
             ),
           ],
         ],
@@ -1333,39 +1522,50 @@ class _AccessibilitySwitchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: value ? AppColors.secondary : AppColors.outlineVariant,
-          width: value ? 1.5 : 1,
+          color: isHighContrast ? Colors.black : (value ? AppColors.secondary : AppColors.outlineVariant),
+          width: isHighContrast ? 2.0 : (value ? 1.5 : 1),
         ),
       ),
       child: SwitchListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         secondary: CircleAvatar(
-          backgroundColor: value ? AppColors.secondaryContainer : AppColors.surfaceContainer,
+          backgroundColor: isHighContrast
+              ? (value ? const Color(0xFF001F3F) : const Color(0xFFE5E5E5))
+              : (value ? AppColors.secondaryContainer : AppColors.surfaceContainer),
           child: Icon(
             icon,
-            color: value ? AppColors.onSecondaryContainer : AppColors.onSurfaceVariant,
+            color: isHighContrast
+                ? (value ? Colors.white : Colors.black)
+                : (value ? AppColors.onSecondaryContainer : AppColors.onSurfaceVariant),
             size: 22,
           ),
         ),
         title: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
+            fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+            color: isHighContrast ? Colors.black : AppColors.onSurface,
           ),
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+          style: TextStyle(
+            fontSize: 13,
+            color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+            fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+          ),
         ),
         value: value,
-        activeThumbColor: AppColors.secondary,
+        activeThumbColor: isHighContrast ? Colors.white : AppColors.secondary,
+        activeTrackColor: isHighContrast ? const Color(0xFF001F3F) : null,
         onChanged: onChanged,
       ),
     );
@@ -1407,6 +1607,7 @@ class _StationSearchModalState extends State<_StationSearchModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     final filtered = widget.stations.where((s) {
       if (_filterWheelchairOnly && !s.hasRamp) return false;
       final q = _query.trim().toLowerCase();
@@ -1421,6 +1622,10 @@ class _StationSearchModalState extends State<_StationSearchModal> {
       child: Container(
         height: MediaQuery.of(context).size.height * 0.82,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        decoration: BoxDecoration(
+          color: context.surfaceColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
         child: Column(
           children: [
             Row(
@@ -1428,16 +1633,17 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                 Expanded(
                   child: Text(
                     widget.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.onSurface,
+                      color: isHighContrast ? Colors.black : AppColors.onSurface,
                     ),
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
                   iconSize: 26,
+                  color: isHighContrast ? Colors.black : null,
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -1447,13 +1653,24 @@ class _StationSearchModalState extends State<_StationSearchModal> {
               controller: _searchController,
               autofocus: true,
               onChanged: (val) => setState(() => _query = val),
-              style: const TextStyle(fontSize: 17),
+              style: TextStyle(
+                fontSize: 17,
+                color: isHighContrast ? Colors.black : null,
+                fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+              ),
               decoration: InputDecoration(
                 hintText: 'Type station or city (e.g. Pettah, Mount Lavinia)...',
-                prefixIcon: const Icon(Icons.search, color: AppColors.primary, size: 24),
+                hintStyle: TextStyle(
+                  color: isHighContrast ? const Color(0xFF4A4A4A) : null,
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: isHighContrast ? Colors.black : AppColors.primary,
+                  size: 24,
+                ),
                 suffixIcon: _query.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: Icon(Icons.clear, color: isHighContrast ? Colors.black : null),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _query = '');
@@ -1461,11 +1678,28 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                       )
                     : null,
                 filled: true,
-                fillColor: AppColors.surfaceContainerLowest,
+                fillColor: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.outlineVariant),
+                  borderSide: BorderSide(
+                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                    width: isHighContrast ? 2.0 : 1.0,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                    width: isHighContrast ? 2.0 : 1.0,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                    width: 2.0,
+                  ),
                 ),
               ),
             ),
@@ -1477,13 +1711,19 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                 children: [
                   if (widget.isFrom && widget.onUseMyLocation != null) ...[
                     ActionChip(
-                      avatar: const Icon(Icons.my_location, size: 16, color: AppColors.primary),
-                      label: const Text(
+                      avatar: Icon(Icons.my_location, size: 16, color: isHighContrast ? Colors.black : AppColors.primary),
+                      label: Text(
                         'My Location',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: isHighContrast ? Colors.black : AppColors.primary,
+                        ),
                       ),
-                      backgroundColor: AppColors.primaryFixed.withValues(alpha: 0.6),
-                      side: const BorderSide(color: AppColors.primaryFixedDim),
+                      backgroundColor: isHighContrast ? Colors.white : AppColors.primaryFixed.withValues(alpha: 0.6),
+                      side: BorderSide(
+                        color: isHighContrast ? Colors.black : AppColors.primaryFixedDim,
+                        width: isHighContrast ? 2.0 : 1.0,
+                      ),
                       onPressed: () {
                         Navigator.of(context).pop();
                         widget.onUseMyLocation!();
@@ -1492,18 +1732,32 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                     const SizedBox(width: 8),
                   ],
                   FilterChip(
-                    label: const Text('All Stops'),
+                    label: Text(
+                      'All Stops',
+                      style: TextStyle(
+                        color: isHighContrast ? Colors.black : null,
+                        fontWeight: isHighContrast ? FontWeight.w700 : null,
+                      ),
+                    ),
                     selected: !_filterWheelchairOnly,
                     onSelected: (val) => setState(() => _filterWheelchairOnly = false),
-                    selectedColor: AppColors.primaryFixed,
+                    selectedColor: isHighContrast ? const Color(0xFF001F3F).withValues(alpha: 0.2) : AppColors.primaryFixed,
+                    side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : null,
                   ),
                   const SizedBox(width: 8),
                   FilterChip(
-                    avatar: const Icon(Icons.accessible, size: 16),
-                    label: const Text('Wheelchair Ramp'),
+                    avatar: Icon(Icons.accessible, size: 16, color: isHighContrast ? Colors.black : null),
+                    label: Text(
+                      'Wheelchair Ramp',
+                      style: TextStyle(
+                        color: isHighContrast ? Colors.black : null,
+                        fontWeight: isHighContrast ? FontWeight.w700 : null,
+                      ),
+                    ),
                     selected: _filterWheelchairOnly,
                     onSelected: (val) => setState(() => _filterWheelchairOnly = val),
-                    selectedColor: AppColors.secondaryContainer,
+                    selectedColor: isHighContrast ? const Color(0xFF001F3F).withValues(alpha: 0.2) : AppColors.secondaryContainer,
+                    side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : null,
                   ),
                 ],
               ),
@@ -1511,16 +1765,23 @@ class _StationSearchModalState extends State<_StationSearchModal> {
             const SizedBox(height: 10),
             Expanded(
               child: filtered.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'No matching stations found.\nTry a different spelling or clear filters.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: AppColors.onSurfaceVariant, fontSize: 16),
+                        style: TextStyle(
+                          color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                          fontSize: 16,
+                          fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                        ),
                       ),
                     )
                   : ListView.separated(
                       itemCount: filtered.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      separatorBuilder: (_, _) => Divider(
+                        height: 1,
+                        color: isHighContrast ? Colors.black : null,
+                      ),
                       itemBuilder: (context, index) {
                         final s = filtered[index];
                         final isSelected = s.id == widget.selectedStationId;
@@ -1528,16 +1789,22 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                         return ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           selected: isSelected,
-                          selectedTileColor: AppColors.primaryContainer.withValues(alpha: 0.08),
+                          selectedTileColor: isHighContrast
+                              ? const Color(0xFF001F3F).withValues(alpha: 0.15)
+                              : AppColors.primaryContainer.withValues(alpha: 0.08),
                           leading: CircleAvatar(
-                            backgroundColor: isSelected
-                                ? AppColors.primaryContainer
-                                : AppColors.surfaceContainer,
+                            backgroundColor: isHighContrast
+                                ? (isSelected ? const Color(0xFF001F3F) : const Color(0xFFE5E5E5))
+                                : (isSelected
+                                    ? AppColors.primaryContainer
+                                    : AppColors.surfaceContainer),
                             child: Icon(
                               widget.isFrom ? Icons.trip_origin_rounded : Icons.location_on_rounded,
-                              color: isSelected
-                                  ? AppColors.onPrimary
-                                  : (widget.isFrom ? AppColors.secondary : AppColors.error),
+                              color: isHighContrast
+                                  ? (isSelected ? Colors.white : Colors.black)
+                                  : (isSelected
+                                      ? AppColors.onPrimary
+                                      : (widget.isFrom ? AppColors.secondary : AppColors.error)),
                               size: 22,
                             ),
                           ),
@@ -1546,28 +1813,49 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                              color: AppColors.onSurface,
+                              color: isHighContrast ? Colors.black : AppColors.onSurface,
                             ),
                           ),
                           subtitle: Row(
                             children: [
                               if (s.hasRamp) ...[
-                                const Icon(Icons.accessible, size: 14, color: AppColors.secondary),
+                                Icon(Icons.accessible, size: 14, color: isHighContrast ? Colors.black : AppColors.secondary),
                                 const SizedBox(width: 4),
-                                const Text('Ramp  ', style: TextStyle(fontSize: 13, color: AppColors.secondary, fontWeight: FontWeight.w600)),
+                                Text(
+                                  'Ramp  ',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isHighContrast ? Colors.black : AppColors.secondary,
+                                    fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                                  ),
+                                ),
                               ],
                               if (s.hasElevator) ...[
-                                const Icon(Icons.elevator_outlined, size: 14, color: AppColors.primary),
+                                Icon(Icons.elevator_outlined, size: 14, color: isHighContrast ? Colors.black : AppColors.primary),
                                 const SizedBox(width: 4),
-                                const Text('Elevator  ', style: TextStyle(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                                Text(
+                                  'Elevator  ',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isHighContrast ? Colors.black : AppColors.primary,
+                                    fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                                  ),
+                                ),
                               ],
                               if (!s.hasRamp && !s.hasElevator)
-                                const Text('Standard Stop', style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant)),
+                                Text(
+                                  'Standard Stop',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                                    fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                                  ),
+                                ),
                             ],
                           ),
                           trailing: isSelected
-                              ? const Icon(Icons.check_circle, color: AppColors.primaryContainer, size: 26)
-                              : const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.onSurfaceVariant),
+                              ? Icon(Icons.check_circle, color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer, size: 26)
+                              : Icon(Icons.arrow_forward_ios, size: 14, color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant),
                           onTap: () => widget.onSelect(s),
                         );
                       },
@@ -1594,6 +1882,7 @@ class _VoiceSearchModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     final quickSuggestions = stations.take(6).toList();
 
     return SafeArea(
@@ -1612,7 +1901,7 @@ class _VoiceSearchModal extends StatelessWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.outlineVariant,
+                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1622,24 +1911,28 @@ class _VoiceSearchModal extends StatelessWidget {
                 label: 'Voice microphone listening animation',
                 child: CircleAvatar(
                   radius: 36,
-                  backgroundColor: AppColors.primaryFixed,
-                  child: const Icon(Icons.mic, size: 40, color: AppColors.primary),
+                  backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryFixed,
+                  child: Icon(Icons.mic, size: 40, color: isHighContrast ? Colors.white : AppColors.primary),
                 ),
               ),
               const SizedBox(height: 14),
               Text(
                 isFrom ? 'Speak Boarding Stop' : 'Speak Destination Stop',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.onSurface,
+                  color: isHighContrast ? Colors.black : AppColors.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Listening... or tap a suggested stop below:',
-                style: TextStyle(fontSize: 14, color: AppColors.onSurfaceVariant),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                  fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 18),
@@ -1650,11 +1943,17 @@ class _VoiceSearchModal extends StatelessWidget {
                 children: [
                   for (final s in quickSuggestions)
                     ActionChip(
-                      avatar: const Icon(Icons.location_on, size: 16),
+                      avatar: Icon(Icons.location_on, size: 16, color: isHighContrast ? Colors.black : null),
                       label: Text(
                         s.name,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                          color: isHighContrast ? Colors.black : null,
+                        ),
                       ),
+                      backgroundColor: isHighContrast ? Colors.white : null,
+                      side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : null,
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                       onPressed: () => onStationRecognized(s),
                     ),
@@ -1712,89 +2011,92 @@ class _RecentSavedSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.star_rounded, size: 22, color: AppColors.primary),
-            SizedBox(width: 8),
+            Icon(Icons.star_rounded, size: 22, color: isHighContrast ? Colors.black : AppColors.primary),
+            const SizedBox(width: 8),
             Text(
               'Popular Accessible Routes',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
+                color: isHighContrast ? Colors.black : AppColors.onSurface,
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.surfaceVariant),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.onSurface.withValues(alpha: 0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              for (var i = 0; i < _corridors.length; i++) ...[
-                if (i > 0)
-                  const Divider(height: 1, color: AppColors.surfaceVariant),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.surfaceContainer,
-                    child: Icon(
-                      _corridors[i].$6,
-                      color: AppColors.primaryContainer,
-                      size: 24,
+        Material(
+          color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(18),
+          elevation: isHighContrast ? 0 : 1,
+          shadowColor: AppColors.onSurface.withValues(alpha: 0.04),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: isHighContrast
+                  ? Border.all(color: Colors.black, width: 2.0)
+                  : Border.all(color: AppColors.surfaceVariant),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < _corridors.length; i++) ...[
+                  if (i > 0)
+                    Divider(height: 1, color: isHighContrast ? Colors.black : AppColors.surfaceVariant),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
                     ),
-                  ),
-                  title: Text(
-                    _corridors[i].$4,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
+                    leading: CircleAvatar(
+                      backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.surfaceContainer,
+                      child: Icon(
+                        _corridors[i].$6,
+                        color: isHighContrast ? Colors.white : AppColors.primaryContainer,
+                        size: 24,
+                      ),
                     ),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 2),
-                      Text(
-                        _corridors[i].$1,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
+                    title: Text(
+                      _corridors[i].$4,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: isHighContrast ? Colors.black : AppColors.onSurface,
                       ),
-                      Text(
-                        _corridors[i].$5,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.onSurfaceVariant,
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 2),
+                        Text(
+                          _corridors[i].$1,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isHighContrast ? Colors.black : AppColors.primary,
+                          ),
                         ),
-                      ),
-                    ],
+                        Text(
+                          _corridors[i].$5,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                            color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: Icon(Icons.arrow_forward_rounded, size: 18, color: isHighContrast ? Colors.black : AppColors.primary),
+                    onTap: () => onSelectCorridor(_corridors[i].$2, _corridors[i].$3),
                   ),
-                  trailing: const Icon(Icons.arrow_forward_rounded, size: 18, color: AppColors.primary),
-                  onTap: () => onSelectCorridor(_corridors[i].$2, _corridors[i].$3),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ],

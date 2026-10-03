@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 import '../../data/seed_data.dart';
 import '../../logic/bus_matcher.dart';
@@ -10,6 +11,7 @@ import '../../models/bus_route.dart';
 import '../../models/report.dart';
 import '../../models/station.dart';
 import '../../models/trip_model.dart';
+import '../../services/accessibility_preferences_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/trip_service.dart';
 import 'live_journey_screen.dart';
@@ -88,9 +90,9 @@ class RouteResultsScreen extends StatefulWidget {
     this.origin = 'Colombo Fort Station',
     this.destination = 'Kottawa Highway Bus Station',
     this.selectedDate,
-    this.wheelchairAccessRequired = false,
-    this.stepFreeOnly = false,
-    this.minimizeWalking = false,
+    this.wheelchairAccessRequired,
+    this.stepFreeOnly,
+    this.minimizeWalking,
   });
 
   final String fromStationId;
@@ -98,9 +100,9 @@ class RouteResultsScreen extends StatefulWidget {
   final String origin;
   final String destination;
   final DateTime? selectedDate;
-  final bool wheelchairAccessRequired;
-  final bool stepFreeOnly;
-  final bool minimizeWalking;
+  final bool? wheelchairAccessRequired;
+  final bool? stepFreeOnly;
+  final bool? minimizeWalking;
 
   @override
   State<RouteResultsScreen> createState() => _RouteResultsScreenState();
@@ -114,11 +116,19 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   Map<String, BusRoute> _routesMap = {};
   Map<String, Station> _stationsMap = {};
   bool _isLoadingData = true;
-  String _selectedFilterTab = 'All'; // 'All', '♿ Accessible', '⚡ Fastest'
+  late String _selectedFilterTab; // 'All', 'Accessible', 'Fastest'
+  late final bool _isWheelchair;
+  late final bool _isStepFree;
+  late final bool _isMinimizeWalking;
 
   @override
   void initState() {
     super.initState();
+    final prefs = AccessibilityPreferencesService.instance;
+    _isWheelchair = widget.wheelchairAccessRequired ?? prefs.isWheelchairOnly;
+    _isStepFree = widget.stepFreeOnly ?? prefs.isStepFree;
+    _isMinimizeWalking = widget.minimizeWalking ?? prefs.minimizeWalking;
+    _selectedFilterTab = _isWheelchair ? 'Accessible' : 'All';
     _loadInitialData();
   }
 
@@ -205,10 +215,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
     );
 
     // Filter by user's initial search query requirements
-    if (widget.wheelchairAccessRequired) {
-      matchedBuses = matchedBuses.where((bus) => bus.wheelchairAccessible).toList();
-    }
-    if (widget.stepFreeOnly) {
+    if (_isStepFree) {
       matchedBuses = matchedBuses.where((bus) => bus.lowFloor).toList();
     }
 
@@ -340,9 +347,9 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       );
     }).toList();
 
-    // 3. Filter by Tab ('All', '♿ Accessible', '⚡ Fastest')
+    // 3. Filter by Tab ('All', 'Accessible', 'Fastest')
     var filtered = items;
-    if (_selectedFilterTab == '♿ Accessible') {
+    if (_selectedFilterTab == 'Accessible') {
       filtered = filtered
           .where((r) => r.rawBus?.wheelchairAccessible == true || r.rawBus?.hasRamp == true)
           .toList();
@@ -350,8 +357,32 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 
     // 4. Sort
     filtered.sort((a, b) {
-      if (_selectedFilterTab == '⚡ Fastest') {
+      if (_selectedFilterTab == 'Fastest') {
         return a.durationMinutes.compareTo(b.durationMinutes);
+      }
+
+      // Prioritize wheelchair accessible buses when wheelchair access is required
+      // or when the Accessible tab is selected
+      if (_isWheelchair || _selectedFilterTab == 'Accessible') {
+        final aAcc = (a.rawBus?.wheelchairAccessible == true || a.rawBus?.hasRamp == true);
+        final bAcc = (b.rawBus?.wheelchairAccessible == true || b.rawBus?.hasRamp == true);
+        if (aAcc != bAcc) {
+          return aAcc ? -1 : 1; // Accessible buses first
+        }
+
+        final rankA = _statusRank(a.accessibilityStatus);
+        final rankB = _statusRank(b.accessibilityStatus);
+        if (rankA != rankB) {
+          return rankA.compareTo(rankB); // Verified accessible status first
+        }
+      }
+
+      // Prioritize fewer stops / shortest walking distance when minimize walking is enabled
+      if (_isMinimizeWalking) {
+        final stopsComp = a.intermediateStops.length.compareTo(b.intermediateStops.length);
+        if (stopsComp != 0) {
+          return stopsComp;
+        }
       }
 
       // Default: Earliest upcoming bus first
@@ -362,7 +393,6 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
         return timeComp;
       }
 
-      // Secondary: Accessibility priority
       final rankA = _statusRank(a.accessibilityStatus);
       final rankB = _statusRank(b.accessibilityStatus);
       return rankA.compareTo(rankB);
@@ -374,9 +404,10 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+    final isHighContrast = context.isHighContrast;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       body: Column(
         children: [
           _TopBar(
@@ -451,18 +482,18 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                                       ] else ...[
                                         Row(
                                           children: [
-                                            const Icon(
+                                            Icon(
                                               Icons.directions_bus_rounded,
                                               size: 18,
-                                              color: AppColors.primary,
+                                              color: isHighContrast ? Colors.black : AppColors.primary,
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
                                               'Available Buses (${routes.length})',
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w700,
-                                                color: AppColors.onSurface,
+                                                color: isHighContrast ? Colors.black : AppColors.onSurface,
                                               ),
                                             ),
                                           ],
@@ -496,9 +527,10 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   }
 
   Widget _buildEmptyState() {
-    final isFiltered = _selectedFilterTab == '♿ Accessible' ||
-        widget.wheelchairAccessRequired ||
-        widget.stepFreeOnly;
+    final isHighContrast = context.isHighContrast;
+    final isFiltered = _selectedFilterTab == 'Accessible' ||
+        _isWheelchair ||
+        _isStepFree;
 
     final emptyTitle = isFiltered
         ? 'No Accessible Buses Found'
@@ -510,8 +542,11 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: AppColors.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : BorderSide.none,
+      ),
+      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Column(
@@ -519,24 +554,25 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
             Icon(
               isFiltered ? Icons.accessible_forward : Icons.directions_bus_outlined,
               size: 56,
-              color: AppColors.onSurfaceVariant,
+              color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
             ),
             const SizedBox(height: 16),
             Text(
               emptyTitle,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.onSurface,
+                color: isHighContrast ? Colors.black : AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               emptyDesc,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppColors.onSurfaceVariant,
+                color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
             if (isFiltered && _selectedFilterTab == '♿ Accessible') ...[
@@ -560,48 +596,59 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Material(
-      color: AppColors.surfaceContainerLow,
-      elevation: 1,
+      color: context.surfaceColor,
+      elevation: isHighContrast ? 0 : 1,
       shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 56,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: onBack,
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  color: AppColors.primary,
-                  tooltip: 'Back',
-                  iconSize: 26,
-                ),
-                const SizedBox(width: 6),
-                const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Available Buses',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+      child: Container(
+        decoration: BoxDecoration(
+          border: isHighContrast
+              ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+              : null,
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 56,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: isHighContrast ? Colors.black : AppColors.primary,
+                    tooltip: 'Back',
+                    iconSize: context.navIconSize,
+                    constraints: context.appBarActionConstraints,
+                  ),
+                  const SizedBox(width: 6),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Available Buses',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: isHighContrast ? Colors.black : AppColors.primary,
+                        ),
                       ),
-                    ),
-                    Text(
-                      'Select a bus to track live journey',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.onSurfaceVariant,
+                      Text(
+                        'Select a bus to track live journey',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                          fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -626,21 +673,26 @@ class _TripSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     final dateStr = TimeUtils.formatDateString(selectedDate ?? DateTime.now());
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.surfaceVariant),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 2.0)
+            : Border.all(color: AppColors.surfaceVariant),
+        boxShadow: isHighContrast
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.onSurface.withValues(alpha: 0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -648,33 +700,33 @@ class _TripSummaryCard extends StatelessWidget {
           // Origin to Destination Row
           Row(
             children: [
-              const Icon(Icons.trip_origin_rounded, size: 16, color: AppColors.secondary),
+              Icon(Icons.trip_origin_rounded, size: 16, color: isHighContrast ? Colors.black : AppColors.secondary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   origin,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                    color: isHighContrast ? Colors.black : AppColors.onSurface,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6),
-                child: Icon(Icons.arrow_forward_rounded, size: 16, color: AppColors.primary),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Icon(Icons.arrow_forward_rounded, size: 16, color: isHighContrast ? Colors.black : AppColors.primary),
               ),
-              const Icon(Icons.location_on_rounded, size: 16, color: AppColors.error),
+              Icon(Icons.location_on_rounded, size: 16, color: isHighContrast ? const Color(0xFF8B0000) : AppColors.error),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   destination,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                    color: isHighContrast ? Colors.black : AppColors.onSurface,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -683,30 +735,39 @@ class _TripSummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          const Divider(height: 1, color: AppColors.surfaceVariant),
+          Divider(height: 1, color: isHighContrast ? Colors.black : AppColors.surfaceVariant),
           const SizedBox(height: 8),
           // Info row: Date & status
           Row(
             children: [
-              const Icon(Icons.event_note_rounded, size: 15, color: AppColors.onSurfaceVariant),
+              Icon(Icons.event_note_rounded, size: 15, color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant),
               const SizedBox(width: 6),
-              Text(
-                dateStr,
-                style: const TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+              Expanded(
+                child: Text(
+                  dateStr,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                    fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryFixed,
+                  color: isHighContrast ? Colors.white : AppColors.primaryFixed,
                   borderRadius: BorderRadius.circular(6),
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
                 child: Text(
                   '$matchedCount buses available',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: isHighContrast ? Colors.black : AppColors.primary,
                   ),
                 ),
               ),
@@ -746,16 +807,16 @@ class _LmtGoFilterTabs extends StatelessWidget {
           const SizedBox(width: 8),
           _TabItem(
             icon: Icons.accessible_rounded,
-            label: '♿ Accessible ($accessibleCount)',
-            isSelected: selectedTab == '♿ Accessible',
-            onTap: () => onTabSelected('♿ Accessible'),
+            label: 'Accessible ($accessibleCount)',
+            isSelected: selectedTab == 'Accessible',
+            onTap: () => onTabSelected('Accessible'),
           ),
           const SizedBox(width: 8),
           _TabItem(
             icon: Icons.flash_on_rounded,
-            label: '⚡ Fastest',
-            isSelected: selectedTab == '⚡ Fastest',
-            onTap: () => onTabSelected('⚡ Fastest'),
+            label: 'Fastest',
+            isSelected: selectedTab == 'Fastest',
+            onTap: () => onTabSelected('Fastest'),
           ),
         ],
       ),
@@ -778,19 +839,41 @@ class _TabItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final Color bgColor;
+    final Color borderColor;
+    final Color contentColor;
+
+    if (isHighContrast) {
+      bgColor = isSelected ? const Color(0xFF001F3F) : Colors.white;
+      borderColor = Colors.black;
+      contentColor = isSelected ? Colors.white : Colors.black;
+    } else {
+      bgColor = isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerLowest;
+      borderColor = isSelected ? AppColors.primaryContainer : AppColors.outlineVariant;
+      contentColor = isSelected ? AppColors.onPrimary : AppColors.onSurface;
+    }
+
+    final hasLargeTargets = context.hasLargeTargets;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        constraints: BoxConstraints(minHeight: context.chipHeight, minWidth: context.chipHeight),
+        alignment: Alignment.center,
+        padding: EdgeInsets.symmetric(
+          horizontal: hasLargeTargets ? 20 : 16,
+          vertical: hasLargeTargets ? 14 : 10,
+        ),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerLowest,
+          color: bgColor,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: isSelected ? AppColors.primaryContainer : AppColors.outlineVariant,
-            width: isSelected ? 1.5 : 1,
+            color: borderColor,
+            width: isHighContrast ? 2.0 : (isSelected ? 1.5 : 1.0),
           ),
-          boxShadow: isSelected
+          boxShadow: (isSelected && !isHighContrast)
               ? [
                   BoxShadow(
                     color: AppColors.primaryContainer.withValues(alpha: 0.25),
@@ -806,17 +889,17 @@ class _TabItem extends StatelessWidget {
             if (icon != null) ...[
               Icon(
                 icon,
-                size: 16,
-                color: isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant,
+                size: hasLargeTargets ? 20 : 16,
+                color: isHighContrast ? contentColor : (isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant),
               ),
               const SizedBox(width: 6),
             ],
             Text(
               label,
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: isSelected ? AppColors.onPrimary : AppColors.onSurface,
+                fontSize: hasLargeTargets ? 16 : 14,
+                fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                color: contentColor,
               ),
             ),
           ],
@@ -838,126 +921,158 @@ class _LmtGoRouteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
     final rawBus = route.rawBus;
     final hasRamp = rawBus?.wheelchairAccessible == true || rawBus?.hasRamp == true;
     final hasLowFloor = rawBus?.lowFloor == true;
 
-    // LMT Go Status Pill Color
+    // LMT Go Status Pill Color (WCAG AA/AAA compliant contrast)
     final (statusBg, statusFg) = switch (route.liveStatusLabel.toLowerCase()) {
-      'ongoing' => (const Color(0xFFE8F5E9), const Color(0xFF2E7D32)),
-      'approaching' => (const Color(0xFFE3F2FD), const Color(0xFF1565C0)),
-      'delayed' => (const Color(0xFFFFEBEE), const Color(0xFFC62828)),
-      _ => (AppColors.surfaceContainer, AppColors.onSurfaceVariant),
+      'ongoing' => (isHighContrast ? const Color(0xFF003833) : const Color(0xFFE8F5E9), isHighContrast ? Colors.white : const Color(0xFF1B5E20)),
+      'approaching' => (isHighContrast ? const Color(0xFF001F3F) : const Color(0xFFE3F2FD), isHighContrast ? Colors.white : const Color(0xFF0D47A1)),
+      'delayed' => (isHighContrast ? const Color(0xFF8B0000) : const Color(0xFFFFEBEE), isHighContrast ? Colors.white : const Color(0xFFB71C1C)),
+      _ => (isHighContrast ? const Color(0xFF1A1A1A) : AppColors.surfaceContainer, isHighContrast ? Colors.white : AppColors.onSurfaceVariant),
     };
 
     return Material(
-      color: AppColors.surfaceContainerLowest,
+      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
       borderRadius: BorderRadius.circular(16),
-      elevation: 1,
+      elevation: isHighContrast ? 0 : 1,
       shadowColor: AppColors.onSurface.withValues(alpha: 0.06),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.symmetric(
+            horizontal: hasLargeTargets ? 16 : 14,
+            vertical: hasLargeTargets ? 18 : 14,
+          ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: route.recommended ? AppColors.secondary : AppColors.surfaceVariant,
-              width: route.recommended ? 1.5 : 1,
+              color: isHighContrast
+                  ? Colors.black
+                  : (route.recommended ? AppColors.secondary : AppColors.surfaceVariant),
+              width: isHighContrast ? 2.0 : (route.recommended ? 1.5 : 1),
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Top Row: Route Badge (like LMT Go's red "CM01"), Bus Number, Status Pill, and Bold Price
+              // 1. Top Row: Route Badge, Bus Number, Status Pill, and Bold Price
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Prominent Route Code Badge (LMT Go style red badge)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFC62828), // High-visibility crimson
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      route.routeNo ?? 'Route',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Bus Plate Number
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  Expanded(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const Icon(Icons.directions_bus, size: 14, color: AppColors.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text(
-                          route.busNo ?? route.busId,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Live Status Pill (Ongoing / Scheduled / Delayed)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusBg,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                        // Prominent Route Code Badge
                         Container(
-                          width: 6,
-                          height: 6,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hasLargeTargets ? 10 : 8,
+                            vertical: hasLargeTargets ? 6 : 4,
+                          ),
                           decoration: BoxDecoration(
-                            color: statusFg,
-                            shape: BoxShape.circle,
+                            color: isHighContrast ? const Color(0xFF8B0000) : const Color(0xFFC62828),
+                            borderRadius: BorderRadius.circular(8),
+                            border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                          ),
+                          child: Text(
+                            route.routeNo ?? 'Route',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: hasLargeTargets ? 14 : 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          route.liveStatusLabel,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: statusFg,
+
+                        // Bus Plate Number
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hasLargeTargets ? 8 : 6,
+                            vertical: hasLargeTargets ? 5 : 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.5),
+                              width: isHighContrast ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.directions_bus,
+                                size: hasLargeTargets ? 15 : 13,
+                                color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                route.busNo ?? route.busId,
+                                style: TextStyle(
+                                  fontSize: hasLargeTargets ? 13 : 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isHighContrast ? Colors.black : AppColors.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Live Status Pill (Ongoing / Scheduled / Delayed)
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hasLargeTargets ? 8 : 6,
+                            vertical: hasLargeTargets ? 5 : 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusBg,
+                            borderRadius: BorderRadius.circular(999),
+                            border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: isHighContrast ? Colors.white : statusFg,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                route.liveStatusLabel,
+                                style: TextStyle(
+                                  fontSize: hasLargeTargets ? 11 : 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: statusFg,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-
-                  const Spacer(),
+                  const SizedBox(width: 8),
 
                   // Estimated Price in LKR (Right-aligned, bold)
                   Text(
                     'LKR ${route.estimatedPriceLkr}',
-                    style: const TextStyle(
-                      fontSize: 18,
+                    style: TextStyle(
+                      fontSize: hasLargeTargets ? 19 : 17,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
+                      color: isHighContrast ? Colors.black : AppColors.primary,
                     ),
                   ),
                 ],
@@ -970,10 +1085,10 @@ class _LmtGoRouteCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       '${route.origin} ➔ ${route.destination}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
+                        color: isHighContrast ? Colors.black : AppColors.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -987,8 +1102,9 @@ class _LmtGoRouteCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLow,
+                  color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(12),
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
                 child: Row(
                   children: [
@@ -996,21 +1112,21 @@ class _LmtGoRouteCard extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Departs at',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.onSurfaceVariant,
+                            color: isHighContrast ? const Color(0xFF2B2B2B) : AppColors.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           route.departureTimeStr,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.onSurface,
+                            color: isHighContrast ? Colors.black : AppColors.onSurface,
                           ),
                         ),
                       ],
@@ -1024,10 +1140,10 @@ class _LmtGoRouteCard extends StatelessWidget {
                           children: [
                             Text(
                               '~${route.durationMinutes} min',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
+                                color: isHighContrast ? Colors.black : AppColors.primary,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -1036,21 +1152,21 @@ class _LmtGoRouteCard extends StatelessWidget {
                                 Container(
                                   width: 6,
                                   height: 6,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.secondary,
+                                  decoration: BoxDecoration(
+                                    color: isHighContrast ? Colors.black : AppColors.secondary,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
-                                const Expanded(
+                                Expanded(
                                   child: Divider(
                                     thickness: 1.5,
-                                    color: AppColors.outlineVariant,
+                                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
                                   ),
                                 ),
-                                const Icon(
+                                Icon(
                                   Icons.arrow_forward_rounded,
                                   size: 16,
-                                  color: AppColors.primary,
+                                  color: isHighContrast ? Colors.black : AppColors.primary,
                                 ),
                               ],
                             ),
@@ -1063,21 +1179,21 @@ class _LmtGoRouteCard extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text(
+                        Text(
                           'Arrives at',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.onSurfaceVariant,
+                            color: isHighContrast ? const Color(0xFF2B2B2B) : AppColors.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           route.arrivalTimeStr,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.onSurface,
+                            color: isHighContrast ? Colors.black : AppColors.onSurface,
                           ),
                         ),
                       ],
@@ -1096,25 +1212,25 @@ class _LmtGoRouteCard extends StatelessWidget {
                       _MiniFeatureBadge(
                         icon: Icons.accessible_rounded,
                         label: 'Ramp Available',
-                        color: AppColors.secondary,
-                        bgColor: AppColors.secondaryContainer.withValues(alpha: 0.4),
+                        color: isHighContrast ? Colors.black : AppColors.secondary,
+                        bgColor: isHighContrast ? Colors.white : AppColors.secondaryContainer.withValues(alpha: 0.4),
                       ),
                       const SizedBox(width: 6),
                     ],
                     if (hasLowFloor) ...[
-                      const _MiniFeatureBadge(
+                      _MiniFeatureBadge(
                         icon: Icons.elevator_outlined,
                         label: 'Low Floor',
-                        color: AppColors.primary,
-                        bgColor: AppColors.primaryFixed,
+                        color: isHighContrast ? Colors.black : AppColors.primary,
+                        bgColor: isHighContrast ? Colors.white : AppColors.primaryFixed,
                       ),
                       const SizedBox(width: 6),
                     ],
                     _MiniFeatureBadge(
                       icon: Icons.people_outline_rounded,
                       label: '${route.crowdLevel} Crowd',
-                      color: AppColors.onSurfaceVariant,
-                      bgColor: AppColors.surfaceContainer,
+                      color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                      bgColor: isHighContrast ? Colors.white : AppColors.surfaceContainer,
                     ),
                     const SizedBox(width: 6),
                     if (route.isLive)
@@ -1145,23 +1261,25 @@ class _MiniFeatureBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: isHighContrast ? Colors.white : bgColor,
         borderRadius: BorderRadius.circular(8),
+        border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
+          Icon(icon, size: 14, color: isHighContrast ? Colors.black : color),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: color,
+              fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+              color: isHighContrast ? Colors.black : color,
             ),
           ),
         ],
@@ -1170,7 +1288,6 @@ class _MiniFeatureBadge extends StatelessWidget {
   }
 }
 
-
 class _LiveTripBadge extends StatelessWidget {
   const _LiveTripBadge({required this.busId});
 
@@ -1178,6 +1295,7 @@ class _LiveTripBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
     return StreamBuilder<TripModel?>(
       stream: TripService().watchActiveTripForBus(busId),
       builder: (context, snapshot) {
@@ -1191,21 +1309,24 @@ class _LiveTripBadge extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.green.withValues(alpha: 0.15),
+            color: isHighContrast ? Colors.white : Colors.green.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.green.shade600, width: 1),
+            border: Border.all(
+              color: isHighContrast ? Colors.black : Colors.green.shade600,
+              width: isHighContrast ? 1.5 : 1.0,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.directions_bus_filled, size: 14, color: Colors.green.shade700),
+              Icon(Icons.directions_bus_filled, size: 14, color: isHighContrast ? Colors.black : Colors.green.shade800),
               const SizedBox(width: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: Colors.green.shade800,
+                  color: isHighContrast ? Colors.black : Colors.green.shade900,
                 ),
               ),
             ],

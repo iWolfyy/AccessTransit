@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 import '../../data/seed_data.dart';
 import '../../logic/delay_eta_logic.dart';
@@ -21,6 +22,7 @@ import '../../services/trip_service.dart';
 import '../../models/trip_model.dart';
 import '../../models/station.dart';
 import '../../widgets/add_station_dialog.dart';
+import '../../widgets/logout_confirmation_dialog.dart';
 import '../auth/login_screen.dart';
 
 
@@ -173,7 +175,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       // Past the final scheduled stop
       return _BusRunStatus(
         label: 'Departed',
-        color: Colors.grey,
+        color: const Color(0xFF5D616B), // WCAG AA 6.1:1 on white (was Colors.grey 2.8:1)
         icon: Icons.check_circle_outline,
         sortKey: 2000 + minsToEnd.abs(), // departed at the bottom
       );
@@ -584,8 +586,12 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         foregroundColor: AppColors.onPrimary,
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_location_alt_outlined),
+            icon: Icon(Icons.add_location_alt_outlined, size: context.tapIconSize),
             tooltip: 'Add Station to Route',
+            constraints: BoxConstraints(
+              minWidth: context.minTapHeight,
+              minHeight: context.minTapHeight,
+            ),
             onPressed: () {
               AddStationDialog.show(
                 context,
@@ -596,8 +602,12 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
           ),
           if (kDebugMode)
             IconButton(
-              icon: const Icon(Icons.cloud_upload_outlined),
+              icon: Icon(Icons.cloud_upload_outlined, size: context.tapIconSize),
               tooltip: 'Seed Firestore Data (Debug)',
+              constraints: BoxConstraints(
+                minWidth: context.minTapHeight,
+                minHeight: context.minTapHeight,
+              ),
               onPressed: () async {
                 try {
                   await SeedData().seedAll();
@@ -610,17 +620,30 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               },
             ),
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: Icon(Icons.logout, size: context.tapIconSize),
+            constraints: BoxConstraints(
+              minWidth: context.minTapHeight,
+              minHeight: context.minTapHeight,
+            ),
             onPressed: () async {
               final nav = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+              final isHighContrast = context.isHighContrast;
+
+              final confirmed = await showLogoutConfirmationDialog(context);
+              if (confirmed != true) return;
+
               if (_isTripActive) {
                 await _stopTrip();
               }
               await _authService.logout();
-              if (!mounted) return;
               nav.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
+              );
+              showLogoutSuccessSnackBar(
+                messenger: messenger,
+                isHighContrast: isHighContrast,
               );
             },
             tooltip: 'Sign out',
@@ -711,7 +734,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             ),
             const SizedBox(height: 20),
             SizedBox(
-              height: 52,
+              height: context.buttonHeight,
               width: double.infinity,
               child: _isInitializing
                   ? const Center(child: CircularProgressIndicator())
@@ -848,7 +871,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                             children: [
                               Expanded(
                                 child: SizedBox(
-                                  height: 48,
+                                  height: context.buttonHeight,
                                   child: FilledButton.icon(
                                     onPressed: hasNextStop
                                         ? () async {
@@ -900,14 +923,14 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                                       foregroundColor: AppColors.onPrimary,
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
-                                    icon: const Icon(Icons.check_circle_rounded, size: 20),
+                                    icon: Icon(Icons.check_circle_rounded, size: context.tapIconSize),
                                     label: Text(hasNextStop ? 'Next Stop Reached' : 'Final Stop Reached'),
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 8),
                               SizedBox(
-                                height: 48,
+                                height: context.buttonHeight,
                                 child: OutlinedButton.icon(
                                   onPressed: () => _stopTrip(),
                                   style: OutlinedButton.styleFrom(
@@ -915,7 +938,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                                     side: const BorderSide(color: AppColors.error),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
-                                  icon: const Icon(Icons.flag_rounded, size: 18),
+                                  icon: Icon(Icons.flag_rounded, size: context.tapIconSize),
                                   label: const Text('End Trip'),
                                 ),
                               ),
@@ -1122,7 +1145,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                     ),
                   ],
                   SizedBox(
-                    height: 40,
+                    height: context.minTapHeight,
                     child: OutlinedButton.icon(
                       onPressed: () => _showReportDelayBottomSheet(
                         currentReason: loc?.delayReason,
@@ -1135,7 +1158,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      icon: const Icon(Icons.traffic_rounded, size: 18),
+                      icon: Icon(Icons.traffic_rounded, size: context.tapIconSize),
                       label: Text(
                         hasActiveDelay
                             ? 'Update Delay / Traffic Reason'
@@ -2411,8 +2434,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   _showSnack('Request acknowledged');
                 },
                 style: OutlinedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  minimumSize: Size(0, context.minTapHeight),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),
                 child: const Text('Acknowledge'),
               ),
@@ -2428,10 +2451,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.green.shade700,
                   foregroundColor: Colors.white,
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  minimumSize: Size(0, context.minTapHeight),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),
-                icon: const Icon(Icons.check, size: 16),
+                icon: Icon(Icons.check, size: context.tapIconSize),
                 label: const Text('Complete'),
               ),
             ],

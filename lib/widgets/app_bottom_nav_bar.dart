@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_theme.dart';
 
 /// Shared bottom navigation bar used by the [MainShell].
 ///
@@ -41,26 +42,37 @@ class AppBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 8,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            children: [
-              for (final tab in _tabs)
-                Expanded(
-                  child: _NavItem(
-                    icon: currentTab == tab.label ? tab.activeIcon : tab.icon,
-                    label: tab.label,
-                    selected: currentTab == tab.label,
-                    onTap: () => onTabSelected(tab.label),
+    final isHighContrast = context.isHighContrast;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isHighContrast ? Colors.white : AppColors.surface,
+        border: isHighContrast
+            ? const Border(top: BorderSide(color: Colors.black, width: 2.0))
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        elevation: isHighContrast ? 0 : 8,
+        shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: context.navBarHeight,
+            child: Row(
+              children: [
+                for (final tab in _tabs)
+                  Expanded(
+                    child: _NavItem(
+                      icon: currentTab == tab.label ? tab.activeIcon : tab.icon,
+                      label: tab.label,
+                      selected: currentTab == tab.label,
+                      isHighContrast: isHighContrast,
+                      onTap: () => onTabSelected(tab.label),
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -86,25 +98,45 @@ class _NavItem extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.selected = false,
+    this.isHighContrast = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool selected;
+  final bool isHighContrast;
 
   @override
   Widget build(BuildContext context) {
+    final activeBg = isHighContrast
+        ? const Color(0xFF001F3F)
+        : AppColors.primaryContainer;
+    final activeFg = Colors.white;
+    final inactiveFg = isHighContrast
+        ? Colors.black
+        : AppColors.onSurfaceVariant;
+    final hasLargeTargets = context.hasLargeTargets;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        margin: EdgeInsets.symmetric(
+          horizontal: 4,
+          vertical: hasLargeTargets ? 4 : 6,
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: hasLargeTargets ? 6 : 4,
+        ),
         decoration: selected
             ? BoxDecoration(
-                color: AppColors.primaryContainer,
+                color: activeBg,
                 borderRadius: BorderRadius.circular(12),
+                border: isHighContrast
+                    ? Border.all(color: Colors.black, width: 2.0)
+                    : null,
               )
             : null,
         child: Column(
@@ -113,10 +145,8 @@ class _NavItem extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 22,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
+              size: context.navIconSize,
+              color: selected ? activeFg : inactiveFg,
             ),
             const SizedBox(height: 2),
             Text(
@@ -124,12 +154,10 @@ class _NavItem extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: hasLargeTargets ? 13 : 11,
                 height: 14 / 11,
-                fontWeight: FontWeight.w600,
-                color: selected
-                    ? AppColors.onPrimaryContainer
-                    : AppColors.onSurfaceVariant,
+                fontWeight: selected ? FontWeight.w800 : (isHighContrast ? FontWeight.w700 : FontWeight.w600),
+                color: selected ? activeFg : inactiveFg,
               ),
             ),
           ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
 import '../models/user_model.dart';
 import '../widgets/app_bottom_nav_bar.dart';
 import 'community/community_screen.dart';
@@ -46,6 +47,7 @@ class MainShellState extends State<MainShell> {
     final isDesktop = MediaQuery.sizeOf(context).width >= 768;
 
     return Scaffold(
+      backgroundColor: context.surfaceColor,
       body: IndexedStack(
         index: _currentIndex,
         children: [

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../auth/login_screen.dart';
 import 'community_reporting_page.dart';
 import 'navigate_with_confidence_page.dart';
@@ -99,21 +100,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark.copyWith(
         statusBarColor: Colors.transparent,
-        systemNavigationBarColor: AppColors.surfaceBright,
+        systemNavigationBarColor: context.surfaceColor,
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        backgroundColor: AppColors.surfaceBright,
+        backgroundColor: context.surfaceColor,
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 448),
               child: Column(
                 children: [
-                  _buildHeader(),
+                  _buildHeader(isHC),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
@@ -143,9 +145,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ),
                           ),
                           const SizedBox(height: 24),
-                          _buildProgress(),
+                          _buildProgress(isHC),
                           const SizedBox(height: 24),
-                          _buildNextButton(),
+                          _buildNextButton(isHC),
                         ],
                       ),
                     ),
@@ -159,26 +161,26 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isHC) {
     return SizedBox(
-      height: 48,
+      height: context.minTapHeight,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.blind,
-              color: AppColors.primary,
-              size: 24,
+              color: isHC ? Colors.black : AppColors.primary,
+              size: context.tapIconSize,
             ),
             const SizedBox(width: 4),
-            const Text(
+            Text(
               'Access Transit',
               style: TextStyle(
                 fontSize: 18,
                 height: 24 / 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.primary,
+                color: isHC ? Colors.black : AppColors.primary,
               ),
             ),
             const Spacer(),
@@ -187,14 +189,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               child: TextButton(
                 onPressed: _finish,
                 style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  minimumSize: const Size(48, 48),
+                  foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                  minimumSize: Size(context.minTapHeight, context.minTapHeight),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   shape: const StadiumBorder(),
-                  textStyle: const TextStyle(
-                    fontSize: 14,
+                  textStyle: TextStyle(
+                    fontSize: context.buttonFontSize,
                     height: 20 / 14,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
                     letterSpacing: 0.1,
                   ),
                 ),
@@ -207,7 +209,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  Widget _buildProgress() {
+  Widget _buildProgress(bool isHC) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(OnboardingScreen.stepCount, (index) {
@@ -223,20 +225,23 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             right: index == OnboardingScreen.stepCount - 1 ? 0 : 4,
           ),
           decoration: BoxDecoration(
-            color: isActive ? AppColors.primary : AppColors.surfaceVariant,
+            color: isActive
+                ? (isHC ? Colors.black : AppColors.primary)
+                : (isHC ? Colors.white : AppColors.surfaceVariant),
             borderRadius: BorderRadius.circular(999),
+            border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
           ),
         );
       }),
     );
   }
 
-  Widget _buildNextButton() {
+  Widget _buildNextButton(bool isHC) {
     return ScaleTransition(
       scale: _buttonScale,
       child: SizedBox(
         width: double.infinity,
-        height: 48,
+        height: context.buttonHeight,
         child: Listener(
           onPointerDown: (_) => _buttonScaleController.forward(),
           onPointerUp: (_) => _buttonScaleController.reverse(),
@@ -244,14 +249,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           child: FilledButton(
             onPressed: _onNext,
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primaryContainer,
-              foregroundColor: AppColors.onPrimary,
+              backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
+                side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
               ),
               elevation: 0,
-              textStyle: const TextStyle(
-                fontSize: 14,
+              textStyle: TextStyle(
+                fontSize: context.buttonFontSize,
                 height: 20 / 14,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.1,
