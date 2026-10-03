@@ -7,10 +7,14 @@ import '../../core/theme/app_theme.dart';
 import '../../models/journey_model.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../models/enums/user_role.dart';
 import '../../services/journey_service.dart';
 import '../auth/login_screen.dart';
 import '../journey/journey_search_screen.dart';
 import '../main_shell.dart';
+import '../operator/operator_dashboard_screen.dart';
+import '../preferences/accessibility_preferences_screen.dart';
+import '../profile/rewards_contributions_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.initialUser});
@@ -130,6 +134,20 @@ class _HomeScreenState extends State<HomeScreen> {
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
+  String get _roleLabel {
+    switch (_user?.role) {
+      case UserRole.contributor:
+        return 'Community Contributor';
+      case UserRole.operator:
+        return 'Transit Bus Operator';
+      case UserRole.admin:
+        return 'System Administrator';
+      case UserRole.passenger:
+      case null:
+        return 'Inclusive Commuter';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
@@ -140,11 +158,33 @@ class _HomeScreenState extends State<HomeScreen> {
       drawer: _HomeDrawer(
         user: _user,
         initials: _initials,
+        roleLabel: _roleLabel,
         onLogout: _logout,
-        onProfile: () {
-          Navigator.of(context).pop();
-          _openProfile();
+        onNavTap: _onNavTap,
+        onAccessibilityTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => AccessibilityPreferencesScreen(
+                initialUser: _user,
+              ),
+            ),
+          );
         },
+        onRewardsTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const RewardsContributionsScreen(),
+            ),
+          );
+        },
+        onOperatorTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const OperatorDashboardScreen(),
+            ),
+          );
+        },
+        onFeatureTap: _showComingSoon,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -227,110 +267,275 @@ class _HomeDrawer extends StatelessWidget {
   const _HomeDrawer({
     required this.user,
     required this.initials,
+    required this.roleLabel,
     required this.onLogout,
-    required this.onProfile,
+    required this.onNavTap,
+    required this.onAccessibilityTap,
+    required this.onRewardsTap,
+    required this.onOperatorTap,
+    required this.onFeatureTap,
   });
 
   final UserModel? user;
   final String initials;
+  final String roleLabel;
   final VoidCallback onLogout;
-  final VoidCallback onProfile;
+  final void Function(String label) onNavTap;
+  final VoidCallback onAccessibilityTap;
+  final VoidCallback onRewardsTap;
+  final VoidCallback onOperatorTap;
+  final void Function(String label) onFeatureTap;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+    final isOperatorOrAdmin = user?.role == UserRole.operator || user?.role == UserRole.admin;
 
     return Drawer(
-      backgroundColor: isHighContrast ? Colors.white : null,
+      backgroundColor: isHighContrast ? Colors.white : context.surfaceColor,
       child: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
-                border: isHighContrast
-                    ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
-                    : null,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: isHighContrast ? Colors.white : AppColors.primaryContainer,
-                    foregroundColor: isHighContrast ? Colors.black : AppColors.onPrimaryContainer,
-                    child: Text(
-                      initials,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                  // Drawer Header
+                  DrawerHeader(
+                    decoration: BoxDecoration(
+                      color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                      border: isHighContrast
+                          ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+                          : null,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: hasLargeTargets ? 30 : 26,
+                              backgroundColor: isHighContrast ? Colors.white : AppColors.primaryContainer,
+                              foregroundColor: isHighContrast ? Colors.black : AppColors.onPrimaryContainer,
+                              child: Text(
+                                initials,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: hasLargeTargets ? 18 : 16,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.20),
+                                borderRadius: BorderRadius.circular(12),
+                                border: isHighContrast ? Border.all(color: Colors.white, width: 1.5) : null,
+                              ),
+                              child: Text(
+                                roleLabel,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          user?.name.isNotEmpty == true ? user!.name : 'Passenger',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: hasLargeTargets ? 20 : 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          user?.email ?? '',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    user?.name.isNotEmpty == true ? user!.name : 'Passenger',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+
+                  // Navigation Tabs
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.home_rounded,
+                    title: 'Home',
+                    selected: true,
+                    onTap: () => Navigator.pop(context),
                   ),
-                  Text(
-                    user?.email ?? '',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.directions_bus_rounded,
+                    title: 'Plan Journey',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onNavTap('Plan');
+                    },
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.people_rounded,
+                    title: 'Community',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onNavTap('Community');
+                    },
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.person_rounded,
+                    title: 'Profile',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onNavTap('Profile');
+                    },
+                  ),
+
+                  Divider(
+                    height: 1,
+                    thickness: isHighContrast ? 2.0 : 1.0,
+                    color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.3),
+                  ),
+
+                  // Settings & Features
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.settings_accessibility_rounded,
+                    title: 'Accessibility Preferences',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onAccessibilityTap();
+                    },
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.stars_rounded,
+                    title: 'Rewards & Contributions',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onRewardsTap();
+                    },
+                  ),
+                  if (isOperatorOrAdmin)
+                    _buildDrawerTile(
+                      context,
+                      icon: Icons.dashboard_rounded,
+                      title: 'Operator Dashboard',
+                      onTap: () {
+                        Navigator.pop(context);
+                        onOperatorTap();
+                      },
+                    ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.bookmark_rounded,
+                    title: 'Saved Places',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onFeatureTap('Saved Places');
+                    },
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.help_outline_rounded,
+                    title: 'Help & Support',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onFeatureTap('Help & Support');
+                    },
                   ),
                 ],
               ),
             ),
-            ListTile(
-              leading: Icon(
-                Icons.home,
-                color: isHighContrast ? Colors.black : AppColors.primary,
-              ),
-              title: Text(
-                'Home',
-                style: TextStyle(
-                  color: isHighContrast ? Colors.black : null,
-                  fontWeight: isHighContrast ? FontWeight.w800 : null,
-                ),
-              ),
-              selected: true,
-              selectedTileColor: isHighContrast ? const Color(0xFFE5E5E5) : null,
-              onTap: () => Navigator.pop(context),
+
+            // Bottom Logout Tile
+            Divider(
+              height: 1,
+              thickness: isHighContrast ? 2.0 : 1.0,
+              color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.3),
             ),
-            ListTile(
-              leading: Icon(
-                Icons.person_outline,
-                color: isHighContrast ? Colors.black : AppColors.primary,
-              ),
-              title: Text(
-                'Profile',
-                style: TextStyle(
-                  color: isHighContrast ? Colors.black : null,
-                  fontWeight: isHighContrast ? FontWeight.w700 : null,
-                ),
-              ),
-              onTap: onProfile,
-            ),
-            const Spacer(),
-            ListTile(
-              leading: Icon(
-                Icons.logout,
-                color: isHighContrast ? Colors.black : null,
-              ),
-              title: Text(
-                'Log out',
-                style: TextStyle(
-                  color: isHighContrast ? Colors.black : null,
-                  fontWeight: isHighContrast ? FontWeight.w700 : null,
-                ),
-              ),
+            _buildDrawerTile(
+              context,
+              icon: Icons.logout_rounded,
+              title: 'Log out',
+              titleColor: isHighContrast ? Colors.black : AppColors.error,
+              iconColor: isHighContrast ? Colors.black : AppColors.error,
               onTap: () {
                 Navigator.pop(context);
                 onLogout();
               },
             ),
+            const SizedBox(height: 8),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool selected = false,
+    Color? iconColor,
+    Color? titleColor,
+  }) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+
+    final effectiveIconColor = iconColor ??
+        (isHighContrast
+            ? Colors.black
+            : (selected ? AppColors.primary : AppColors.onSurfaceVariant));
+
+    final effectiveTitleColor = titleColor ??
+        (isHighContrast
+            ? Colors.black
+            : (selected ? AppColors.primary : context.textColor));
+
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        selected: selected,
+        selectedTileColor: isHighContrast
+            ? const Color(0xFFE5E5E5)
+            : AppColors.primaryContainer.withValues(alpha: 0.25),
+        dense: !hasLargeTargets,
+        minVerticalPadding: hasLargeTargets ? 16 : 8,
+        minLeadingWidth: 28,
+        leading: Icon(
+          icon,
+          size: context.tapIconSize,
+          color: effectiveIconColor,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: hasLargeTargets ? 17 : 15,
+            fontWeight: selected
+                ? FontWeight.w800
+                : (isHighContrast ? FontWeight.w700 : FontWeight.w600),
+            color: effectiveTitleColor,
+          ),
+        ),
+        onTap: onTap,
       ),
     );
   }
@@ -583,12 +788,13 @@ class _IconCircleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 48,
-      height: 48,
+      width: context.minTapHeight,
+      height: context.minTapHeight,
       child: IconButton(
         onPressed: onPressed,
         icon: Icon(
           icon,
+          size: context.tapIconSize,
           color: isHighContrast ? Colors.black : AppColors.primary,
         ),
       ),
@@ -612,8 +818,8 @@ class _AvatarButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 48,
-      height: 48,
+      width: context.minTapHeight,
+      height: context.minTapHeight,
       child: IconButton(
         onPressed: onPressed,
         padding: EdgeInsets.zero,
@@ -653,6 +859,7 @@ class _WhereToSearch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
 
     return Material(
       color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
@@ -664,7 +871,7 @@ class _WhereToSearch extends StatelessWidget {
           decoration: InputDecoration(
             hintText: 'Where to?',
             hintStyle: TextStyle(
-              fontSize: 16,
+              fontSize: hasLargeTargets ? 18 : 16,
               height: 24 / 16,
               color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
               fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
@@ -672,12 +879,14 @@ class _WhereToSearch extends StatelessWidget {
             prefixIcon: Icon(
               Icons.search,
               color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
-              size: isHighContrast ? 26 : 24,
+              size: hasLargeTargets ? 30 : (isHighContrast ? 26 : 24),
             ),
             filled: true,
             fillColor: Colors.transparent,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: hasLargeTargets ? 26 : 20,
+            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: isHighContrast
@@ -694,7 +903,7 @@ class _WhereToSearch extends StatelessWidget {
           child: Text(
             'Where to?',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: hasLargeTargets ? 18 : 16,
               height: 24 / 16,
               color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
               fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
@@ -733,7 +942,9 @@ class _FavoritesSection extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: isDesktop ? 16 : 12,
           mainAxisSpacing: isDesktop ? 16 : 12,
-          childAspectRatio: isDesktop ? 1.35 : 1.15,
+          childAspectRatio: isDesktop
+              ? (context.hasLargeTargets ? 1.2 : 1.35)
+              : (context.hasLargeTargets ? 1.02 : 1.15),
           children: [
             _FavoriteCard(
               icon: Icons.home,
@@ -792,6 +1003,11 @@ class _FavoriteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+    final circleSize = hasLargeTargets ? 58.0 : 48.0;
+    final iconSize = hasLargeTargets ? 28.0 : 24.0;
+    final labelSize = hasLargeTargets ? 16.0 : 14.0;
+    final subtitleSize = hasLargeTargets ? 13.0 : 12.0;
 
     return Material(
       color: isHighContrast
@@ -813,13 +1029,13 @@ class _FavoriteCard extends StatelessWidget {
           child: CustomPaint(
             painter: (dashed && !isHighContrast) ? const _DashedBorderPainter() : null,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(hasLargeTargets ? 18 : 16),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: circleSize,
+                    height: circleSize,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isHighContrast
@@ -833,6 +1049,7 @@ class _FavoriteCard extends StatelessWidget {
                     ),
                     child: Icon(
                       icon,
+                      size: iconSize,
                       color: isHighContrast
                           ? Colors.black
                           : (dashed ? AppColors.onSurfaceVariant : AppColors.primary),
@@ -842,7 +1059,7 @@ class _FavoriteCard extends StatelessWidget {
                   Text(
                     label,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: labelSize,
                       height: 20 / 14,
                       fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
                       letterSpacing: 0.1,
@@ -856,7 +1073,7 @@ class _FavoriteCard extends StatelessWidget {
                     Text(
                       subtitle!,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: subtitleSize,
                         height: 16 / 12,
                         fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
                         color: isHighContrast
@@ -1150,6 +1367,7 @@ class _ActiveJourneyBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
 
     return Material(
       color: isHighContrast
@@ -1161,7 +1379,7 @@ class _ActiveJourneyBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(hasLargeTargets ? 20 : 16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -1174,8 +1392,8 @@ class _ActiveJourneyBanner extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: hasLargeTargets ? 54 : 48,
+                height: hasLargeTargets ? 54 : 48,
                 decoration: BoxDecoration(
                   color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
@@ -1183,10 +1401,10 @@ class _ActiveJourneyBanner extends StatelessWidget {
                       ? Border.all(color: Colors.black, width: 1.5)
                       : null,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.directions_bus_rounded,
                   color: Colors.white,
-                  size: 28,
+                  size: hasLargeTargets ? 32 : 28,
                 ),
               ),
               const SizedBox(width: 16),
@@ -1203,7 +1421,7 @@ class _ActiveJourneyBanner extends StatelessWidget {
                                 : 'Active Journey',
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: hasLargeTargets ? 18 : 16,
                               fontWeight: FontWeight.w700,
                               color: isHighContrast ? Colors.black : AppColors.onSurface,
                             ),
@@ -1239,7 +1457,7 @@ class _ActiveJourneyBanner extends StatelessWidget {
                       '${journey.origin} → ${journey.destination}',
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: hasLargeTargets ? 15 : 14,
                         color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
                         fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
                       ),
@@ -1248,7 +1466,7 @@ class _ActiveJourneyBanner extends StatelessWidget {
                     Text(
                       'Tap to resume live tracking →',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: hasLargeTargets ? 14 : 13,
                         fontWeight: FontWeight.w700,
                         color: isHighContrast ? Colors.black : AppColors.primary,
                       ),
@@ -1272,6 +1490,7 @@ class _RecentJourneyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1288,7 +1507,7 @@ class _RecentJourneyCard extends StatelessWidget {
         const SizedBox(height: 16),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(hasLargeTargets ? 20 : 16),
           decoration: BoxDecoration(
             color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(12),
@@ -1304,9 +1523,10 @@ class _RecentJourneyCard extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final stacked = constraints.maxWidth < 520;
+              final mapBoxSize = hasLargeTargets ? 108.0 : 96.0;
               final map = Container(
-                width: stacked ? double.infinity : 96,
-                height: 96,
+                width: stacked ? double.infinity : mapBoxSize,
+                height: mapBoxSize,
                 decoration: BoxDecoration(
                   color: isHighContrast ? const Color(0xFFE5E5E5) : AppColors.surfaceContainer,
                   borderRadius: BorderRadius.circular(8),
@@ -1315,7 +1535,7 @@ class _RecentJourneyCard extends StatelessWidget {
                 child: Icon(
                   Icons.map,
                   color: isHighContrast ? Colors.black : AppColors.primary,
-                  size: 36,
+                  size: hasLargeTargets ? 42 : 36,
                 ),
               );
 
@@ -1327,7 +1547,7 @@ class _RecentJourneyCard extends StatelessWidget {
                     'Central Station to Library',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: hasLargeTargets ? 20 : 18,
                       height: 24 / 18,
                       fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
                       color: isHighContrast ? Colors.black : AppColors.onSurface,
@@ -1337,7 +1557,7 @@ class _RecentJourneyCard extends StatelessWidget {
                   Text(
                     'Yesterday, 2:45 PM',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: hasLargeTargets ? 15 : 14,
                       height: 20 / 14,
                       color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
                       fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
@@ -1347,7 +1567,7 @@ class _RecentJourneyCard extends StatelessWidget {
               );
 
               final button = SizedBox(
-                height: 48,
+                height: context.buttonHeight,
                 width: stacked ? double.infinity : null,
                 child: FilledButton(
                   onPressed: onReplan,
@@ -1359,9 +1579,12 @@ class _RecentJourneyCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Re-plan',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: context.buttonFontSize,
+                    ),
                   ),
                 ),
               );
@@ -1403,6 +1626,7 @@ class _AssistanceFab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
 
     return Material(
       color: isHighContrast ? const Color(0xFF8B0000) : AppColors.error,
@@ -1418,18 +1642,21 @@ class _AssistanceFab extends StatelessWidget {
                   border: Border.all(color: Colors.black, width: 2.0),
                 )
               : null,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          padding: EdgeInsets.symmetric(
+            horizontal: hasLargeTargets ? 28 : 24,
+            vertical: hasLargeTargets ? 18 : 14,
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.support_agent, color: Colors.white),
+              Icon(Icons.support_agent, color: Colors.white, size: context.tapIconSize),
               if (showLabel) ...[
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Assistance',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 14,
+                    fontSize: hasLargeTargets ? 17 : 14,
                     height: 20 / 14,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.1,

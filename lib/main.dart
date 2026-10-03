@@ -99,12 +99,21 @@ class _AccessTransitAppState extends State<AccessTransitApp> {
         return ListenableBuilder(
           listenable: AccessibilityPreferencesService.instance,
           builder: (context, _) {
-            final isHighContrast =
-                AccessibilityPreferencesService.instance.isHighContrast;
+            final prefs = AccessibilityPreferencesService.instance;
+            final isHighContrast = prefs.isHighContrast;
+            final hasLargeTargets = prefs.hasLargeTargets;
+            final baseTheme = isHighContrast
+                ? AppTheme.highContrastTheme
+                : AppTheme.lightTheme;
             return Theme(
-              data: isHighContrast
-                  ? AppTheme.highContrastTheme
-                  : AppTheme.lightTheme,
+              data: baseTheme.copyWith(
+                extensions: [
+                  AccessibilityTokens(
+                    hasLargeTargets: hasLargeTargets,
+                    isHighContrast: isHighContrast,
+                  ),
+                ],
+              ),
               child: child!,
             );
           },

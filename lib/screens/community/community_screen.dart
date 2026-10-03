@@ -120,10 +120,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
         ),
         actions: [
           IconButton(
+            constraints: context.appBarActionConstraints,
             onPressed: _openReportIssue,
             tooltip: 'Report Issue',
             icon: Icon(
               Icons.add_circle_outline_rounded,
+              size: context.tapIconSize,
               color: isHC ? Colors.black : AppColors.primary,
             ),
           ),
@@ -138,15 +140,19 @@ class _CommunityScreenState extends State<CommunityScreen> {
           backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
           foregroundColor: isHC ? Colors.white : AppColors.onPrimary,
           elevation: isHC ? 0 : 4,
+          extendedPadding: EdgeInsets.symmetric(
+            horizontal: context.hasLargeTargets ? 22 : 16,
+            vertical: context.hasLargeTargets ? 16 : 0,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
           ),
-          icon: const Icon(Icons.add_alert_rounded, size: 20),
-          label: const Text(
+          icon: Icon(Icons.add_alert_rounded, size: context.tapIconSize),
+          label: Text(
             'Report Issue',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: context.hasLargeTargets ? 15.5 : 14,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.2,
             ),
@@ -439,11 +445,16 @@ class _TabButton extends StatelessWidget {
       contentColor = isHC ? Colors.black : AppColors.onSurfaceVariant;
     }
 
+    final hasLargeTargets = context.hasLargeTargets;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        constraints: BoxConstraints(minHeight: context.chipHeight),
+        padding: EdgeInsets.symmetric(
+          vertical: hasLargeTargets ? 14 : 10,
+        ),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(12),
@@ -463,14 +474,14 @@ class _TabButton extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 18,
+              size: hasLargeTargets ? 24 : (context.tapIconSize - 2),
               color: contentColor,
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: hasLargeTargets ? 16 : 14,
                 fontWeight: FontWeight.w700,
                 color: contentColor,
               ),
@@ -568,6 +579,7 @@ class _ModernReportCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHC = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
     final isResolved = report.status.toLowerCase() == 'resolved';
     final isExpired = !isActive && !isResolved;
 
@@ -591,7 +603,7 @@ class _ModernReportCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(hasLargeTargets ? 20 : 16),
           decoration: BoxDecoration(
             color: context.cardColor,
             borderRadius: BorderRadius.circular(16),
@@ -620,7 +632,7 @@ class _ModernReportCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.all(hasLargeTargets ? 11 : 8),
                     decoration: BoxDecoration(
                       color: isHC
                           ? Colors.white
@@ -630,7 +642,7 @@ class _ModernReportCard extends StatelessWidget {
                     ),
                     child: Icon(
                       isBus ? Icons.directions_bus_rounded : Icons.store_mall_directory_rounded,
-                      size: 20,
+                      size: hasLargeTargets ? 26 : 20,
                       color: isHC ? Colors.black : AppColors.primary,
                     ),
                   ),
@@ -642,7 +654,7 @@ class _ModernReportCard extends StatelessWidget {
                         Text(
                           targetTitle,
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: hasLargeTargets ? 17.5 : 15,
                             fontWeight: FontWeight.w700,
                             color: context.textColor,
                           ),
@@ -651,7 +663,7 @@ class _ModernReportCard extends StatelessWidget {
                         Text(
                           timeAgo,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: hasLargeTargets ? 13.5 : 12,
                             color: context.subtextColor,
                           ),
                         ),
@@ -668,7 +680,7 @@ class _ModernReportCard extends StatelessWidget {
               Text(
                 report.problemType,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: hasLargeTargets ? 18.5 : 16,
                   fontWeight: FontWeight.w700,
                   height: 1.25,
                   color: context.textColor,
@@ -682,7 +694,7 @@ class _ModernReportCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: hasLargeTargets ? 14.5 : 13,
                     fontStyle: FontStyle.italic,
                     color: isHC ? Colors.black : AppColors.onSurfaceVariant,
                   ),
@@ -763,7 +775,7 @@ class _ModernReportCard extends StatelessWidget {
 
                   Icon(
                     Icons.arrow_forward_ios_rounded,
-                    size: 14,
+                    size: hasLargeTargets ? 18 : 14,
                     color: isHC ? Colors.black : AppColors.onSurfaceVariant,
                   ),
                 ],

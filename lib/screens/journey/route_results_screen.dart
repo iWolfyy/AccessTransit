@@ -621,8 +621,8 @@ class _TopBar extends StatelessWidget {
                     icon: const Icon(Icons.arrow_back_rounded),
                     color: isHighContrast ? Colors.black : AppColors.primary,
                     tooltip: 'Back',
-                    iconSize: 26,
-                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    iconSize: context.navIconSize,
+                    constraints: context.appBarActionConstraints,
                   ),
                   const SizedBox(width: 6),
                   Column(
@@ -854,13 +854,18 @@ class _TabItem extends StatelessWidget {
       contentColor = isSelected ? AppColors.onPrimary : AppColors.onSurface;
     }
 
+    final hasLargeTargets = context.hasLargeTargets;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+        constraints: BoxConstraints(minHeight: context.chipHeight, minWidth: context.chipHeight),
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: hasLargeTargets ? 20 : 16,
+          vertical: hasLargeTargets ? 14 : 10,
+        ),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(999),
@@ -884,7 +889,7 @@ class _TabItem extends StatelessWidget {
             if (icon != null) ...[
               Icon(
                 icon,
-                size: 16,
+                size: hasLargeTargets ? 20 : 16,
                 color: isHighContrast ? contentColor : (isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant),
               ),
               const SizedBox(width: 6),
@@ -892,7 +897,7 @@ class _TabItem extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: hasLargeTargets ? 16 : 14,
                 fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
                 color: contentColor,
               ),
@@ -917,6 +922,7 @@ class _LmtGoRouteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
     final rawBus = route.rawBus;
     final hasRamp = rawBus?.wheelchairAccessible == true || rawBus?.hasRamp == true;
     final hasLowFloor = rawBus?.lowFloor == true;
@@ -938,7 +944,10 @@ class _LmtGoRouteCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.symmetric(
+            horizontal: hasLargeTargets ? 16 : 14,
+            vertical: hasLargeTargets ? 18 : 14,
+          ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
@@ -953,99 +962,115 @@ class _LmtGoRouteCard extends StatelessWidget {
             children: [
               // 1. Top Row: Route Badge, Bus Number, Status Pill, and Bold Price
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Prominent Route Code Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: isHighContrast ? const Color(0xFF8B0000) : const Color(0xFFC62828),
-                      borderRadius: BorderRadius.circular(8),
-                      border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
-                    ),
-                    child: Text(
-                      route.routeNo ?? 'Route',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Bus Plate Number
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.5),
-                        width: isHighContrast ? 1.5 : 1.0,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  Expanded(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Icon(
-                          Icons.directions_bus,
-                          size: 14,
-                          color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          route.busNo ?? route.busId,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: isHighContrast ? Colors.black : AppColors.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Live Status Pill (Ongoing / Scheduled / Delayed)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusBg,
-                      borderRadius: BorderRadius.circular(999),
-                      border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                        // Prominent Route Code Badge
                         Container(
-                          width: 6,
-                          height: 6,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hasLargeTargets ? 10 : 8,
+                            vertical: hasLargeTargets ? 6 : 4,
+                          ),
                           decoration: BoxDecoration(
-                            color: isHighContrast ? Colors.white : statusFg,
-                            shape: BoxShape.circle,
+                            color: isHighContrast ? const Color(0xFF8B0000) : const Color(0xFFC62828),
+                            borderRadius: BorderRadius.circular(8),
+                            border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                          ),
+                          child: Text(
+                            route.routeNo ?? 'Route',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: hasLargeTargets ? 14 : 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          route.liveStatusLabel,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: statusFg,
+
+                        // Bus Plate Number
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hasLargeTargets ? 8 : 6,
+                            vertical: hasLargeTargets ? 5 : 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.5),
+                              width: isHighContrast ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.directions_bus,
+                                size: hasLargeTargets ? 15 : 13,
+                                color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                route.busNo ?? route.busId,
+                                style: TextStyle(
+                                  fontSize: hasLargeTargets ? 13 : 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isHighContrast ? Colors.black : AppColors.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Live Status Pill (Ongoing / Scheduled / Delayed)
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hasLargeTargets ? 8 : 6,
+                            vertical: hasLargeTargets ? 5 : 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusBg,
+                            borderRadius: BorderRadius.circular(999),
+                            border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: isHighContrast ? Colors.white : statusFg,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                route.liveStatusLabel,
+                                style: TextStyle(
+                                  fontSize: hasLargeTargets ? 11 : 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: statusFg,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-
-                  const Spacer(),
+                  const SizedBox(width: 8),
 
                   // Estimated Price in LKR (Right-aligned, bold)
                   Text(
                     'LKR ${route.estimatedPriceLkr}',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: hasLargeTargets ? 19 : 17,
                       fontWeight: FontWeight.w800,
                       color: isHighContrast ? Colors.black : AppColors.primary,
                     ),

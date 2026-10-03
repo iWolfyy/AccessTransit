@@ -290,8 +290,9 @@ class _RegisterScreenState extends State<RegisterScreen>
         child: Row(
           children: [
             IconButton(
+              constraints: context.appBarActionConstraints,
               onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize),
               color: context.textColor,
               tooltip: 'Go back',
             ),
@@ -307,7 +308,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 ),
               ),
             ),
-            const SizedBox(width: 48),
+            SizedBox(width: context.hasLargeTargets ? 56 : 48),
           ],
         ),
       ),
@@ -600,7 +601,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       child: ScaleTransition(
         scale: _buttonScale,
         child: SizedBox(
-          height: 48,
+          height: context.buttonHeight,
           child: FilledButton(
             onPressed: _isLoading ? null : _register,
             style: FilledButton.styleFrom(
@@ -616,8 +617,8 @@ class _RegisterScreenState extends State<RegisterScreen>
               ),
               elevation: isHC ? 0 : 1,
               shadowColor: isHC ? null : AppColors.primary.withValues(alpha: 0.2),
-              textStyle: const TextStyle(
-                fontSize: 14,
+              textStyle: TextStyle(
+                fontSize: context.hasLargeTargets ? 15.5 : 14,
                 height: 20 / 14,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.1,
@@ -632,12 +633,12 @@ class _RegisterScreenState extends State<RegisterScreen>
                       color: Colors.white,
                     ),
                   )
-                : const Row(
+                : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Create Account'),
-                      SizedBox(width: 8),
-                      Icon(Icons.arrow_forward_rounded, size: 20),
+                      const Text('Create Account'),
+                      const SizedBox(width: 8),
+                      Icon(Icons.arrow_forward_rounded, size: context.tapIconSize),
                     ],
                   ),
           ),
@@ -684,11 +685,11 @@ class _RegisterScreenState extends State<RegisterScreen>
     return Column(
       children: [
         SizedBox(
-          height: 48,
+          height: context.buttonHeight,
           child: OutlinedButton.icon(
             onPressed:
                 _isLoading ? null : () => _showComingSoon('Google sign-up'),
-            icon: const _GoogleLogo(size: 20),
+            icon: _GoogleLogo(size: context.tapIconSize),
             label: const Text('Sign up with Google'),
             style: OutlinedButton.styleFrom(
               backgroundColor: isHC ? Colors.white : null,
@@ -698,7 +699,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 borderRadius: BorderRadius.circular(999),
               ),
               textStyle: TextStyle(
-                fontSize: 14,
+                fontSize: context.hasLargeTargets ? 15.5 : 14,
                 height: 20 / 14,
                 fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
                 letterSpacing: 0.1,
@@ -708,11 +709,11 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 48,
+          height: context.buttonHeight,
           child: OutlinedButton.icon(
             onPressed:
                 _isLoading ? null : () => _showComingSoon('Apple sign-up'),
-            icon: Icon(Icons.apple, size: 22, color: isHC ? Colors.black : null),
+            icon: Icon(Icons.apple, size: context.tapIconSize, color: isHC ? Colors.black : null),
             label: const Text('Sign up with Apple'),
             style: OutlinedButton.styleFrom(
               backgroundColor: isHC ? Colors.white : null,
@@ -722,7 +723,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 borderRadius: BorderRadius.circular(999),
               ),
               textStyle: TextStyle(
-                fontSize: 14,
+                fontSize: context.hasLargeTargets ? 15.5 : 14,
                 height: 20 / 14,
                 fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
                 letterSpacing: 0.1,
@@ -757,8 +758,11 @@ class _RegisterScreenState extends State<RegisterScreen>
                 },
           style: TextButton.styleFrom(
             foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            minimumSize: Size.zero,
+            padding: EdgeInsets.symmetric(
+              horizontal: 6,
+              vertical: context.hasLargeTargets ? 10 : 4,
+            ),
+            minimumSize: Size(0, context.minTapHeight),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           child: Text(

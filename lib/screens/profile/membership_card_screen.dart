@@ -67,7 +67,7 @@ class MembershipCardScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
                         SizedBox(
-                          height: 48,
+                          height: context.buttonHeight,
                           child: FilledButton.icon(
                             onPressed: () => Navigator.of(context).maybePop(),
                             style: FilledButton.styleFrom(
@@ -81,14 +81,14 @@ class MembershipCardScreen extends StatelessWidget {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              textStyle: const TextStyle(
-                                fontSize: 14,
+                              textStyle: TextStyle(
+                                fontSize: context.buttonFontSize,
                                 height: 20 / 14,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.1,
                               ),
                             ),
-                            icon: const Icon(Icons.arrow_back, size: 20),
+                            icon: Icon(Icons.arrow_back, size: context.tapIconSize),
                             label: const Text('Back to Rewards'),
                           ),
                         ),
@@ -136,7 +136,9 @@ class _TopBar extends StatelessWidget {
                   icon: Icon(
                     Icons.arrow_back,
                     color: isHC ? Colors.black : AppColors.primary,
+                    size: context.tapIconSize,
                   ),
+                  constraints: context.appBarActionConstraints,
                 ),
                 Expanded(
                   child: Text(

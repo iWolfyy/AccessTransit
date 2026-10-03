@@ -1519,7 +1519,7 @@ class _ActionButtons extends StatelessWidget {
     return Column(
       children: [
         SizedBox(
-          height: 54,
+          height: context.hasLargeTargets ? 60 : 54,
           width: double.infinity,
           child: FilledButton.icon(
             onPressed: onTrackLive,
@@ -1531,18 +1531,18 @@ class _ActionButtons extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
-              textStyle: const TextStyle(
-                fontSize: 16,
+              textStyle: TextStyle(
+                fontSize: context.hasLargeTargets ? 17.5 : 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            icon: const Icon(Icons.map_rounded, size: 22),
+            icon: Icon(Icons.map_rounded, size: context.tapIconSize),
             label: const Text('Track Live on Map'),
           ),
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 48,
+          height: context.buttonHeight,
           width: double.infinity,
           child: FilledButton.tonalIcon(
             onPressed: onConfirmSchedule,
@@ -1553,18 +1553,18 @@ class _ActionButtons extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              textStyle: const TextStyle(
-                fontSize: 15,
+              textStyle: TextStyle(
+                fontSize: context.buttonFontSize,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            icon: const Icon(Icons.bookmark_add_outlined, size: 20),
+            icon: Icon(Icons.bookmark_add_outlined, size: context.tapIconSize),
             label: const Text('Save to Trip Plan'),
           ),
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 48,
+          height: context.buttonHeight,
           width: double.infinity,
           child: OutlinedButton.icon(
             onPressed: onReport,
@@ -1578,12 +1578,12 @@ class _ActionButtons extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              textStyle: const TextStyle(
-                fontSize: 14,
+              textStyle: TextStyle(
+                fontSize: context.buttonFontSize,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            icon: const Icon(Icons.report_problem_outlined, size: 20),
+            icon: Icon(Icons.report_problem_outlined, size: context.tapIconSize),
             label: const Text('Report Accessibility Condition'),
           ),
         ),

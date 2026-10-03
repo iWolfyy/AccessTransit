@@ -211,7 +211,7 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                         ),
                         const SizedBox(height: 24),
                         SizedBox(
-                          height: 48,
+                          height: context.buttonHeight,
                           child: FilledButton.icon(
                             onPressed: _sendRequest,
                             style: FilledButton.styleFrom(
@@ -225,18 +225,18 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
                               ),
-                              textStyle: const TextStyle(
-                                fontSize: 14,
+                              textStyle: TextStyle(
+                                fontSize: context.buttonFontSize,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            icon: const Icon(Icons.send, size: 20),
+                            icon: Icon(Icons.send, size: context.tapIconSize),
                             label: const Text('Send Request'),
                           ),
                         ),
                         const SizedBox(height: 8),
                         SizedBox(
-                          height: 48,
+                          height: context.buttonHeight,
                           child: OutlinedButton(
                             onPressed: () => Navigator.of(context).maybePop(),
                             style: OutlinedButton.styleFrom(
@@ -253,8 +253,8 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
                               ),
-                              textStyle: const TextStyle(
-                                fontSize: 14,
+                              textStyle: TextStyle(
+                                fontSize: context.buttonFontSize,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -298,14 +298,15 @@ class _TopBar extends StatelessWidget {
       child: SafeArea(
         bottom: false,
         child: SizedBox(
-          height: 48,
+          height: context.hasLargeTargets ? 56 : 48,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
                 IconButton(
+                  constraints: context.appBarActionConstraints,
                   onPressed: onBack,
-                  icon: const Icon(Icons.arrow_back_rounded),
+                  icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize),
                   color: isHC ? Colors.black : AppColors.primary,
                   tooltip: 'Back',
                 ),
@@ -322,8 +323,9 @@ class _TopBar extends StatelessWidget {
                   ),
                 ),
                 IconButton(
+                  constraints: context.appBarActionConstraints,
                   onPressed: onMenu,
-                  icon: const Icon(Icons.person_outline),
+                  icon: Icon(Icons.person_outline, size: context.tapIconSize),
                   color: isHC ? Colors.black : AppColors.primary,
                   tooltip: 'Profile',
                 ),

@@ -58,7 +58,7 @@ class AppBottomNavBar extends StatelessWidget {
         child: SafeArea(
           top: false,
           child: SizedBox(
-            height: 72,
+            height: context.navBarHeight,
             child: Row(
               children: [
                 for (final tab in _tabs)
@@ -116,13 +116,20 @@ class _NavItem extends StatelessWidget {
     final inactiveFg = isHighContrast
         ? Colors.black
         : AppColors.onSurfaceVariant;
+    final hasLargeTargets = context.hasLargeTargets;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        margin: EdgeInsets.symmetric(
+          horizontal: 4,
+          vertical: hasLargeTargets ? 4 : 6,
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: hasLargeTargets ? 6 : 4,
+        ),
         decoration: selected
             ? BoxDecoration(
                 color: activeBg,
@@ -138,7 +145,7 @@ class _NavItem extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 22,
+              size: context.navIconSize,
               color: selected ? activeFg : inactiveFg,
             ),
             const SizedBox(height: 2),
@@ -147,7 +154,7 @@ class _NavItem extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: hasLargeTargets ? 13 : 11,
                 height: 14 / 11,
                 fontWeight: selected ? FontWeight.w800 : (isHighContrast ? FontWeight.w700 : FontWeight.w600),
                 color: selected ? activeFg : inactiveFg,

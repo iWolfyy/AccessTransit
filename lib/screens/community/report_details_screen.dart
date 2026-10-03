@@ -167,8 +167,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             ),
             IconButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+              icon: Icon(Icons.close_rounded, color: Colors.white, size: context.tapIconSize + 4),
               tooltip: 'Close',
+              constraints: context.appBarActionConstraints,
             ),
           ],
         ),
@@ -229,9 +230,10 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         backgroundColor: context.surfaceColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: context.textColor),
+          icon: Icon(Icons.arrow_back_rounded, color: context.textColor, size: context.tapIconSize),
           onPressed: () => Navigator.of(context).maybePop(),
           tooltip: 'Back',
+          constraints: context.appBarActionConstraints,
         ),
         title: Text(
           'Report Details',
@@ -246,9 +248,11 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             icon: Icon(
               Icons.share_outlined,
               color: isHC ? Colors.black : AppColors.primary,
+              size: context.tapIconSize,
             ),
             onPressed: () => _shareReport(report, targetTitle),
             tooltip: 'Share alert',
+            constraints: context.appBarActionConstraints,
           ),
           const SizedBox(width: 8),
         ],
@@ -1018,7 +1022,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               // 1. Confirm Condition Button
               Expanded(
                 child: SizedBox(
-                  height: 48,
+                  height: context.buttonHeight,
                   child: FilledButton.icon(
                     onPressed: (hasConfirmed || _isLoadingAction || isResolved)
                         ? null
@@ -1044,8 +1048,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     ),
                     label: Text(
                       hasConfirmed ? 'Confirmed' : 'Still Broken (+1)',
-                      style: const TextStyle(
-                        fontSize: 13,
+                      style: TextStyle(
+                        fontSize: context.hasLargeTargets ? 14 : 13,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1057,7 +1061,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               // 2. Mark Resolved Button
               Expanded(
                 child: SizedBox(
-                  height: 48,
+                  height: context.buttonHeight,
                   child: OutlinedButton.icon(
                     onPressed: (isResolved || _isLoadingAction)
                         ? null
@@ -1080,8 +1084,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
                     label: Text(
                       isResolved ? 'Resolved' : 'Mark Fixed',
-                      style: const TextStyle(
-                        fontSize: 13,
+                      style: TextStyle(
+                        fontSize: context.hasLargeTargets ? 14 : 13,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1102,12 +1106,13 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   : () => _handleFlag(report),
               style: TextButton.styleFrom(
                 foregroundColor: isHC ? const Color(0xFF8B0000) : AppColors.error,
+                minimumSize: Size(0, context.minTapHeight),
               ),
-              icon: const Icon(Icons.flag_outlined, size: 16),
+              icon: Icon(Icons.flag_outlined, size: context.hasLargeTargets ? 18 : 16),
               label: Text(
                 hasFlagged ? 'Flagged as Inaccurate' : 'Report as Inaccurate',
-                style: const TextStyle(
-                  fontSize: 12,
+                style: TextStyle(
+                  fontSize: context.hasLargeTargets ? 13 : 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),

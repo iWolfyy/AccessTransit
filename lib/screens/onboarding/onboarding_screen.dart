@@ -163,7 +163,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   Widget _buildHeader(bool isHC) {
     return SizedBox(
-      height: 48,
+      height: context.minTapHeight,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
@@ -171,7 +171,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             Icon(
               Icons.blind,
               color: isHC ? Colors.black : AppColors.primary,
-              size: 24,
+              size: context.tapIconSize,
             ),
             const SizedBox(width: 4),
             Text(
@@ -190,11 +190,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 onPressed: _finish,
                 style: TextButton.styleFrom(
                   foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
-                  minimumSize: const Size(48, 48),
+                  minimumSize: Size(context.minTapHeight, context.minTapHeight),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   shape: const StadiumBorder(),
                   textStyle: TextStyle(
-                    fontSize: 14,
+                    fontSize: context.buttonFontSize,
                     height: 20 / 14,
                     fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
                     letterSpacing: 0.1,
@@ -241,7 +241,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       scale: _buttonScale,
       child: SizedBox(
         width: double.infinity,
-        height: 48,
+        height: context.buttonHeight,
         child: Listener(
           onPointerDown: (_) => _buttonScaleController.forward(),
           onPointerUp: (_) => _buttonScaleController.reverse(),
@@ -256,8 +256,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
               ),
               elevation: 0,
-              textStyle: const TextStyle(
-                fontSize: 14,
+              textStyle: TextStyle(
+                fontSize: context.buttonFontSize,
                 height: 20 / 14,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.1,

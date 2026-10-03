@@ -251,8 +251,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         child: Row(
           children: [
             IconButton(
+              constraints: context.appBarActionConstraints,
               onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize),
               color: isHC ? Colors.black : AppColors.primary,
               tooltip: 'Go back',
             ),
@@ -353,7 +354,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         ),
         const SizedBox(height: 32),
         SizedBox(
-          height: 48,
+          height: context.buttonHeight,
           child: FilledButton(
             onPressed: _goToLogin,
             style: FilledButton.styleFrom(
@@ -363,8 +364,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 borderRadius: BorderRadius.circular(8),
                 side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
               ),
-              textStyle: const TextStyle(
-                fontSize: 14,
+              textStyle: TextStyle(
+                fontSize: context.hasLargeTargets ? 15.5 : 14,
                 height: 20 / 14,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.1,
@@ -383,12 +384,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 },
           style: TextButton.styleFrom(
             foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
-            minimumSize: const Size(48, 48),
+            minimumSize: Size(48, context.minTapHeight),
           ),
           child: Text(
             'Resend email',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: context.hasLargeTargets ? 15.5 : 14,
               fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
             ),
           ),
@@ -487,7 +488,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       child: ScaleTransition(
         scale: _buttonScale,
         child: SizedBox(
-          height: 48,
+          height: context.buttonHeight,
           child: FilledButton(
             onPressed: _isLoading ? null : _sendResetEmail,
             style: FilledButton.styleFrom(
@@ -502,8 +503,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
               ),
               elevation: 0,
-              textStyle: const TextStyle(
-                fontSize: 14,
+              textStyle: TextStyle(
+                fontSize: context.hasLargeTargets ? 15.5 : 14,
                 height: 20 / 14,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.1,
@@ -531,8 +532,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         onPressed: _isLoading ? null : _goToLogin,
         style: TextButton.styleFrom(
           foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
-          minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          minimumSize: Size(48, context.minTapHeight),
+          padding: EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: context.hasLargeTargets ? 12 : 8,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
           ),
@@ -540,7 +544,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         child: Text(
           'Back to Login',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: context.hasLargeTargets ? 15.5 : 14,
             height: 20 / 14,
             fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
             letterSpacing: 0.1,

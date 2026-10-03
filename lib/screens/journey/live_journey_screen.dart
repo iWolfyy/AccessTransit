@@ -1342,77 +1342,83 @@ class _DraggableJourneySheetContent extends StatelessWidget {
 
         // LMT Go Header Bar: Route Crimson Pill + Plate + Live status + Price
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFC2185B),
-                borderRadius: BorderRadius.circular(8),
-                border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
-              ),
-              child: Text(
-                routeNumber,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
-                  letterSpacing: 0.5,
-                ),
+            Expanded(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFC2185B),
+                      borderRadius: BorderRadius.circular(8),
+                      border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                    ),
+                    child: Text(
+                      routeNumber,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    busPlate,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      color: context.textColor,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isHighContrast
+                          ? Colors.white
+                          : (isBroadcasting
+                              ? const Color(0xFFE8F5E9)
+                              : const Color(0xFFFFF3E0)),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isHighContrast
+                            ? Colors.black
+                            : (isBroadcasting
+                                ? const Color(0xFF81C784)
+                                : const Color(0xFFFFB74D)),
+                        width: isHighContrast ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Text(
+                      isBroadcasting ? '● Ongoing' : '● Scheduled',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: isHighContrast
+                            ? (isBroadcasting ? const Color(0xFF003833) : const Color(0xFF8B4500))
+                            : (isBroadcasting
+                                ? const Color(0xFF1B5E20)
+                                : Colors.orange.shade900),
+                      ),
+                    ),
+                  ),
+                  if (isBroadcasting && speed > 0)
+                    Text(
+                      '${speed.toStringAsFixed(0)} km/h',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                        color: context.subtextColor,
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              busPlate,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-                color: context.textColor,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: isHighContrast
-                    ? Colors.white
-                    : (isBroadcasting
-                        ? const Color(0xFFE8F5E9)
-                        : const Color(0xFFFFF3E0)),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isHighContrast
-                      ? Colors.black
-                      : (isBroadcasting
-                          ? const Color(0xFF81C784)
-                          : const Color(0xFFFFB74D)),
-                  width: isHighContrast ? 1.5 : 1.0,
-                ),
-              ),
-              child: Text(
-                isBroadcasting ? '● Ongoing' : '● Scheduled',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: isHighContrast
-                      ? (isBroadcasting ? const Color(0xFF003833) : const Color(0xFF8B4500))
-                      : (isBroadcasting
-                          ? const Color(0xFF1B5E20)
-                          : Colors.orange.shade900),
-                ),
-              ),
-            ),
-            if (isBroadcasting && speed > 0) ...[
-              const SizedBox(width: 6),
-              Text(
-                '${speed.toStringAsFixed(0)} km/h',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
-                  color: context.subtextColor,
-                ),
-              ),
-            ],
-            const Spacer(),
             Text(
               'LKR $fareLkr',
               style: TextStyle(
@@ -1527,7 +1533,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                   isAlertActive
                       ? Icons.notifications_active_rounded
                       : Icons.add_alert_rounded,
-                  size: 18,
+                  size: context.tapIconSize - 2,
                   color: isHighContrast
                       ? (isAlertActive ? Colors.white : Colors.black)
                       : (isAlertActive ? Colors.white : const Color(0xFFE65100)),
@@ -1535,7 +1541,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                 label: Text(
                   isAlertActive ? 'Alert Active' : 'Alert When Near',
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: context.hasLargeTargets ? 14 : 12.5,
                     fontWeight: FontWeight.w700,
                     color: isHighContrast
                         ? (isAlertActive ? Colors.white : Colors.black)
@@ -1549,7 +1555,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                           ? const Color(0xFFE65100)
                           : const Color(0xFFFFF3E0)),
                   elevation: isHighContrast ? 0 : (isAlertActive ? 2 : 0),
-                  minimumSize: const Size(0, 48),
+                  minimumSize: Size(0, context.buttonHeight),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                     side: BorderSide(
@@ -1570,15 +1576,15 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                     ),
                   );
                 },
-                icon: const Icon(
+                icon: Icon(
                   Icons.accessible_rounded,
-                  size: 18,
+                  size: context.tapIconSize - 2,
                   color: Colors.white,
                 ),
-                label: const Text(
+                label: Text(
                   'Assistance',
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: context.hasLargeTargets ? 14 : 12.5,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
@@ -1586,7 +1592,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
                   elevation: isHighContrast ? 0 : 1,
-                  minimumSize: const Size(0, 48),
+                  minimumSize: Size(0, context.buttonHeight),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                     side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : BorderSide.none,
@@ -3739,7 +3745,7 @@ class _EmergencyActions extends StatelessWidget {
             button: true,
             label: 'Emergency help button',
             child: SizedBox(
-              height: 56,
+              height: context.buttonHeight,
               child: FilledButton.icon(
                 onPressed: onEmergency,
                 style: FilledButton.styleFrom(
@@ -3751,12 +3757,12 @@ class _EmergencyActions extends StatelessWidget {
                         ? const BorderSide(color: Colors.black, width: 2.0)
                         : BorderSide.none,
                   ),
-                  textStyle: const TextStyle(
-                    fontSize: 15,
+                  textStyle: TextStyle(
+                    fontSize: context.buttonFontSize,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                icon: const Icon(Icons.emergency_rounded, size: 22),
+                icon: Icon(Icons.emergency_rounded, size: context.tapIconSize),
                 label: const Text('Emergency'),
               ),
             ),
@@ -3768,7 +3774,7 @@ class _EmergencyActions extends StatelessWidget {
             button: true,
             label: 'Report accessibility issue or vehicle condition',
             child: SizedBox(
-              height: 56,
+              height: context.buttonHeight,
               child: OutlinedButton.icon(
                 onPressed: onReport,
                 style: OutlinedButton.styleFrom(
@@ -3781,12 +3787,12 @@ class _EmergencyActions extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  textStyle: const TextStyle(
-                    fontSize: 15,
+                  textStyle: TextStyle(
+                    fontSize: context.buttonFontSize,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                icon: const Icon(Icons.report_problem_outlined, size: 22),
+                icon: Icon(Icons.report_problem_outlined, size: context.tapIconSize),
                 label: const Text('Report Issue'),
               ),
             ),

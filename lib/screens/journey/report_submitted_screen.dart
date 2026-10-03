@@ -54,7 +54,12 @@ class ReportSubmittedScreen extends StatelessWidget {
             ? const Border(bottom: BorderSide(color: Colors.black, width: 2))
             : null,
         leading: IconButton(
-          icon: Icon(Icons.close_rounded, color: isHC ? Colors.black : AppColors.onSurface),
+          constraints: context.appBarActionConstraints,
+          icon: Icon(
+            Icons.close_rounded,
+            color: isHC ? Colors.black : AppColors.onSurface,
+            size: context.tapIconSize,
+          ),
           onPressed: () => _goToHome(context),
           tooltip: 'Close',
         ),
@@ -388,7 +393,7 @@ class ReportSubmittedScreen extends StatelessWidget {
 
                 // Primary CTA: View in Community Feed
                 SizedBox(
-                  height: 52,
+                  height: context.buttonHeight,
                   child: FilledButton.icon(
                     onPressed: () => _goToCommunity(context),
                     style: FilledButton.styleFrom(
@@ -401,11 +406,11 @@ class ReportSubmittedScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    icon: const Icon(Icons.forum_rounded, size: 20),
-                    label: const Text(
+                    icon: Icon(Icons.forum_rounded, size: context.tapIconSize),
+                    label: Text(
                       'View in Community Feed',
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: context.buttonFontSize,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -415,7 +420,7 @@ class ReportSubmittedScreen extends StatelessWidget {
 
                 // Secondary CTA: Back to Home
                 SizedBox(
-                  height: 48,
+                  height: context.buttonHeight,
                   child: OutlinedButton.icon(
                     onPressed: () => _goToHome(context),
                     style: OutlinedButton.styleFrom(
@@ -430,13 +435,13 @@ class ReportSubmittedScreen extends StatelessWidget {
                     ),
                     icon: Icon(
                       Icons.home_rounded,
-                      size: 20,
+                      size: context.tapIconSize,
                       color: isHC ? Colors.black : AppColors.onSurface,
                     ),
                     label: Text(
                       'Back to Home',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: context.buttonFontSize,
                         fontWeight: FontWeight.w600,
                         color: isHC ? Colors.black : AppColors.onSurface,
                       ),

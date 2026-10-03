@@ -130,7 +130,7 @@ class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen>
                         opacity: _fade,
                         child: SizedBox(
                           width: double.infinity,
-                          height: 48,
+                          height: context.buttonHeight,
                           child: FilledButton(
                             onPressed: () {
                               Navigator.of(context).pushAndRemoveUntil(
@@ -147,8 +147,8 @@ class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen>
                                 borderRadius: BorderRadius.circular(999),
                                 side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
                               ),
-                              textStyle: const TextStyle(
-                                fontSize: 14,
+                              textStyle: TextStyle(
+                                fontSize: context.hasLargeTargets ? 15.5 : 14,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),

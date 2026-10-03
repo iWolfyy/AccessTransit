@@ -8,6 +8,7 @@ import '../../services/auth_service.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import 'rewards_contributions_screen.dart';
 
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
@@ -110,7 +111,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _TopBar(
             initials: _initials,
-            onMenu: widget.onMenu ?? () => Navigator.of(context).maybePop(),
+            onMenu: widget.onMenu,
           ),
           Expanded(child: _buildBody(context)),
         ],
@@ -143,6 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: _loadProfile,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primaryContainer,
+                  minimumSize: Size(0, context.buttonHeight),
                 ),
                 child: const Text('Retry'),
               ),
@@ -234,14 +236,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.initials, required this.onMenu});
+  const _TopBar({required this.initials, this.onMenu});
 
   final String initials;
-  final VoidCallback onMenu;
+  final VoidCallback? onMenu;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final canPop = ModalRoute.of(context)?.canPop ?? false;
 
     return Material(
       color: context.surfaceColor,
@@ -262,15 +265,27 @@ class _TopBar extends StatelessWidget {
               child: Row(
                 children: [
                   SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: IconButton(
-                      onPressed: onMenu,
-                      icon: Icon(
-                        Icons.menu,
-                        color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
-                      ),
-                    ),
+                    width: context.minTapHeight,
+                    height: context.minTapHeight,
+                    child: canPop
+                        ? IconButton(
+                            onPressed: () => Navigator.of(context).maybePop(),
+                            icon: Icon(
+                              Icons.arrow_back_rounded,
+                              color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                              size: context.tapIconSize,
+                            ),
+                          )
+                        : (onMenu != null
+                            ? IconButton(
+                                onPressed: onMenu,
+                                icon: Icon(
+                                  Icons.menu_rounded,
+                                  color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                                  size: context.tapIconSize,
+                                ),
+                              )
+                            : null),
                   ),
                   Expanded(
                     child: Text(
@@ -285,8 +300,8 @@ class _TopBar extends StatelessWidget {
                     ),
                   ),
                   SizedBox(
-                    width: 48,
-                    height: 48,
+                    width: context.minTapHeight,
+                    height: context.minTapHeight,
                     child: Center(
                       child: CircleAvatar(
                         radius: 16,
@@ -501,9 +516,10 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(hasLargeTargets ? 20 : 16),
       decoration: BoxDecoration(
         color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
@@ -520,12 +536,16 @@ class _StatCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(icon, color: isHighContrast ? Colors.black : iconColor),
+          Icon(
+            icon,
+            size: hasLargeTargets ? 28 : 24,
+            color: isHighContrast ? Colors.black : iconColor,
+          ),
           const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: hasLargeTargets ? 22 : 18,
               height: 24 / 18,
               fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
               color: isHighContrast ? Colors.black : AppColors.onSurface,
@@ -535,7 +555,7 @@ class _StatCard extends StatelessWidget {
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: hasLargeTargets ? 13.5 : 12,
               height: 16 / 12,
               fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
               color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
@@ -555,6 +575,8 @@ class _ImpactCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+
     return Material(
       color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
       borderRadius: BorderRadius.circular(12),
@@ -563,7 +585,7 @@ class _ImpactCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(hasLargeTargets ? 28 : 24),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -601,13 +623,14 @@ class _ImpactCard extends StatelessWidget {
                     children: [
                       Icon(
                         Icons.favorite,
+                        size: hasLargeTargets ? 26 : 22,
                         color: isHighContrast ? Colors.white : AppColors.onPrimary,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         'Your Impact',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: hasLargeTargets ? 21 : 18,
                           height: 24 / 18,
                           fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
                           color: isHighContrast ? Colors.white : AppColors.onPrimary,
@@ -619,7 +642,7 @@ class _ImpactCard extends StatelessWidget {
                   Text.rich(
                     TextSpan(
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: hasLargeTargets ? 17.5 : 16,
                         height: 24 / 16,
                         color: isHighContrast ? Colors.white : AppColors.onPrimary,
                       ),
@@ -695,6 +718,9 @@ class _BadgesSection extends StatelessWidget {
             if (onSeeAll != null)
               TextButton(
                 onPressed: onSeeAll,
+                style: TextButton.styleFrom(
+                  minimumSize: Size(0, context.minTapHeight),
+                ),
                 child: Text(
                   'See all',
                   style: TextStyle(
@@ -991,16 +1017,17 @@ class _AccountSection extends StatelessWidget {
                   child: InkWell(
                     onTap: () => onItemTap(items[i].$2),
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 64),
+                      constraints: BoxConstraints(minHeight: context.minTapHeight),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
+                        padding: EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 16,
+                          vertical: context.hasLargeTargets ? 20 : 14,
                         ),
                         child: Row(
                           children: [
                             Icon(
                               items[i].$1,
+                              size: context.tapIconSize,
                               color: isHighContrast
                                   ? Colors.black
                                   : AppColors.onSurfaceVariant,
@@ -1010,17 +1037,18 @@ class _AccountSection extends StatelessWidget {
                               child: Text(
                                 items[i].$2,
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: context.hasLargeTargets ? 18 : 16,
                                   height: 24 / 16,
                                   fontWeight: isHighContrast
                                       ? FontWeight.w700
-                                      : FontWeight.normal,
+                                      : (context.hasLargeTargets ? FontWeight.w600 : FontWeight.normal),
                                   color: context.textColor,
                                 ),
                               ),
                             ),
                             Icon(
                               Icons.chevron_right,
+                              size: context.tapIconSize,
                               color: isHighContrast
                                   ? Colors.black
                                   : AppColors.onSurfaceVariant,
@@ -1039,5 +1067,7 @@ class _AccountSection extends StatelessWidget {
     );
   }
 }
+
+
 
 

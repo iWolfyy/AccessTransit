@@ -82,7 +82,7 @@ class RewardsContributionsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
                 SizedBox(
-                  height: 48,
+                  height: context.buttonHeight,
                   child: FilledButton.icon(
                     onPressed: () {
                       Navigator.of(context).push(
@@ -107,14 +107,14 @@ class RewardsContributionsScreen extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      textStyle: const TextStyle(
-                        fontSize: 14,
+                      textStyle: TextStyle(
+                        fontSize: context.buttonFontSize,
                         height: 20 / 14,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.1,
                       ),
                     ),
-                    icon: const Icon(Icons.badge_outlined, size: 20),
+                    icon: Icon(Icons.badge_outlined, size: context.tapIconSize),
                     label: const Text('View Membership Card'),
                   ),
                 ),
@@ -159,9 +159,14 @@ class _TopBar extends StatelessWidget {
                 IconButton(
                   onPressed: onBack,
                   tooltip: 'Go back',
+                  constraints: BoxConstraints(
+                    minWidth: context.minTapHeight,
+                    minHeight: context.minTapHeight,
+                  ),
                   icon: Icon(
                     Icons.arrow_back,
                     color: isHC ? Colors.black : AppColors.primary,
+                    size: context.tapIconSize,
                   ),
                 ),
                 Expanded(
@@ -179,9 +184,14 @@ class _TopBar extends StatelessWidget {
                 IconButton(
                   onPressed: onSettings,
                   tooltip: 'Settings',
+                  constraints: BoxConstraints(
+                    minWidth: context.minTapHeight,
+                    minHeight: context.minTapHeight,
+                  ),
                   icon: Icon(
                     Icons.settings,
                     color: isHC ? Colors.black : AppColors.primary,
+                    size: context.tapIconSize,
                   ),
                 ),
               ],

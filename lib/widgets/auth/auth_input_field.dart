@@ -39,6 +39,8 @@ class AuthInputField extends StatelessWidget {
     final isHC = context.isHighContrast;
     final errorColor = isHC ? const Color(0xFF8B0000) : AppColors.error;
 
+    final hasLargeTargets = context.hasLargeTargets;
+
     final field = TextFormField(
       controller: controller,
       validator: validator,
@@ -49,7 +51,7 @@ class AuthInputField extends StatelessWidget {
       autofillHints: autofillHints,
       textCapitalization: textCapitalization,
       style: TextStyle(
-        fontSize: 14,
+        fontSize: hasLargeTargets ? 15.5 : 14,
         height: 20 / 14,
         fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
         color: context.textColor,
@@ -61,14 +63,15 @@ class AuthInputField extends StatelessWidget {
         ),
         prefixIcon: Icon(
           prefixIcon,
+          size: context.tapIconSize,
           color: isHC ? Colors.black : AppColors.onSurfaceVariant,
         ),
         suffixIcon: suffixIcon,
         filled: true,
         fillColor: isHC ? Colors.white : Colors.transparent,
-        contentPadding: const EdgeInsets.symmetric(
+        contentPadding: EdgeInsets.symmetric(
           horizontal: 12,
-          vertical: 14,
+          vertical: context.inputVerticalPadding,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -121,7 +124,7 @@ class AuthInputField extends StatelessWidget {
         Text(
           label!,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: hasLargeTargets ? 15.5 : 14,
             height: 20 / 14,
             fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
             letterSpacing: 0.1,

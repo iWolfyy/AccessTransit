@@ -180,4 +180,88 @@ extension HighContrastX on BuildContext {
                   offset: Offset(0, 4),
                 ),
               ]);
+
+  // ==========================================
+  // Large Tap Targets (48dp+) Sizing Tokens
+  // ==========================================
+
+  /// Accessibility tokens from inherited theme extension, if available.
+  AccessibilityTokens? get accessibilityTokens {
+    try {
+      return Theme.of(this).extension<AccessibilityTokens>();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Whether large tap targets (48dp+) is currently enabled.
+  bool get hasLargeTargets =>
+      accessibilityTokens?.hasLargeTargets ??
+      AccessibilityPreferencesService.instance.hasLargeTargets;
+
+  /// Minimum interactive element height: 60dp when large targets, 44dp compact.
+  double get minTapHeight => hasLargeTargets ? 60.0 : 44.0;
+
+  /// Button height: 60dp when large targets, 48dp compact.
+  double get buttonHeight => hasLargeTargets ? 60.0 : 48.0;
+
+  /// Icon size for interactive controls: 28dp large, 20dp compact.
+  double get tapIconSize => hasLargeTargets ? 28.0 : 20.0;
+
+  /// Standard padding for interactive rows.
+  EdgeInsets get tapPadding => hasLargeTargets
+      ? const EdgeInsets.symmetric(horizontal: 20, vertical: 16)
+      : const EdgeInsets.symmetric(horizontal: 12, vertical: 8);
+
+  /// Button text size: 18 large, 15 compact.
+  double get buttonFontSize => hasLargeTargets ? 18.0 : 15.0;
+
+  /// Bottom nav icon size: 28 large, 22 compact.
+  double get navIconSize => hasLargeTargets ? 28.0 : 22.0;
+
+  /// Bottom nav bar height: 84 large, 72 compact.
+  double get navBarHeight => hasLargeTargets ? 84.0 : 72.0;
+
+  /// Content padding vertical for inputs.
+  double get inputVerticalPadding => hasLargeTargets ? 18.0 : 14.0;
+
+  /// Chip / filter touch target height: 52dp large, 38dp compact.
+  double get chipHeight => hasLargeTargets ? 52.0 : 38.0;
+
+  /// Constraints for AppBar action icons and small tap targets.
+  BoxConstraints get appBarActionConstraints => BoxConstraints(
+        minWidth: hasLargeTargets ? 60.0 : 48.0,
+        minHeight: hasLargeTargets ? 60.0 : 48.0,
+      );
+}
+
+/// ThemeExtension delivering reactive accessibility sizing tokens to all screens.
+class AccessibilityTokens extends ThemeExtension<AccessibilityTokens> {
+  const AccessibilityTokens({
+    required this.hasLargeTargets,
+    required this.isHighContrast,
+  });
+
+  final bool hasLargeTargets;
+  final bool isHighContrast;
+
+  @override
+  AccessibilityTokens copyWith({bool? hasLargeTargets, bool? isHighContrast}) {
+    return AccessibilityTokens(
+      hasLargeTargets: hasLargeTargets ?? this.hasLargeTargets,
+      isHighContrast: isHighContrast ?? this.isHighContrast,
+    );
+  }
+
+  @override
+  AccessibilityTokens lerp(
+    ThemeExtension<AccessibilityTokens>? other,
+    double t,
+  ) {
+    if (other is! AccessibilityTokens) return this;
+    return AccessibilityTokens(
+      hasLargeTargets: t < 0.5 ? hasLargeTargets : other.hasLargeTargets,
+      isHighContrast: t < 0.5 ? isHighContrast : other.isHighContrast,
+    );
+  }
 }

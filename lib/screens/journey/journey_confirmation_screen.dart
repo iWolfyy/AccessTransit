@@ -206,14 +206,15 @@ class _TopBar extends StatelessWidget {
       child: SafeArea(
         bottom: false,
         child: SizedBox(
-          height: 48,
+          height: context.hasLargeTargets ? 56 : 48,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
                 IconButton(
+                  constraints: context.appBarActionConstraints,
                   onPressed: onBack,
-                  icon: const Icon(Icons.arrow_back_rounded),
+                  icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize),
                   color: isHC ? Colors.black : AppColors.primary,
                   tooltip: 'Back',
                 ),
@@ -770,7 +771,7 @@ class _FixedActions extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          height: 48,
+          height: context.buttonHeight,
           width: double.infinity,
           child: FilledButton.icon(
             onPressed: onConfirm,
@@ -783,12 +784,12 @@ class _FixedActions extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
               ),
-              textStyle: const TextStyle(
-                fontSize: 14,
+              textStyle: TextStyle(
+                fontSize: context.buttonFontSize,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            icon: const Icon(Icons.navigation, size: 20),
+            icon: Icon(Icons.navigation, size: context.tapIconSize),
             label: const Text('Confirm & Start Navigation'),
           ),
         ),
@@ -797,7 +798,7 @@ class _FixedActions extends StatelessWidget {
           children: [
             Expanded(
               child: SizedBox(
-                height: 48,
+                height: context.buttonHeight,
                 child: OutlinedButton.icon(
                   onPressed: onSetAlert,
                   style: OutlinedButton.styleFrom(
@@ -810,12 +811,12 @@ class _FixedActions extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    textStyle: const TextStyle(
-                      fontSize: 14,
+                    textStyle: TextStyle(
+                      fontSize: context.buttonFontSize,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  icon: const Icon(Icons.notifications_active, size: 20),
+                  icon: Icon(Icons.notifications_active, size: context.tapIconSize),
                   label: const Text('Set Alert'),
                 ),
               ),
@@ -823,7 +824,7 @@ class _FixedActions extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: SizedBox(
-                height: 48,
+                height: context.buttonHeight,
                 child: OutlinedButton.icon(
                   onPressed: onShare,
                   style: OutlinedButton.styleFrom(
@@ -836,12 +837,12 @@ class _FixedActions extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    textStyle: const TextStyle(
-                      fontSize: 14,
+                    textStyle: TextStyle(
+                      fontSize: context.buttonFontSize,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  icon: const Icon(Icons.share, size: 20),
+                  icon: Icon(Icons.share, size: context.tapIconSize),
                   label: const Text('Share Route'),
                 ),
               ),

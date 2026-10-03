@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../models/user_model.dart';
 import '../../services/accessibility_preferences_service.dart';
 import '../main_shell.dart';
@@ -115,10 +116,14 @@ class _AccessibilityPreferencesScreenState
         backgroundColor: isHighContrast ? Colors.white : AppColors.surface,
         elevation: isHighContrast ? 1 : 0,
         leading: IconButton(
-          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          constraints: BoxConstraints(
+            minWidth: context.minTapHeight,
+            minHeight: context.minTapHeight,
+          ),
           icon: Icon(
             Icons.arrow_back_rounded,
             color: isHighContrast ? Colors.black : AppColors.primary,
+            size: context.tapIconSize,
           ),
           onPressed: () => Navigator.of(context).maybePop(),
           tooltip: 'Back',
@@ -133,10 +138,14 @@ class _AccessibilityPreferencesScreenState
         ),
         actions: [
           IconButton(
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            constraints: BoxConstraints(
+              minWidth: context.minTapHeight,
+              minHeight: context.minTapHeight,
+            ),
             icon: Icon(
               Icons.account_circle,
               color: isHighContrast ? Colors.black : AppColors.primary,
+              size: context.tapIconSize,
             ),
             onPressed: _openProfile,
             tooltip: 'User profile',
@@ -218,16 +227,18 @@ class _AccessibilityPreferencesScreenState
                 ),
                 const SizedBox(height: 20),
 
-                // Category 1: Mobility
+                // Category 1: Mobility & Physical Access
                 _PreferenceCategory(
                   title: 'Mobility & Physical Access',
                   icon: Icons.accessible_rounded,
+                  hasLargeTargets: _hasLargeTargets,
                   children: [
                     _PreferenceToggle(
                       icon: Icons.accessible,
                       label: 'Wheelchair access required',
                       subtitle: 'Only show buses with deployed ramps & designated spaces',
                       value: _wheelchairAccess,
+                      hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _wheelchairAccess = v);
                         AccessibilityPreferencesService.instance.setWheelchairOnly(v);
@@ -239,6 +250,7 @@ class _AccessibilityPreferencesScreenState
                       label: 'Step-free routes only',
                       subtitle: 'Avoid stops and terminals requiring stairs',
                       value: _stepFree,
+                      hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _stepFree = v);
                         AccessibilityPreferencesService.instance.setStepFree(v);
@@ -250,20 +262,10 @@ class _AccessibilityPreferencesScreenState
                       label: 'Minimize walking distance',
                       subtitle: 'Prioritize connections closest to entry points',
                       value: _minimizeWalking,
+                      hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _minimizeWalking = v);
                         AccessibilityPreferencesService.instance.setMinimizeWalking(v);
-                      },
-                    ),
-                    const Divider(height: 1, indent: 64),
-                    _PreferenceToggle(
-                      icon: Icons.touch_app_rounded,
-                      label: 'Large tap targets (48dp+)',
-                      subtitle: 'Enforce minimum 48dp touch targets across buttons & controls',
-                      value: _hasLargeTargets,
-                      onChanged: (v) {
-                        setState(() => _hasLargeTargets = v);
-                        AccessibilityPreferencesService.instance.setLargeTargets(v);
                       },
                     ),
                   ],
@@ -274,15 +276,61 @@ class _AccessibilityPreferencesScreenState
                 _PreferenceCategory(
                   title: 'Sensory & Vision',
                   icon: Icons.visibility_rounded,
+                  hasLargeTargets: _hasLargeTargets,
                   children: [
                     _PreferenceToggle(
                       icon: Icons.contrast,
                       label: 'High contrast mode',
                       subtitle: 'Enhance text clarity and strong border lines (WCAG AAA)',
                       value: _highContrast,
+                      hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _highContrast = v);
                         AccessibilityPreferencesService.instance.setHighContrast(v);
+                      },
+                    ),
+                    const Divider(height: 1, indent: 64),
+                    _PreferenceToggle(
+                      icon: Icons.touch_app_rounded,
+                      label: 'Large tap targets (48dp+)',
+                      subtitle: 'Enforce minimum 48dp touch targets across buttons & controls',
+                      value: _hasLargeTargets,
+                      hasLargeTargets: _hasLargeTargets,
+                      onChanged: (v) {
+                        setState(() => _hasLargeTargets = v);
+                        AccessibilityPreferencesService.instance.setLargeTargets(v);
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Icon(
+                                    v
+                                        ? Icons.touch_app_rounded
+                                        : Icons.compress_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    v
+                                        ? 'Large tap targets (48dp+) enabled'
+                                        : 'Standard tap targets enabled',
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                              duration: const Duration(milliseconds: 1400),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: isHighContrast
+                                  ? const Color(0xFF001F3F)
+                                  : AppColors.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          );
                       },
                     ),
                     const Divider(height: 1, indent: 64),
@@ -291,6 +339,7 @@ class _AccessibilityPreferencesScreenState
                       label: 'Voice guidance for navigation',
                       subtitle: 'Spoken stop announcements and transfer cues',
                       value: _voiceGuidance,
+                      hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _voiceGuidance = v);
                         AccessibilityPreferencesService.instance.setVoiceGuidance(v);
@@ -302,6 +351,7 @@ class _AccessibilityPreferencesScreenState
                       label: 'Haptic alerts for stops',
                       subtitle: 'Vibrate device when approaching destination',
                       value: _hapticAlerts,
+                      hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _hapticAlerts = v);
                         AccessibilityPreferencesService.instance.setHapticAlerts(v);
@@ -315,12 +365,14 @@ class _AccessibilityPreferencesScreenState
                 _PreferenceCategory(
                   title: 'Assistance & Environment',
                   icon: Icons.diversity_3,
+                  hasLargeTargets: _hasLargeTargets,
                   children: [
                     _PreferenceToggle(
                       icon: Icons.front_hand_rounded,
                       label: 'Boarding assistance required',
                       subtitle: 'Notify driver in advance to assist with ramp deployment',
                       value: _boardingAssistance,
+                      hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _boardingAssistance = v);
                         AccessibilityPreferencesService.instance.setBoardingAssistance(v);
@@ -332,6 +384,7 @@ class _AccessibilityPreferencesScreenState
                       label: 'Show quiet routes',
                       subtitle: 'Prioritize lower crowd levels and quieter transit options',
                       value: _quietRoutes,
+                      hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _quietRoutes = v);
                         AccessibilityPreferencesService.instance.setQuietRoutes(v);
@@ -341,10 +394,12 @@ class _AccessibilityPreferencesScreenState
                 ),
                 const SizedBox(height: 24),
 
-                // Save Preferences CTA Button (52dp height for easy tapping)
-                SizedBox(
+                // Save Preferences CTA Button (Dynamic height responding to large tap targets)
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutCubic,
                   width: double.infinity,
-                  height: 52,
+                  height: context.buttonHeight,
                   child: FilledButton.icon(
                     onPressed: _save,
                     style: FilledButton.styleFrom(
@@ -360,11 +415,14 @@ class _AccessibilityPreferencesScreenState
                       ),
                       elevation: isHighContrast ? 0 : 2,
                     ),
-                    icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
-                    label: const Text(
+                    icon: Icon(
+                      Icons.check_circle_outline_rounded,
+                      size: context.tapIconSize,
+                    ),
+                    label: Text(
                       'Save Preferences',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: context.buttonFontSize,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -385,11 +443,13 @@ class _PreferenceCategory extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.children,
+    this.hasLargeTargets = true,
   });
 
   final String title;
   final IconData icon;
   final List<Widget> children;
+  final bool hasLargeTargets;
 
   @override
   Widget build(BuildContext context) {
@@ -397,7 +457,9 @@ class _PreferenceCategory extends StatelessWidget {
         Theme.of(context).colorScheme.outline == const Color(0xFF000000) ||
         AccessibilityPreferencesService.instance.isHighContrast;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
       width: double.infinity,
       decoration: BoxDecoration(
         color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
@@ -420,20 +482,27 @@ class _PreferenceCategory extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+          AnimatedPadding(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              hasLargeTargets ? 16 : 12,
+              16,
+              hasLargeTargets ? 12 : 8,
+            ),
             child: Row(
               children: [
                 Icon(
                   icon,
-                  size: 20,
+                  size: hasLargeTargets ? 22 : 19,
                   color: isHighContrast ? Colors.black : AppColors.primary,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: hasLargeTargets ? 16.5 : 15.0,
                     fontWeight: FontWeight.w700,
                     color: isHighContrast ? Colors.black : AppColors.onSurface,
                   ),
@@ -461,6 +530,7 @@ class _PreferenceToggle extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
+    this.hasLargeTargets = true,
   });
 
   final IconData icon;
@@ -468,6 +538,7 @@ class _PreferenceToggle extends StatelessWidget {
   final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
+  final bool hasLargeTargets;
 
   @override
   Widget build(BuildContext context) {
@@ -475,69 +546,83 @@ class _PreferenceToggle extends StatelessWidget {
         Theme.of(context).colorScheme.outline == const Color(0xFF000000) ||
         AccessibilityPreferencesService.instance.isHighContrast;
 
+    final targetMinHeight = hasLargeTargets ? 64.0 : 48.0;
+    final verticalPadding = hasLargeTargets ? 12.0 : 6.0;
+    final iconBoxSize = hasLargeTargets ? 46.0 : 38.0;
+    final iconSize = hasLargeTargets ? 24.0 : 20.0;
+    final labelFontSize = hasLargeTargets ? 15.5 : 14.0;
+    final subtitleFontSize = hasLargeTargets ? 12.5 : 11.5;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => onChanged(!value),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 56),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: isHighContrast
-                        ? (value ? const Color(0xFF001F3F) : const Color(0xFFE5E5E5))
-                        : (value
-                            ? AppColors.primaryContainer.withValues(alpha: 0.25)
-                            : AppColors.surfaceContainer),
-                    borderRadius: BorderRadius.circular(10),
-                    border: isHighContrast
-                        ? Border.all(color: Colors.black, width: 1.5)
-                        : null,
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 22,
-                    color: isHighContrast
-                        ? (value ? Colors.white : Colors.black)
-                        : (value ? AppColors.primary : AppColors.onSurfaceVariant),
-                  ),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          constraints: BoxConstraints(minHeight: targetMinHeight),
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: verticalPadding),
+          child: Row(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                width: iconBoxSize,
+                height: iconBoxSize,
+                decoration: BoxDecoration(
+                  color: isHighContrast
+                      ? (value ? const Color(0xFF001F3F) : const Color(0xFFE5E5E5))
+                      : (value
+                          ? AppColors.primaryContainer.withValues(alpha: 0.25)
+                          : AppColors.surfaceContainer),
+                  borderRadius: BorderRadius.circular(10),
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-                          color: isHighContrast ? Colors.black : AppColors.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isHighContrast
-                              ? const Color(0xFF1A1A1A)
-                              : AppColors.onSurfaceVariant,
-                          height: 1.25,
-                        ),
-                      ),
-                    ],
-                  ),
+                child: Icon(
+                  icon,
+                  size: iconSize,
+                  color: isHighContrast
+                      ? (value ? Colors.white : Colors.black)
+                      : (value ? AppColors.primary : AppColors.onSurfaceVariant),
                 ),
-                const SizedBox(width: 8),
-                Semantics(
-                  label: label,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: labelFontSize,
+                        fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                        color: isHighContrast ? Colors.black : AppColors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: subtitleFontSize,
+                        color: isHighContrast
+                            ? const Color(0xFF1A1A1A)
+                            : AppColors.onSurfaceVariant,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Semantics(
+                label: label,
+                child: AnimatedScale(
+                  scale: hasLargeTargets ? 1.05 : 0.9,
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutCubic,
                   child: Switch(
                     value: value,
                     onChanged: onChanged,
@@ -560,8 +645,8 @@ class _PreferenceToggle extends StatelessWidget {
                         : null,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

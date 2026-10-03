@@ -707,7 +707,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             ? const Border(bottom: BorderSide(color: Colors.black, width: 2))
             : null,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: context.textColor),
+          constraints: context.appBarActionConstraints,
+          icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize, color: context.textColor),
           onPressed: () => Navigator.of(context).maybePop(),
           tooltip: 'Back',
         ),
@@ -854,7 +855,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
                       // Step 6: Large Accessible Submit Button
                       SizedBox(
-                        height: 56,
+                        height: context.hasLargeTargets ? 64 : 56,
                         child: FilledButton.icon(
                           onPressed: _isSubmitting ? null : _submitReport,
                           style: FilledButton.styleFrom(
@@ -879,13 +880,13 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(Icons.send_rounded, size: 22),
+                              : Icon(Icons.send_rounded, size: context.tapIconSize),
                           label: Text(
                             _isSubmitting
                                 ? 'Submitting Report…'
                                 : 'Submit Accessibility Report (+10 Pts)',
-                            style: const TextStyle(
-                              fontSize: 16,
+                            style: TextStyle(
+                              fontSize: context.hasLargeTargets ? 17.5 : 16,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.2,
                             ),
@@ -1875,13 +1876,17 @@ class _TargetChoiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHC = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 96),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        constraints: BoxConstraints(minHeight: hasLargeTargets ? 108 : 96),
+        padding: EdgeInsets.symmetric(
+          horizontal: hasLargeTargets ? 16 : 14,
+          vertical: hasLargeTargets ? 16 : 12,
+        ),
         decoration: BoxDecoration(
           color: isHC
               ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
@@ -1918,7 +1923,7 @@ class _TargetChoiceCard extends StatelessWidget {
               children: [
                 Icon(
                   icon,
-                  size: 24,
+                  size: hasLargeTargets ? 28 : 24,
                   color: isHC
                       ? (isSelected ? Colors.white : Colors.black)
                       : (isSelected ? AppColors.onPrimary : AppColors.primary),
@@ -1927,7 +1932,7 @@ class _TargetChoiceCard extends StatelessWidget {
                 if (isSelected)
                   Icon(
                     Icons.check_circle_rounded,
-                    size: 18,
+                    size: hasLargeTargets ? 22 : 18,
                     color: isHC ? Colors.white : AppColors.onPrimary,
                   ),
               ],
@@ -1938,7 +1943,7 @@ class _TargetChoiceCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: hasLargeTargets ? 16 : 14,
                 fontWeight: FontWeight.w700,
                 color: isHC
                     ? (isSelected ? Colors.white : Colors.black)
@@ -1951,7 +1956,7 @@ class _TargetChoiceCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: hasLargeTargets ? 12.5 : 11,
                 fontWeight: isHC && isSelected ? FontWeight.w600 : FontWeight.normal,
                 color: isHC
                     ? (isSelected ? Colors.white : Colors.black)

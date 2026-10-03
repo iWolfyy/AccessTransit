@@ -277,8 +277,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                minimumSize: Size.zero,
+                padding: EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: context.hasLargeTargets ? 8 : 4,
+                ),
+                minimumSize: Size(0, context.minTapHeight),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
               ),
@@ -322,7 +325,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildSignInButton(bool isHC) {
     return SizedBox(
-      height: 48,
+      height: context.buttonHeight,
       child: FilledButton(
         onPressed: _isLoading ? null : _login,
         style: FilledButton.styleFrom(
@@ -336,8 +339,8 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(8),
             side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
           ),
-          textStyle: const TextStyle(
-            fontSize: 18,
+          textStyle: TextStyle(
+            fontSize: context.hasLargeTargets ? 19 : 18,
             height: 24 / 18,
             fontWeight: FontWeight.w600,
           ),
@@ -391,10 +394,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildBiometricButton(bool isHC) {
     return SizedBox(
-      height: 48,
+      height: context.buttonHeight,
       child: OutlinedButton.icon(
         onPressed: _isLoading ? null : () => _showComingSoon('Biometric sign-in'),
-        icon: const Icon(Icons.fingerprint_rounded, size: 22),
+        icon: Icon(Icons.fingerprint_rounded, size: context.tapIconSize),
         label: const Text('Sign in with Biometrics'),
         style: OutlinedButton.styleFrom(
           backgroundColor: isHC ? Colors.white : null,
@@ -405,7 +408,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           textStyle: TextStyle(
-            fontSize: 14,
+            fontSize: context.hasLargeTargets ? 15.5 : 14,
             height: 20 / 14,
             fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
             letterSpacing: 0.1,
@@ -417,10 +420,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildGoogleButton(bool isHC) {
     return SizedBox(
-      height: 48,
+      height: context.buttonHeight,
       child: OutlinedButton.icon(
         onPressed: _isLoading ? null : () => _showComingSoon('Google sign-in'),
-        icon: const _GoogleLogo(size: 20),
+        icon: _GoogleLogo(size: context.tapIconSize),
         label: const Text('Sign in with Google'),
         style: OutlinedButton.styleFrom(
           backgroundColor: isHC ? Colors.white : null,
@@ -431,7 +434,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           textStyle: TextStyle(
-            fontSize: 14,
+            fontSize: context.hasLargeTargets ? 15.5 : 14,
             height: 20 / 14,
             fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
             letterSpacing: 0.1,
@@ -449,7 +452,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Text(
           'Don\'t have an account?',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: context.hasLargeTargets ? 15 : 14,
             height: 20 / 14,
             color: context.textColor,
           ),
@@ -464,8 +467,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 },
           style: TextButton.styleFrom(
             foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            minimumSize: Size.zero,
+            padding: EdgeInsets.symmetric(
+              horizontal: 6,
+              vertical: context.hasLargeTargets ? 10 : 4,
+            ),
+            minimumSize: Size(0, context.minTapHeight),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           child: Text(

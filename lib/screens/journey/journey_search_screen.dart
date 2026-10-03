@@ -817,9 +817,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                         ),
                         const SizedBox(height: 20),
 
-                        // Full-width prominent "Find Buses" action button (56dp height)
+                        // Full-width prominent "Find Buses" action button
                         SizedBox(
-                          height: 56,
+                          height: context.hasLargeTargets ? 64 : 56,
                           child: FilledButton(
                             onPressed: _searchRoutes,
                             style: FilledButton.styleFrom(
@@ -1066,13 +1066,13 @@ class _SearchInputsCard extends StatelessWidget {
                             onTap: onSwap,
                             customBorder: const CircleBorder(),
                             child: Container(
-                              width: 48,
-                              height: 48,
+                              width: context.minTapHeight,
+                              height: context.minTapHeight,
                               alignment: Alignment.center,
                               child: Icon(
                                 Icons.swap_vert_rounded,
                                 color: isHighContrast ? Colors.black : AppColors.primary,
-                                size: 26,
+                                size: context.tapIconSize + 2,
                               ),
                             ),
                           ),
@@ -1131,6 +1131,7 @@ class _LocationInputField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
     final effectiveHeaderColor = isHighContrast ? Colors.black : headerColor;
     final effectiveIconColor = isHighContrast ? Colors.black : iconColor;
 
@@ -1141,7 +1142,10 @@ class _LocationInputField extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: hasLargeTargets ? 14 : 12,
+            vertical: hasLargeTargets ? 18 : 12,
+          ),
           decoration: BoxDecoration(
             color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
             borderRadius: BorderRadius.circular(14),
@@ -1153,8 +1157,8 @@ class _LocationInputField extends StatelessWidget {
             children: [
               // Indicator Dot / Icon
               Container(
-                width: 36,
-                height: 36,
+                width: hasLargeTargets ? 46 : 36,
+                height: hasLargeTargets ? 46 : 36,
                 decoration: BoxDecoration(
                   color: isHighContrast
                       ? const Color(0xFFE5E5E5)
@@ -1164,7 +1168,7 @@ class _LocationInputField extends StatelessWidget {
                       ? Border.all(color: Colors.black, width: 1.5)
                       : null,
                 ),
-                child: Icon(icon, color: effectiveIconColor, size: 20),
+                child: Icon(icon, color: effectiveIconColor, size: hasLargeTargets ? 24 : 20),
               ),
               const SizedBox(width: 12),
               // Text contents
@@ -1178,7 +1182,7 @@ class _LocationInputField extends StatelessWidget {
                           child: Text(
                             headerLabel,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: hasLargeTargets ? 12 : 11,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.6,
                               color: effectiveHeaderColor,
@@ -1223,7 +1227,7 @@ class _LocationInputField extends StatelessWidget {
                     Text(
                       stationName,
                       style: TextStyle(
-                        fontSize: 17,
+                        fontSize: hasLargeTargets ? 19 : 17,
                         fontWeight: FontWeight.w700,
                         color: isHighContrast ? Colors.black : AppColors.onSurface,
                       ),
@@ -1234,7 +1238,7 @@ class _LocationInputField extends StatelessWidget {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: hasLargeTargets ? 13.5 : 12,
                         fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
                         color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
                       ),
@@ -1252,13 +1256,16 @@ class _LocationInputField extends StatelessWidget {
                 child: IconButton(
                   onPressed: onVoiceTap,
                   icon: Icon(Icons.mic, color: isHighContrast ? Colors.black : AppColors.primary),
-                  iconSize: 22,
+                  iconSize: context.tapIconSize,
                   tooltip: 'Speak stop name',
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                  constraints: BoxConstraints(
+                    minWidth: hasLargeTargets ? 48 : 38,
+                    minHeight: hasLargeTargets ? 48 : 38,
+                  ),
                 ),
               ),
-              Icon(Icons.arrow_drop_down, color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant, size: 22),
+              Icon(Icons.arrow_drop_down, color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant, size: hasLargeTargets ? 28 : 22),
             ],
           ),
         ),

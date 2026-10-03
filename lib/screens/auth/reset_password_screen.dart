@@ -271,6 +271,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
         child: Row(
           children: [
             IconButton(
+              constraints: context.appBarActionConstraints,
               onPressed: _isLoading
                   ? null
                   : () {
@@ -280,7 +281,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
                         ),
                       );
                     },
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize),
               color: isHC ? Colors.black : AppColors.primary,
               tooltip: 'Go back',
             ),
@@ -434,7 +435,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
       child: ScaleTransition(
         scale: _buttonScale,
         child: SizedBox(
-          height: 48,
+          height: context.buttonHeight,
           child: FilledButton(
             onPressed: _isLoading ? null : _resetPassword,
             style: FilledButton.styleFrom(
@@ -450,8 +451,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
               ),
               elevation: isHC ? 0 : 1,
               shadowColor: isHC ? null : AppColors.primary.withValues(alpha: 0.15),
-              textStyle: const TextStyle(
-                fontSize: 14,
+              textStyle: TextStyle(
+                fontSize: context.hasLargeTargets ? 15.5 : 14,
                 height: 20 / 14,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.1,
