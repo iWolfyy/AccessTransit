@@ -50,7 +50,7 @@ void main() {
       occupancy: 'medium',
     );
 
-    test('isReportActive returns true for active reports within 12 hours', () {
+    test('isReportActive returns true for active reports within 24 hours', () {
       final freshReport = Report(
         id: 'r1',
         targetType: 'station',
@@ -64,14 +64,14 @@ void main() {
       expect(StatusLogic.isReportActive(freshReport, currentTime: now), isTrue);
     });
 
-    test('isReportActive returns false for reports older than 12 hours (expiry check)', () {
+    test('isReportActive returns false for reports older than 24 hours (expiry check)', () {
       final expiredReport = Report(
         id: 'r2',
         targetType: 'station',
         targetId: 'st_fort',
         problemType: 'Elevator jammed',
         status: 'active',
-        createdAt: now.subtract(const Duration(hours: 14)),
+        createdAt: now.subtract(const Duration(hours: 25)),
         userId: 'user_1',
       );
 
@@ -99,7 +99,7 @@ void main() {
         targetId: 'st_fort',
         problemType: 'Elevator jammed',
         status: 'active',
-        createdAt: now.subtract(const Duration(hours: 15)),
+        createdAt: now.subtract(const Duration(hours: 28)),
         lastConfirmedAt: now.subtract(const Duration(hours: 1)),
         confirmCount: 2,
         userId: 'user_1',
@@ -108,20 +108,20 @@ void main() {
       expect(StatusLogic.isReportActive(reportConfirmed1hAgo, currentTime: now), isTrue);
     });
 
-    test('isReportActive (AC-81): report confirmed 13 hours ago = expired/inactive', () {
-      final reportConfirmed13hAgo = Report(
+    test('isReportActive (AC-81): report confirmed 25 hours ago = expired/inactive', () {
+      final reportConfirmed25hAgo = Report(
         id: 'r5',
         targetType: 'station',
         targetId: 'st_fort',
         problemType: 'Elevator jammed',
         status: 'active',
-        createdAt: now.subtract(const Duration(hours: 20)),
-        lastConfirmedAt: now.subtract(const Duration(hours: 13)),
+        createdAt: now.subtract(const Duration(hours: 30)),
+        lastConfirmedAt: now.subtract(const Duration(hours: 25)),
         confirmCount: 1,
         userId: 'user_1',
       );
 
-      expect(StatusLogic.isReportActive(reportConfirmed13hAgo, currentTime: now), isFalse);
+      expect(StatusLogic.isReportActive(reportConfirmed25hAgo, currentTime: now), isFalse);
     });
 
     test('isReportActive (AC-81/AC-83): hidden report (falseCount >= 3) = inactive', () {
@@ -189,15 +189,15 @@ void main() {
     test('AC-83 integration lifecycle: create report -> bus Warning -> re-confirm extends Warning -> resolve -> bus Safe', () {
       final startTime = DateTime.now();
 
-      // 1. Initial report created on stop station 11 hours ago (active, near 12h expiry)
+      // 1. Initial report created on stop station 23 hours ago (active, near 24h expiry)
       final initialReport = Report(
         id: 'rep_lifecycle',
         targetType: 'station',
         targetId: 'st_fort',
         problemType: 'Elevator power failure',
         status: 'active',
-        createdAt: startTime.subtract(const Duration(hours: 11)),
-        lastConfirmedAt: startTime.subtract(const Duration(hours: 11)),
+        createdAt: startTime.subtract(const Duration(hours: 23)),
+        lastConfirmedAt: startTime.subtract(const Duration(hours: 23)),
         confirmCount: 0,
         userId: 'user_reporter',
       );
@@ -212,13 +212,13 @@ void main() {
       expect(result.status, equals(AccessibilityStatus.partial));
       expect(result.statusLabel, equals('Warning'));
 
-      // 2. Advance time by 2 hours (13 hours after creation). Without re-confirmation, report expires.
-      final timeAfter13h = startTime.add(const Duration(hours: 2));
+      // 2. Advance time by 2 hours (25 hours after creation). Without re-confirmation, report expires.
+      final timeAfter25h = startTime.add(const Duration(hours: 2));
       result = StatusLogic.getBusStatus(
         safeBus,
         [initialReport],
         stationsMap: stationsMap,
-        currentTime: timeAfter13h,
+        currentTime: timeAfter25h,
       );
       expect(result.status, equals(AccessibilityStatus.accessible));
       expect(result.statusLabel, equals('Safe'));
@@ -230,12 +230,12 @@ void main() {
         confirmedBy: ['user_passenger2'],
       );
 
-      // At time T+2h (13h after creation, but only 1h after re-confirmation), report remains active!
+      // At time T+2h (25h after creation, but only 1h after re-confirmation), report remains active!
       result = StatusLogic.getBusStatus(
         safeBus,
         [confirmedReport],
         stationsMap: stationsMap,
-        currentTime: timeAfter13h,
+        currentTime: timeAfter25h,
       );
       expect(result.status, equals(AccessibilityStatus.partial));
       expect(result.statusLabel, equals('Warning'));
@@ -248,7 +248,7 @@ void main() {
         safeBus,
         [resolvedReport],
         stationsMap: stationsMap,
-        currentTime: timeAfter13h,
+        currentTime: timeAfter25h,
       );
       expect(result.status, equals(AccessibilityStatus.accessible));
       expect(result.statusLabel, equals('Safe'));

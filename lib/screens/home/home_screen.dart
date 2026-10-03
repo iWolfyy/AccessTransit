@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
@@ -13,6 +14,11 @@ import '../../widgets/logout_confirmation_dialog.dart';
 import '../auth/login_screen.dart';
 import '../journey/journey_search_screen.dart';
 import '../main_shell.dart';
+import '../../core/utils/time_utils.dart';
+import '../../logic/status_logic.dart';
+import '../../models/report.dart';
+import '../../services/firestore_service.dart';
+import '../community/report_details_screen.dart';
 import '../operator/operator_dashboard_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import '../profile/rewards_contributions_screen.dart';
@@ -295,18 +301,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                       onResume: _resumeJourney,
                                     ),
                                   ],
-                                  // ── Favorites Section ──
+                                  // ── Recent Community Reports ──
                                   const SizedBox(height: 24),
-                                  _FavoritesSection(
-                                    onTap: _showComingSoon,
+                                  _RecentReportsSection(
+                                    onSeeAll: () => _onNavTap('Community'),
                                   ),
-                                  // ── Live Status & Alerts ──
-                                  const SizedBox(height: 24),
-                                  const _AlertsSection(),
                                   // ── Recent Journey ──
                                   const SizedBox(height: 24),
                                   _RecentJourneyCard(
                                     onReplan: _openJourneySearch,
+                                    passengerId: _user?.uid,
                                   ),
                                 ],
                               ),
@@ -758,207 +762,6 @@ class _QuickActionCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// FAVORITES SECTION (Phase 1.4 — horizontal scrollable pills)
-// ═══════════════════════════════════════════════════════════════════════════
-
-class _FavoritesSection extends StatelessWidget {
-  const _FavoritesSection({required this.onTap});
-
-  final void Function(String feature) onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isHighContrast = context.isHighContrast;
-    final hasLargeTargets = context.hasLargeTargets;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Your Favorites',
-          style: TextStyle(
-            fontSize: 18,
-            height: 24 / 18,
-            fontWeight: FontWeight.w700,
-            color: context.textColor,
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: hasLargeTargets ? 88 : 76,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            clipBehavior: Clip.none,
-            children: [
-              _FavoritePill(
-                icon: Icons.home_rounded,
-                label: 'Home',
-                subtitle: '15 min',
-                subtitleColor: AppColors.secondary,
-                filled: true,
-                onTap: () => onTap('Home favorite'),
-              ),
-              const SizedBox(width: 10),
-              _FavoritePill(
-                icon: Icons.work_outline_rounded,
-                label: 'Work',
-                subtitle: '32 min',
-                subtitleColor: AppColors.secondary,
-                onTap: () => onTap('Work favorite'),
-              ),
-              const SizedBox(width: 10),
-              _FavoritePill(
-                icon: Icons.local_hospital_outlined,
-                label: 'Medical',
-                subtitle: '-- min',
-                subtitleColor: isHighContrast
-                    ? const Color(0xFF1A1A1A)
-                    : AppColors.onSurfaceVariant,
-                onTap: () => onTap('Medical favorite'),
-              ),
-              const SizedBox(width: 10),
-              _FavoritePill(
-                icon: Icons.add_rounded,
-                label: 'Add',
-                isAdd: true,
-                onTap: () => onTap('Add favorite'),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FavoritePill extends StatelessWidget {
-  const _FavoritePill({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.subtitle,
-    this.subtitleColor,
-    this.filled = false,
-    this.isAdd = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final String? subtitle;
-  final Color? subtitleColor;
-  final bool filled;
-  final bool isAdd;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isHighContrast = context.isHighContrast;
-    final hasLargeTargets = context.hasLargeTargets;
-
-    return Material(
-      color: isHighContrast
-          ? Colors.white
-          : (isAdd
-              ? AppColors.surfaceContainer
-              : AppColors.surfaceContainerLowest),
-      borderRadius: BorderRadius.circular(16),
-      elevation: isHighContrast ? 0 : (isAdd ? 0 : 1),
-      shadowColor: const Color(0x14000000),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          constraints: BoxConstraints(
-            minWidth: hasLargeTargets ? 120 : 100,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: isHighContrast
-                ? Border.all(color: Colors.black, width: 2.0)
-                : (isAdd
-                    ? Border.all(
-                        color: AppColors.outlineVariant,
-                        style: BorderStyle.solid,
-                      )
-                    : Border.all(
-                        color:
-                            AppColors.outlineVariant.withValues(alpha: 0.3))),
-          ),
-          padding: EdgeInsets.symmetric(
-            horizontal: hasLargeTargets ? 18 : 14,
-            vertical: hasLargeTargets ? 14 : 10,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: hasLargeTargets ? 44 : 40,
-                height: hasLargeTargets ? 44 : 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isHighContrast
-                      ? (isAdd ? Colors.transparent : const Color(0xFFE5E5E5))
-                      : (isAdd
-                          ? Colors.transparent
-                          : (filled
-                              ? AppColors.primaryContainer
-                                  .withValues(alpha: 0.15)
-                              : AppColors.primaryContainer
-                                  .withValues(alpha: 0.08))),
-                  border: isHighContrast && !isAdd
-                      ? Border.all(color: Colors.black, width: 1.5)
-                      : null,
-                ),
-                child: Icon(
-                  icon,
-                  size: hasLargeTargets ? 22 : 20,
-                  color: isHighContrast
-                      ? Colors.black
-                      : (isAdd
-                          ? AppColors.onSurfaceVariant
-                          : AppColors.primaryContainer),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: hasLargeTargets ? 15 : 14,
-                      fontWeight:
-                          isHighContrast ? FontWeight.w800 : FontWeight.w600,
-                      color: isHighContrast
-                          ? Colors.black
-                          : (isAdd
-                              ? AppColors.onSurfaceVariant
-                              : AppColors.onSurface),
-                    ),
-                  ),
-                  if (subtitle != null)
-                    Text(
-                      subtitle!,
-                      style: TextStyle(
-                        fontSize: hasLargeTargets ? 12.5 : 11,
-                        fontWeight:
-                            isHighContrast ? FontWeight.w700 : FontWeight.w500,
-                        color: isHighContrast
-                            ? const Color(0xFF1A1A1A)
-                            : (subtitleColor ?? AppColors.onSurfaceVariant),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DRAWER (preserved from original)
@@ -1491,235 +1294,245 @@ class _AvatarButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ALERTS SECTION (Phase 1.5 — kept with polish)
+// RECENT REPORTS SECTION
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _AlertsSection extends StatelessWidget {
-  const _AlertsSection();
+class _RecentReportsSection extends StatelessWidget {
+  const _RecentReportsSection({required this.onSeeAll});
+
+  final VoidCallback onSeeAll;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Live Status & Alerts',
-          style: TextStyle(
-            fontSize: 18,
-            height: 24 / 18,
-            fontWeight: FontWeight.w700,
-            color: context.textColor,
-          ),
-        ),
-        const SizedBox(height: 16),
-        const _AlertCard(
-          accent: AppColors.error,
-          icon: Icons.warning,
-          title: 'Red Line Delays',
-          body: 'Expect up to 15 minute delays due to signal issues.',
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'Recent Community Reports',
+                style: TextStyle(
+                  fontSize: 18,
+                  height: 24 / 18,
+                  fontWeight: FontWeight.w700,
+                  color: context.textColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onSeeAll,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'See All →',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
-        const _StatusCard(
-          title: 'Bus 42',
-          body: 'On time. Arriving in 4 min.',
-          badge: 'Good',
+        StreamBuilder<List<Report>>(
+          stream: FirestoreService().streamReports(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+
+            final reports = snapshot.data ?? [];
+            final activeReports = reports
+                .where((r) => StatusLogic.isReportActive(r))
+                .take(3)
+                .toList();
+
+            if (activeReports.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: context.isHighContrast
+                      ? Colors.white
+                      : AppColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(12),
+                  border: context.isHighContrast
+                      ? Border.all(color: Colors.black, width: 2.0)
+                      : null,
+                ),
+                child: Text(
+                  'No recent community reports.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+              );
+            }
+
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              itemCount: activeReports.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final report = activeReports[index];
+                return _RecentReportCard(report: report);
+              },
+            );
+          },
         ),
       ],
     );
   }
 }
 
-class _AlertCard extends StatelessWidget {
-  const _AlertCard({
-    required this.accent,
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
+class _RecentReportCard extends StatelessWidget {
+  const _RecentReportCard({required this.report});
 
-  final Color accent;
-  final IconData icon;
-  final String title;
-  final String body;
+  final Report report;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
-    final effectiveAccent = isHighContrast ? const Color(0xFF8B0000) : accent;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+    final title = report.targetName.isNotEmpty
+        ? report.targetName
+        : (report.targetId.isNotEmpty ? report.targetId : 'Report');
+
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: isHighContrast ? 0 : 1,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: isHighContrast
-            ? Border.all(color: Colors.black, width: 2.0)
-            : null,
-        boxShadow: isHighContrast
-            ? null
-            : const [
-                BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
-              ],
+        side: isHighContrast
+            ? const BorderSide(color: Colors.black, width: 2.0)
+            : BorderSide.none,
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ReportDetailsScreen(report: report),
+            ),
+          );
+        },
+        title: Row(
           children: [
-            Container(
-              width: isHighContrast ? 6 : 4,
-              decoration: BoxDecoration(
-                color: effectiveAccent,
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isHighContrast ? Colors.black : AppColors.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(icon, color: effectiveAccent),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: 18,
-                              height: 24 / 18,
-                              fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-                              color: isHighContrast ? Colors.black : AppColors.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            body,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 20 / 14,
-                              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            const SizedBox(width: 8),
+            Text(
+              TimeUtils.formatRelativeTime(report.createdAt),
+              style: TextStyle(
+                fontSize: 12,
+                color: isHighContrast
+                    ? const Color(0xFF1A1A1A)
+                    : AppColors.onSurfaceVariant,
               ),
             ),
           ],
         ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              report.problemType,
+              style: TextStyle(
+                fontSize: 14,
+                color: isHighContrast
+                    ? const Color(0xFF1A1A1A)
+                    : AppColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _buildFlagChip(
+                  icon: Icons.thumb_up_outlined,
+                  label: 'True: ${report.confirmCount}',
+                  color: Colors.green.shade700,
+                  isHighContrast: isHighContrast,
+                ),
+                const SizedBox(width: 8),
+                _buildFlagChip(
+                  icon: Icons.flag_outlined,
+                  label: 'False: ${report.falseCount}/3',
+                  color: Colors.red.shade700,
+                  isHighContrast: isHighContrast,
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+
+  Widget _buildFlagChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required bool isHighContrast,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withAlpha(25),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isHighContrast ? Colors.black : color.withAlpha(76),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: isHighContrast ? Colors.black : color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isHighContrast ? Colors.black : color,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.title,
-    required this.body,
-    required this.badge,
-  });
-
-  final String title;
-  final String body;
-  final String badge;
-
-  @override
-  Widget build(BuildContext context) {
-    final isHighContrast = context.isHighContrast;
-    final accent = isHighContrast ? const Color(0xFF003833) : AppColors.secondary;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: isHighContrast
-            ? Border.all(color: Colors.black, width: 2.0)
-            : null,
-        boxShadow: isHighContrast
-            ? null
-            : const [
-                BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
-              ],
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: isHighContrast ? 6 : 4,
-              decoration: BoxDecoration(
-                color: accent,
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle, color: accent),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: 18,
-                              height: 24 / 18,
-                              fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-                              color: isHighContrast ? Colors.black : AppColors.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            body,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 20 / 14,
-                              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isHighContrast
-                            ? const Color(0xFF003833)
-                            : AppColors.secondary.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(999),
-                        border: isHighContrast
-                            ? Border.all(color: Colors.black, width: 1.5)
-                            : null,
-                      ),
-                      child: Text(
-                        badge,
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 16 / 12,
-                          fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w500,
-                          color: isHighContrast ? Colors.white : AppColors.secondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ACTIVE JOURNEY BANNER (Phase 1.3 — kept as-is)
@@ -1857,14 +1670,19 @@ class _ActiveJourneyBanner extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _RecentJourneyCard extends StatelessWidget {
-  const _RecentJourneyCard({required this.onReplan});
+  const _RecentJourneyCard({
+    required this.onReplan,
+    this.passengerId,
+  });
 
   final VoidCallback onReplan;
+  final String? passengerId;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
     final hasLargeTargets = context.hasLargeTargets;
+    final pid = passengerId ?? '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1878,8 +1696,85 @@ class _RecentJourneyCard extends StatelessWidget {
             color: isHighContrast ? Colors.black : AppColors.onSurface,
           ),
         ),
-        const SizedBox(height: 16),
-        Container(
+        const SizedBox(height: 12),
+        if (pid.isEmpty)
+          _buildCardContent(
+            context,
+            title: 'Pettah Station to Kottawa',
+            subtitle: 'Yesterday, 2:45 PM',
+            isHighContrast: isHighContrast,
+            hasLargeTargets: hasLargeTargets,
+          )
+        else
+          StreamBuilder<List<JourneyModel>>(
+            stream: _getJourneysStream(pid),
+            builder: (context, snapshot) {
+              String title = 'Pettah Station to Kottawa';
+              String subtitle = 'Yesterday, 2:45 PM';
+
+              final docs = snapshot.data ?? [];
+              if (docs.isNotEmpty) {
+                final sortedDocs = List<JourneyModel>.from(docs)
+                  ..sort((a, b) {
+                    final aTime =
+                        a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                    final bTime =
+                        b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                    return bTime.compareTo(aTime);
+                  });
+
+                final latest = sortedDocs.first;
+                final orig =
+                    latest.origin.isNotEmpty ? latest.origin : 'Origin';
+                final dest = latest.destination.isNotEmpty
+                    ? latest.destination
+                    : 'Destination';
+                title = '$orig to $dest';
+                if (latest.createdAt != null) {
+                  subtitle = TimeUtils.formatRelativeTime(latest.createdAt!);
+                } else {
+                  subtitle = 'Recent';
+                }
+              }
+
+              return _buildCardContent(
+                context,
+                title: title,
+                subtitle: subtitle,
+                isHighContrast: isHighContrast,
+                hasLargeTargets: hasLargeTargets,
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Stream<List<JourneyModel>> _getJourneysStream(String pid) {
+    if (pid.isEmpty) return Stream.value([]);
+    try {
+      return FirebaseFirestore.instance
+          .collection('journeys')
+          .where('passengerId', isEqualTo: pid)
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs
+            .map((doc) => JourneyModel.fromMap(doc.data(), documentId: doc.id))
+            .toList();
+      });
+    } catch (_) {
+      return Stream.value([]);
+    }
+  }
+
+  Widget _buildCardContent(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required bool isHighContrast,
+    required bool hasLargeTargets,
+  }) {
+    return Container(
           width: double.infinity,
           padding: EdgeInsets.all(hasLargeTargets ? 20 : 16),
           decoration: BoxDecoration(
@@ -1918,8 +1813,8 @@ class _RecentJourneyCard extends StatelessWidget {
                     stacked ? CrossAxisAlignment.center : CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Central Station to Library',
-                    textAlign: TextAlign.center,
+                    title,
+                    textAlign: stacked ? TextAlign.center : TextAlign.start,
                     style: TextStyle(
                       fontSize: hasLargeTargets ? 20 : 18,
                       height: 24 / 18,
@@ -1929,7 +1824,7 @@ class _RecentJourneyCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Yesterday, 2:45 PM',
+                    subtitle,
                     style: TextStyle(
                       fontSize: hasLargeTargets ? 15 : 14,
                       height: 20 / 14,
@@ -1985,9 +1880,7 @@ class _RecentJourneyCard extends StatelessWidget {
               );
             },
           ),
-        ),
-      ],
-    );
+        );
   }
 }
 

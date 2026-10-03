@@ -86,9 +86,60 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
+  Future<void> _handleCardConfirm(Report report) async {
+    final userId = currentUserId ?? 'guest_user';
+    if (report.confirmedBy.contains(userId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You already confirmed this report as True.')),
+      );
+      return;
+    }
+    try {
+      await _firestoreService.confirmReport(report.id, userId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('True flag recorded! Thank you.')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Action failed: ${e.toString().replaceAll('Exception: ', '')}')),
+      );
+    }
+  }
+
+  Future<void> _handleCardFlag(Report report) async {
+    final userId = currentUserId ?? 'guest_user';
+    if (report.flaggedBy.contains(userId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You already flagged this report as False.')),
+      );
+      return;
+    }
+    try {
+      final newCount = report.falseCount + 1;
+      await _firestoreService.flagReport(report.id, userId);
+      if (newCount >= 3) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Report deleted and hidden due to 3 false flags.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('False flag recorded ($newCount/3 flags). Report deletes at 3.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Action failed: ${e.toString().replaceAll('Exception: ', '')}')),
+      );
+    }
+  }
+
+  String? get currentUserId => FirebaseAuth.instance.currentUser?.uid;
+
   @override
   Widget build(BuildContext context) {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     final isHC = context.isHighContrast;
 
     return Scaffold(
@@ -228,6 +279,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                       targetTitle: _resolveTargetTitle(activeReports[i]),
                                       isActive: true,
                                       onTap: () => _openReportDetails(activeReports[i]),
+                                      onConfirm: () => _handleCardConfirm(activeReports[i]),
+                                      onFlag: () => _handleCardFlag(activeReports[i]),
                                     ),
                                   ],
                                 ],
@@ -268,6 +321,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                       targetTitle: _resolveTargetTitle(inactiveReports[i]),
                                       isActive: false,
                                       onTap: () => _openReportDetails(inactiveReports[i]),
+                                      onConfirm: () => _handleCardConfirm(inactiveReports[i]),
+                                      onFlag: () => _handleCardFlag(inactiveReports[i]),
                                     ),
                                   ],
                                 ],
@@ -569,12 +624,16 @@ class _ModernReportCard extends StatelessWidget {
     required this.targetTitle,
     required this.isActive,
     required this.onTap,
+    required this.onConfirm,
+    required this.onFlag,
   });
 
   final Report report;
   final String targetTitle;
   final bool isActive;
   final VoidCallback onTap;
+  final VoidCallback onConfirm;
+  final VoidCallback onFlag;
 
   @override
   Widget build(BuildContext context) {
@@ -582,6 +641,10 @@ class _ModernReportCard extends StatelessWidget {
     final hasLargeTargets = context.hasLargeTargets;
     final isResolved = report.status.toLowerCase() == 'resolved';
     final isExpired = !isActive && !isResolved;
+
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final hasConfirmed = report.confirmedBy.contains(userId);
+    final hasFlagged = report.flaggedBy.contains(userId);
 
     final _ReportBadge badgeType;
     if (isResolved) {
@@ -703,9 +766,95 @@ class _ModernReportCard extends StatelessWidget {
 
               const SizedBox(height: 14),
 
-              // Bottom Details Row: Photo indicator, Trust verification, Chevron
+              // Flag Counter Chips (True count & False count out of 3)
               Row(
                 children: [
+                  // True Flag count pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isHC
+                          ? (hasConfirmed ? const Color(0xFF003833) : Colors.white)
+                          : (hasConfirmed
+                              ? AppColors.success.withValues(alpha: 0.2)
+                              : AppColors.success.withValues(alpha: 0.1)),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isHC ? Colors.black : AppColors.success,
+                        width: isHC ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.thumb_up_alt_rounded,
+                          size: 13,
+                          color: isHC
+                              ? (hasConfirmed ? Colors.white : const Color(0xFF003833))
+                              : AppColors.success,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          'True: ${report.confirmCount}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isHC
+                                ? (hasConfirmed ? Colors.white : const Color(0xFF003833))
+                                : AppColors.success,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  // False Flag count pill (hides at 3)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isHC
+                          ? (hasFlagged ? const Color(0xFF8B0000) : Colors.white)
+                          : (report.falseCount > 0
+                              ? AppColors.error.withValues(alpha: 0.15)
+                              : AppColors.surfaceContainer),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isHC
+                            ? const Color(0xFF8B0000)
+                            : (report.falseCount > 0 ? AppColors.error : AppColors.outline),
+                        width: isHC ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.flag_rounded,
+                          size: 13,
+                          color: isHC
+                              ? (hasFlagged ? Colors.white : const Color(0xFF8B0000))
+                              : (report.falseCount > 0 ? AppColors.error : AppColors.outline),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          'False: ${report.falseCount}/3',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isHC
+                                ? (hasFlagged ? Colors.white : const Color(0xFF8B0000))
+                                : (report.falseCount > 0 ? AppColors.error : AppColors.outline),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Spacer(),
+
                   if (report.photoUrl.isNotEmpty) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -736,47 +885,88 @@ class _ModernReportCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
                   ],
+                ],
+              ),
 
+              const SizedBox(height: 12),
+              Divider(
+                color: isHC ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.5),
+                height: 1,
+              ),
+              const SizedBox(height: 10),
+
+              // Interactive True & False Quick Action Buttons
+              Row(
+                children: [
+                  // True Flag Button
                   Expanded(
-                    child: Row(
-                      children: [
-                        Icon(
-                          report.confirmCount > 0
-                              ? Icons.verified_rounded
-                              : Icons.schedule_rounded,
-                          size: 15,
-                          color: isHC
-                              ? (report.confirmCount > 0 ? const Color(0xFF003833) : Colors.black)
-                              : (report.confirmCount > 0 ? AppColors.success : AppColors.outline),
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            report.confirmCount > 0
-                                ? 'Confirmed by ${report.confirmCount} rider${report.confirmCount == 1 ? "" : "s"}'
-                                : 'Awaiting confirmation',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isHC
-                                  ? (report.confirmCount > 0 ? const Color(0xFF003833) : Colors.black)
-                                  : (report.confirmCount > 0
-                                      ? AppColors.success
-                                      : AppColors.outline),
-                            ),
+                    child: SizedBox(
+                      height: 38,
+                      child: OutlinedButton.icon(
+                        onPressed: onConfirm,
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: hasConfirmed
+                              ? (isHC ? const Color(0xFF003833) : AppColors.success.withValues(alpha: 0.15))
+                              : (isHC ? Colors.white : null),
+                          foregroundColor: isHC
+                              ? (hasConfirmed ? Colors.white : const Color(0xFF003833))
+                              : AppColors.success,
+                          side: BorderSide(
+                            color: isHC ? const Color(0xFF003833) : AppColors.success,
+                            width: isHC ? 1.5 : 1,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                      ],
+                        icon: Icon(
+                          hasConfirmed ? Icons.check_circle_rounded : Icons.thumb_up_outlined,
+                          size: 15,
+                        ),
+                        label: Text(
+                          hasConfirmed ? 'True (${report.confirmCount})' : 'True Flag (${report.confirmCount})',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ),
                     ),
                   ),
 
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: hasLargeTargets ? 18 : 14,
-                    color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+                  const SizedBox(width: 10),
+
+                  // False Flag Button
+                  Expanded(
+                    child: SizedBox(
+                      height: 38,
+                      child: OutlinedButton.icon(
+                        onPressed: isResolved ? null : onFlag,
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: hasFlagged
+                              ? (isHC ? const Color(0xFF8B0000) : AppColors.error.withValues(alpha: 0.15))
+                              : (isHC ? Colors.white : null),
+                          foregroundColor: isHC
+                              ? (hasFlagged ? Colors.white : const Color(0xFF8B0000))
+                              : AppColors.error,
+                          side: BorderSide(
+                            color: isHC ? const Color(0xFF8B0000) : AppColors.error,
+                            width: isHC ? 1.5 : 1,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        icon: Icon(
+                          hasFlagged ? Icons.flag_rounded : Icons.flag_outlined,
+                          size: 15,
+                        ),
+                        label: Text(
+                          hasFlagged ? 'False (${report.falseCount}/3)' : 'False Flag (${report.falseCount}/3)',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),

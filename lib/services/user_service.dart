@@ -53,7 +53,7 @@ class UserService {
     try {
       final doc = userDocument(user.uid);
       if (doc != null) {
-        await doc.update(user.toMap());
+        await doc.set(user.toMap(), SetOptions(merge: true));
       }
     } catch (e) {
       debugPrint('UserService.updateUser fallback: $e');
@@ -123,6 +123,63 @@ class UserService {
       debugPrint('UserService.userExists fallback: $e');
     }
     return _localUserFallback.containsKey(uid);
+  }
+
+  /// Atomically updates user points, reportsSubmitted, and verifiedCount stats.
+  Future<void> updateUserStats(
+    String uid, {
+    int pointsDelta = 0,
+    int reportsDelta = 0,
+    int verificationsDelta = 0,
+  }) async {
+    if (uid.isEmpty) return;
+
+    final user = await getUser(uid);
+    if (user == null) {
+      final newUser = UserModel(
+        uid: uid,
+        name: 'User',
+        email: '',
+        points: (pointsDelta).clamp(0, 999999),
+        reportsSubmitted: (reportsDelta).clamp(0, 999999),
+        verifiedCount: (verificationsDelta).clamp(0, 999999),
+      );
+      _localUserFallback[uid] = newUser;
+      try {
+        final doc = userDocument(uid);
+        if (doc != null) {
+          await doc.set(newUser.toMap(isCreate: true));
+        }
+      } catch (e) {
+        debugPrint('UserService.updateUserStats fallback set: $e');
+      }
+      return;
+    }
+
+    final newPoints = (user.points + pointsDelta).clamp(0, 999999);
+    final newReports = (user.reportsSubmitted + reportsDelta).clamp(0, 999999);
+    final newVerifications = (user.verifiedCount + verificationsDelta).clamp(0, 999999);
+
+    final updatedUser = user.copyWith(
+      points: newPoints,
+      reportsSubmitted: newReports,
+      verifiedCount: newVerifications,
+    );
+
+    _localUserFallback[uid] = updatedUser;
+
+    try {
+      final doc = userDocument(uid);
+      if (doc != null) {
+        await doc.set({
+          FirestoreConstants.fieldPoints: newPoints,
+          FirestoreConstants.fieldReportsSubmitted: newReports,
+          FirestoreConstants.fieldVerifiedCount: newVerifications,
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('UserService.updateUserStats fallback update: $e');
+    }
   }
 }
 
