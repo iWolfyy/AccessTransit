@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/extensions/context_extensions.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_theme.dart';
 
@@ -107,6 +108,22 @@ class _NavItem extends StatelessWidget {
   final bool selected;
   final bool isHighContrast;
 
+  String _getLocalizedLabel(BuildContext context, String key) {
+    final loc = context.loc;
+    switch (key) {
+      case 'Home':
+        return loc.navHome;
+      case 'Plan':
+        return loc.navJourney;
+      case 'Community':
+        return loc.navCommunity;
+      case 'Profile':
+        return loc.navProfile;
+      default:
+        return key;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeBg = isHighContrast
@@ -150,7 +167,7 @@ class _NavItem extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              label,
+              _getLocalizedLabel(context, label),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
