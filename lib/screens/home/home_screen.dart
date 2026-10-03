@@ -13,6 +13,11 @@ import '../../widgets/logout_confirmation_dialog.dart';
 import '../auth/login_screen.dart';
 import '../journey/journey_search_screen.dart';
 import '../main_shell.dart';
+import '../../core/utils/time_utils.dart';
+import '../../logic/status_logic.dart';
+import '../../models/report.dart';
+import '../../services/firestore_service.dart';
+import '../community/report_details_screen.dart';
 import '../operator/operator_dashboard_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import '../profile/rewards_contributions_screen.dart';
@@ -300,9 +305,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   _FavoritesSection(
                                     onTap: _showComingSoon,
                                   ),
-                                  // ── Live Status & Alerts ──
+                                  // ── Recent Community Reports ──
                                   const SizedBox(height: 24),
-                                  const _AlertsSection(),
+                                  _RecentReportsSection(
+                                    onSeeAll: () => _onNavTap('Community'),
+                                  ),
                                   // ── Recent Journey ──
                                   const SizedBox(height: 24),
                                   _RecentJourneyCard(
@@ -1491,235 +1498,244 @@ class _AvatarButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ALERTS SECTION (Phase 1.5 — kept with polish)
+// RECENT REPORTS SECTION
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _AlertsSection extends StatelessWidget {
-  const _AlertsSection();
+class _RecentReportsSection extends StatelessWidget {
+  const _RecentReportsSection({required this.onSeeAll});
+
+  final VoidCallback onSeeAll;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Live Status & Alerts',
-          style: TextStyle(
-            fontSize: 18,
-            height: 24 / 18,
-            fontWeight: FontWeight.w700,
-            color: context.textColor,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'Recent Community Reports',
+                style: TextStyle(
+                  fontSize: 18,
+                  height: 24 / 18,
+                  fontWeight: FontWeight.w700,
+                  color: context.textColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onSeeAll,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'See All →',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        const _AlertCard(
-          accent: AppColors.error,
-          icon: Icons.warning,
-          title: 'Red Line Delays',
-          body: 'Expect up to 15 minute delays due to signal issues.',
-        ),
-        const SizedBox(height: 8),
-        const _StatusCard(
-          title: 'Bus 42',
-          body: 'On time. Arriving in 4 min.',
-          badge: 'Good',
+        const SizedBox(height: 12),
+        StreamBuilder<List<Report>>(
+          stream: FirestoreService().streamReports(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+
+            final reports = snapshot.data ?? [];
+            final activeReports = reports
+                .where((r) => StatusLogic.isReportActive(r))
+                .take(3)
+                .toList();
+
+            if (activeReports.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: context.isHighContrast
+                      ? Colors.white
+                      : AppColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(12),
+                  border: context.isHighContrast
+                      ? Border.all(color: Colors.black, width: 2.0)
+                      : null,
+                ),
+                child: Text(
+                  'No recent community reports.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+              );
+            }
+
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: activeReports.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final report = activeReports[index];
+                return _RecentReportCard(report: report);
+              },
+            );
+          },
         ),
       ],
     );
   }
 }
 
-class _AlertCard extends StatelessWidget {
-  const _AlertCard({
-    required this.accent,
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
+class _RecentReportCard extends StatelessWidget {
+  const _RecentReportCard({required this.report});
 
-  final Color accent;
-  final IconData icon;
-  final String title;
-  final String body;
+  final Report report;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
-    final effectiveAccent = isHighContrast ? const Color(0xFF8B0000) : accent;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+    final title = report.targetName.isNotEmpty
+        ? report.targetName
+        : (report.targetId.isNotEmpty ? report.targetId : 'Report');
+
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: isHighContrast ? 0 : 1,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: isHighContrast
-            ? Border.all(color: Colors.black, width: 2.0)
-            : null,
-        boxShadow: isHighContrast
-            ? null
-            : const [
-                BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
-              ],
+        side: isHighContrast
+            ? const BorderSide(color: Colors.black, width: 2.0)
+            : BorderSide.none,
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ReportDetailsScreen(report: report),
+            ),
+          );
+        },
+        title: Row(
           children: [
-            Container(
-              width: isHighContrast ? 6 : 4,
-              decoration: BoxDecoration(
-                color: effectiveAccent,
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isHighContrast ? Colors.black : AppColors.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(icon, color: effectiveAccent),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: 18,
-                              height: 24 / 18,
-                              fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-                              color: isHighContrast ? Colors.black : AppColors.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            body,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 20 / 14,
-                              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            const SizedBox(width: 8),
+            Text(
+              TimeUtils.formatRelativeTime(report.createdAt),
+              style: TextStyle(
+                fontSize: 12,
+                color: isHighContrast
+                    ? const Color(0xFF1A1A1A)
+                    : AppColors.onSurfaceVariant,
               ),
             ),
           ],
         ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              report.problemType,
+              style: TextStyle(
+                fontSize: 14,
+                color: isHighContrast
+                    ? const Color(0xFF1A1A1A)
+                    : AppColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _buildFlagChip(
+                  icon: Icons.thumb_up_outlined,
+                  label: 'True: ${report.confirmCount}',
+                  color: Colors.green.shade700,
+                  isHighContrast: isHighContrast,
+                ),
+                const SizedBox(width: 8),
+                _buildFlagChip(
+                  icon: Icons.flag_outlined,
+                  label: 'False: ${report.falseCount}/3',
+                  color: Colors.red.shade700,
+                  isHighContrast: isHighContrast,
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+
+  Widget _buildFlagChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required bool isHighContrast,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withAlpha(25),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isHighContrast ? Colors.black : color.withAlpha(76),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: isHighContrast ? Colors.black : color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isHighContrast ? Colors.black : color,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.title,
-    required this.body,
-    required this.badge,
-  });
-
-  final String title;
-  final String body;
-  final String badge;
-
-  @override
-  Widget build(BuildContext context) {
-    final isHighContrast = context.isHighContrast;
-    final accent = isHighContrast ? const Color(0xFF003833) : AppColors.secondary;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: isHighContrast
-            ? Border.all(color: Colors.black, width: 2.0)
-            : null,
-        boxShadow: isHighContrast
-            ? null
-            : const [
-                BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
-              ],
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: isHighContrast ? 6 : 4,
-              decoration: BoxDecoration(
-                color: accent,
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle, color: accent),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: 18,
-                              height: 24 / 18,
-                              fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-                              color: isHighContrast ? Colors.black : AppColors.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            body,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 20 / 14,
-                              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                              fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isHighContrast
-                            ? const Color(0xFF003833)
-                            : AppColors.secondary.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(999),
-                        border: isHighContrast
-                            ? Border.all(color: Colors.black, width: 1.5)
-                            : null,
-                      ),
-                      child: Text(
-                        badge,
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 16 / 12,
-                          fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w500,
-                          color: isHighContrast ? Colors.white : AppColors.secondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ACTIVE JOURNEY BANNER (Phase 1.3 — kept as-is)
