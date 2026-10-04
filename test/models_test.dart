@@ -100,6 +100,35 @@ void main() {
       expect(inboundBus.stops.first, equals('st_kottawa'));
       expect(outboundBus.stops, isNot(equals(inboundBus.stops)));
     });
+
+    test('Bus scheduleTimes serialization and fallback calculation', () {
+      final busWithSchedules = Bus.fromMap({
+        'routeNo': '138',
+        'stops': ['st_pettah', 'st_maradana'],
+        'scheduleTimes': ['08:00 AM', '08:12 AM'],
+        'hasRamp': true,
+        'lowFloor': true,
+        'rampOk': true,
+        'occupancy': 'low',
+      });
+
+      expect(busWithSchedules.scheduleTimes, equals(['08:00 AM', '08:12 AM']));
+      expect(busWithSchedules.getScheduledTimeForStop(0), equals('08:00 AM'));
+      expect(busWithSchedules.getScheduledTimeForStop(1), equals('08:12 AM'));
+
+      final busWithoutSchedules = Bus.fromMap({
+        'routeNo': '100',
+        'stops': ['st_pettah', 'st_fort'],
+        'hasRamp': true,
+        'lowFloor': true,
+        'rampOk': true,
+        'occupancy': 'low',
+      });
+
+      expect(busWithoutSchedules.scheduleTimes, isEmpty);
+      expect(busWithoutSchedules.getScheduledTimeForStop(0), equals('08:00 AM'));
+      expect(busWithoutSchedules.getScheduledTimeForStop(1), equals('08:12 AM'));
+    });
   });
 
   group('Report Model Tests', () {

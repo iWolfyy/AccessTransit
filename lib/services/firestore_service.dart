@@ -1,8 +1,14 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../constants/firestore_constants.dart';
+import '../data/seed_data.dart';
+import '../models/boarding_request.dart';
 import '../models/bus.dart';
+import '../models/bus_route.dart';
 import '../models/report.dart';
 import '../models/station.dart';
+import 'user_service.dart';
 
 /// Repository service for accessing stations, static bus routes, and reports in Firestore.
 class FirestoreService {
@@ -13,9 +19,27 @@ class FirestoreService {
 
   FirebaseFirestore get _db => _customFirestore ?? FirebaseFirestore.instance;
 
+  static final List<Report> _localReportsFallback = [...SeedData.getSampleReports()];
+  static final StreamController<List<Report>> _localStreamController =
+      StreamController<List<Report>>.broadcast();
+
+  static final List<BusRoute> _localRoutesFallback = [...SeedData.sampleRoutes];
+
+  static final List<Bus> _localBusesFallback = [...SeedData.sampleBuses];
+  static final StreamController<List<Bus>> _localBusesStreamController =
+      StreamController<List<Bus>>.broadcast();
+
+  static final List<BoardingRequest> _localRequestsFallback = [];
+  static final StreamController<List<BoardingRequest>> _localRequestsStreamController =
+      StreamController<List<BoardingRequest>>.broadcast();
+
   /// Collection reference for `stations`.
   CollectionReference<Map<String, dynamic>> get _stationsRef =>
       _db.collection(FirestoreConstants.stationsCollection);
+
+  /// Collection reference for `routes`.
+  CollectionReference<Map<String, dynamic>> get _routesRef =>
+      _db.collection(FirestoreConstants.routesCollection);
 
   /// Collection reference for `buses`.
   CollectionReference<Map<String, dynamic>> get _busesRef =>
@@ -25,62 +49,255 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>> get _reportsRef =>
       _db.collection(FirestoreConstants.reportsCollection);
 
+  /// Collection reference for `boarding_requests`.
+  CollectionReference<Map<String, dynamic>> get _boardingRequestsRef =>
+      _db.collection(FirestoreConstants.boardingRequestsCollection);
+
   /// 1. Fetches a snapshot list of all transit stations (`stations`).
   Future<List<Station>> getStations() async {
-    final snapshot = await _stationsRef.get();
-    return snapshot.docs.map((doc) => Station.fromFirestore(doc)).toList();
+    try {
+      final snapshot = await _stationsRef.get();
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.map((doc) => Station.fromFirestore(doc)).toList();
+      }
+    } catch (e) {
+      debugPrint('Firestore getStations fallback: $e');
+    }
+    return SeedData.colomboStations;
   }
 
   /// Fetches a single station by its ID (`stations/{id}`).
   Future<Station?> getStationById(String stationId) async {
-    final doc = await _stationsRef.doc(stationId).get();
-    if (!doc.exists) return null;
-    return Station.fromFirestore(doc);
+    try {
+      final doc = await _stationsRef.doc(stationId).get();
+      if (doc.exists) return Station.fromFirestore(doc);
+    } catch (e) {
+      debugPrint('Firestore getStationById fallback: $e');
+    }
+    try {
+      return SeedData.colomboStations.firstWhere((s) => s.id == stationId);
+    } catch (_) {
+      return null;
+    }
   }
 
-  /// 2. Fetches a snapshot list of all static bus routes (`buses`).
+  // ==========================================
+  // Routes APIs (`routes` collection)
+  // ==========================================
+
+  /// Fetches a snapshot list of all bus routes (`routes`).
+  Future<List<BusRoute>> getRoutes() async {
+    try {
+      final snapshot = await _routesRef.get();
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.map((doc) => BusRoute.fromFirestore(doc)).toList();
+      }
+    } catch (e) {
+      debugPrint('Firestore getRoutes fallback: $e');
+    }
+    return _localRoutesFallback;
+  }
+
+  /// Fetches a single bus route by its ID (`routes/{id}`).
+  Future<BusRoute?> getRouteById(String routeId) async {
+    try {
+      final doc = await _routesRef.doc(routeId).get();
+      if (doc.exists) return BusRoute.fromFirestore(doc);
+    } catch (e) {
+      debugPrint('Firestore getRouteById fallback: $e');
+    }
+    try {
+      return _localRoutesFallback.firstWhere((r) => r.id == routeId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Finds all bus routes that connect [fromStopId] to [toStopId] in valid directional order.
+  Future<List<BusRoute>> findRoutesConnectingStops(
+    String fromStopId,
+    String toStopId,
+  ) async {
+    final allRoutes = await getRoutes();
+    return allRoutes
+        .where((route) => route.isValidDirection(fromStopId, toStopId))
+        .toList();
+  }
+
+  // ==========================================
+  // Buses APIs (`buses` collection)
+  // ==========================================
+
+  /// 2. Fetches a snapshot list of all static bus vehicles (`buses`).
   Future<List<Bus>> getBuses() async {
-    final snapshot = await _busesRef.get();
-    return snapshot.docs.map((doc) => Bus.fromFirestore(doc)).toList();
+    try {
+      final snapshot = await _busesRef.get();
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.map((doc) => Bus.fromFirestore(doc)).toList();
+      }
+    } catch (e) {
+      debugPrint('Firestore getBuses fallback: $e');
+    }
+    return _localBusesFallback;
   }
 
-  /// Fetches a single static bus route by its ID (`buses/{id}`).
+  /// Fetches all buses assigned to a specific [routeId] or [routeNo].
+  Future<List<Bus>> getBusesForRoute(String routeIdOrNo) async {
+    try {
+      final snapshot = await _busesRef
+          .where('routeId', isEqualTo: routeIdOrNo)
+          .get();
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.map((doc) => Bus.fromFirestore(doc)).toList();
+      }
+      final snapshotByNo = await _busesRef
+          .where(FirestoreConstants.fieldRouteNo, isEqualTo: routeIdOrNo)
+          .get();
+      if (snapshotByNo.docs.isNotEmpty) {
+        return snapshotByNo.docs.map((doc) => Bus.fromFirestore(doc)).toList();
+      }
+    } catch (e) {
+      debugPrint('Firestore getBusesForRoute fallback: $e');
+    }
+    return _localBusesFallback
+        .where((b) => b.routeId == routeIdOrNo || b.routeNo == routeIdOrNo)
+        .toList();
+  }
+
+  /// Fetches a single static bus vehicle by its ID (`buses/{id}`).
   Future<Bus?> getBusById(String busId) async {
-    final doc = await _busesRef.doc(busId).get();
-    if (!doc.exists) return null;
-    return Bus.fromFirestore(doc);
+    try {
+      final doc = await _busesRef.doc(busId).get();
+      if (doc.exists) return Bus.fromFirestore(doc);
+    } catch (e) {
+      debugPrint('Firestore getBusById fallback: $e');
+    }
+    try {
+      return _localBusesFallback.firstWhere((b) => b.id == busId);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 3. Returns a real-time stream of accessibility reports (`reports`).
   ///
   /// Excludes reports with status 'hidden'.
   /// Optionally filters by [status] (e.g. "active" or "resolved") and [userId].
-  Stream<List<Report>> streamReports({String? status, String? userId}) {
-    Query<Map<String, dynamic>> query = _reportsRef;
-    if (status != null && status.isNotEmpty) {
-      query = query.where(FirestoreConstants.fieldStatus, isEqualTo: status);
+  Stream<List<Report>> streamReports({String? status, String? userId}) async* {
+    List<Report> filterReports(List<Report> reports) {
+      final Map<String, Report> mergedMap = {};
+      for (final r in reports) {
+        if (r.id.isNotEmpty) mergedMap[r.id] = r;
+      }
+      for (final r in _localReportsFallback) {
+        if (r.id.isNotEmpty && !mergedMap.containsKey(r.id)) {
+          mergedMap[r.id] = r;
+        }
+      }
+
+      final filtered = mergedMap.values.where((r) {
+        if (r.status.toLowerCase() == 'hidden' || r.falseCount >= 3 || r.flaggedBy.length >= 3) return false;
+        if (status != null && status.isNotEmpty && r.status != status) {
+          return false;
+        }
+        if (userId != null && userId.isNotEmpty && r.userId != userId) {
+          return false;
+        }
+        return true;
+      }).toList();
+      filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return filtered;
     }
-    if (userId != null && userId.isNotEmpty) {
-      query = query.where(FirestoreConstants.fieldUserId, isEqualTo: userId);
+
+    // Always emit local fallback first
+    yield filterReports(_localReportsFallback);
+
+    // Stream updates from local modifications
+    final localSub = _localStreamController.stream.listen((_) {});
+
+    try {
+      Query<Map<String, dynamic>> query = _reportsRef;
+      if (status != null && status.isNotEmpty) {
+        query = query.where(FirestoreConstants.fieldStatus, isEqualTo: status);
+      }
+      if (userId != null && userId.isNotEmpty) {
+        query = query.where(FirestoreConstants.fieldUserId, isEqualTo: userId);
+      }
+
+      await for (final snapshot in query.snapshots()) {
+        final remote = snapshot.docs
+            .map((doc) => Report.fromFirestore(doc))
+            .toList();
+        yield filterReports(remote);
+      }
+    } catch (e) {
+      debugPrint('Firestore streamReports fallback: $e');
+      yield filterReports(_localReportsFallback);
+    } finally {
+      await localSub.cancel();
     }
-    return query.snapshots().map((snapshot) {
-      final reports = snapshot.docs
-          .map((doc) => Report.fromFirestore(doc))
-          .where((r) => r.status.toLowerCase() != 'hidden')
-          .toList();
-      // Sort newest first by createdAt
-      reports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return reports;
-    });
+  }
+
+  /// Returns a real-time stream of a single report by ID (`reports/{id}`).
+  Stream<Report?> streamReportById(String reportId) async* {
+    Report? findLocal() {
+      final idx = _localReportsFallback.indexWhere((r) => r.id == reportId);
+      if (idx != -1) return _localReportsFallback[idx];
+      return null;
+    }
+
+    yield findLocal();
+
+    try {
+      await for (final snapshot in _reportsRef.doc(reportId).snapshots()) {
+        if (snapshot.exists && snapshot.data() != null) {
+          final report = Report.fromFirestore(snapshot);
+          final idx = _localReportsFallback.indexWhere((r) => r.id == reportId);
+          if (idx != -1) {
+            _localReportsFallback[idx] = report;
+          } else {
+            _localReportsFallback.add(report);
+          }
+          yield report;
+        } else {
+          yield findLocal();
+        }
+      }
+    } catch (e) {
+      debugPrint('Firestore streamReportById fallback: $e');
+      yield findLocal();
+    }
   }
 
   /// Submits a new condition report to Firestore (`reports/{id}`).
   Future<void> createReport(Report report) async {
-    final docRef = report.id.isNotEmpty
-        ? _reportsRef.doc(report.id)
-        : _reportsRef.doc();
-    final data = report.toMap(isServerTimestamp: true);
-    await docRef.set(data);
+    final reportId = report.id.isNotEmpty
+        ? report.id
+        : 'rep_${DateTime.now().millisecondsSinceEpoch}';
+    final newReport = report.copyWith(id: reportId);
+
+    // Save to local fallback first
+    _localReportsFallback.removeWhere((r) => r.id == reportId);
+    _localReportsFallback.add(newReport);
+    _localStreamController.add(_localReportsFallback);
+
+    // Award +10 points and +1 report count to submitting user
+    if (newReport.userId.isNotEmpty) {
+      UserService().updateUserStats(
+        newReport.userId,
+        pointsDelta: 10,
+        reportsDelta: 1,
+      );
+    }
+
+    try {
+      final docRef = _reportsRef.doc(reportId);
+      final data = newReport.toMap(isServerTimestamp: true);
+      await docRef.set(data);
+    } catch (e) {
+      debugPrint('Firestore createReport permission/network warning: $e');
+      // Report remains safely stored in _localReportsFallback
+    }
   }
 
   /// Checks if a user has created a report for the same target in the last [thresholdMinutes] (AC-77).
@@ -91,84 +308,426 @@ class FirestoreService {
   }) async {
     if (userId.isEmpty || targetId.isEmpty) return false;
     final cutoff = DateTime.now().subtract(Duration(minutes: thresholdMinutes));
-    final snapshot = await _reportsRef
-        .where(FirestoreConstants.fieldUserId, isEqualTo: userId)
-        .where(FirestoreConstants.fieldTargetId, isEqualTo: targetId)
-        .get();
 
-    for (final doc in snapshot.docs) {
-      final report = Report.fromFirestore(doc);
-      if (report.createdAt.isAfter(cutoff)) {
-        return true;
+    for (final r in _localReportsFallback) {
+      if (r.userId == userId && r.targetId == targetId) {
+        if (r.createdAt.isAfter(cutoff)) {
+          return true;
+        }
       }
+    }
+
+    try {
+      final snapshot = await _reportsRef
+          .where(FirestoreConstants.fieldUserId, isEqualTo: userId)
+          .where(FirestoreConstants.fieldTargetId, isEqualTo: targetId)
+          .get();
+
+      for (final doc in snapshot.docs) {
+        final report = Report.fromFirestore(doc);
+        if (report.createdAt.isAfter(cutoff)) {
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Firestore checkRateLimit warning: $e');
     }
     return false;
   }
 
   /// Confirms a report as "Still broken" (AC-79).
   ///
-  /// Uses a Firestore transaction to atomically add [userId] to `confirmedBy`,
+  /// Uses a Firestore transaction/doc update to atomically add [userId] to `confirmedBy`,
   /// increment `confirmCount`, and reset `lastConfirmedAt` to current timestamp.
   Future<void> confirmReport(String reportId, String userId) async {
-    await _db.runTransaction((transaction) async {
+    final idx = _localReportsFallback.indexWhere((r) => r.id == reportId);
+    if (idx != -1) {
+      final r = _localReportsFallback[idx];
+      if (!r.confirmedBy.contains(userId)) {
+        final wasFlagged = r.flaggedBy.contains(userId);
+        final updatedFlaggedBy = List<String>.from(r.flaggedBy)..remove(userId);
+        final newFalseCount = wasFlagged
+            ? (r.falseCount - 1).clamp(0, 999)
+            : r.falseCount;
+        final updatedConfirmedBy = [...r.confirmedBy, userId];
+
+        final updated = r.copyWith(
+          confirmedBy: updatedConfirmedBy,
+          confirmCount: updatedConfirmedBy.length,
+          flaggedBy: updatedFlaggedBy,
+          falseCount: newFalseCount,
+          lastConfirmedAt: DateTime.now(),
+        );
+        _localReportsFallback[idx] = updated;
+        _localStreamController.add(_localReportsFallback);
+
+        if (userId.isNotEmpty) {
+          UserService().updateUserStats(userId, pointsDelta: 5, verificationsDelta: 1);
+        }
+      }
+    }
+
+    try {
       final docRef = _reportsRef.doc(reportId);
-      final snapshot = await transaction.get(docRef);
-      if (!snapshot.exists) {
-        throw Exception('Report not found.');
-      }
-      final report = Report.fromFirestore(snapshot);
+      final snapshot = await docRef.get();
+      if (snapshot.exists && snapshot.data() != null) {
+        final report = Report.fromFirestore(snapshot);
+        if (!report.confirmedBy.contains(userId)) {
+          final wasFlagged = report.flaggedBy.contains(userId);
+          final updatedFlaggedBy = List<String>.from(report.flaggedBy)..remove(userId);
+          final newFalseCount = wasFlagged
+              ? (report.falseCount - 1).clamp(0, 999)
+              : report.falseCount;
+          final updatedConfirmedBy = [...report.confirmedBy, userId];
 
-      if (report.confirmedBy.contains(userId)) {
-        throw Exception('You already confirmed this report.');
-      }
+          await docRef.set({
+            FirestoreConstants.fieldFlaggedBy: updatedFlaggedBy,
+            FirestoreConstants.fieldFalseCount: newFalseCount,
+            FirestoreConstants.fieldConfirmedBy: updatedConfirmedBy,
+            FirestoreConstants.fieldConfirmCount: updatedConfirmedBy.length,
+            FirestoreConstants.fieldLastConfirmedAt: FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
 
-      final updatedConfirmedBy = [...report.confirmedBy, userId];
-      transaction.update(docRef, {
-        FirestoreConstants.fieldConfirmedBy: updatedConfirmedBy,
-        FirestoreConstants.fieldConfirmCount: FieldValue.increment(1),
-        FirestoreConstants.fieldLastConfirmedAt: FieldValue.serverTimestamp(),
-      });
-    });
+          if (userId.isNotEmpty && idx == -1) {
+            UserService().updateUserStats(userId, pointsDelta: 5, verificationsDelta: 1);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Firestore confirmReport warning: $e');
+    }
   }
 
   /// Marks a report as resolved / "Fixed now" (AC-80).
   Future<void> resolveReport(String reportId) async {
-    final docRef = _reportsRef.doc(reportId);
-    await docRef.update({
-      FirestoreConstants.fieldStatus: 'resolved',
-    });
+    final idx = _localReportsFallback.indexWhere((r) => r.id == reportId);
+    if (idx != -1) {
+      final updated = _localReportsFallback[idx].copyWith(status: 'resolved');
+      _localReportsFallback[idx] = updated;
+      _localStreamController.add(_localReportsFallback);
+    }
+
+    try {
+      final docRef = _reportsRef.doc(reportId);
+      await docRef.update({
+        FirestoreConstants.fieldStatus: 'resolved',
+      });
+    } catch (e) {
+      debugPrint('Firestore resolveReport warning: $e');
+    }
   }
 
   /// Flags a report as false (AC-83).
   ///
-  /// Uses a Firestore transaction to atomically add [userId] to `flaggedBy` and increment `falseCount`.
-  /// If `falseCount` reaches 3, sets status to 'hidden'.
+  /// Adds [userId] to `flaggedBy` and increments `falseCount`.
+  /// If `falseCount` reaches 3, DELETES the report document from Firestore and local store,
+  /// AND deducts 10 points from the user who submitted the report (author).
   Future<void> flagReport(String reportId, String userId) async {
-    await _db.runTransaction((transaction) async {
+    final idx = _localReportsFallback.indexWhere((r) => r.id == reportId);
+    String? authorId;
+    if (idx != -1) {
+      final r = _localReportsFallback[idx];
+      authorId = r.userId;
+      if (!r.flaggedBy.contains(userId)) {
+        final wasConfirmed = r.confirmedBy.contains(userId);
+        final updatedConfirmedBy = List<String>.from(r.confirmedBy)..remove(userId);
+        final newConfirmCount = wasConfirmed
+            ? (r.confirmCount - 1).clamp(0, 999)
+            : r.confirmCount;
+
+        final updatedFlaggedBy = [...r.flaggedBy, userId];
+        final newFalseCount = updatedFlaggedBy.length;
+        final shouldDelete = newFalseCount >= 3;
+
+        if (shouldDelete) {
+          _localReportsFallback.removeAt(idx);
+          if (authorId.isNotEmpty) {
+            UserService().updateUserStats(authorId, pointsDelta: -10, reportsDelta: -1);
+          }
+        } else {
+          final updated = r.copyWith(
+            confirmedBy: updatedConfirmedBy,
+            confirmCount: newConfirmCount,
+            flaggedBy: updatedFlaggedBy,
+            falseCount: newFalseCount,
+          );
+          _localReportsFallback[idx] = updated;
+        }
+        _localStreamController.add(_localReportsFallback);
+      }
+    }
+
+    try {
       final docRef = _reportsRef.doc(reportId);
-      final snapshot = await transaction.get(docRef);
-      if (!snapshot.exists) {
-        throw Exception('Report not found.');
+      final snapshot = await docRef.get();
+      if (snapshot.exists && snapshot.data() != null) {
+        final report = Report.fromFirestore(snapshot);
+        if (!report.flaggedBy.contains(userId)) {
+          final wasConfirmed = report.confirmedBy.contains(userId);
+          final updatedConfirmedBy = List<String>.from(report.confirmedBy)..remove(userId);
+          final newConfirmCount = wasConfirmed
+              ? (report.confirmCount - 1).clamp(0, 999)
+              : report.confirmCount;
+
+          final updatedFlaggedBy = [...report.flaggedBy, userId];
+          final newFalseCount = updatedFlaggedBy.length;
+
+          if (newFalseCount >= 3) {
+            await docRef.delete();
+            if (report.userId.isNotEmpty && (authorId == null || authorId.isEmpty)) {
+              UserService().updateUserStats(report.userId, pointsDelta: -10, reportsDelta: -1);
+            }
+          } else {
+            await docRef.set({
+              FirestoreConstants.fieldConfirmedBy: updatedConfirmedBy,
+              FirestoreConstants.fieldConfirmCount: newConfirmCount,
+              FirestoreConstants.fieldFlaggedBy: updatedFlaggedBy,
+              FirestoreConstants.fieldFalseCount: newFalseCount,
+            }, SetOptions(merge: true));
+          }
+        }
       }
-      final report = Report.fromFirestore(snapshot);
+    } catch (e) {
+      debugPrint('Firestore flagReport warning: $e');
+    }
+  }
 
-      if (report.flaggedBy.contains(userId)) {
-        throw Exception('You already flagged this report.');
+  // --- Sprint 3: Driver Side Bus Streams & Controls (AC-84, AC-85) ---
+
+  /// Returns a real-time stream of all static buses (`buses`).
+  Stream<List<Bus>> streamBuses() async* {
+    List<Bus> mergeBuses(List<Bus> remoteBuses) {
+      final Map<String, Bus> mergedMap = {};
+      for (final b in _localBusesFallback) {
+        mergedMap[b.id] = b;
+      }
+      for (final b in remoteBuses) {
+        mergedMap[b.id] = b;
+      }
+      return mergedMap.values.toList();
+    }
+
+    yield mergeBuses([]);
+
+    final localSub = _localBusesStreamController.stream.listen((_) {});
+
+    try {
+      await for (final snapshot in _busesRef.snapshots()) {
+        final remote =
+            snapshot.docs.map((doc) => Bus.fromFirestore(doc)).toList();
+        yield mergeBuses(remote);
+      }
+    } catch (e) {
+      debugPrint('Firestore streamBuses fallback: $e');
+      yield mergeBuses([]);
+    } finally {
+      await localSub.cancel();
+    }
+  }
+
+  /// Returns a real-time stream of a single bus by ID (`buses/{id}`).
+  Stream<Bus?> streamBusById(String busId) async* {
+    Bus? findLocal() {
+      final idx = _localBusesFallback.indexWhere((b) => b.id == busId);
+      if (idx != -1) return _localBusesFallback[idx];
+      try {
+        return SeedData.sampleBuses.firstWhere((b) => b.id == busId);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    yield findLocal();
+
+    try {
+      await for (final snapshot in _busesRef.doc(busId).snapshots()) {
+        if (snapshot.exists && snapshot.data() != null) {
+          final bus = Bus.fromFirestore(snapshot);
+          final idx = _localBusesFallback.indexWhere((b) => b.id == busId);
+          if (idx != -1) {
+            _localBusesFallback[idx] = bus;
+          } else {
+            _localBusesFallback.add(bus);
+          }
+          yield bus;
+        } else {
+          yield findLocal();
+        }
+      }
+    } catch (e) {
+      debugPrint('Firestore streamBusById fallback: $e');
+      yield findLocal();
+    }
+  }
+
+  /// Updates ramp operational status and/or occupancy on a bus document (`buses/{busId}`) (AC-84).
+  Future<void> updateBusAccessibility(
+    String busId, {
+    bool? rampOk,
+    String? occupancy,
+    String? driverId,
+  }) async {
+    // 1. Update local cache
+    final idx = _localBusesFallback.indexWhere((b) => b.id == busId);
+    if (idx != -1) {
+      final current = _localBusesFallback[idx];
+      _localBusesFallback[idx] = current.copyWith(
+        rampOk: rampOk ?? current.rampOk,
+        occupancy: occupancy ?? current.occupancy,
+        driverId: driverId ?? current.driverId,
+      );
+      _localBusesStreamController.add(_localBusesFallback);
+    }
+
+    // 2. Write to Firestore
+    try {
+      final Map<String, dynamic> updates = {};
+      if (rampOk != null) {
+        updates[FirestoreConstants.fieldRampOk] = rampOk;
+      }
+      if (occupancy != null) {
+        updates[FirestoreConstants.fieldOccupancy] = occupancy.toLowerCase();
+      }
+      if (driverId != null) {
+        updates[FirestoreConstants.fieldDriverId] = driverId;
       }
 
-      final updatedFlaggedBy = [...report.flaggedBy, userId];
-      final newFalseCount = report.falseCount + 1;
-      final Map<String, dynamic> updates = {
-        FirestoreConstants.fieldFlaggedBy: updatedFlaggedBy,
-        FirestoreConstants.fieldFalseCount: newFalseCount,
-      };
-
-      if (newFalseCount >= 3) {
-        updates[FirestoreConstants.fieldStatus] = 'hidden';
+      if (updates.isNotEmpty) {
+        await _busesRef.doc(busId).set(updates, SetOptions(merge: true));
       }
+    } catch (e) {
+      debugPrint('Firestore updateBusAccessibility warning: $e');
+    }
+  }
 
-      transaction.update(docRef, updates);
-    });
+  /// Assigns a driver to a bus document (`buses/{busId}`) (AC-84).
+  Future<void> assignBusDriver(String busId, String driverId) async {
+    await updateBusAccessibility(busId, driverId: driverId);
+  }
+
+  /// Adds a new [Station] to Firestore (`stations/{id}`) and inserts its ID
+  /// into an existing [Bus] route's ordered `stops` list at [insertIndex].
+  Future<void> addStationAndInsertIntoBusRoute({
+    required Station newStation,
+    required String busId,
+    required int insertIndex,
+  }) async {
+    // 1. Save new station
+    try {
+      await _stationsRef.doc(newStation.id).set(newStation.toMap(), SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Firestore addStation warning: $e');
+    }
+
+    // 2. Fetch target bus
+    final bus = await getBusById(busId);
+    if (bus == null) return;
+
+    final updatedStops = List<String>.from(bus.stops);
+    if (!updatedStops.contains(newStation.id)) {
+      if (insertIndex < 0 || insertIndex > updatedStops.length) {
+        updatedStops.add(newStation.id);
+      } else {
+        updatedStops.insert(insertIndex, newStation.id);
+      }
+    }
+
+    final updatedBus = bus.copyWith(stops: updatedStops);
+
+    // 3. Update local fallback
+    final idx = _localBusesFallback.indexWhere((b) => b.id == busId);
+    if (idx != -1) {
+      _localBusesFallback[idx] = updatedBus;
+      _localBusesStreamController.add(_localBusesFallback);
+    }
+
+    // 4. Write updated stops to Firestore
+    try {
+      await _busesRef.doc(busId).set({
+        FirestoreConstants.fieldStops: updatedStops,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Firestore updateBusStops warning: $e');
+    }
+  }
+
+
+  // --- Sprint 3: Boarding Assistance Requests (AC-86) ---
+
+  /// Submits a boarding assistance request to Firestore (`boarding_requests/{id}`) (AC-86).
+  Future<void> createBoardingRequest(BoardingRequest request) async {
+    final requestId = request.id.isNotEmpty
+        ? request.id
+        : 'req_${DateTime.now().millisecondsSinceEpoch}';
+    final newRequest = request.copyWith(id: requestId);
+
+    // Save to local fallback first
+    _localRequestsFallback.removeWhere((r) => r.id == requestId);
+    _localRequestsFallback.insert(0, newRequest);
+    _localRequestsStreamController.add(_localRequestsFallback);
+
+    try {
+      final docRef = _boardingRequestsRef.doc(requestId);
+      final data = newRequest.toMap(isServerTimestamp: true);
+      await docRef.set(data);
+    } catch (e) {
+      debugPrint('Firestore createBoardingRequest warning: $e');
+    }
+  }
+
+  /// Streams boarding assistance requests for a given bus (`boarding_requests`) (AC-86).
+  Stream<List<BoardingRequest>> streamBoardingRequestsForBus(String busId) async* {
+    List<BoardingRequest> filterRequests(List<BoardingRequest> requests) {
+      final Map<String, BoardingRequest> map = {};
+      for (final r in _localRequestsFallback) {
+        if (r.busId == busId) map[r.id] = r;
+      }
+      for (final r in requests) {
+        if (r.busId == busId) map[r.id] = r;
+      }
+      final list = map.values.toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    }
+
+    yield filterRequests([]);
+
+    final localSub = _localRequestsStreamController.stream.listen((_) {});
+
+    try {
+      await for (final snapshot in _boardingRequestsRef
+          .where(FirestoreConstants.fieldBusId, isEqualTo: busId)
+          .snapshots()) {
+        final remote = snapshot.docs
+            .map((doc) => BoardingRequest.fromFirestore(doc))
+            .toList();
+        yield filterRequests(remote);
+      }
+    } catch (e) {
+      debugPrint('Firestore streamBoardingRequestsForBus fallback: $e');
+      yield filterRequests([]);
+    } finally {
+      await localSub.cancel();
+    }
+  }
+
+  /// Updates status of a boarding request (e.g. 'acknowledged', 'completed') (AC-86).
+  Future<void> updateBoardingRequestStatus(String requestId, String status) async {
+    final idx = _localRequestsFallback.indexWhere((r) => r.id == requestId);
+    if (idx != -1) {
+      _localRequestsFallback[idx] =
+          _localRequestsFallback[idx].copyWith(status: status);
+      _localRequestsStreamController.add(_localRequestsFallback);
+    }
+
+    try {
+      await _boardingRequestsRef.doc(requestId).update({
+        FirestoreConstants.fieldRequestStatus: status,
+      });
+    } catch (e) {
+      debugPrint('Firestore updateBoardingRequestStatus warning: $e');
+    }
   }
 }
+
 

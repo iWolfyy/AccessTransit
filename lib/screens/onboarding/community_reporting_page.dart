@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import 'community_preview.dart';
 
 /// Onboarding step 3: community reporting and contribution badges.
@@ -144,17 +145,18 @@ class _CommunityReportingPageState extends State<CommunityReportingPage>
                     fontSize: wide ? 24 : 22,
                     height: wide ? 32 / 24 : 28 / 22,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                    color: context.textColor,
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Report elevator outages and ramp issues to help fellow travelers. Earn badges for your contributions!',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
                     height: 24 / 16,
-                    color: AppColors.onSurfaceVariant,
+                    fontWeight: context.isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                    color: context.isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
                   ),
                 ),
               ],

@@ -2,17 +2,25 @@ import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
+import '../../models/boarding_request.dart';
+import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 
 /// Boarding Assistance request screen — ramp, extra time, boarding help.
 class BoardingAssistanceScreen extends StatefulWidget {
   const BoardingAssistanceScreen({
     super.key,
-    this.stopName = 'Main St & 4th Ave',
-    this.busLabel = 'Bus 42',
+    this.busId = 'bus_138_outbound',
+    this.stopName = 'Colombo Fort Station',
+    this.stationId = 'st_fort',
+    this.busLabel = 'Route 138',
     this.minutesAway = 3,
   });
 
+  final String busId;
   final String stopName;
+  final String stationId;
   final String busLabel;
   final int minutesAway;
 
@@ -23,10 +31,13 @@ class BoardingAssistanceScreen extends StatefulWidget {
 
 class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
   static const double _desktopBreakpoint = 768;
+  final FirestoreService _firestoreService = FirestoreService();
+  final AuthService _authService = AuthService();
 
   bool _deployRamp = false;
   bool _extraTime = false;
   bool _boardingHelp = false;
+  bool _isSubmitting = false;
 
   bool get _hasSelection => _deployRamp || _extraTime || _boardingHelp;
 
@@ -36,7 +47,9 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _sendRequest() {
+  Future<void> _sendRequest() async {
+    if (_isSubmitting) return;
+
     if (!_hasSelection) {
       _showSnack('Please select at least one assistance option.');
       return;
@@ -48,19 +61,55 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
       if (_boardingHelp) 'Boarding Help',
     ];
 
-    _showSnack(
-      'Assistance request sent: ${selected.join(', ')}. Status: Pending',
-    );
+    setState(() => _isSubmitting = true);
 
-    Navigator.of(context).maybePop();
+    try {
+      final user = _authService.currentUser;
+      final riderId = user?.uid ?? 'guest_rider';
+      final riderName = (user?.displayName != null && user!.displayName!.isNotEmpty)
+          ? user.displayName!
+          : (user?.email != null && user!.email!.isNotEmpty
+              ? user.email!
+              : 'Rider (${riderId.length > 6 ? riderId.substring(0, 6) : riderId})');
+
+      final request = BoardingRequest(
+        id: 'req_${DateTime.now().millisecondsSinceEpoch}',
+        riderId: riderId,
+        riderName: riderName,
+        busId: widget.busId,
+        routeNo: widget.busLabel,
+        stationId: widget.stationId,
+        stopName: widget.stopName,
+        assistanceTypes: selected,
+        status: 'pending',
+        createdAt: DateTime.now(),
+      );
+
+      await _firestoreService.createBoardingRequest(request);
+
+      _showSnack(
+        'Assistance request sent: ${selected.join(', ')}. Status: Pending',
+      );
+
+      if (mounted) {
+        Navigator.of(context).maybePop();
+      }
+    } catch (e) {
+      _showSnack('Could not send assistance request: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+    final isHC = context.isHighContrast;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       body: Column(
         children: [
           _TopBar(
@@ -90,17 +139,20 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                         const SizedBox(height: 16),
                         const _CommunityStatusBadge(),
                         const SizedBox(height: 24),
-                        const Text(
+                        Text(
                           'Request Assistance',
                           style: TextStyle(
                             fontSize: 18,
                             height: 24 / 18,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.onSurface,
+                            color: context.textColor,
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Divider(height: 1, color: AppColors.surfaceVariant),
+                        Divider(
+                          height: 1,
+                          color: isHC ? Colors.black : AppColors.surfaceVariant,
+                        ),
                         const SizedBox(height: 16),
                         LayoutBuilder(
                           builder: (context, constraints) {
@@ -153,43 +205,56 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                           },
                         ),
                         const SizedBox(height: 32),
-                        const Divider(height: 1, color: AppColors.surfaceVariant),
+                        Divider(
+                          height: 1,
+                          color: isHC ? Colors.black : AppColors.surfaceVariant,
+                        ),
                         const SizedBox(height: 24),
                         SizedBox(
-                          height: 48,
+                          height: context.buttonHeight,
                           child: FilledButton.icon(
                             onPressed: _sendRequest,
                             style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.primaryContainer,
+                              backgroundColor: isHC
+                                  ? const Color(0xFF001F3F)
+                                  : AppColors.primaryContainer,
                               foregroundColor: AppColors.onPrimary,
+                              side: isHC
+                                  ? const BorderSide(color: Colors.black, width: 2)
+                                  : null,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
                               ),
-                              textStyle: const TextStyle(
-                                fontSize: 14,
+                              textStyle: TextStyle(
+                                fontSize: context.buttonFontSize,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            icon: const Icon(Icons.send, size: 20),
+                            icon: Icon(Icons.send, size: context.tapIconSize),
                             label: const Text('Send Request'),
                           ),
                         ),
                         const SizedBox(height: 8),
                         SizedBox(
-                          height: 48,
+                          height: context.buttonHeight,
                           child: OutlinedButton(
                             onPressed: () => Navigator.of(context).maybePop(),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.primaryContainer,
-                              side: const BorderSide(
-                                color: AppColors.primaryContainer,
+                              backgroundColor: isHC ? Colors.white : null,
+                              foregroundColor: isHC
+                                  ? Colors.black
+                                  : AppColors.primaryContainer,
+                              side: BorderSide(
+                                color: isHC
+                                    ? Colors.black
+                                    : AppColors.primaryContainer,
                                 width: 2,
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
                               ),
-                              textStyle: const TextStyle(
-                                fontSize: 14,
+                              textStyle: TextStyle(
+                                fontSize: context.buttonFontSize,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -205,18 +270,7 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : _AssistanceBottomNav(
-              onNavTap: (label) {
-                AppNavigation.handleBottomNav(
-                  context,
-                  label,
-                  currentTab: 'Live',
-                  onUnsupported: _showSnack,
-                );
-              },
-            ),
+      bottomNavigationBar: null,
     );
   }
 }
@@ -232,25 +286,31 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
+
     return Material(
-      color: AppColors.surfaceContainerLow,
-      elevation: 1,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
+      color: isHC ? Colors.white : AppColors.surfaceContainerLow,
+      elevation: isHC ? 0 : 1,
+      shadowColor: isHC ? null : AppColors.onSurface.withValues(alpha: 0.08),
+      shape: isHC
+          ? const Border(bottom: BorderSide(color: Colors.black, width: 2))
+          : null,
       child: SafeArea(
         bottom: false,
         child: SizedBox(
-          height: 48,
+          height: context.hasLargeTargets ? 56 : 48,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
                 IconButton(
+                  constraints: context.appBarActionConstraints,
                   onPressed: onBack,
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  color: AppColors.primary,
+                  icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize),
+                  color: isHC ? Colors.black : AppColors.primary,
                   tooltip: 'Back',
                 ),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Access Transit',
                     textAlign: TextAlign.center,
@@ -258,14 +318,15 @@ class _TopBar extends StatelessWidget {
                       fontSize: 22,
                       height: 28 / 22,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: isHC ? Colors.black : AppColors.primary,
                     ),
                   ),
                 ),
                 IconButton(
+                  constraints: context.appBarActionConstraints,
                   onPressed: onMenu,
-                  icon: const Icon(Icons.person_outline),
-                  color: AppColors.primary,
+                  icon: Icon(Icons.person_outline, size: context.tapIconSize),
+                  color: isHC ? Colors.black : AppColors.primary,
                   tooltip: 'Profile',
                 ),
               ],
@@ -290,19 +351,25 @@ class _ArrivingSoonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.surfaceVariant),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: isHC
+            ? Border.all(color: Colors.black, width: 2)
+            : Border.all(color: AppColors.surfaceVariant),
+        boxShadow: isHC
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.onSurface.withValues(alpha: 0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,29 +380,29 @@ class _ArrivingSoonCard extends StatelessWidget {
               children: [
                 Text(
                   '$busLabel arriving in $minutesAway mins',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     height: 24 / 18,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.onSurface,
+                    color: context.textColor,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.location_on,
                       size: 18,
-                      color: AppColors.onSurfaceVariant,
+                      color: isHC ? Colors.black : AppColors.onSurfaceVariant,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         stopName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           height: 20 / 14,
-                          color: AppColors.onSurfaceVariant,
+                          color: context.subtextColor,
                         ),
                       ),
                     ),
@@ -348,27 +415,30 @@ class _ArrivingSoonCard extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: 64),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primaryContainer,
+              color: isHC ? Colors.white : AppColors.primaryContainer,
               borderRadius: BorderRadius.circular(8),
+              border: isHC ? Border.all(color: Colors.black, width: 2) : null,
             ),
             child: Column(
               children: [
                 Text(
                   '$minutesAway',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 22,
                     height: 28 / 22,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onPrimaryContainer,
+                    color: isHC
+                        ? const Color(0xFF001F3F)
+                        : AppColors.onPrimaryContainer,
                   ),
                 ),
-                const Text(
+                Text(
                   'MIN',
                   style: TextStyle(
                     fontSize: 12,
                     height: 16 / 12,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                    color: isHC ? Colors.black : AppColors.onPrimaryContainer,
                   ),
                 ),
               ],
@@ -385,31 +455,41 @@ class _CommunityStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.secondary,
+        color: isHC ? Colors.white : AppColors.secondary,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.06),
-            blurRadius: 2,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        border: isHC
+            ? Border.all(color: const Color(0xFF003833), width: 2)
+            : null,
+        boxShadow: isHC
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.onSurface.withValues(alpha: 0.06),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.check_circle, color: AppColors.onSecondary),
-          SizedBox(width: 8),
+          Icon(
+            Icons.check_circle,
+            color: isHC ? const Color(0xFF003833) : AppColors.onSecondary,
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Ramp verified operational by 12 users today',
               style: TextStyle(
                 fontSize: 14,
                 height: 20 / 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.onSecondary,
+                fontWeight: FontWeight.w600,
+                color: isHC ? const Color(0xFF003833) : AppColors.onSecondary,
               ),
             ),
           ),
@@ -434,10 +514,14 @@ class _AssistanceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
+
     return Material(
-      color: selected
-          ? AppColors.primaryContainer.withValues(alpha: 0.1)
-          : AppColors.surfaceContainerLowest,
+      color: isHC
+          ? Colors.white
+          : (selected
+              ? AppColors.primaryContainer.withValues(alpha: 0.1)
+              : AppColors.surfaceContainerLowest),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -447,17 +531,24 @@ class _AssistanceTile extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.outlineVariant,
-              width: selected ? 1.5 : 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.onSurface.withValues(alpha: 0.04),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: isHC
+                ? Border.all(
+                    color: selected ? const Color(0xFF001F3F) : Colors.black,
+                    width: selected ? 3 : 2,
+                  )
+                : Border.all(
+                    color: selected ? AppColors.primary : AppColors.outlineVariant,
+                    width: selected ? 1.5 : 1,
+                  ),
+            boxShadow: isHC
+                ? null
+                : [
+                    BoxShadow(
+                      color: AppColors.onSurface.withValues(alpha: 0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -465,9 +556,11 @@ class _AssistanceTile extends StatelessWidget {
               Icon(
                 icon,
                 size: 40,
-                color: selected
-                    ? AppColors.primary
-                    : AppColors.onSurfaceVariant,
+                color: isHC
+                    ? (selected ? const Color(0xFF001F3F) : Colors.black)
+                    : (selected
+                        ? AppColors.primary
+                        : AppColors.onSurfaceVariant),
               ),
               const SizedBox(height: 8),
               Text(
@@ -476,9 +569,10 @@ class _AssistanceTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   height: 20 / 14,
-                  fontWeight: FontWeight.w600,
-                  color:
-                      selected ? AppColors.primary : AppColors.onSurface,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: isHC
+                      ? (selected ? const Color(0xFF001F3F) : Colors.black)
+                      : (selected ? AppColors.primary : AppColors.onSurface),
                 ),
               ),
             ],
@@ -489,108 +583,3 @@ class _AssistanceTile extends StatelessWidget {
   }
 }
 
-class _AssistanceBottomNav extends StatelessWidget {
-  const _AssistanceBottomNav({required this.onNavTap});
-
-  final ValueChanged<String> onNavTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 8,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_outlined,
-                label: 'Home',
-                onTap: () => onNavTap('Home'),
-              ),
-              _NavItem(
-                icon: Icons.directions_bus_outlined,
-                label: 'Plan',
-                onTap: () => onNavTap('Plan'),
-              ),
-              _NavItem(
-                icon: Icons.sensors,
-                label: 'Live',
-                selected: true,
-                onTap: () => onNavTap('Live'),
-              ),
-              _NavItem(
-                icon: Icons.group_outlined,
-                label: 'Community',
-                onTap: () => onNavTap('Community'),
-              ),
-              _NavItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                onTap: () => onNavTap('Profile'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.selected = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 64,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: selected
-            ? BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                height: 16 / 12,
-                color: selected
-                    ? AppColors.onPrimaryContainer
-                    : AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

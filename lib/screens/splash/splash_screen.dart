@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/enums/user_role.dart';
 import '../../services/auth_service.dart';
-import '../home/home_screen.dart';
+import '../main_shell.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../operator/operator_dashboard_screen.dart';
 
@@ -158,7 +158,7 @@ class _SplashScreenState extends State<SplashScreen>
       if (profile?.role == UserRole.operator) {
         next = const OperatorDashboardScreen();
       } else {
-        next = const HomeScreen();
+        next = const MainShell();
       }
     } else {
       next = const OnboardingScreen();

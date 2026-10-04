@@ -1,14 +1,27 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../models/journey_model.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../models/enums/user_role.dart';
 import '../../services/journey_service.dart';
+import '../../widgets/logout_confirmation_dialog.dart';
 import '../auth/login_screen.dart';
 import '../journey/journey_search_screen.dart';
-import '../journey/live_journey_screen.dart';
+import '../main_shell.dart';
+import '../../core/utils/time_utils.dart';
+import '../../logic/status_logic.dart';
+import '../../models/report.dart';
+import '../../services/firestore_service.dart';
+import '../community/report_details_screen.dart';
+import '../operator/operator_dashboard_screen.dart';
+import '../preferences/accessibility_preferences_screen.dart';
+import '../profile/rewards_contributions_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.initialUser});
@@ -22,8 +35,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   static const double _desktopBreakpoint = 768;
 
-  final AuthService _authService = AuthService();
-  final JourneyService _journeyService = JourneyService();
+  late final AuthService? _authService;
+  late final JourneyService? _journeyService;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   UserModel? _user;
@@ -33,12 +46,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    final hasFirebase = Firebase.apps.isNotEmpty;
+    _authService = hasFirebase ? AuthService() : null;
+    _journeyService = hasFirebase ? JourneyService() : null;
     _user = widget.initialUser;
     _isLoading = widget.initialUser == null;
-    _loadUser();
+    if (hasFirebase) {
+      _loadUser();
+    }
   }
 
   Future<void> _loadUser() async {
+    if (_authService == null) return;
     try {
       final user = await _authService.getCurrentUserProfile();
       if (!mounted) return;
@@ -60,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Checks Firestore for an active/confirmed journey for the current user.
   Future<void> _checkActiveJourney() async {
+    if (_authService == null || _journeyService == null) return;
     final uid = _authService.currentUser?.uid;
     if (uid == null || uid.isEmpty) return;
     try {
@@ -72,20 +92,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _resumeJourney() {
-    final uid = _authService.currentUser?.uid ?? '';
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => LiveJourneyScreen(passengerId: uid),
-      ),
-    );
+    _openJourneySearch();
   }
 
   Future<void> _logout() async {
-    await _authService.logout();
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final isHighContrast = context.isHighContrast;
+
+    final confirmed = await showLogoutConfirmationDialog(context);
+    if (confirmed != true) return;
+
+    await _authService?.logout();
+    nav.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
+    );
+    showLogoutSuccessSnackBar(
+      messenger: messenger,
+      isHighContrast: isHighContrast,
     );
   }
 
@@ -102,19 +127,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openJourneySearch() {
+    final shell = context.findAncestorStateOfType<MainShellState>();
+    if (shell != null) {
+      shell.switchToTab('Plan');
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const JourneySearchScreen()),
     );
   }
 
-  void _onBottomNavTap(String feature) {
-    AppNavigation.handleBottomNav(
-      context,
-      feature,
-      currentTab: 'Home',
-      profileUser: _user,
-      onUnsupported: _showComingSoon,
+  void _openAccessibilityPreferences() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AccessibilityPreferencesScreen(
+          initialUser: _user,
+        ),
+      ),
     );
+  }
+
+  void _onNavTap(String label) {
+    final shell = context.findAncestorStateOfType<MainShellState>();
+    if (shell != null) {
+      shell.switchToTab(label);
+    } else {
+      AppNavigation.handleBottomNav(context, label);
+    }
   }
 
   String get _initials {
@@ -127,21 +166,80 @@ class _HomeScreenState extends State<HomeScreen> {
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
+  String get _firstName {
+    final name = _user?.name.trim() ?? '';
+    if (name.isEmpty) return 'Passenger';
+    final parts = name.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    return parts.first;
+  }
+
+  String get _roleLabel {
+    switch (_user?.role) {
+      case UserRole.contributor:
+        return 'Community Contributor';
+      case UserRole.operator:
+        return 'Transit Bus Operator';
+      case UserRole.admin:
+        return 'System Administrator';
+      case UserRole.passenger:
+      case null:
+        return 'Inclusive Commuter';
+    }
+  }
+
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
+  IconData get _greetingIcon {
+    final hour = DateTime.now().hour;
+    if (hour < 6) return Icons.nights_stay_rounded;
+    if (hour < 12) return Icons.wb_sunny_rounded;
+    if (hour < 17) return Icons.wb_sunny_rounded;
+    if (hour < 20) return Icons.wb_twilight_rounded;
+    return Icons.nights_stay_rounded;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       drawer: _HomeDrawer(
         user: _user,
         initials: _initials,
+        roleLabel: _roleLabel,
         onLogout: _logout,
-        onProfile: () {
-          Navigator.of(context).pop();
-          _openProfile();
+        onNavTap: _onNavTap,
+        onAccessibilityTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => AccessibilityPreferencesScreen(
+                initialUser: _user,
+              ),
+            ),
+          );
         },
+        onRewardsTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const RewardsContributionsScreen(),
+            ),
+          );
+        },
+        onOperatorTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const OperatorDashboardScreen(),
+            ),
+          );
+        },
+        onFeatureTap: _showComingSoon,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -151,50 +249,68 @@ class _HomeScreenState extends State<HomeScreen> {
                   _DesktopTopNav(
                     initials: _initials,
                     onMenu: () => _scaffoldKey.currentState?.openDrawer(),
-                    onNavTap: _onBottomNavTap,
-                    onProfileTap: _openProfile,
-                  )
-                else
-                  _MobileTopBar(
-                    initials: _initials,
-                    onMenu: () => _scaffoldKey.currentState?.openDrawer(),
+                    onNavTap: _onNavTap,
                     onProfileTap: _openProfile,
                   ),
                 Expanded(
                   child: CustomScrollView(
                     slivers: [
+                      // ── Hero Gradient Header ──
+                      SliverToBoxAdapter(
+                        child: _HeroHeader(
+                          greeting: _greeting,
+                          greetingIcon: _greetingIcon,
+                          firstName: _firstName,
+                          initials: _initials,
+                          isDesktop: isDesktop,
+                          onSearchTap: _openJourneySearch,
+                          onMenuTap: () =>
+                              _scaffoldKey.currentState?.openDrawer(),
+                          onProfileTap: _openProfile,
+                        ),
+                      ),
+                      // ── Body Content ──
                       SliverPadding(
                         padding: EdgeInsets.fromLTRB(
                           isDesktop ? 24 : 16,
-                          24,
+                          20,
                           isDesktop ? 24 : 16,
-                          isDesktop ? 24 : 112,
+                          isDesktop ? 24 : 24,
                         ),
                         sliver: SliverToBoxAdapter(
                           child: Center(
                             child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 1280),
+                              constraints:
+                                  const BoxConstraints(maxWidth: 1280),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 children: [
-                                  _WhereToSearch(onTap: _openJourneySearch),
+                                  // ── Quick Actions Row ──
+                                  _QuickActionsRow(
+                                    onTrackBus: _openJourneySearch,
+                                    onPlanJourney: _openJourneySearch,
+                                    onAccessPrefs:
+                                        _openAccessibilityPreferences,
+                                  ),
+                                  // ── Active Journey Banner ──
                                   if (_activeJourney != null) ...[
-                                    const SizedBox(height: 16),
+                                    const SizedBox(height: 20),
                                     _ActiveJourneyBanner(
                                       journey: _activeJourney!,
                                       onResume: _resumeJourney,
                                     ),
                                   ],
+                                  // ── Recent Community Reports ──
                                   const SizedBox(height: 24),
-                                  _FavoritesSection(
-                                    isDesktop: isDesktop,
-                                    onTap: _showComingSoon,
+                                  _RecentReportsSection(
+                                    onSeeAll: () => _onNavTap('Community'),
                                   ),
-                                  const SizedBox(height: 24),
-                                  const _AlertsSection(),
+                                  // ── Recent Journey ──
                                   const SizedBox(height: 24),
                                   _RecentJourneyCard(
                                     onReplan: _openJourneySearch,
+                                    passengerId: _user?.uid,
                                   ),
                                 ],
                               ),
@@ -209,136 +325,306 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: isDesktop ? 0 : 72),
+        padding: const EdgeInsets.only(bottom: 0),
         child: _AssistanceFab(
           showLabel: MediaQuery.sizeOf(context).width >= 640,
           onPressed: () => _showComingSoon('Assistance'),
         ),
       ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : _MobileBottomNav(onNavTap: _onBottomNavTap),
+      bottomNavigationBar: null,
     );
   }
 }
 
-class _HomeDrawer extends StatelessWidget {
-  const _HomeDrawer({
-    required this.user,
+// ═══════════════════════════════════════════════════════════════════════════
+// HERO GRADIENT HEADER (Phase 1.1 — LMT Go inspired)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _HeroHeader extends StatelessWidget {
+  const _HeroHeader({
+    required this.greeting,
+    required this.greetingIcon,
+    required this.firstName,
     required this.initials,
-    required this.onLogout,
-    required this.onProfile,
+    required this.isDesktop,
+    required this.onSearchTap,
+    required this.onMenuTap,
+    required this.onProfileTap,
   });
 
-  final UserModel? user;
+  final String greeting;
+  final IconData greetingIcon;
+  final String firstName;
   final String initials;
-  final VoidCallback onLogout;
-  final VoidCallback onProfile;
+  final bool isDesktop;
+  final VoidCallback onSearchTap;
+  final VoidCallback onMenuTap;
+  final VoidCallback onProfileTap;
 
   @override
   Widget build(BuildContext context) {
-    return Drawer(
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: isHighContrast
+            ? null
+            : const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary,        // #003466
+                  AppColors.primaryContainer, // #1A4B84
+                ],
+              ),
+        color: isHighContrast ? const Color(0xFF001F3F) : null,
+        border: isHighContrast
+            ? const Border(
+                bottom: BorderSide(color: Colors.black, width: 2.0))
+            : null,
+      ),
       child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(color: AppColors.primary),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            isDesktop ? 24 : 20,
+            8,
+            isDesktop ? 24 : 20,
+            hasLargeTargets ? 28 : 24,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Top row: Menu + Title + Avatar ──
+              if (!isDesktop)
+                Row(
+                  children: [
+                    _HeaderIconButton(
+                      icon: Icons.menu_rounded,
+                      onPressed: onMenuTap,
+                      semanticLabel: 'Open menu',
+                    ),
+                    const Spacer(),
+                    Text(
+                      'Access Transit',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 0.2,
+                        shadows: isHighContrast
+                            ? null
+                            : const [
+                                Shadow(
+                                  color: Color(0x40000000),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                      ),
+                    ),
+                    const Spacer(),
+                    _HeaderAvatarButton(
+                      initials: initials,
+                      onPressed: onProfileTap,
+                    ),
+                  ],
+                ),
+
+              SizedBox(height: hasLargeTargets ? 20 : 16),
+
+              // ── Greeting row ──
+              Row(
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppColors.primaryContainer,
-                    foregroundColor: AppColors.onPrimaryContainer,
+                  Icon(
+                    greetingIcon,
+                    color: const Color(0xFFFFD54F),
+                    size: hasLargeTargets ? 28 : 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
                     child: Text(
-                      initials,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      '$greeting, $firstName',
+                      style: TextStyle(
+                        fontSize: hasLargeTargets ? 26 : 22,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        height: 1.3,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    user?.name.isNotEmpty == true ? user!.name : 'Passenger',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    user?.email ?? '',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                 ],
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.home, color: AppColors.primary),
-              title: const Text('Home'),
-              selected: true,
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.person_outline, color: AppColors.primary),
-              title: const Text('Profile'),
-              onTap: onProfile,
-            ),
-            const Spacer(),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Log out'),
-              onTap: () {
-                Navigator.pop(context);
-                onLogout();
-              },
-            ),
-          ],
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(left: 36),
+                child: Text(
+                  'Ready to ride?',
+                  style: TextStyle(
+                    fontSize: hasLargeTargets ? 16 : 14,
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+              SizedBox(height: hasLargeTargets ? 20 : 16),
+
+              // ── Prominent Search Card ──
+              Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                elevation: isHighContrast ? 0 : 4,
+                shadowColor: const Color(0x40000000),
+                child: InkWell(
+                  onTap: onSearchTap,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    constraints: BoxConstraints(
+                      minHeight: hasLargeTargets ? 64 : 56,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: isHighContrast
+                          ? Border.all(color: Colors.black, width: 2.0)
+                          : null,
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: hasLargeTargets ? 20 : 16,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: hasLargeTargets ? 44 : 40,
+                          height: hasLargeTargets ? 44 : 40,
+                          decoration: BoxDecoration(
+                            color: isHighContrast
+                                ? const Color(0xFFE5E5E5)
+                                : AppColors.primaryContainer
+                                    .withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.search_rounded,
+                            color: isHighContrast
+                                ? Colors.black
+                                : AppColors.primaryContainer,
+                            size: hasLargeTargets ? 26 : 22,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Where are you going?',
+                                style: TextStyle(
+                                  fontSize: hasLargeTargets ? 18 : 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: isHighContrast
+                                      ? Colors.black
+                                      : AppColors.onSurface,
+                                ),
+                              ),
+                              Text(
+                                'Tap to plan your journey',
+                                style: TextStyle(
+                                  fontSize: hasLargeTargets ? 13 : 12,
+                                  color: isHighContrast
+                                      ? const Color(0xFF1A1A1A)
+                                      : AppColors.onSurfaceVariant,
+                                  fontWeight: isHighContrast
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          color: isHighContrast
+                              ? Colors.black
+                              : AppColors.primaryContainer,
+                          size: hasLargeTargets ? 24 : 20,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _MobileTopBar extends StatelessWidget {
-  const _MobileTopBar({
-    required this.initials,
-    required this.onMenu,
-    required this.onProfileTap,
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
+    required this.icon,
+    required this.onPressed,
+    this.semanticLabel,
   });
 
-  final String initials;
-  final VoidCallback onMenu;
-  final VoidCallback onProfileTap;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surfaceContainerLow,
-      elevation: 1,
-      shadowColor: Colors.black26,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 48,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _IconCircleButton(icon: Icons.menu, onPressed: onMenu),
-                const Expanded(
-                  child: Text(
-                    'Access Transit',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      height: 28 / 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                _AvatarButton(initials: initials, onPressed: onProfileTap),
-              ],
+    return SizedBox(
+      width: context.minTapHeight,
+      height: context.minTapHeight,
+      child: IconButton(
+        onPressed: onPressed,
+        tooltip: semanticLabel,
+        icon: Icon(
+          icon,
+          color: Colors.white,
+          size: context.tapIconSize,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderAvatarButton extends StatelessWidget {
+  const _HeaderAvatarButton({
+    required this.initials,
+    required this.onPressed,
+  });
+
+  final String initials;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasLargeTargets = context.hasLargeTargets;
+    return SizedBox(
+      width: context.minTapHeight,
+      height: context.minTapHeight,
+      child: IconButton(
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+        tooltip: 'Open profile',
+        icon: Container(
+          width: hasLargeTargets ? 38 : 34,
+          height: hasLargeTargets ? 38 : 34,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.20),
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            initials,
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: hasLargeTargets ? 14 : 12,
             ),
           ),
         ),
@@ -346,6 +632,422 @@ class _MobileTopBar extends StatelessWidget {
     );
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QUICK ACTIONS ROW (Phase 1.2 — LMT Go inspired)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _QuickActionsRow extends StatelessWidget {
+  const _QuickActionsRow({
+    required this.onTrackBus,
+    required this.onPlanJourney,
+    required this.onAccessPrefs,
+  });
+
+  final VoidCallback onTrackBus;
+  final VoidCallback onPlanJourney;
+  final VoidCallback onAccessPrefs;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _QuickActionCard(
+            icon: Icons.directions_bus_rounded,
+            label: 'Track\nBus',
+            onTap: onTrackBus,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _QuickActionCard(
+            icon: Icons.map_rounded,
+            label: 'Plan\nJourney',
+            onTap: onPlanJourney,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _QuickActionCard(
+            icon: Icons.accessibility_new_rounded,
+            label: 'Access\nPrefs',
+            onTap: onAccessPrefs,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+    final circleSize = hasLargeTargets ? 54.0 : 48.0;
+
+    return Material(
+      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+      borderRadius: BorderRadius.circular(16),
+      elevation: isHighContrast ? 0 : 2,
+      shadowColor: const Color(0x14000000),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          constraints: BoxConstraints(
+            minHeight: hasLargeTargets ? 120 : 108,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: isHighContrast
+                ? Border.all(color: Colors.black, width: 2.0)
+                : Border.all(
+                    color: AppColors.outlineVariant.withValues(alpha: 0.3)),
+          ),
+          padding: EdgeInsets.symmetric(
+            vertical: hasLargeTargets ? 16 : 14,
+            horizontal: 8,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: circleSize,
+                height: circleSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isHighContrast
+                      ? const Color(0xFFE5E5E5)
+                      : AppColors.primaryContainer.withValues(alpha: 0.10),
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
+                ),
+                child: Icon(
+                  icon,
+                  size: hasLargeTargets ? 28 : 24,
+                  color: isHighContrast
+                      ? Colors.black
+                      : AppColors.primaryContainer,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: hasLargeTargets ? 14 : 12,
+                  fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                  color: isHighContrast ? Colors.black : AppColors.onSurface,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DRAWER (preserved from original)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _HomeDrawer extends StatelessWidget {
+  const _HomeDrawer({
+    required this.user,
+    required this.initials,
+    required this.roleLabel,
+    required this.onLogout,
+    required this.onNavTap,
+    required this.onAccessibilityTap,
+    required this.onRewardsTap,
+    required this.onOperatorTap,
+    required this.onFeatureTap,
+  });
+
+  final UserModel? user;
+  final String initials;
+  final String roleLabel;
+  final VoidCallback onLogout;
+  final void Function(String label) onNavTap;
+  final VoidCallback onAccessibilityTap;
+  final VoidCallback onRewardsTap;
+  final VoidCallback onOperatorTap;
+  final void Function(String label) onFeatureTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+    final isOperatorOrAdmin = user?.role == UserRole.operator || user?.role == UserRole.admin;
+
+    return Drawer(
+      backgroundColor: isHighContrast ? Colors.white : context.surfaceColor,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  // Drawer Header
+                  DrawerHeader(
+                    decoration: BoxDecoration(
+                      color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                      border: isHighContrast
+                          ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+                          : null,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: hasLargeTargets ? 30 : 26,
+                              backgroundColor: isHighContrast ? Colors.white : AppColors.primaryContainer,
+                              foregroundColor: isHighContrast ? Colors.black : AppColors.onPrimaryContainer,
+                              child: Text(
+                                initials,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: hasLargeTargets ? 18 : 16,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.20),
+                                borderRadius: BorderRadius.circular(12),
+                                border: isHighContrast ? Border.all(color: Colors.white, width: 1.5) : null,
+                              ),
+                              child: Text(
+                                roleLabel,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          user?.name.isNotEmpty == true ? user!.name : 'Passenger',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: hasLargeTargets ? 20 : 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          user?.email ?? '',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Navigation Tabs
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.home_rounded,
+                    title: 'Home',
+                    selected: true,
+                    onTap: () => Navigator.pop(context),
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.directions_bus_rounded,
+                    title: 'Plan Journey',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onNavTap('Plan');
+                    },
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.people_rounded,
+                    title: 'Community',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onNavTap('Community');
+                    },
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.person_rounded,
+                    title: 'Profile',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onNavTap('Profile');
+                    },
+                  ),
+
+                  Divider(
+                    height: 1,
+                    thickness: isHighContrast ? 2.0 : 1.0,
+                    color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.3),
+                  ),
+
+                  // Settings & Features
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.settings_accessibility_rounded,
+                    title: 'Accessibility Preferences',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onAccessibilityTap();
+                    },
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.stars_rounded,
+                    title: 'Rewards & Contributions',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onRewardsTap();
+                    },
+                  ),
+                  if (isOperatorOrAdmin)
+                    _buildDrawerTile(
+                      context,
+                      icon: Icons.dashboard_rounded,
+                      title: 'Operator Dashboard',
+                      onTap: () {
+                        Navigator.pop(context);
+                        onOperatorTap();
+                      },
+                    ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.bookmark_rounded,
+                    title: 'Saved Places',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onFeatureTap('Saved Places');
+                    },
+                  ),
+                  _buildDrawerTile(
+                    context,
+                    icon: Icons.help_outline_rounded,
+                    title: 'Help & Support',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onFeatureTap('Help & Support');
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // Bottom Logout Tile
+            Divider(
+              height: 1,
+              thickness: isHighContrast ? 2.0 : 1.0,
+              color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.3),
+            ),
+            _buildDrawerTile(
+              context,
+              icon: Icons.logout_rounded,
+              title: 'Log out',
+              titleColor: isHighContrast ? Colors.black : AppColors.error,
+              iconColor: isHighContrast ? Colors.black : AppColors.error,
+              onTap: () {
+                Navigator.pop(context);
+                onLogout();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool selected = false,
+    Color? iconColor,
+    Color? titleColor,
+  }) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+
+    final effectiveIconColor = iconColor ??
+        (isHighContrast
+            ? Colors.black
+            : (selected ? AppColors.primary : AppColors.onSurfaceVariant));
+
+    final effectiveTitleColor = titleColor ??
+        (isHighContrast
+            ? Colors.black
+            : (selected ? AppColors.primary : context.textColor));
+
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        selected: selected,
+        selectedTileColor: isHighContrast
+            ? const Color(0xFFE5E5E5)
+            : AppColors.primaryContainer.withValues(alpha: 0.25),
+        dense: !hasLargeTargets,
+        minVerticalPadding: hasLargeTargets ? 16 : 8,
+        minLeadingWidth: 28,
+        leading: Icon(
+          icon,
+          size: context.tapIconSize,
+          color: effectiveIconColor,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: hasLargeTargets ? 17 : 15,
+            fontWeight: selected
+                ? FontWeight.w800
+                : (isHighContrast ? FontWeight.w700 : FontWeight.w600),
+            color: effectiveTitleColor,
+          ),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DESKTOP TOP NAV (preserved from original)
+// ═══════════════════════════════════════════════════════════════════════════
 
 class _DesktopTopNav extends StatelessWidget {
   const _DesktopTopNav({
@@ -362,53 +1064,86 @@ class _DesktopTopNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 1,
-      shadowColor: Colors.black26,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 72,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              children: [
-                _IconCircleButton(icon: Icons.menu, onPressed: onMenu),
-                const SizedBox(width: 16),
-                const Text(
-                  'Access Transit',
-                  style: TextStyle(
-                    fontSize: 24,
-                    height: 32 / 24,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+    final isHighContrast = context.isHighContrast;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isHighContrast ? Colors.white : AppColors.surface,
+        border: isHighContrast
+            ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        elevation: isHighContrast ? 0 : 1,
+        shadowColor: Colors.black26,
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 72,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  _IconCircleButton(
+                    icon: Icons.menu,
+                    onPressed: onMenu,
+                    isHighContrast: isHighContrast,
                   ),
-                ),
-                const Spacer(),
-                const _DesktopNavChip(icon: Icons.home, label: 'Home', selected: true),
-                _DesktopNavChip(
-                  icon: Icons.directions_bus,
-                  label: 'Plan',
-                  onTap: () => onNavTap('Plan'),
-                ),
-                _DesktopNavChip(
-                  icon: Icons.sensors,
-                  label: 'Live',
-                  onTap: () => onNavTap('Live'),
-                ),
-                _DesktopNavChip(
-                  icon: Icons.groups,
-                  label: 'Community',
-                  onTap: () => onNavTap('Community'),
-                ),
-                const Spacer(),
-                _AvatarButton(
-                  initials: initials,
-                  onPressed: onProfileTap,
-                  bordered: true,
-                ),
-              ],
+                  const SizedBox(width: 16),
+                  Text(
+                    'Access Transit',
+                    style: TextStyle(
+                      fontSize: 24,
+                      height: 32 / 24,
+                      fontWeight: FontWeight.w700,
+                      color: isHighContrast ? Colors.black : AppColors.primary,
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(width: 16),
+                          _DesktopNavChip(
+                            icon: Icons.home,
+                            label: 'Home',
+                            selected: true,
+                            isHighContrast: isHighContrast,
+                          ),
+                          _DesktopNavChip(
+                            icon: Icons.directions_bus,
+                            label: 'Plan',
+                            isHighContrast: isHighContrast,
+                            onTap: () => onNavTap('Plan'),
+                          ),
+                          _DesktopNavChip(
+                            icon: Icons.groups,
+                            label: 'Community',
+                            isHighContrast: isHighContrast,
+                            onTap: () => onNavTap('Community'),
+                          ),
+                          _DesktopNavChip(
+                            icon: Icons.person,
+                            label: 'Profile',
+                            isHighContrast: isHighContrast,
+                            onTap: () => onNavTap('Profile'),
+                          ),
+                          const SizedBox(width: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                  _AvatarButton(
+                    initials: initials,
+                    onPressed: onProfileTap,
+                    bordered: true,
+                    isHighContrast: isHighContrast,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -422,34 +1157,44 @@ class _DesktopNavChip extends StatelessWidget {
     required this.icon,
     required this.label,
     this.selected = false,
+    this.isHighContrast = false,
     this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
+  final bool isHighContrast;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final activeBg = isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer;
+    final activeFg = Colors.white;
+    final inactiveFg = isHighContrast ? Colors.black : AppColors.onSurfaceVariant;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Material(
-        color: selected ? AppColors.primaryContainer : Colors.transparent,
+        color: selected ? activeBg : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          child: Padding(
+          child: Container(
+            decoration: (selected && isHighContrast)
+                ? BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.black, width: 2),
+                  )
+                : null,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 Icon(
                   icon,
                   size: 22,
-                  color: selected
-                      ? AppColors.onPrimaryContainer
-                      : AppColors.onSurfaceVariant,
+                  color: selected ? activeFg : inactiveFg,
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -457,11 +1202,9 @@ class _DesktopNavChip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     height: 20 / 14,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: selected ? FontWeight.w800 : (isHighContrast ? FontWeight.w700 : FontWeight.w600),
                     letterSpacing: 0.1,
-                    color: selected
-                        ? AppColors.onPrimaryContainer
-                        : AppColors.onSurfaceVariant,
+                    color: selected ? activeFg : inactiveFg,
                   ),
                 ),
               ],
@@ -474,19 +1217,28 @@ class _DesktopNavChip extends StatelessWidget {
 }
 
 class _IconCircleButton extends StatelessWidget {
-  const _IconCircleButton({required this.icon, required this.onPressed});
+  const _IconCircleButton({
+    required this.icon,
+    required this.onPressed,
+    this.isHighContrast = false,
+  });
 
   final IconData icon;
   final VoidCallback onPressed;
+  final bool isHighContrast;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 48,
-      height: 48,
+      width: context.minTapHeight,
+      height: context.minTapHeight,
       child: IconButton(
         onPressed: onPressed,
-        icon: Icon(icon, color: AppColors.primary),
+        icon: Icon(
+          icon,
+          size: context.tapIconSize,
+          color: isHighContrast ? Colors.black : AppColors.primary,
+        ),
       ),
     );
   }
@@ -497,17 +1249,19 @@ class _AvatarButton extends StatelessWidget {
     required this.initials,
     required this.onPressed,
     this.bordered = false,
+    this.isHighContrast = false,
   });
 
   final String initials;
   final VoidCallback onPressed;
   final bool bordered;
+  final bool isHighContrast;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 48,
-      height: 48,
+      width: context.minTapHeight,
+      height: context.minTapHeight,
       child: IconButton(
         onPressed: onPressed,
         padding: EdgeInsets.zero,
@@ -516,16 +1270,19 @@ class _AvatarButton extends StatelessWidget {
           height: 32,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppColors.primaryContainer,
-            border: bordered
-                ? Border.all(color: AppColors.outlineVariant, width: 2)
+            color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+            border: (bordered || isHighContrast)
+                ? Border.all(
+                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                    width: 2,
+                  )
                 : null,
           ),
           alignment: Alignment.center,
           child: Text(
             initials,
             style: const TextStyle(
-              color: AppColors.onPrimaryContainer,
+              color: Colors.white,
               fontWeight: FontWeight.w700,
               fontSize: 12,
             ),
@@ -536,441 +1293,250 @@ class _AvatarButton extends StatelessWidget {
   }
 }
 
-class _WhereToSearch extends StatelessWidget {
-  const _WhereToSearch({required this.onTap});
+// ═══════════════════════════════════════════════════════════════════════════
+// RECENT REPORTS SECTION
+// ═══════════════════════════════════════════════════════════════════════════
 
-  final VoidCallback onTap;
+class _RecentReportsSection extends StatelessWidget {
+  const _RecentReportsSection({required this.onSeeAll});
 
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: InputDecorator(
-          decoration: InputDecoration(
-            hintText: 'Where to?',
-            hintStyle: const TextStyle(
-              fontSize: 16,
-              height: 24 / 16,
-              color: AppColors.onSurfaceVariant,
-            ),
-            prefixIcon:
-                const Icon(Icons.search, color: AppColors.onSurfaceVariant),
-            filled: true,
-            fillColor: Colors.transparent,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.outline),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
-            ),
-          ),
-          child: const Text(
-            'Where to?',
-            style: TextStyle(
-              fontSize: 16,
-              height: 24 / 16,
-              color: AppColors.onSurfaceVariant,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FavoritesSection extends StatelessWidget {
-  const _FavoritesSection({required this.isDesktop, required this.onTap});
-
-  final bool isDesktop;
-  final void Function(String feature) onTap;
+  final VoidCallback onSeeAll;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Your Favorites',
-          style: TextStyle(
-            fontSize: 18,
-            height: 24 / 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurface,
-          ),
-        ),
-        const SizedBox(height: 16),
-        GridView.count(
-          crossAxisCount: isDesktop ? 4 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: isDesktop ? 16 : 12,
-          mainAxisSpacing: isDesktop ? 16 : 12,
-          childAspectRatio: isDesktop ? 1.35 : 1.15,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _FavoriteCard(
-              icon: Icons.home,
-              filled: true,
-              label: 'Home',
-              subtitle: '15 min',
-              subtitleColor: AppColors.secondary,
-              onTap: () => onTap('Home favorite'),
+            Expanded(
+              child: Text(
+                'Recent Community Reports',
+                style: TextStyle(
+                  fontSize: 18,
+                  height: 24 / 18,
+                  fontWeight: FontWeight.w700,
+                  color: context.textColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            _FavoriteCard(
-              icon: Icons.work_outline,
-              label: 'Work',
-              subtitle: '32 min',
-              subtitleColor: AppColors.secondary,
-              onTap: () => onTap('Work favorite'),
-            ),
-            _FavoriteCard(
-              icon: Icons.local_hospital_outlined,
-              label: 'Medical',
-              subtitle: '-- min',
-              subtitleColor: AppColors.onSurfaceVariant,
-              onTap: () => onTap('Medical favorite'),
-            ),
-            _FavoriteCard(
-              icon: Icons.add,
-              label: 'Add New',
-              dashed: true,
-              onTap: () => onTap('Add favorite'),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onSeeAll,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'See All →',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
             ),
           ],
         ),
-      ],
-    );
-  }
-}
-
-class _FavoriteCard extends StatelessWidget {
-  const _FavoriteCard({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.subtitle,
-    this.subtitleColor,
-    this.filled = false,
-    this.dashed = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final String? subtitle;
-  final Color? subtitleColor;
-  final bool filled;
-  final bool dashed;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: dashed ? AppColors.surfaceContainer : AppColors.surfaceContainerLowest,
-      elevation: 1,
-      shadowColor: Colors.black12,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: CustomPaint(
-          painter: dashed ? const _DashedBorderPainter() : null,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: dashed
-                        ? Colors.transparent
-                        : AppColors.primaryContainer.withValues(alpha: 0.10),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: dashed ? AppColors.onSurfaceVariant : AppColors.primary,
-                  ),
+        const SizedBox(height: 8),
+        StreamBuilder<List<Report>>(
+          stream: FirestoreService().streamReports(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  label,
+              );
+            }
+
+            final reports = snapshot.data ?? [];
+            final activeReports = reports
+                .where((r) => StatusLogic.isReportActive(r))
+                .take(3)
+                .toList();
+
+            if (activeReports.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: context.isHighContrast
+                      ? Colors.white
+                      : AppColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(12),
+                  border: context.isHighContrast
+                      ? Border.all(color: Colors.black, width: 2.0)
+                      : null,
+                ),
+                child: Text(
+                  'No recent community reports.',
                   style: TextStyle(
                     fontSize: 14,
-                    height: 20 / 14,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.1,
-                    color: dashed ? AppColors.onSurfaceVariant : AppColors.onSurface,
+                    color: AppColors.onSurfaceVariant,
                   ),
                 ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 16 / 12,
-                      fontWeight: FontWeight.w500,
-                      color: subtitleColor ?? AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+              );
+            }
 
-class _DashedBorderPainter extends CustomPainter {
-  const _DashedBorderPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.outlineVariant
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(0.5, 0.5, size.width - 1, size.height - 1),
-          const Radius.circular(12),
-        ),
-      );
-
-    const dashWidth = 6.0;
-    const dashSpace = 4.0;
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        canvas.drawPath(
-          metric.extractPath(distance, distance + dashWidth),
-          paint,
-        );
-        distance += dashWidth + dashSpace;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _AlertsSection extends StatelessWidget {
-  const _AlertsSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Live Status & Alerts',
-          style: TextStyle(
-            fontSize: 18,
-            height: 24 / 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurface,
-          ),
-        ),
-        SizedBox(height: 16),
-        _AlertCard(
-          accent: AppColors.error,
-          icon: Icons.warning,
-          title: 'Red Line Delays',
-          body: 'Expect up to 15 minute delays due to signal issues.',
-        ),
-        SizedBox(height: 8),
-        _StatusCard(
-          title: 'Bus 42',
-          body: 'On time. Arriving in 4 min.',
-          badge: 'Good',
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              itemCount: activeReports.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final report = activeReports[index];
+                return _RecentReportCard(report: report);
+              },
+            );
+          },
         ),
       ],
     );
   }
 }
 
-class _AlertCard extends StatelessWidget {
-  const _AlertCard({
-    required this.accent,
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
+class _RecentReportCard extends StatelessWidget {
+  const _RecentReportCard({required this.report});
 
-  final Color accent;
-  final IconData icon;
-  final String title;
-  final String body;
+  final Report report;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+    final isHighContrast = context.isHighContrast;
+
+    final title = report.targetName.isNotEmpty
+        ? report.targetName
+        : (report.targetId.isNotEmpty ? report.targetId : 'Report');
+
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: isHighContrast ? 0 : 1,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
-        ],
+        side: isHighContrast
+            ? const BorderSide(color: Colors.black, width: 2.0)
+            : BorderSide.none,
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ReportDetailsScreen(report: report),
+            ),
+          );
+        },
+        title: Row(
           children: [
-            Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: accent,
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isHighContrast ? Colors.black : AppColors.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(icon, color: accent),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              height: 24 / 18,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            body,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              height: 20 / 14,
-                              color: AppColors.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            const SizedBox(width: 8),
+            Text(
+              TimeUtils.formatRelativeTime(report.createdAt),
+              style: TextStyle(
+                fontSize: 12,
+                color: isHighContrast
+                    ? const Color(0xFF1A1A1A)
+                    : AppColors.onSurfaceVariant,
               ),
             ),
           ],
         ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              report.problemType,
+              style: TextStyle(
+                fontSize: 14,
+                color: isHighContrast
+                    ? const Color(0xFF1A1A1A)
+                    : AppColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _buildFlagChip(
+                  icon: Icons.thumb_up_outlined,
+                  label: 'True: ${report.confirmCount}',
+                  color: Colors.green.shade700,
+                  isHighContrast: isHighContrast,
+                ),
+                const SizedBox(width: 8),
+                _buildFlagChip(
+                  icon: Icons.flag_outlined,
+                  label: 'False: ${report.falseCount}/3',
+                  color: Colors.red.shade700,
+                  isHighContrast: isHighContrast,
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+
+  Widget _buildFlagChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required bool isHighContrast,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withAlpha(25),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isHighContrast ? Colors.black : color.withAlpha(76),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: isHighContrast ? Colors.black : color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isHighContrast ? Colors.black : color,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.title,
-    required this.body,
-    required this.badge,
-  });
 
-  final String title;
-  final String body;
-  final String badge;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
-        ],
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: 4,
-              decoration: const BoxDecoration(
-                color: AppColors.secondary,
-                borderRadius: BorderRadius.horizontal(left: Radius.circular(12)),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle, color: AppColors.secondary),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              height: 24 / 18,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            body,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              height: 20 / 14,
-                              color: AppColors.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondary.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        badge,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          height: 16 / 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.secondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// ACTIVE JOURNEY BANNER (Phase 1.3 — kept as-is)
+// ═══════════════════════════════════════════════════════════════════════════
 
 class _ActiveJourneyBanner extends StatelessWidget {
   const _ActiveJourneyBanner({
@@ -983,35 +1549,45 @@ class _ActiveJourneyBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+
     return Material(
-      color: AppColors.primaryContainer.withValues(alpha: 0.15),
+      color: isHighContrast
+          ? Colors.white
+          : AppColors.primaryContainer.withValues(alpha: 0.15),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onResume,
         borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(hasLargeTargets ? 20 : 16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.3),
-              width: 1.5,
+              color: isHighContrast
+                  ? Colors.black
+                  : AppColors.primary.withValues(alpha: 0.3),
+              width: isHighContrast ? 2.0 : 1.5,
             ),
           ),
           child: Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: hasLargeTargets ? 54 : 48,
+                height: hasLargeTargets ? 54 : 48,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryContainer,
+                  color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.directions_bus_rounded,
-                  color: AppColors.onPrimaryContainer,
-                  size: 28,
+                  color: Colors.white,
+                  size: hasLargeTargets ? 32 : 28,
                 ),
               ),
               const SizedBox(width: 16),
@@ -1027,10 +1603,10 @@ class _ActiveJourneyBanner extends StatelessWidget {
                                 ? journey.routeTitle
                                 : 'Active Journey',
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
+                            style: TextStyle(
+                              fontSize: hasLargeTargets ? 18 : 16,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.onSurface,
+                              color: isHighContrast ? Colors.black : AppColors.onSurface,
                             ),
                           ),
                         ),
@@ -1041,15 +1617,18 @@ class _ActiveJourneyBanner extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primary,
+                            color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
                             borderRadius: BorderRadius.circular(999),
+                            border: isHighContrast
+                                ? Border.all(color: Colors.black, width: 1.5)
+                                : null,
                           ),
                           child: const Text(
                             'LIVE',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.onPrimary,
+                              color: Colors.white,
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -1060,18 +1639,19 @@ class _ActiveJourneyBanner extends StatelessWidget {
                     Text(
                       '${journey.origin} → ${journey.destination}',
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.onSurfaceVariant,
+                      style: TextStyle(
+                        fontSize: hasLargeTargets ? 15 : 14,
+                        color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Tap to resume live tracking →',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
+                        fontSize: hasLargeTargets ? 14 : 13,
+                        fontWeight: FontWeight.w700,
+                        color: isHighContrast ? Colors.black : AppColors.primary,
                       ),
                     ),
                   ],
@@ -1085,90 +1665,195 @@ class _ActiveJourneyBanner extends StatelessWidget {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// RECENT JOURNEY CARD (Phase 1.6 — kept with polish)
+// ═══════════════════════════════════════════════════════════════════════════
+
 class _RecentJourneyCard extends StatelessWidget {
-  const _RecentJourneyCard({required this.onReplan});
+  const _RecentJourneyCard({
+    required this.onReplan,
+    this.passengerId,
+  });
 
   final VoidCallback onReplan;
+  final String? passengerId;
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+    final pid = passengerId ?? '';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Recent Journey',
           style: TextStyle(
             fontSize: 18,
             height: 24 / 18,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurface,
+            fontWeight: FontWeight.w700,
+            color: isHighContrast ? Colors.black : AppColors.onSurface,
           ),
         ),
-        const SizedBox(height: 16),
-        Container(
+        const SizedBox(height: 12),
+        if (pid.isEmpty)
+          _buildCardContent(
+            context,
+            title: 'Pettah Station to Kottawa',
+            subtitle: 'Yesterday, 2:45 PM',
+            isHighContrast: isHighContrast,
+            hasLargeTargets: hasLargeTargets,
+          )
+        else
+          StreamBuilder<List<JourneyModel>>(
+            stream: _getJourneysStream(pid),
+            builder: (context, snapshot) {
+              String title = 'Pettah Station to Kottawa';
+              String subtitle = 'Yesterday, 2:45 PM';
+
+              final docs = snapshot.data ?? [];
+              if (docs.isNotEmpty) {
+                final sortedDocs = List<JourneyModel>.from(docs)
+                  ..sort((a, b) {
+                    final aTime =
+                        a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                    final bTime =
+                        b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                    return bTime.compareTo(aTime);
+                  });
+
+                final latest = sortedDocs.first;
+                final orig =
+                    latest.origin.isNotEmpty ? latest.origin : 'Origin';
+                final dest = latest.destination.isNotEmpty
+                    ? latest.destination
+                    : 'Destination';
+                title = '$orig to $dest';
+                if (latest.createdAt != null) {
+                  subtitle = TimeUtils.formatRelativeTime(latest.createdAt!);
+                } else {
+                  subtitle = 'Recent';
+                }
+              }
+
+              return _buildCardContent(
+                context,
+                title: title,
+                subtitle: subtitle,
+                isHighContrast: isHighContrast,
+                hasLargeTargets: hasLargeTargets,
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Stream<List<JourneyModel>> _getJourneysStream(String pid) {
+    if (pid.isEmpty) return Stream.value([]);
+    try {
+      return FirebaseFirestore.instance
+          .collection('journeys')
+          .where('passengerId', isEqualTo: pid)
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs
+            .map((doc) => JourneyModel.fromMap(doc.data(), documentId: doc.id))
+            .toList();
+      });
+    } catch (_) {
+      return Stream.value([]);
+    }
+  }
+
+  Widget _buildCardContent(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required bool isHighContrast,
+    required bool hasLargeTargets,
+  }) {
+    return Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(hasLargeTargets ? 20 : 16),
           decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
+            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
-              BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
-            ],
+            border: isHighContrast
+                ? Border.all(color: Colors.black, width: 2.0)
+                : null,
+            boxShadow: isHighContrast
+                ? null
+                : const [
+                    BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
+                  ],
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final stacked = constraints.maxWidth < 520;
+              final mapBoxSize = hasLargeTargets ? 108.0 : 96.0;
               final map = Container(
-                width: stacked ? double.infinity : 96,
-                height: 96,
+                width: stacked ? double.infinity : mapBoxSize,
+                height: mapBoxSize,
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
+                  color: isHighContrast ? const Color(0xFFE5E5E5) : AppColors.surfaceContainer,
                   borderRadius: BorderRadius.circular(8),
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
                 ),
-                child: const Icon(Icons.map, color: AppColors.primary, size: 36),
+                child: Icon(
+                  Icons.map,
+                  color: isHighContrast ? Colors.black : AppColors.primary,
+                  size: hasLargeTargets ? 42 : 36,
+                ),
               );
 
               final details = Column(
                 crossAxisAlignment:
                     stacked ? CrossAxisAlignment.center : CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Central Station to Library',
-                    textAlign: TextAlign.center,
+                  Text(
+                    title,
+                    textAlign: stacked ? TextAlign.center : TextAlign.start,
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: hasLargeTargets ? 20 : 18,
                       height: 24 / 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.onSurface,
+                      fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                      color: isHighContrast ? Colors.black : AppColors.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Yesterday, 2:45 PM',
+                    subtitle,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: hasLargeTargets ? 15 : 14,
                       height: 20 / 14,
-                      color: AppColors.onSurfaceVariant,
+                      color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                      fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
                     ),
                   ),
                 ],
               );
 
               final button = SizedBox(
-                height: 48,
+                height: context.buttonHeight,
                 width: stacked ? double.infinity : null,
                 child: FilledButton(
                   onPressed: onReplan,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primaryContainer,
-                    foregroundColor: AppColors.onPrimary,
+                    backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                    foregroundColor: Colors.white,
+                    side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : null,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Re-plan',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: context.buttonFontSize,
+                    ),
                   ),
                 ),
               );
@@ -1195,11 +1880,13 @@ class _RecentJourneyCard extends StatelessWidget {
               );
             },
           ),
-        ),
-      ],
-    );
+        );
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ASSISTANCE FAB (Phase 1.7 — kept as-is)
+// ═══════════════════════════════════════════════════════════════════════════
 
 class _AssistanceFab extends StatelessWidget {
   const _AssistanceFab({required this.showLabel, required this.onPressed});
@@ -1209,152 +1896,46 @@ class _AssistanceFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+
     return Material(
-      color: AppColors.error,
-      elevation: 6,
+      color: isHighContrast ? const Color(0xFF8B0000) : AppColors.error,
+      elevation: isHighContrast ? 0 : 6,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        child: Container(
+          decoration: isHighContrast
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.black, width: 2.0),
+                )
+              : null,
+          padding: EdgeInsets.symmetric(
+            horizontal: hasLargeTargets ? 28 : 24,
+            vertical: hasLargeTargets ? 18 : 14,
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.support_agent, color: AppColors.onError),
+              Icon(Icons.support_agent, color: Colors.white, size: context.tapIconSize),
               if (showLabel) ...[
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Assistance',
                   style: TextStyle(
-                    color: AppColors.onError,
-                    fontSize: 14,
+                    color: Colors.white,
+                    fontSize: hasLargeTargets ? 17 : 14,
                     height: 20 / 14,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 0.1,
                   ),
                 ),
               ],
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MobileBottomNav extends StatelessWidget {
-  const _MobileBottomNav({required this.onNavTap});
-
-  final void Function(String feature) onNavTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 8,
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            children: [
-              const Expanded(
-                child: _BottomNavItem(
-                  icon: Icons.home,
-                  label: 'Home',
-                  selected: true,
-                ),
-              ),
-              Expanded(
-                child: _BottomNavItem(
-                  icon: Icons.directions_bus,
-                  label: 'Plan',
-                  onTap: () => onNavTap('Plan'),
-                ),
-              ),
-              Expanded(
-                child: _BottomNavItem(
-                  icon: Icons.sensors,
-                  label: 'Live',
-                  onTap: () => onNavTap('Live'),
-                ),
-              ),
-              Expanded(
-                child: _BottomNavItem(
-                  icon: Icons.groups,
-                  label: 'Community',
-                  onTap: () => onNavTap('Community'),
-                ),
-              ),
-              Expanded(
-                child: _BottomNavItem(
-                  icon: Icons.person_outline,
-                  label: 'Profile',
-                  onTap: () => onNavTap('Profile'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BottomNavItem extends StatelessWidget {
-  const _BottomNavItem({
-    required this.icon,
-    required this.label,
-    this.selected = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: selected
-            ? BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                height: 14 / 11,
-                fontWeight: FontWeight.w600,
-                color: selected
-                    ? AppColors.onPrimaryContainer
-                    : AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
         ),
       ),
     );

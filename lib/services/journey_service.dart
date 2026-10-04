@@ -11,9 +11,14 @@ import '../models/journey_model.dart';
 /// `live_locations/{busId}` for real-time tracking.
 class JourneyService {
   JourneyService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+      : _customFirestore = firestore;
 
-  final FirebaseFirestore _firestore;
+  final FirebaseFirestore? _customFirestore;
+
+  FirebaseFirestore get _firestore {
+    if (_customFirestore != null) return _customFirestore;
+    return FirebaseFirestore.instance;
+  }
 
   CollectionReference<Map<String, dynamic>> get _journeysCollection =>
       _firestore.collection(FirestoreConstants.journeysCollection);

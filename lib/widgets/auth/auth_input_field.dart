@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 
 /// Styled text field matching the AccessTransit login/register design.
 class AuthInputField extends StatelessWidget {
@@ -35,60 +36,82 @@ class AuthInputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHC = context.isHighContrast;
+    final errorColor = isHC ? const Color(0xFF8B0000) : AppColors.error;
+
+    final hasLargeTargets = context.hasLargeTargets;
+
     final field = TextFormField(
-          controller: controller,
-          validator: validator,
-          keyboardType: keyboardType,
-          textInputAction: textInputAction,
-          obscureText: obscureText,
-          onFieldSubmitted: onFieldSubmitted,
-          autofillHints: autofillHints,
-          textCapitalization: textCapitalization,
-          style: const TextStyle(
-            fontSize: 14,
-            height: 20 / 14,
-            color: AppColors.onSurface,
+      controller: controller,
+      validator: validator,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      obscureText: obscureText,
+      onFieldSubmitted: onFieldSubmitted,
+      autofillHints: autofillHints,
+      textCapitalization: textCapitalization,
+      style: TextStyle(
+        fontSize: hasLargeTargets ? 15.5 : 14,
+        height: 20 / 14,
+        fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
+        color: context.textColor,
+      ),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(
+          color: isHC ? Colors.black54 : AppColors.onSurfaceVariant,
+        ),
+        prefixIcon: Icon(
+          prefixIcon,
+          size: context.tapIconSize,
+          color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+        ),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: isHC ? Colors.white : Colors.transparent,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: context.inputVerticalPadding,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isHC ? Colors.black : AppColors.outline,
+            width: isHC ? 2 : 1,
           ),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: AppColors.onSurfaceVariant),
-            prefixIcon: Icon(prefixIcon, color: AppColors.onSurfaceVariant),
-            suffixIcon: suffixIcon,
-            filled: true,
-            fillColor: Colors.transparent,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.outline),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.outline),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: AppColors.primaryContainer,
-                width: 2,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.error),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.error, width: 2),
-            ),
-            errorStyle: const TextStyle(
-              color: AppColors.error,
-              fontSize: 12,
-              height: 16 / 12,
-            ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isHC ? Colors.black : AppColors.outline,
+            width: isHC ? 2 : 1,
           ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isHC ? Colors.black : AppColors.primaryContainer,
+            width: 2,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: errorColor,
+            width: isHC ? 2 : 1,
+          ),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: errorColor, width: 2),
+        ),
+        errorStyle: TextStyle(
+          color: errorColor,
+          fontSize: 12,
+          height: 16 / 12,
+          fontWeight: isHC ? FontWeight.w700 : FontWeight.normal,
+        ),
+      ),
     );
 
     if (label == null || label!.isEmpty) {
@@ -100,12 +123,12 @@ class AuthInputField extends StatelessWidget {
       children: [
         Text(
           label!,
-          style: const TextStyle(
-            fontSize: 14,
+          style: TextStyle(
+            fontSize: hasLargeTargets ? 15.5 : 14,
             height: 20 / 14,
-            fontWeight: FontWeight.w600,
+            fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
             letterSpacing: 0.1,
-            color: AppColors.onSurface,
+            color: context.textColor,
           ),
         ),
         const SizedBox(height: 4),

@@ -2,6 +2,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../models/bus_location_model.dart';
 import '../models/enums/bus_status.dart';
+import '../models/trip_model.dart';
 
 /// Result object holding calculated Bus Estimated Time of Arrival (ETA) telemetry.
 class EtaResult {
@@ -169,4 +170,79 @@ class EtaService {
       reason: 'Dynamically calculated from live GPS coordinates & speed.',
     );
   }
+
+  /// Computes cumulative estimated arrival times for an ordered list of stop station IDs
+  /// starting from [departureTime].
+  static Map<String, StopTimingInfo> computeTripStopEstimates(
+    List<String> stops,
+    DateTime departureTime,
+  ) {
+    final Map<String, StopTimingInfo> result = {};
+    if (stops.isEmpty) return result;
+
+    DateTime currentEst = departureTime;
+    result[stops.first] = StopTimingInfo(
+      estimatedArrival: currentEst,
+      actualArrival: currentEst, // Start station actual departure/arrival
+    );
+
+    for (int i = 1; i < stops.length; i++) {
+      final prevStop = stops[i - 1];
+      final currStop = stops[i];
+
+      final prevLoc = getStopCoordinates(prevStop);
+      final currLoc = getStopCoordinates(currStop);
+
+      double segmentMinutes = 5.0; // Fallback: 5 minutes per segment
+      if (prevLoc != null && currLoc != null) {
+        final distMeters = _distanceCalculator.distance(prevLoc, currLoc);
+        // Average urban speed: 20 km/h = 333.33 meters / minute
+        final calcMinutes = (distMeters / 1000.0 / 20.0) * 60.0;
+        segmentMinutes = calcMinutes.clamp(2.0, 30.0);
+      }
+
+      currentEst = currentEst.add(Duration(seconds: (segmentMinutes * 60).round()));
+      result[currStop] = StopTimingInfo(estimatedArrival: currentEst);
+    }
+
+    return result;
+  }
+
+  /// Recalculates remaining stops' estimated arrival times when actual arrival is confirmed at [confirmedIndex].
+  ///
+  /// Adjusts remaining stop estimates based on actual elapsed time / pace offset.
+  static Map<String, StopTimingInfo> recalculateRemainingStopsPace({
+    required List<String> stops,
+    required Map<String, StopTimingInfo> currentStopTimes,
+    required int confirmedIndex,
+    required DateTime actualArrivalTime,
+  }) {
+    final updated = Map<String, StopTimingInfo>.from(currentStopTimes);
+    if (confirmedIndex < 0 || confirmedIndex >= stops.length) return updated;
+
+    final confirmedStopId = stops[confirmedIndex];
+    final prevInfo = updated[confirmedStopId];
+
+    // Mark actual arrival for confirmed stop
+    updated[confirmedStopId] = (prevInfo ?? StopTimingInfo(estimatedArrival: actualArrivalTime))
+        .copyWith(actualArrival: actualArrivalTime);
+
+    if (prevInfo == null) return updated;
+
+    // Time difference / offset between actual arrival and original estimated arrival
+    final timeOffset = actualArrivalTime.difference(prevInfo.estimatedArrival);
+
+    // Adjust remaining stops
+    for (int i = confirmedIndex + 1; i < stops.length; i++) {
+      final stopId = stops[i];
+      final origInfo = updated[stopId];
+      if (origInfo != null) {
+        final newEst = origInfo.estimatedArrival.add(timeOffset);
+        updated[stopId] = origInfo.copyWith(estimatedArrival: newEst);
+      }
+    }
+
+    return updated;
+  }
 }
+

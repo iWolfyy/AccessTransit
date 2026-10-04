@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 
-import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/utils/time_utils.dart';
 import '../../data/seed_data.dart';
 import '../../logic/bus_matcher.dart';
 import '../../logic/status_logic.dart';
 import '../../models/bus.dart';
-import '../../models/bus_location_model.dart';
-import '../../models/enums/bus_status.dart';
+import '../../models/bus_route.dart';
 import '../../models/report.dart';
 import '../../models/station.dart';
+import '../../models/trip_model.dart';
+import '../../services/accessibility_preferences_service.dart';
 import '../../services/firestore_service.dart';
-import '../../services/live_bus_service.dart';
-import 'route_details_screen.dart';
+import '../../services/trip_service.dart';
+import 'live_journey_screen.dart';
 
 /// Route result item used for passenger route selection.
+/// Enhanced in Phase 2 with LMT Go inspired fields: departure/arrival times,
+/// price calculation, and real-time live status.
 class RouteResultItem {
   const RouteResultItem({
     required this.id,
@@ -28,12 +32,22 @@ class RouteResultItem {
     required this.safetyLabel,
     required this.summary,
     this.busId = 'bus_01',
+    this.busNo,
+    this.routeNo,
+    this.routeName,
+    this.scheduledDeparture,
+    this.departureTimeStr = '08:30 AM',
+    this.arrivalTimeStr = '09:05 AM',
+    this.estimatedPriceLkr = 95,
+    this.liveStatusLabel = 'Scheduled',
+    this.isLive = false,
     this.origin = 'Colombo',
     this.destination = 'Kandy',
     this.intermediateStops = const [],
     this.recommended = false,
     this.rawBus,
     this.statusResult,
+    this.nextDepartureDateTime,
   });
 
   final String id;
@@ -47,17 +61,27 @@ class RouteResultItem {
   final String safetyLabel;
   final String summary;
   final String busId;
+  final String? busNo;
+  final String? routeNo;
+  final String? routeName;
+  final String? scheduledDeparture;
+  final String departureTimeStr;
+  final String arrivalTimeStr;
+  final int estimatedPriceLkr;
+  final String liveStatusLabel;
+  final bool isLive;
   final String origin;
   final String destination;
   final List<String> intermediateStops;
   final bool recommended;
   final Bus? rawBus;
   final BusStatusResult? statusResult;
+  final DateTime? nextDepartureDateTime;
 }
 
 enum AccessibilityStatus { accessible, partial, notAccessible }
 
-/// Route Results screen — list of routes with ETA, crowd, accessibility, safety.
+/// Route Results screen — LMT Go styled available bus cards with accessibility-first enhancements.
 class RouteResultsScreen extends StatefulWidget {
   const RouteResultsScreen({
     super.key,
@@ -65,12 +89,20 @@ class RouteResultsScreen extends StatefulWidget {
     this.toStationId = 'st_kottawa',
     this.origin = 'Colombo Fort Station',
     this.destination = 'Kottawa Highway Bus Station',
+    this.selectedDate,
+    this.wheelchairAccessRequired,
+    this.stepFreeOnly,
+    this.minimizeWalking,
   });
 
   final String fromStationId;
   final String toStationId;
   final String origin;
   final String destination;
+  final DateTime? selectedDate;
+  final bool? wheelchairAccessRequired;
+  final bool? stepFreeOnly;
+  final bool? minimizeWalking;
 
   @override
   State<RouteResultsScreen> createState() => _RouteResultsScreenState();
@@ -81,13 +113,22 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   final FirestoreService _firestoreService = FirestoreService();
 
   List<Bus> _allBuses = [];
+  Map<String, BusRoute> _routesMap = {};
   Map<String, Station> _stationsMap = {};
   bool _isLoadingData = true;
-  String _sortBy = 'Best';
+  late String _selectedFilterTab; // 'All', 'Accessible', 'Fastest'
+  late final bool _isWheelchair;
+  late final bool _isStepFree;
+  late final bool _isMinimizeWalking;
 
   @override
   void initState() {
     super.initState();
+    final prefs = AccessibilityPreferencesService.instance;
+    _isWheelchair = widget.wheelchairAccessRequired ?? prefs.isWheelchairOnly;
+    _isStepFree = widget.stepFreeOnly ?? prefs.isStepFree;
+    _isMinimizeWalking = widget.minimizeWalking ?? prefs.minimizeWalking;
+    _selectedFilterTab = _isWheelchair ? 'Accessible' : 'All';
     _loadInitialData();
   }
 
@@ -95,18 +136,24 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
     try {
       final fetchedBuses = await _firestoreService.getBuses();
       final fetchedStations = await _firestoreService.getStations();
+      final fetchedRoutes = await _firestoreService.getRoutes();
 
       final buses = fetchedBuses.isNotEmpty ? fetchedBuses : SeedData.sampleBuses;
       final stationsList = fetchedStations.isNotEmpty
           ? fetchedStations
           : SeedData.colomboStations;
+      final routesList = fetchedRoutes.isNotEmpty
+          ? fetchedRoutes
+          : SeedData.sampleRoutes;
 
       final stationsMap = {for (final s in stationsList) s.id: s};
+      final routesMap = {for (final r in routesList) r.id: r};
 
       if (mounted) {
         setState(() {
           _allBuses = buses;
           _stationsMap = stationsMap;
+          _routesMap = routesMap;
           _isLoadingData = false;
         });
       }
@@ -115,29 +162,21 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
         setState(() {
           _allBuses = SeedData.sampleBuses;
           _stationsMap = {for (final s in SeedData.colomboStations) s.id: s};
+          _routesMap = {for (final r in SeedData.sampleRoutes) r.id: r};
           _isLoadingData = false;
         });
       }
     }
   }
 
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text('$feature will be available soon.')),
-      );
-  }
-
   void _onSelectRoute(RouteResultItem route) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => RouteDetailsScreen(
+        builder: (_) => LiveJourneyScreen(
           origin: widget.origin,
           destination: widget.destination,
           route: route,
-          bus: route.rawBus,
-          statusResult: route.statusResult,
+          busId: route.busId,
         ),
       ),
     );
@@ -154,26 +193,36 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
     }
   }
 
-  int _crowdRank(String level) {
-    switch (level.toLowerCase()) {
-      case 'low':
-        return 0;
-      case 'medium':
-        return 1;
-      default:
-        return 2;
-    }
+  int _calculateEstimatedPrice(int durationMinutes, int stopsCount) {
+    // Authentic Sri Lankan bus transit fare calculation:
+    // Base fare: LKR 35 + ~LKR 2.2 per minute + ~LKR 5 per intermediate stop
+    final price = 35 + (durationMinutes * 2.2) + (stopsCount * 4);
+    // Round to nearest 5 or 10 LKR
+    return ((price / 5).round() * 5).clamp(40, 450);
   }
 
-  List<RouteResultItem> _buildAndSortRouteItems(List<Report> activeReports) {
-    // 1. Direct bus matching (AC-72)
-    final matchedBuses = BusMatcher.findDirectBuses(
-      _allBuses,
+  List<RouteResultItem> _buildAndFilterRouteItems(
+    List<Report> activeReports, {
+    List<Bus>? buses,
+  }) {
+    final busesToMatch = (buses != null && buses.isNotEmpty) ? buses : _allBuses;
+
+    // 1. Direct bus matching
+    var matchedBuses = BusMatcher.findDirectBuses(
+      busesToMatch,
       widget.fromStationId,
       widget.toStationId,
     );
 
-    // 2. Compute status & reasons (AC-74)
+    // Filter by user's initial search query requirements
+    if (_isStepFree) {
+      matchedBuses = matchedBuses.where((bus) => bus.lowFloor).toList();
+    }
+
+    final now = DateTime.now();
+    final todayBase = DateTime(now.year, now.month, now.day);
+
+    // 2. Compute status & reasons
     final List<RouteResultItem> items = matchedBuses.map((bus) {
       final statusResult = StatusLogic.getBusStatus(
         bus,
@@ -181,11 +230,80 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
         stationsMap: _stationsMap,
       );
 
+      final routeObj = _routesMap[bus.routeId] ??
+          _routesMap.values.cast<BusRoute?>().firstWhere(
+                (r) => r?.routeNo == bus.routeNo,
+                orElse: () => null,
+              );
+
+      final routeName = routeObj?.routeName ?? 'Route ${bus.routeNo}';
+      final displayBusNo = bus.displayBusNo;
+
+      // Determine scheduled departure at the passenger's boarding station
+      final fromIdx = bus.stops.indexWhere((s) =>
+          s.toLowerCase() == widget.fromStationId.toLowerCase() ||
+          (_stationsMap[s]?.name.toLowerCase() == widget.fromStationId.toLowerCase()) ||
+          (_stationsMap[s]?.name.toLowerCase() == widget.origin.toLowerCase()));
+      final targetIdx = fromIdx != -1 ? fromIdx : 0;
+      final stopTimeStr = bus.getScheduledTimeForStop(targetIdx);
+
+      var nextDepDateTime = TimeUtils.parseTimeStringToDateTime(stopTimeStr, todayBase);
+      bool isTomorrow = false;
+      if (nextDepDateTime.isBefore(now.subtract(const Duration(minutes: 10)))) {
+        nextDepDateTime = nextDepDateTime.add(const Duration(days: 1));
+        isTomorrow = true;
+      }
+
+      final diffMins = nextDepDateTime.difference(now).inMinutes;
+
+      final String scheduledDepartureDisplay;
+      final String etaLabelDisplay;
+      if (isTomorrow) {
+        scheduledDepartureDisplay = 'Tomorrow, $stopTimeStr';
+        etaLabelDisplay = 'Tomorrow at $stopTimeStr';
+      } else {
+        if (diffMins <= 1 && diffMins >= 0) {
+          scheduledDepartureDisplay = '$stopTimeStr (Now)';
+          etaLabelDisplay = 'Arriving now • $stopTimeStr';
+        } else if (diffMins < 60) {
+          scheduledDepartureDisplay = '$stopTimeStr (in ${diffMins}m)';
+          etaLabelDisplay = 'Departs in $diffMins mins • Today, $stopTimeStr';
+        } else {
+          scheduledDepartureDisplay = 'Today, $stopTimeStr';
+          etaLabelDisplay = 'Today at $stopTimeStr';
+        }
+      }
+
+      final durationMinutes = (bus.stops.length * 6).clamp(12, 110);
+      final arrivalDateTime = nextDepDateTime.add(Duration(minutes: durationMinutes));
+      final departureTimeFormatted = TimeUtils.formatTimeString(nextDepDateTime);
+      final arrivalTimeFormatted = TimeUtils.formatTimeString(arrivalDateTime);
+
+      // Determine live operational status label
+      final String liveStatus;
+      final bool isBusLive;
+      if (diffMins <= 5 && diffMins >= -30) {
+        liveStatus = 'Ongoing';
+        isBusLive = true;
+      } else if (diffMins < 20 && diffMins > 5) {
+        liveStatus = 'Approaching';
+        isBusLive = true;
+      } else if (statusResult.status == AccessibilityStatus.partial ||
+          statusResult.reasons.any((r) => r.toLowerCase().contains('delay'))) {
+        liveStatus = 'Delayed';
+        isBusLive = false;
+      } else {
+        liveStatus = 'Scheduled';
+        isBusLive = false;
+      }
+
       final summaryText = statusResult.reasons.isNotEmpty
           ? statusResult.reasons.first
-          : (bus.hasRamp
-              ? 'Step-free boarding · Ramp operational'
-              : 'Standard bus service');
+          : (bus.wheelchairAccessible
+              ? 'Wheelchair Ramp Ready · Step-free entry'
+              : (bus.hasRamp
+                  ? 'Ramp equipped · Check operator assistance'
+                  : 'Standard bus service'));
 
       String crowdLabel = 'Low';
       if (bus.occupancy.toLowerCase() == 'medium') crowdLabel = 'Medium';
@@ -194,176 +312,276 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       final fromName = _stationsMap[widget.fromStationId]?.name ?? widget.origin;
       final toName = _stationsMap[widget.toStationId]?.name ?? widget.destination;
 
+      final estimatedPrice = _calculateEstimatedPrice(durationMinutes, bus.stops.length);
+
       return RouteResultItem(
         id: bus.id,
-        title: 'Route ${bus.routeNo}: ${bus.id.replaceAll('bus_', '').replaceAll('_outbound', '').replaceAll('_inbound', '')}',
-        durationMinutes: (bus.stops.length * 6).clamp(10, 120),
-        etaLabel: 'Departs in 5 min',
+        title: 'Route ${bus.routeNo} • $displayBusNo',
+        busNo: displayBusNo,
+        routeNo: bus.routeNo,
+        routeName: routeName,
+        scheduledDeparture: scheduledDepartureDisplay,
+        departureTimeStr: departureTimeFormatted,
+        arrivalTimeStr: arrivalTimeFormatted,
+        durationMinutes: durationMinutes,
+        etaLabel: etaLabelDisplay,
+        estimatedPriceLkr: estimatedPrice,
+        liveStatusLabel: liveStatus,
+        isLive: isBusLive,
         transfers: 0,
         crowdLevel: crowdLabel,
         accessibilityStatus: statusResult.status,
         accessibilityLabel: statusResult.statusLabel,
-        safetyLabel: bus.hasRamp && bus.rampOk ? 'Accessible Bus' : 'Standard Bus',
-        summary: summaryText,
+        safetyLabel: bus.wheelchairAccessible
+            ? 'Wheelchair Accessible Bus'
+            : (bus.hasRamp ? 'Standard Ramp Bus' : 'Standard Bus'),
+        summary: '$routeName · $summaryText',
         busId: bus.id,
         origin: fromName,
         destination: toName,
         intermediateStops: bus.stops,
-        recommended: statusResult.status == AccessibilityStatus.accessible,
+        recommended: statusResult.status == AccessibilityStatus.accessible && bus.wheelchairAccessible,
         rawBus: bus,
         statusResult: statusResult,
+        nextDepartureDateTime: nextDepDateTime,
       );
     }).toList();
 
-    // 3. Sort: Safe first, then Warning, then Not accessible (AC-73)
-    items.sort((a, b) {
+    // 3. Filter by Tab ('All', 'Accessible', 'Fastest')
+    var filtered = items;
+    if (_selectedFilterTab == 'Accessible') {
+      filtered = filtered
+          .where((r) => r.rawBus?.wheelchairAccessible == true || r.rawBus?.hasRamp == true)
+          .toList();
+    }
+
+    // 4. Sort
+    filtered.sort((a, b) {
+      if (_selectedFilterTab == 'Fastest') {
+        return a.durationMinutes.compareTo(b.durationMinutes);
+      }
+
+      // Prioritize wheelchair accessible buses when wheelchair access is required
+      // or when the Accessible tab is selected
+      if (_isWheelchair || _selectedFilterTab == 'Accessible') {
+        final aAcc = (a.rawBus?.wheelchairAccessible == true || a.rawBus?.hasRamp == true);
+        final bAcc = (b.rawBus?.wheelchairAccessible == true || b.rawBus?.hasRamp == true);
+        if (aAcc != bAcc) {
+          return aAcc ? -1 : 1; // Accessible buses first
+        }
+
+        final rankA = _statusRank(a.accessibilityStatus);
+        final rankB = _statusRank(b.accessibilityStatus);
+        if (rankA != rankB) {
+          return rankA.compareTo(rankB); // Verified accessible status first
+        }
+      }
+
+      // Prioritize fewer stops / shortest walking distance when minimize walking is enabled
+      if (_isMinimizeWalking) {
+        final stopsComp = a.intermediateStops.length.compareTo(b.intermediateStops.length);
+        if (stopsComp != 0) {
+          return stopsComp;
+        }
+      }
+
+      // Default: Earliest upcoming bus first
+      final timeA = a.nextDepartureDateTime ?? DateTime.now();
+      final timeB = b.nextDepartureDateTime ?? DateTime.now();
+      final timeComp = timeA.compareTo(timeB);
+      if (timeComp != 0) {
+        return timeComp;
+      }
+
       final rankA = _statusRank(a.accessibilityStatus);
       final rankB = _statusRank(b.accessibilityStatus);
-      if (rankA != rankB) {
-        return rankA.compareTo(rankB);
-      }
-
-      switch (_sortBy) {
-        case 'Fastest':
-          return a.durationMinutes.compareTo(b.durationMinutes);
-        case 'Least crowded':
-          return _crowdRank(a.crowdLevel).compareTo(_crowdRank(b.crowdLevel));
-        case 'Best':
-        default:
-          return a.durationMinutes.compareTo(b.durationMinutes);
-      }
+      return rankA.compareTo(rankB);
     });
 
-    return items;
+    return filtered;
   }
 
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+    final isHighContrast = context.isHighContrast;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.surfaceColor,
       body: Column(
         children: [
           _TopBar(
             onBack: () => Navigator.of(context).maybePop(),
-            onFilter: () => _showComingSoon('Filters'),
           ),
           Expanded(
             child: _isLoadingData
                 ? const Center(child: CircularProgressIndicator())
-                : StreamBuilder<List<Report>>(
-                    stream: _firestoreService.streamReports(),
-                    builder: (context, snapshot) {
-                      final reports = snapshot.data ?? SeedData.getSampleReports();
-                      final routes = _buildAndSortRouteItems(reports);
+                : StreamBuilder<List<Bus>>(
+                    stream: _firestoreService.streamBuses(),
+                    builder: (context, busSnapshot) {
+                      final buses = busSnapshot.data ?? _allBuses;
 
-                      return ListView(
-                        padding: EdgeInsets.fromLTRB(
-                          16,
-                          16,
-                          16,
-                          isDesktop ? 24 : 112,
-                        ),
-                        children: [
-                          Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 768),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _TripSummaryCard(
-                                    origin: widget.origin,
-                                    destination: widget.destination,
-                                    matchedCount: routes.length,
-                                    totalCount: routes.length,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _SortChips(
-                                    selected: _sortBy,
-                                    onSelected: (value) =>
-                                        setState(() => _sortBy = value),
-                                  ),
-                                  const SizedBox(height: 16),
+                      return StreamBuilder<List<Report>>(
+                        stream: _firestoreService.streamReports(),
+                        builder: (context, snapshot) {
+                          final reports = snapshot.data ?? SeedData.getSampleReports();
+                          final routes = _buildAndFilterRouteItems(
+                            reports,
+                            buses: buses,
+                          );
 
-                                  if (routes.isEmpty) ...[
-                                    _buildEmptyState(),
-                                  ] else ...[
-                                    _SectionLabel(
-                                      label:
-                                          'Direct Routes Found (${routes.length})',
-                                      icon: Icons.check_circle_outline,
-                                      color: AppColors.secondary,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    ...routes.map(
-                                      (route) => Padding(
-                                        padding: const EdgeInsets.only(bottom: 12),
-                                        child: _RouteCard(
-                                          route: route,
-                                          onTap: () => _onSelectRoute(route),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
+                          final totalAvailable = BusMatcher.findDirectBuses(
+                            buses,
+                            widget.fromStationId,
+                            widget.toStationId,
+                          ).length;
+
+                          final accessibleCount = BusMatcher.findDirectBuses(
+                            buses,
+                            widget.fromStationId,
+                            widget.toStationId,
+                          ).where((b) => b.wheelchairAccessible || b.hasRamp).length;
+
+                          return ListView(
+                            padding: EdgeInsets.fromLTRB(
+                              16,
+                              16,
+                              16,
+                              isDesktop ? 24 : 112,
                             ),
-                          ),
-                        ],
+                            children: [
+                              Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 768),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      // Clean Trip Corridor Header
+                                      _TripSummaryCard(
+                                        origin: widget.origin,
+                                        destination: widget.destination,
+                                        matchedCount: routes.length,
+                                        selectedDate: widget.selectedDate,
+                                      ),
+                                      const SizedBox(height: 14),
+
+                                      // LMT Go Style Accessible Filter Tabs
+                                      _LmtGoFilterTabs(
+                                        selectedTab: _selectedFilterTab,
+                                        allCount: totalAvailable,
+                                        accessibleCount: accessibleCount,
+                                        onTabSelected: (tab) {
+                                          setState(() => _selectedFilterTab = tab);
+                                        },
+                                      ),
+                                      const SizedBox(height: 16),
+
+                                      // Route Results Cards or Empty State
+                                      if (routes.isEmpty) ...[
+                                        _buildEmptyState(),
+                                      ] else ...[
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.directions_bus_rounded,
+                                              size: 18,
+                                              color: isHighContrast ? Colors.black : AppColors.primary,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Available Buses (${routes.length})',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w700,
+                                                color: isHighContrast ? Colors.black : AppColors.onSurface,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        ...routes.map(
+                                          (route) => Padding(
+                                            padding: const EdgeInsets.only(bottom: 14),
+                                            child: _LmtGoRouteCard(
+                                              route: route,
+                                              onTap: () => _onSelectRoute(route),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       );
                     },
                   ),
           ),
         ],
       ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : _ResultsBottomNav(
-              onNavTap: (label) {
-                AppNavigation.handleBottomNav(
-                  context,
-                  label,
-                  currentTab: 'Plan',
-                  onUnsupported: _showComingSoon,
-                );
-              },
-            ),
+      bottomNavigationBar: null,
     );
   }
 
   Widget _buildEmptyState() {
+    final isHighContrast = context.isHighContrast;
+    final isFiltered = _selectedFilterTab == 'Accessible' ||
+        _isWheelchair ||
+        _isStepFree;
+
+    final emptyTitle = isFiltered
+        ? 'No Accessible Buses Found'
+        : 'No Direct Buses Found';
+
+    final emptyDesc = isFiltered
+        ? 'No buses with wheelchair ramps or step-free entries are available for this corridor right now. Try selecting the "All Buses" tab.'
+        : 'There are currently no direct bus routes connecting ${widget.origin} to ${widget.destination}.';
+
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: AppColors.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : BorderSide.none,
+      ),
+      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Column(
           children: [
-            const Icon(
-              Icons.directions_bus_outlined,
+            Icon(
+              isFiltered ? Icons.accessible_forward : Icons.directions_bus_outlined,
               size: 56,
-              color: AppColors.onSurfaceVariant,
+              color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'No Direct Buses Found',
+            Text(
+              emptyTitle,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.onSurface,
+                color: isHighContrast ? Colors.black : AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'There are currently no direct bus routes connecting ${widget.origin} to ${widget.destination}.',
+              emptyDesc,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppColors.onSurfaceVariant,
+                color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
+            if (isFiltered && _selectedFilterTab == '♿ Accessible') ...[
+              const SizedBox(height: 16),
+              FilledButton.tonal(
+                onPressed: () => setState(() => _selectedFilterTab = 'All'),
+                child: const Text('Show All Buses'),
+              ),
+            ],
           ],
         ),
       ),
@@ -372,49 +590,65 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onBack, required this.onFilter});
+  const _TopBar({required this.onBack});
 
   final VoidCallback onBack;
-  final VoidCallback onFilter;
 
   @override
   Widget build(BuildContext context) {
+    final isHighContrast = context.isHighContrast;
+
     return Material(
-      color: AppColors.surfaceContainerLow,
-      elevation: 1,
+      color: context.surfaceColor,
+      elevation: isHighContrast ? 0 : 1,
       shadowColor: AppColors.onSurface.withValues(alpha: 0.08),
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 48,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: onBack,
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  color: AppColors.primary,
-                  tooltip: 'Back',
-                ),
-                const Expanded(
-                  child: Text(
-                    'Route Results',
-                    style: TextStyle(
-                      fontSize: 22,
-                      height: 28 / 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
+      child: Container(
+        decoration: BoxDecoration(
+          border: isHighContrast
+              ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+              : null,
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 56,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: isHighContrast ? Colors.black : AppColors.primary,
+                    tooltip: 'Back',
+                    iconSize: context.navIconSize,
+                    constraints: context.appBarActionConstraints,
                   ),
-                ),
-                IconButton(
-                  onPressed: onFilter,
-                  icon: const Icon(Icons.tune_rounded),
-                  color: AppColors.primary,
-                  tooltip: 'Filters',
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Available Buses',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: isHighContrast ? Colors.black : AppColors.primary,
+                        ),
+                      ),
+                      Text(
+                        'Select a bus to track live journey',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                          fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -423,87 +657,76 @@ class _TopBar extends StatelessWidget {
   }
 }
 
+/// Trip Summary Corridor Header
 class _TripSummaryCard extends StatelessWidget {
   const _TripSummaryCard({
     required this.origin,
     required this.destination,
     required this.matchedCount,
-    required this.totalCount,
+    this.selectedDate,
   });
 
   final String origin;
   final String destination;
   final int matchedCount;
-  final int totalCount;
+  final DateTime? selectedDate;
 
   @override
   Widget build(BuildContext context) {
-    final summaryText = matchedCount > 0
-        ? '$matchedCount route${matchedCount == 1 ? '' : 's'} serve your journey · Depart now'
-        : 'No exact matches — showing all $totalCount routes';
+    final isHighContrast = context.isHighContrast;
+    final dateStr = TimeUtils.formatDateString(selectedDate ?? DateTime.now());
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.surfaceVariant),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 2.0)
+            : Border.all(color: AppColors.surfaceVariant),
+        boxShadow: isHighContrast
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.onSurface.withValues(alpha: 0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Origin to Destination Row
           Row(
             children: [
-              const Icon(
-                Icons.my_location,
-                size: 18,
-                color: AppColors.primaryContainer,
-              ),
+              Icon(Icons.trip_origin_rounded, size: 16, color: isHighContrast ? Colors.black : AppColors.secondary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   origin,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    height: 20 / 14,
-                    color: AppColors.onSurface,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: isHighContrast ? Colors.black : AppColors.onSurface,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ],
-          ),
-          const Padding(
-            padding: EdgeInsets.only(left: 8),
-            child: SizedBox(
-              height: 12,
-              child: VerticalDivider(
-                width: 18,
-                thickness: 1,
-                color: AppColors.outlineVariant,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Icon(Icons.arrow_forward_rounded, size: 16, color: isHighContrast ? Colors.black : AppColors.primary),
               ),
-            ),
-          ),
-          Row(
-            children: [
-              const Icon(Icons.location_on, size: 18, color: AppColors.error),
-              const SizedBox(width: 8),
+              Icon(Icons.location_on_rounded, size: 16, color: isHighContrast ? const Color(0xFF8B0000) : AppColors.error),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   destination,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 24 / 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onSurface,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: isHighContrast ? Colors.black : AppColors.onSurface,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -511,18 +734,44 @@ class _TripSummaryCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            summaryText,
-            style: TextStyle(
-              fontSize: 14,
-              height: 20 / 14,
-              color: matchedCount > 0
-                  ? AppColors.secondary
-                  : AppColors.onSurfaceVariant,
-              fontWeight:
-                  matchedCount > 0 ? FontWeight.w600 : FontWeight.w400,
-            ),
+          const SizedBox(height: 8),
+          Divider(height: 1, color: isHighContrast ? Colors.black : AppColors.surfaceVariant),
+          const SizedBox(height: 8),
+          // Info row: Date & status
+          Row(
+            children: [
+              Icon(Icons.event_note_rounded, size: 15, color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  dateStr,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                    fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isHighContrast ? Colors.white : AppColors.primaryFixed,
+                  borderRadius: BorderRadius.circular(6),
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                ),
+                child: Text(
+                  '$matchedCount buses available',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isHighContrast ? Colors.black : AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -530,13 +779,19 @@ class _TripSummaryCard extends StatelessWidget {
   }
 }
 
-class _SortChips extends StatelessWidget {
-  const _SortChips({required this.selected, required this.onSelected});
+/// LMT Go Filter Tabs (All / ♿ Accessible / Fastest)
+class _LmtGoFilterTabs extends StatelessWidget {
+  const _LmtGoFilterTabs({
+    required this.selectedTab,
+    required this.allCount,
+    required this.accessibleCount,
+    required this.onTabSelected,
+  });
 
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  static const _options = ['Best', 'Fastest', 'Least crowded'];
+  final String selectedTab;
+  final int allCount;
+  final int accessibleCount;
+  final ValueChanged<String> onTabSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -544,476 +799,534 @@ class _SortChips extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          for (final option in _options) ...[
-            FilterChip(
-              label: Text(option),
-              selected: selected == option,
-              onSelected: (_) => onSelected(option),
-              selectedColor: AppColors.primaryFixed,
-              checkmarkColor: AppColors.primary,
-              labelStyle: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: selected == option
-                    ? AppColors.primary
-                    : AppColors.onSurfaceVariant,
-              ),
-              side: BorderSide(
-                color: selected == option
-                    ? AppColors.primaryContainer
-                    : AppColors.outlineVariant,
-              ),
-              backgroundColor: AppColors.surfaceContainerLowest,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
+          _TabItem(
+            label: 'All ($allCount)',
+            isSelected: selectedTab == 'All',
+            onTap: () => onTabSelected('All'),
+          ),
+          const SizedBox(width: 8),
+          _TabItem(
+            icon: Icons.accessible_rounded,
+            label: 'Accessible ($accessibleCount)',
+            isSelected: selectedTab == 'Accessible',
+            onTap: () => onTabSelected('Accessible'),
+          ),
+          const SizedBox(width: 8),
+          _TabItem(
+            icon: Icons.flash_on_rounded,
+            label: 'Fastest',
+            isSelected: selectedTab == 'Fastest',
+            onTap: () => onTabSelected('Fastest'),
+          ),
         ],
       ),
     );
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({
+class _TabItem extends StatelessWidget {
+  const _TabItem({
     required this.label,
-    required this.icon,
-    required this.color,
+    required this.isSelected,
+    required this.onTap,
+    this.icon,
   });
 
   final String label;
-  final IconData icon;
-  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            height: 20 / 13,
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
+    final isHighContrast = context.isHighContrast;
+    final Color bgColor;
+    final Color borderColor;
+    final Color contentColor;
+
+    if (isHighContrast) {
+      bgColor = isSelected ? const Color(0xFF001F3F) : Colors.white;
+      borderColor = Colors.black;
+      contentColor = isSelected ? Colors.white : Colors.black;
+    } else {
+      bgColor = isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerLowest;
+      borderColor = isSelected ? AppColors.primaryContainer : AppColors.outlineVariant;
+      contentColor = isSelected ? AppColors.onPrimary : AppColors.onSurface;
+    }
+
+    final hasLargeTargets = context.hasLargeTargets;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        constraints: BoxConstraints(minHeight: context.chipHeight, minWidth: context.chipHeight),
+        alignment: Alignment.center,
+        padding: EdgeInsets.symmetric(
+          horizontal: hasLargeTargets ? 20 : 16,
+          vertical: hasLargeTargets ? 14 : 10,
         ),
-      ],
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: borderColor,
+            width: isHighContrast ? 2.0 : (isSelected ? 1.5 : 1.0),
+          ),
+          boxShadow: (isSelected && !isHighContrast)
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryContainer.withValues(alpha: 0.25),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: hasLargeTargets ? 20 : 16,
+                color: isHighContrast ? contentColor : (isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: hasLargeTargets ? 16 : 14,
+                fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                color: contentColor,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _RouteCard extends StatelessWidget {
-  const _RouteCard({
+/// LMT Go Style Available Bus Card
+class _LmtGoRouteCard extends StatelessWidget {
+  const _LmtGoRouteCard({
     required this.route,
     required this.onTap,
-    this.dimmed = false,
   });
 
   final RouteResultItem route;
   final VoidCallback onTap;
-  final bool dimmed;
 
   @override
   Widget build(BuildContext context) {
-    final card = Material(
-      color: AppColors.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(12),
+    final isHighContrast = context.isHighContrast;
+    final hasLargeTargets = context.hasLargeTargets;
+    final rawBus = route.rawBus;
+    final hasRamp = rawBus?.wheelchairAccessible == true || rawBus?.hasRamp == true;
+    final hasLowFloor = rawBus?.lowFloor == true;
+
+    // LMT Go Status Pill Color (WCAG AA/AAA compliant contrast)
+    final (statusBg, statusFg) = switch (route.liveStatusLabel.toLowerCase()) {
+      'ongoing' => (isHighContrast ? const Color(0xFF003833) : const Color(0xFFE8F5E9), isHighContrast ? Colors.white : const Color(0xFF1B5E20)),
+      'approaching' => (isHighContrast ? const Color(0xFF001F3F) : const Color(0xFFE3F2FD), isHighContrast ? Colors.white : const Color(0xFF0D47A1)),
+      'delayed' => (isHighContrast ? const Color(0xFF8B0000) : const Color(0xFFFFEBEE), isHighContrast ? Colors.white : const Color(0xFFB71C1C)),
+      _ => (isHighContrast ? const Color(0xFF1A1A1A) : AppColors.surfaceContainer, isHighContrast ? Colors.white : AppColors.onSurfaceVariant),
+    };
+
+    return Material(
+      color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+      borderRadius: BorderRadius.circular(16),
+      elevation: isHighContrast ? 0 : 1,
+      shadowColor: AppColors.onSurface.withValues(alpha: 0.06),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.symmetric(
+            horizontal: hasLargeTargets ? 16 : 14,
+            vertical: hasLargeTargets ? 18 : 14,
+          ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: route.recommended
-                  ? AppColors.secondary
-                  : AppColors.surfaceVariant,
-              width: route.recommended ? 1.5 : 1,
+              color: isHighContrast
+                  ? Colors.black
+                  : (route.recommended ? AppColors.secondary : AppColors.surfaceVariant),
+              width: isHighContrast ? 2.0 : (route.recommended ? 1.5 : 1),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.onSurface.withValues(alpha: 0.04),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 1. Top Row: Route Badge, Bus Number, Status Pill, and Bold Price
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        if (route.recommended) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.secondaryContainer,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: const Text(
-                              'Recommended',
-                              style: TextStyle(
-                                fontSize: 12,
-                                height: 16 / 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.onSecondaryContainer,
-                              ),
-                            ),
+                        // Prominent Route Code Badge
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hasLargeTargets ? 10 : 8,
+                            vertical: hasLargeTargets ? 6 : 4,
                           ),
-                          const SizedBox(height: 8),
-                        ],
-                        Text(
-                          route.title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            height: 24 / 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onSurface,
+                          decoration: BoxDecoration(
+                            color: isHighContrast ? const Color(0xFF8B0000) : const Color(0xFFC62828),
+                            borderRadius: BorderRadius.circular(8),
+                            border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                          ),
+                          child: Text(
+                            route.routeNo ?? 'Route',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: hasLargeTargets ? 14 : 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          route.summary,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            height: 20 / 14,
-                            color: AppColors.onSurfaceVariant,
+
+                        // Bus Plate Number
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hasLargeTargets ? 8 : 6,
+                            vertical: hasLargeTargets ? 5 : 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.5),
+                              width: isHighContrast ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.directions_bus,
+                                size: hasLargeTargets ? 15 : 13,
+                                color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                route.busNo ?? route.busId,
+                                style: TextStyle(
+                                  fontSize: hasLargeTargets ? 13 : 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isHighContrast ? Colors.black : AppColors.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Live Status Pill (Ongoing / Scheduled / Delayed)
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: hasLargeTargets ? 8 : 6,
+                            vertical: hasLargeTargets ? 5 : 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusBg,
+                            borderRadius: BorderRadius.circular(999),
+                            border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: isHighContrast ? Colors.white : statusFg,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                route.liveStatusLabel,
+                                style: TextStyle(
+                                  fontSize: hasLargeTargets ? 11 : 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: statusFg,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '${route.durationMinutes} min',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          height: 28 / 22,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      Text(
-                        route.etaLabel,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          height: 16 / 12,
-                          color: AppColors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _LiveTrackingBadge(busId: route.busId),
-                  _InfoChip(
-                    icon: Icons.transfer_within_a_station,
-                    label: route.transfers == 0
-                        ? 'Direct'
-                        : '${route.transfers} transfer',
-                  ),
-                  _InfoChip(
-                    icon: Icons.groups_outlined,
-                    label: 'Crowd: ${route.crowdLevel}',
-                  ),
-                  _AccessibilityChip(
-                    status: route.accessibilityStatus,
-                    label: route.accessibilityLabel,
-                  ),
-                  _InfoChip(
-                    icon: Icons.shield_outlined,
-                    label: route.safetyLabel,
+                  const SizedBox(width: 8),
+
+                  // Estimated Price in LKR (Right-aligned, bold)
+                  Text(
+                    'LKR ${route.estimatedPriceLkr}',
+                    style: TextStyle(
+                      fontSize: hasLargeTargets ? 19 : 17,
+                      fontWeight: FontWeight.w800,
+                      color: isHighContrast ? Colors.black : AppColors.primary,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
+
+              // 2. FROM ➔ TO Corridor Title
               Row(
                 children: [
-                  const Spacer(),
-                  TextButton(
-                    onPressed: onTap,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primaryContainer,
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'View details',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        SizedBox(width: 4),
-                        Icon(Icons.arrow_forward, size: 18),
-                      ],
+                  Expanded(
+                    child: Text(
+                      '${route.origin} ➔ ${route.destination}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: isHighContrast ? Colors.black : AppColors.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+
+              // 3. Middle Timeline Row: "Departs at" ── [Duration] ──> "Arrives at"
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                ),
+                child: Row(
+                  children: [
+                    // Departs at
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Departs at',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isHighContrast ? const Color(0xFF2B2B2B) : AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          route.departureTimeStr,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: isHighContrast ? Colors.black : AppColors.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Visual Journey Indicator with Duration
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Column(
+                          children: [
+                            Text(
+                              '~${route.durationMinutes} min',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: isHighContrast ? Colors.black : AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: isHighContrast ? Colors.black : AppColors.secondary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Divider(
+                                    thickness: 1.5,
+                                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 16,
+                                  color: isHighContrast ? Colors.black : AppColors.primary,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Arrives at
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Arrives at',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isHighContrast ? const Color(0xFF2B2B2B) : AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          route.arrivalTimeStr,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: isHighContrast ? Colors.black : AppColors.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 4. Accessibility Badges (Visual at a glance)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    if (hasRamp) ...[
+                      _MiniFeatureBadge(
+                        icon: Icons.accessible_rounded,
+                        label: 'Ramp Available',
+                        color: isHighContrast ? Colors.black : AppColors.secondary,
+                        bgColor: isHighContrast ? Colors.white : AppColors.secondaryContainer.withValues(alpha: 0.4),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    if (hasLowFloor) ...[
+                      _MiniFeatureBadge(
+                        icon: Icons.elevator_outlined,
+                        label: 'Low Floor',
+                        color: isHighContrast ? Colors.black : AppColors.primary,
+                        bgColor: isHighContrast ? Colors.white : AppColors.primaryFixed,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    _MiniFeatureBadge(
+                      icon: Icons.people_outline_rounded,
+                      label: '${route.crowdLevel} Crowd',
+                      color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                      bgColor: isHighContrast ? Colors.white : AppColors.surfaceContainer,
+                    ),
+                    const SizedBox(width: 6),
+                    if (route.isLive)
+                      _LiveTripBadge(busId: route.busId),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
-    return dimmed ? Opacity(opacity: 0.55, child: card) : card;
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: AppColors.onSurfaceVariant),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              height: 16 / 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.onSurface,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AccessibilityChip extends StatelessWidget {
-  const _AccessibilityChip({required this.status, required this.label});
-
-  final AccessibilityStatus status;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final (icon, bg, fg) = switch (status) {
-      AccessibilityStatus.accessible => (
-        Icons.check_circle,
-        AppColors.secondaryContainer,
-        AppColors.onSecondaryContainer,
-      ),
-      AccessibilityStatus.partial => (
-        Icons.warning_amber_rounded,
-        const Color(0xFFFFDBCA),
-        AppColors.tertiary,
-      ),
-      AccessibilityStatus.notAccessible => (
-        Icons.cancel,
-        AppColors.errorContainer,
-        AppColors.onErrorContainer,
-      ),
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: fg),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              height: 16 / 12,
-              fontWeight: FontWeight.w600,
-              color: fg,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ResultsBottomNav extends StatelessWidget {
-  const _ResultsBottomNav({required this.onNavTap});
-
-  final ValueChanged<String> onNavTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 8,
-      shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_outlined,
-                label: 'Home',
-                onTap: () => onNavTap('Home'),
-              ),
-              _NavItem(
-                icon: Icons.directions_bus,
-                label: 'Plan',
-                selected: true,
-                onTap: () => onNavTap('Plan'),
-              ),
-              _NavItem(
-                icon: Icons.sensors,
-                label: 'Live',
-                onTap: () => onNavTap('Live'),
-              ),
-              _NavItem(
-                icon: Icons.group_outlined,
-                label: 'Community',
-                onTap: () => onNavTap('Community'),
-              ),
-              _NavItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                onTap: () => onNavTap('Profile'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
+class _MiniFeatureBadge extends StatelessWidget {
+  const _MiniFeatureBadge({
     required this.icon,
     required this.label,
-    required this.onTap,
-    this.selected = false,
+    required this.color,
+    required this.bgColor,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
-  final bool selected;
+  final Color color;
+  final Color bgColor;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 64,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: selected
-            ? BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: selected
-                  ? AppColors.onPrimaryContainer
-                  : AppColors.onSurfaceVariant,
+    final isHighContrast = context.isHighContrast;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isHighContrast ? Colors.white : bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: isHighContrast ? Colors.black : color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+              color: isHighContrast ? Colors.black : color,
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                height: 16 / 12,
-                color: selected
-                    ? AppColors.onPrimaryContainer
-                    : AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _LiveTrackingBadge extends StatelessWidget {
-  const _LiveTrackingBadge({required this.busId});
+class _LiveTripBadge extends StatelessWidget {
+  const _LiveTripBadge({required this.busId});
 
   final String busId;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<BusLocationModel?>(
-      stream: LiveBusService().listenToLiveLocation(busId),
+    final isHighContrast = context.isHighContrast;
+    return StreamBuilder<TripModel?>(
+      stream: TripService().watchActiveTripForBus(busId),
       builder: (context, snapshot) {
-        final bus = snapshot.data;
-        final isBroadcasting =
-            bus != null && bus.isBroadcasting && bus.status == BusStatus.active;
+        final trip = snapshot.data;
+        if (trip == null || !trip.isInProgress) return const SizedBox.shrink();
+
+        final depTime = trip.actualDepartureTime ?? trip.createdAt;
+        final elapsedMinutes = DateTime.now().difference(depTime).inMinutes.clamp(0, 999);
+        final label = elapsedMinutes == 0 ? 'Departed now' : '$elapsedMinutes m ago';
 
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: isBroadcasting
-                ? AppColors.secondaryContainer
-                : AppColors.surfaceContainer,
-            borderRadius: BorderRadius.circular(999),
+            color: isHighContrast ? Colors.white : Colors.green.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isHighContrast ? Colors.black : Colors.green.shade600,
+              width: isHighContrast ? 1.5 : 1.0,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                isBroadcasting ? Icons.sensors_rounded : Icons.schedule_rounded,
-                size: 16,
-                color: isBroadcasting
-                    ? AppColors.onSecondaryContainer
-                    : AppColors.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
+              Icon(Icons.directions_bus_filled, size: 14, color: isHighContrast ? Colors.black : Colors.green.shade800),
+              const SizedBox(width: 4),
               Text(
-                isBroadcasting ? 'Live GPS Active' : 'Scheduled',
+                label,
                 style: TextStyle(
-                  fontSize: 12,
-                  height: 16 / 12,
-                  fontWeight: FontWeight.w600,
-                  color: isBroadcasting
-                      ? AppColors.onSecondaryContainer
-                      : AppColors.onSurfaceVariant,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isHighContrast ? Colors.black : Colors.green.shade900,
                 ),
               ),
             ],

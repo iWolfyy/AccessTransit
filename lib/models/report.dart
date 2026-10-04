@@ -9,7 +9,13 @@ class Report {
     required this.id,
     required this.targetType,
     required this.targetId,
+    this.targetName = '',
     required this.problemType,
+    this.severity = 'moderate',
+    this.category = 'rampAccess',
+    this.subCategory = '',
+    this.description = '',
+    this.photoUrl = '',
     required this.status,
     required this.createdAt,
     this.lastConfirmedAt,
@@ -23,7 +29,13 @@ class Report {
   final String id;
   final String targetType; // 'station' or 'bus'
   final String targetId;
+  final String targetName;
   final String problemType;
+  final String severity; // 'minor', 'moderate', 'major'
+  final String category; // 'rampAccess', 'elevatorOut', 'crowding', 'cleanliness', 'safetyHazard', etc.
+  final String subCategory; // Specific problem detail e.g. 'Ramp broken / Motor jammed'
+  final String description;
+  final String photoUrl; // URL or asset path or base64 photo
   final String status; // 'active' or 'resolved'
   final DateTime createdAt;
   final DateTime? lastConfirmedAt;
@@ -64,8 +76,26 @@ class Report {
       targetId: map[FirestoreConstants.fieldTargetId]?.toString() ??
           map['targetId']?.toString() ??
           '',
+      targetName: map[FirestoreConstants.fieldTargetName]?.toString() ??
+          map['targetName']?.toString() ??
+          '',
       problemType: map[FirestoreConstants.fieldProblemType]?.toString() ??
           map['problemType']?.toString() ??
+          '',
+      severity: map[FirestoreConstants.fieldSeverity]?.toString() ??
+          map['severity']?.toString() ??
+          'moderate',
+      category: map[FirestoreConstants.fieldCategory]?.toString() ??
+          map['category']?.toString() ??
+          'rampAccess',
+      subCategory: map[FirestoreConstants.fieldSubCategory]?.toString() ??
+          map['subCategory']?.toString() ??
+          '',
+      description: map[FirestoreConstants.fieldDescription]?.toString() ??
+          map['description']?.toString() ??
+          '',
+      photoUrl: map[FirestoreConstants.fieldPhotoUrl]?.toString() ??
+          map['photoUrl']?.toString() ??
           '',
       status: map[FirestoreConstants.fieldStatus]?.toString() ??
           map['status']?.toString() ??
@@ -101,7 +131,13 @@ class Report {
     return {
       FirestoreConstants.fieldTargetType: targetType,
       FirestoreConstants.fieldTargetId: targetId,
+      FirestoreConstants.fieldTargetName: targetName,
       FirestoreConstants.fieldProblemType: problemType,
+      FirestoreConstants.fieldSeverity: severity,
+      FirestoreConstants.fieldCategory: category,
+      FirestoreConstants.fieldSubCategory: subCategory,
+      FirestoreConstants.fieldDescription: description,
+      FirestoreConstants.fieldPhotoUrl: photoUrl,
       FirestoreConstants.fieldStatus: status,
       FirestoreConstants.fieldCreatedAt: isServerTimestamp
           ? FieldValue.serverTimestamp()
@@ -126,7 +162,13 @@ class Report {
     String? id,
     String? targetType,
     String? targetId,
+    String? targetName,
     String? problemType,
+    String? severity,
+    String? category,
+    String? subCategory,
+    String? description,
+    String? photoUrl,
     String? status,
     DateTime? createdAt,
     DateTime? lastConfirmedAt,
@@ -140,7 +182,13 @@ class Report {
       id: id ?? this.id,
       targetType: targetType ?? this.targetType,
       targetId: targetId ?? this.targetId,
+      targetName: targetName ?? this.targetName,
       problemType: problemType ?? this.problemType,
+      severity: severity ?? this.severity,
+      category: category ?? this.category,
+      subCategory: subCategory ?? this.subCategory,
+      description: description ?? this.description,
+      photoUrl: photoUrl ?? this.photoUrl,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       lastConfirmedAt: lastConfirmedAt ?? this.lastConfirmedAt,
