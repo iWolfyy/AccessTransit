@@ -1373,7 +1373,7 @@ class SeedData {
       final docRef = _db
           .collection(FirestoreConstants.reportsCollection)
           .doc(report.id);
-      batch.set(docRef, report.toMap(), SetOptions(merge: true));
+      batch.set(docRef, report.copyWith(isDemo: true).toMap(), SetOptions(merge: true));
     }
 
     await batch.commit();

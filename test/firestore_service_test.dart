@@ -1,3 +1,4 @@
+import 'package:access_transit/logic/report_mutation.dart';
 import 'package:access_transit/models/report.dart';
 import 'package:access_transit/services/firestore_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,9 +8,19 @@ void main() {
 
   group('FirestoreService Report Tests', () {
     late FirestoreService service;
+    String? actor;
 
     setUp(() {
-      service = FirestoreService();
+      actor = null;
+      service = FirestoreService(
+        reportWriter: (_) async {},
+        reportActorId: () => actor,
+        reportMutationWriter: (plan) async => ReportMutationResult(
+          action: plan.action,
+          changed: plan.changed,
+          report: plan.after,
+        ),
+      );
     });
 
     test('createReport adds report and streamReports yields it', () async {
@@ -49,9 +60,17 @@ void main() {
       await service.createReport(testReport);
 
       final reports = await service.streamReports().first;
-      final found = reports.firstWhere((r) => r.id == 'test_report_subcategory_101');
-      expect(found.subCategory, equals('Ramp broken / deployment motor jammed'));
-      expect(found.photoUrl, equals('https://images.unsplash.com/photo-1544620347-c4fd4a3d5957'));
+      final found = reports.firstWhere(
+        (r) => r.id == 'test_report_subcategory_101',
+      );
+      expect(
+        found.subCategory,
+        equals('Ramp broken / deployment motor jammed'),
+      );
+      expect(
+        found.photoUrl,
+        equals('https://images.unsplash.com/photo-1544620347-c4fd4a3d5957'),
+      );
     });
 
     test('checkRateLimit returns true when user submitted report within 15 minutes', () async {
@@ -78,7 +97,8 @@ void main() {
     });
 
     test('confirmReport increments confirmCount and tracks user', () async {
-      final reportId = 'test_report_confirm_${DateTime.now().millisecondsSinceEpoch}';
+      final reportId =
+          'test_report_confirm_${DateTime.now().millisecondsSinceEpoch}';
       final report = Report(
         id: reportId,
         targetType: 'bus',
@@ -92,6 +112,7 @@ void main() {
       );
 
       await service.createReport(report);
+      actor = 'confirmer_1';
       await service.confirmReport(reportId, 'confirmer_1');
 
       final reports = await service.streamReports().first;
@@ -102,7 +123,8 @@ void main() {
     });
 
     test('resolveReport sets report status to resolved', () async {
-      final reportId = 'test_report_resolve_${DateTime.now().millisecondsSinceEpoch}';
+      final reportId =
+          'test_report_resolve_${DateTime.now().millisecondsSinceEpoch}';
       final report = Report(
         id: reportId,
         targetType: 'station',
@@ -114,6 +136,7 @@ void main() {
       );
 
       await service.createReport(report);
+      actor = (await service.streamReportById(reportId).first)!.userId;
       await service.resolveReport(reportId);
 
       final reports = await service.streamReports(status: 'resolved').first;
@@ -121,7 +144,8 @@ void main() {
     });
 
     test('flagReport hides report when false count reaches 3', () async {
-      final reportId = 'test_report_flag_${DateTime.now().millisecondsSinceEpoch}';
+      final reportId =
+          'test_report_flag_${DateTime.now().millisecondsSinceEpoch}';
       final report = Report(
         id: reportId,
         targetType: 'bus',
@@ -135,8 +159,11 @@ void main() {
       );
 
       await service.createReport(report);
+      actor = 'flagger_1';
       await service.flagReport(reportId, 'flagger_1');
+      actor = 'flagger_2';
       await service.flagReport(reportId, 'flagger_2');
+      actor = 'flagger_3';
       await service.flagReport(reportId, 'flagger_3');
 
       final reports = await service.streamReports().first;
@@ -145,7 +172,8 @@ void main() {
     });
 
     test('true flag increments confirmCount and switching from false to true flag updates counts correctly', () async {
-      final reportId = 'test_report_tf_${DateTime.now().millisecondsSinceEpoch}';
+      final reportId =
+          'test_report_tf_${DateTime.now().millisecondsSinceEpoch}';
       final report = Report(
         id: reportId,
         targetType: 'station',
@@ -163,7 +191,9 @@ void main() {
       await service.createReport(report);
 
       // User 1 & User 2 click True Flag
+      actor = 'user_tf_1';
       await service.confirmReport(reportId, 'user_tf_1');
+      actor = 'user_tf_2';
       await service.confirmReport(reportId, 'user_tf_2');
 
       var reports = await service.streamReports().first;
@@ -172,6 +202,7 @@ void main() {
       expect(updated.falseCount, equals(0));
 
       // User 3 clicks False Flag
+      actor = 'user_tf_3';
       await service.flagReport(reportId, 'user_tf_3');
       reports = await service.streamReports().first;
       updated = reports.firstWhere((r) => r.id == reportId);
@@ -179,6 +210,7 @@ void main() {
       expect(updated.falseCount, equals(1));
 
       // User 3 switches to True Flag
+      actor = 'user_tf_3';
       await service.confirmReport(reportId, 'user_tf_3');
       reports = await service.streamReports().first;
       updated = reports.firstWhere((r) => r.id == reportId);

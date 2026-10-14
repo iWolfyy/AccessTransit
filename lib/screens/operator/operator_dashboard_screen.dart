@@ -23,9 +23,8 @@ import '../../models/trip_model.dart';
 import '../../models/station.dart';
 import '../../widgets/add_station_dialog.dart';
 import '../../widgets/logout_confirmation_dialog.dart';
+import '../../widgets/assistance_operator_actions.dart';
 import '../auth/login_screen.dart';
-
-
 
 /// Screen for Bus Operators to start/stop trips and broadcast real-time GPS telemetry to Firestore.
 class OperatorDashboardScreen extends StatefulWidget {
@@ -50,6 +49,11 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   Duration _tripDuration = Duration.zero;
 
   bool _isTripActive = false;
+  bool _operatorWriteBusy = false;
+  bool _gpsWriteBusy = false;
+  String? _tripId;
+  DateTime? _lastPublishedAt;
+  String _publicationStatus = 'No shared GPS update';
   bool _isInitializing = false;
   bool _userManuallySelectedBus = false;
 
@@ -64,7 +68,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   String _nextStop = 'Kottawa Highway Bus Station';
 
   bool _rampOperational = true;
-  bool _elevatorWorking = true;
+  final bool _elevatorWorking = true;
   String _occupancyLevel = 'Medium';
 
   double? _currentLat;
@@ -73,11 +77,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   double _heading = 0.0;
   DateTime? _lastUpdateTimestamp;
 
-  static const List<String> _occupancyOptions = [
-    'Low',
-    'Medium',
-    'High',
-  ];
+  static const List<String> _occupancyOptions = ['Low', 'Medium', 'High'];
 
   @override
   void initState() {
@@ -109,9 +109,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   String _autoSelectNearestUpcomingBus(List<Bus> buses, String? currentUserId) {
     // Priority 1: Bus already assigned to this driver
     final myBus = buses.cast<Bus?>().firstWhere(
-          (b) => b?.driverId != null && b?.driverId == currentUserId,
-          orElse: () => null,
-        );
+      (b) => b?.driverId != null && b?.driverId == currentUserId,
+      orElse: () => null,
+    );
     if (myBus != null) return myBus.id;
 
     // Priority 2: Nearest upcoming departure (scheduled departure >= now)
@@ -150,7 +150,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
     // Compute last-stop arrival time from scheduleTimes
     final lastIndex = bus.stops.isNotEmpty ? bus.stops.length - 1 : 0;
     final lastStopStr = bus.getScheduledTimeForStop(lastIndex);
-    final lastStopTime = TimeUtils.parseTimeStringToDateTime(lastStopStr, today);
+    final lastStopTime = TimeUtils.parseTimeStringToDateTime(
+      lastStopStr,
+      today,
+    );
 
     final minsToDep = depTime.difference(now).inMinutes;
     final minsToEnd = lastStopTime.difference(now).inMinutes;
@@ -175,7 +178,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       // Past the final scheduled stop
       return _BusRunStatus(
         label: 'Departed',
-        color: const Color(0xFF5D616B), // WCAG AA 6.1:1 on white (was Colors.grey 2.8:1)
+        color: const Color(
+          0xFF5D616B,
+        ), // WCAG AA 6.1:1 on white (was Colors.grey 2.8:1)
         icon: Icons.check_circle_outline,
         sortKey: 2000 + minsToEnd.abs(), // departed at the bottom
       );
@@ -191,7 +196,11 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
 
       setState(() {
         _availableBuses = list;
-        if (!_userManuallySelectedBus) {
+        if (!_userManuallySelectedBus &&
+            !_isTripActive &&
+            !_isInitializing &&
+            !_operatorWriteBusy &&
+            _tripId == null) {
           _selectedBusId = _autoSelectNearestUpcomingBus(list, currentUserId);
         }
       });
@@ -202,7 +211,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   void _listenToSelectedBus(String busId) {
     _busDocSubscription?.cancel();
     _busDocSubscription = _firestoreService.streamBusById(busId).listen((bus) {
-      if (!mounted || bus == null) return;
+      if (!mounted || bus == null || busId != _selectedBusId) return;
       setState(() {
         _currentBus = bus;
         _rampOperational = bus.rampOk;
@@ -227,18 +236,29 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   }
 
   Future<void> _claimBusAssignment() async {
-    final currentUserId = _authService.currentUser?.uid ?? 'operator_dev';
+    if (_operatorWriteBusy) return;
+    final currentUserId = _authService.currentUser?.uid ?? '';
+    if (currentUserId.isEmpty) {
+      _showSnack('Sign in as an approved operator first.', isError: true);
+      return;
+    }
+    setState(() => _operatorWriteBusy = true);
     try {
       await _firestoreService.assignBusDriver(_selectedBusId, currentUserId);
       _showSnack('Bus $_selectedRouteNumber is now assigned to you!');
     } catch (e) {
       _showSnack('Failed to assign bus: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _operatorWriteBusy = false);
+      }
     }
   }
 
   Future<void> _onRampToggled(bool val) async {
-    final currentUserId = _authService.currentUser?.uid ?? 'operator_dev';
-    final isAssignedDriver = _currentBus == null ||
+    final currentUserId = _authService.currentUser?.uid ?? '';
+    final isAssignedDriver =
+        _currentBus == null ||
         _currentBus?.driverId == null ||
         _currentBus?.driverId == currentUserId;
 
@@ -250,28 +270,36 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       return;
     }
 
-    setState(() => _rampOperational = val);
+    if (_operatorWriteBusy) return;
+    setState(() => _operatorWriteBusy = true);
     try {
       await _firestoreService.updateBusAccessibility(
         _selectedBusId,
         rampOk: val,
         driverId: currentUserId,
       );
-      _pushAccessibilityUpdate();
+      if (mounted) setState(() => _rampOperational = val);
+      await _pushAccessibilityUpdate();
       _showSnack(
         val
-            ? 'Ramp marked Working (Riders will see Safe)'
-            : 'Ramp marked Broken (Riders will see Warning)',
+            ? 'Ramp working observation saved'
+            : 'Ramp broken observation saved',
       );
     } catch (e) {
-      _showSnack('Failed to update ramp status: $e', isError: true);
+      _showSnack(
+        'Could not save all ramp updates: $e. Refresh and retry.',
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _operatorWriteBusy = false);
     }
   }
 
   Future<void> _onOccupancyChanged(String? val) async {
     if (val == null) return;
-    final currentUserId = _authService.currentUser?.uid ?? 'operator_dev';
-    final isAssignedDriver = _currentBus == null ||
+    final currentUserId = _authService.currentUser?.uid ?? '';
+    final isAssignedDriver =
+        _currentBus == null ||
         _currentBus?.driverId == null ||
         _currentBus?.driverId == currentUserId;
 
@@ -283,17 +311,24 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       return;
     }
 
-    setState(() => _occupancyLevel = val);
+    if (_operatorWriteBusy) return;
+    setState(() => _operatorWriteBusy = true);
     try {
       await _firestoreService.updateBusAccessibility(
         _selectedBusId,
         occupancy: val.toLowerCase(),
         driverId: currentUserId,
       );
-      _pushAccessibilityUpdate();
+      if (mounted) setState(() => _occupancyLevel = val);
+      await _pushAccessibilityUpdate();
       _showSnack('Occupancy updated to $val');
     } catch (e) {
-      _showSnack('Failed to update occupancy: $e', isError: true);
+      _showSnack(
+        'Could not save all occupancy updates: $e. Refresh and retry.',
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _operatorWriteBusy = false);
     }
   }
 
@@ -303,9 +338,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
     _busDocSubscription?.cancel();
     _positionSubscription?.cancel();
     _tripTimer?.cancel();
-    if (_isTripActive) {
-      _liveBusService.stopTrip(_selectedBusId, endStatus: BusStatus.offline);
-    }
+
     super.dispose();
   }
 
@@ -326,7 +359,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       final initialPosition = await _locationService.getCurrentPosition();
 
       final currentUser = _authService.currentUser;
-      final driverId = currentUser?.uid ?? 'operator_dev';
+      final driverId = currentUser?.uid;
+      if (driverId == null) {
+        throw StateError('Sign in as the assigned operator first');
+      }
       final operatorName =
           (currentUser?.displayName != null &&
               currentUser!.displayName!.isNotEmpty)
@@ -347,7 +383,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         _lastUpdateTimestamp = now;
       });
 
-      final initialNextStop = (_currentBus != null && _currentBus!.stops.length > 1)
+      final initialNextStop =
+          (_currentBus != null && _currentBus!.stops.length > 1)
           ? _resolveStopName(_currentBus!.stops[1])
           : _nextStop;
       _nextStop = initialNextStop;
@@ -368,26 +405,43 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         nextStop: initialNextStop,
         currentStopIndex: 0,
         rampOperational: _rampOperational,
-        elevatorWorking: _elevatorWorking,
         occupancyLevel: _occupancyLevel,
         isBroadcasting: true,
       );
 
-      await _liveBusService.startOrUpdateLiveLocation(initialBusModel);
-
       // Create new trip document in trips/{tripId} with actualDepartureTime = now
       final stops = _currentBus?.stops.isNotEmpty == true
           ? _currentBus!.stops
-          : ['st_pettah', 'st_maradana', 'st_borella', 'st_kottawa'];
+          : <String>[];
 
-      await TripService().startTrip(
+      if (_tripId == null) {
+        final prior = await TripService().getActiveTrip(_selectedBusId);
+        if (prior != null) {
+          if (prior.driverId != driverId) {
+            throw StateError('This bus has another operator\'s active trip');
+          }
+          _tripId = prior.tripId;
+        }
+      }
+      _tripId ??=
+          'trip_${_selectedBusId}_${DateTime.now().microsecondsSinceEpoch}';
+      final savedTrip = await TripService().startTrip(
         busId: _selectedBusId,
         routeNo: _selectedRouteNumber,
         stops: stops,
         driverId: driverId,
         scheduleTimes: _currentBus?.scheduleTimes,
         departureTime: now,
+        requestedTripId: _tripId,
+        initialTelemetry: initialBusModel,
       );
+      if (!savedTrip.isInProgress) {
+        throw StateError(
+          'This trip already ended. Refresh before starting another.',
+        );
+      }
+      _lastPublishedAt = DateTime.now();
+      _publicationStatus = 'Shared GPS acknowledged';
 
       // 4. Listen to live GPS location stream with background tracking enabled
       await _positionSubscription?.cancel();
@@ -398,11 +452,17 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             enableBackground: true,
             notificationTitle: 'AccessTransit Live Bus Tracking',
             notificationText:
-                'Broadcasting live location for Bus $_selectedRouteNumber to passengers',
+                'GPS tracking for Bus $_selectedRouteNumber; shared delivery shown in app',
           )
           .listen(
             _onLocationUpdate,
             onError: (dynamic error) {
+              if (mounted) {
+                setState(
+                  () => _publicationStatus =
+                      'GPS unavailable; last shared fix may be stale',
+                );
+              }
               _showSnack('GPS Stream Error: $error', isError: true);
             },
           );
@@ -411,7 +471,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       _tripDuration = Duration.zero;
       _tripTimer?.cancel();
       _tripTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         setState(() {
           _tripDuration += const Duration(seconds: 1);
         });
@@ -452,6 +514,16 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       _lastUpdateTimestamp = now;
     });
 
+    if (_gpsWriteBusy || _operatorWriteBusy || _positionSubscription == null) {
+      return;
+    }
+    final uploadingTrip = _tripId;
+    _gpsWriteBusy = true;
+    if (mounted) {
+      setState(
+        () => _publicationStatus = 'Pending GPS upload; coordinates are local',
+      );
+    }
     try {
       await _liveBusService.updateLocationOnly(
         busId: _selectedBusId,
@@ -459,15 +531,38 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         longitude: position.longitude,
         speed: speedKmH,
         heading: position.heading,
+        expectedTripId: _tripId,
       );
+      if (mounted &&
+          _isTripActive &&
+          _tripId == uploadingTrip &&
+          _positionSubscription != null) {
+        setState(() {
+          _lastPublishedAt = DateTime.now();
+          _publicationStatus = 'Shared GPS acknowledged';
+        });
+      }
     } catch (e) {
-      // Ignore intermittent update errors to keep stream uninterrupted
+      if (mounted &&
+          _isTripActive &&
+          _tripId == uploadingTrip &&
+          _positionSubscription != null) {
+        setState(
+          () => _publicationStatus =
+              'GPS upload failed/offline; next fix retries',
+        );
+      }
+    } finally {
+      _gpsWriteBusy = false;
     }
   }
 
   /// Stops current trip, cancels GPS subscription, and sets status to `completed` in Firestore.
   Future<void> _stopTrip() async {
-    if (!_isTripActive && _positionSubscription == null) return;
+    if (!_isTripActive || _operatorWriteBusy) {
+      return;
+    }
+    setState(() => _operatorWriteBusy = true);
 
     // 1. Cancel location stream and timer immediately
     await _positionSubscription?.cancel();
@@ -476,53 +571,46 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
     _tripTimer?.cancel();
     _tripTimer = null;
 
-    // 2. Update Firestore status to completed
+    // Retain an unfinished shared trip on failure, so Stop can be retried.
     try {
-      await _liveBusService.stopTrip(
+      final completed = await TripService().completeTrip(
         _selectedBusId,
-        endStatus: BusStatus.completed,
+        expectedTripId: _tripId,
       );
-      await TripService().completeTrip(_selectedBusId);
+      if (completed == null) {
+        throw StateError('No acknowledged trip is available; refresh');
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isTripActive = false;
+        _tripId = null;
+        _publicationStatus = 'Shared trip completion acknowledged';
+      });
+      _showSnack('Trip completion saved. Broadcasting ended.');
     } catch (e) {
-      _showSnack('Notice: Updated status to completed ($e)', isError: true);
+      if (mounted) {
+        setState(
+          () => _publicationStatus =
+              'GPS stopped locally; shared completion failed. Retry Stop.',
+        );
+      }
+      _showSnack('Could not confirm shared trip completion: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _operatorWriteBusy = false);
+      }
     }
-
-    if (!mounted) return;
-
-    setState(() {
-      _isTripActive = false;
-    });
-
-    _showSnack('Trip Completed. GPS broadcasting stopped.');
   }
 
-  /// Pushes status/accessibility updates to Firestore during an active trip.
   Future<void> _pushAccessibilityUpdate() async {
     if (!_isTripActive) return;
-    try {
-      if (_currentLat != null && _currentLng != null) {
-        final busModel = BusLocationModel(
-          busId: _selectedBusId,
-          routeId: _selectedRouteId,
-          routeNumber: _selectedRouteNumber,
-          routeName: _selectedRouteName,
-          driverId: _authService.currentUser?.uid ?? 'operator_dev',
-          latitude: _currentLat!,
-          longitude: _currentLng!,
-          speed: _speed,
-          heading: _heading,
-          status: BusStatus.active,
-          nextStop: _nextStop,
-          rampOperational: _rampOperational,
-          elevatorWorking: _elevatorWorking,
-          occupancyLevel: _occupancyLevel,
-          isBroadcasting: true,
-        );
-        await _liveBusService.startOrUpdateLiveLocation(busModel);
-      }
-    } catch (e) {
-      // Ignore minor network update errors
-    }
+    await _liveBusService.updateEquipment(
+      _selectedBusId,
+      rampOperational: _rampOperational,
+      occupancyLevel: _occupancyLevel,
+    );
   }
 
   void _showSnack(String message, {bool isError = false}) {
@@ -586,7 +674,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         foregroundColor: AppColors.onPrimary,
         actions: [
           IconButton(
-            icon: Icon(Icons.add_location_alt_outlined, size: context.tapIconSize),
+            icon: Icon(
+              Icons.add_location_alt_outlined,
+              size: context.tapIconSize,
+            ),
             tooltip: 'Add Station to Route',
             constraints: BoxConstraints(
               minWidth: context.minTapHeight,
@@ -602,7 +693,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
           ),
           if (kDebugMode)
             IconButton(
-              icon: Icon(Icons.cloud_upload_outlined, size: context.tapIconSize),
+              icon: Icon(
+                Icons.cloud_upload_outlined,
+                size: context.tapIconSize,
+              ),
               tooltip: 'Seed Firestore Data (Debug)',
               constraints: BoxConstraints(
                 minWidth: context.minTapHeight,
@@ -722,7 +816,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             const SizedBox(height: 8),
             Text(
               _isTripActive
-                  ? 'Background GPS tracking active. System notification visible in status bar.\nDuration: ${_formatDuration(_tripDuration)}'
+                  ? '$_publicationStatus\nDuration: ${_formatDuration(_tripDuration)}'
                   : 'Press Start Trip to activate background GPS tracking for Bus $_selectedRouteNumber.',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -739,7 +833,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               child: _isInitializing
                   ? const Center(child: CircularProgressIndicator())
                   : FilledButton.icon(
-                      onPressed: _isTripActive ? _stopTrip : _startTrip,
+                      onPressed: _operatorWriteBusy || _isInitializing
+                          ? null
+                          : (_isTripActive ? _stopTrip : _startTrip),
                       style: FilledButton.styleFrom(
                         backgroundColor: _isTripActive
                             ? AppColors.error
@@ -779,8 +875,12 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
 
         return Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          color: isInProgress ? AppColors.surfaceContainerLowest : AppColors.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          color: isInProgress
+              ? AppColors.surfaceContainerLowest
+              : AppColors.surfaceContainerLow,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -792,11 +892,17 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                     const SizedBox(width: 8),
                     const Text(
                       'Trip Route Progress',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: isInProgress
                             ? Colors.green.withValues(alpha: 0.15)
@@ -808,7 +914,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: isInProgress ? Colors.green.shade800 : AppColors.onSurfaceVariant,
+                          color: isInProgress
+                              ? Colors.green.shade800
+                              : AppColors.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -818,7 +926,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                 if (!isInProgress) ...[
                   const Text(
                     'No active trip run. Tap Start Trip above to record actual departure time and activate the rider per-stop timeline.',
-                    style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   _buildPreTripPunctualityCard(),
@@ -826,38 +937,66 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   FutureBuilder<List<Station>>(
                     future: _firestoreService.getStations(),
                     builder: (context, stationsSnapshot) {
-                      final stationsList = stationsSnapshot.data ?? SeedData.colomboStations;
-                      final stationsMap = {for (final s in stationsList) s.id: s};
+                      final stationsList =
+                          stationsSnapshot.data ?? SeedData.colomboStations;
+                      final stationsMap = {
+                        for (final s in stationsList) s.id: s,
+                      };
 
-                      final safeIndex = trip.currentStopIndex.clamp(0, trip.stops.length - 1);
+                      final safeIndex = trip.currentStopIndex.clamp(
+                        0,
+                        trip.stops.length - 1,
+                      );
                       final currentStopId = trip.stops[safeIndex];
-                      final currentStopName = stationsMap[currentStopId]?.name ?? currentStopId;
+                      final currentStopName =
+                          stationsMap[currentStopId]?.name ?? currentStopId;
 
-                      final hasNextStop = trip.currentStopIndex + 1 < trip.stops.length;
-                      final nextStopId = hasNextStop ? trip.stops[trip.currentStopIndex + 1] : null;
-                      final nextStopName = nextStopId != null ? (stationsMap[nextStopId]?.name ?? nextStopId) : 'Final Destination Reached';
+                      final hasNextStop =
+                          trip.currentStopIndex + 1 < trip.stops.length;
+                      final nextStopId = hasNextStop
+                          ? trip.stops[trip.currentStopIndex + 1]
+                          : null;
+                      final nextStopName = nextStopId != null
+                          ? (stationsMap[nextStopId]?.name ?? nextStopId)
+                          : 'Final Destination Reached';
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Current Position: Stop ${trip.currentStopIndex + 1} of ${trip.stops.length}',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.outline),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.outline,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             currentStopName,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(Icons.arrow_forward_rounded, size: 16, color: AppColors.onSurfaceVariant),
+                              const Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 16,
+                                color: AppColors.onSurfaceVariant,
+                              ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   'Next Stop: $nextStopName',
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.onSurface),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.onSurface,
+                                  ),
                                 ),
                               ),
                             ],
@@ -873,58 +1012,110 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                                 child: SizedBox(
                                   height: context.buttonHeight,
                                   child: FilledButton.icon(
-                                    onPressed: hasNextStop
+                                    onPressed:
+                                        hasNextStop &&
+                                            _isTripActive &&
+                                            _tripId == trip.tripId &&
+                                            !_operatorWriteBusy
                                         ? () async {
-                                            final updated = await TripService().confirmNextStopArrival(_selectedBusId);
-                                            if (updated != null) {
-                                              final safeIdx = updated.currentStopIndex.clamp(0, updated.stops.length - 1);
-                                              final arrivedStopId = updated.stops[safeIdx];
-                                              final arrivedStopName = stationsMap[arrivedStopId]?.name ?? arrivedStopId;
+                                            setState(
+                                              () => _operatorWriteBusy = true,
+                                            );
+                                            try {
+                                              final updated =
+                                                  await TripService()
+                                                      .confirmNextStopArrival(
+                                                        _selectedBusId,
+                                                        expectedTripId: _tripId,
+                                                      );
+                                              if (updated != null) {
+                                                final safeIdx = updated
+                                                    .currentStopIndex
+                                                    .clamp(
+                                                      0,
+                                                      updated.stops.length - 1,
+                                                    );
+                                                final arrivedStopId =
+                                                    updated.stops[safeIdx];
+                                                final arrivedStopName =
+                                                    stationsMap[arrivedStopId]
+                                                        ?.name ??
+                                                    arrivedStopId;
 
-                                              final hasUpcoming = updated.currentStopIndex + 1 < updated.stops.length;
-                                              final upcomingStopId = hasUpcoming
-                                                  ? updated.stops[updated.currentStopIndex + 1]
-                                                  : arrivedStopId;
-                                              final upcomingStopName = stationsMap[upcomingStopId]?.name ?? upcomingStopId;
+                                                final hasUpcoming =
+                                                    updated.currentStopIndex +
+                                                        1 <
+                                                    updated.stops.length;
+                                                final upcomingStopId =
+                                                    hasUpcoming
+                                                    ? updated.stops[updated
+                                                              .currentStopIndex +
+                                                          1]
+                                                    : arrivedStopId;
+                                                final upcomingStopName =
+                                                    stationsMap[upcomingStopId]
+                                                        ?.name ??
+                                                    upcomingStopId;
 
-                                              if (mounted) {
-                                                setState(() {
-                                                  _nextStop = upcomingStopName;
-                                                });
-                                              }
+                                                if (mounted) {
+                                                  setState(() {
+                                                    _nextStop =
+                                                        upcomingStopName;
+                                                  });
+                                                }
 
-                                              // Calculate ETA countdown to upcoming stop
-                                              int etaMinutes = 4;
-                                              if (_currentBus != null) {
-                                                final etaCalc = DelayEtaCalculator.calculateArrivalEta(
-                                                  bus: _currentBus!,
-                                                  targetStopIdOrName: upcomingStopId,
-                                                  activeTrip: updated,
-                                                  stationsMap: stationsMap,
-                                                  currentTime: DateTime.now(),
+                                                if (!updated.isInProgress) {
+                                                  await _positionSubscription
+                                                      ?.cancel();
+                                                  _positionSubscription = null;
+                                                  _tripTimer?.cancel();
+                                                  if (mounted) {
+                                                    setState(() {
+                                                      _isTripActive = false;
+                                                      _tripId = null;
+                                                      _publicationStatus = 'Final arrival and trip completion acknowledged';
+                                                    });
+                                                  }
+                                                }
+
+                                                _showSnack(
+                                                  updated.isInProgress
+                                                      ? 'Arrival saved at $arrivedStopName. Next: $upcomingStopName'
+                                                      : 'Final arrival saved at $arrivedStopName. Trip completed.',
                                                 );
-                                                etaMinutes = etaCalc.countdownMinutes.clamp(1, 120);
                                               }
-
-                                              // Instantly sync LiveBusService with human-readable stop name for Passenger screen
-                                              await _liveBusService.updateNextStop(
-                                                busId: _selectedBusId,
-                                                nextStop: upcomingStopName,
-                                                currentStopIndex: updated.currentStopIndex,
-                                                etaMinutes: hasUpcoming ? etaMinutes : 0,
+                                            } catch (e) {
+                                              _showSnack(
+                                                'Arrival not confirmed: $e. Refresh and retry.',
+                                                isError: true,
                                               );
-
-                                              _showSnack('Arrival confirmed at $arrivedStopName! Next: $upcomingStopName');
+                                            } finally {
+                                              if (mounted) {
+                                                setState(
+                                                  () => _operatorWriteBusy =
+                                                      false,
+                                                );
+                                              }
                                             }
                                           }
                                         : null,
                                     style: FilledButton.styleFrom(
-                                      backgroundColor: AppColors.primaryContainer,
+                                      backgroundColor:
+                                          AppColors.primaryContainer,
                                       foregroundColor: AppColors.onPrimary,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
                                     ),
-                                    icon: Icon(Icons.check_circle_rounded, size: context.tapIconSize),
-                                    label: Text(hasNextStop ? 'Next Stop Reached' : 'Final Stop Reached'),
+                                    icon: Icon(
+                                      Icons.check_circle_rounded,
+                                      size: context.tapIconSize,
+                                    ),
+                                    label: Text(
+                                      hasNextStop
+                                          ? 'Next Stop Reached'
+                                          : 'Final Stop Reached',
+                                    ),
                                   ),
                                 ),
                               ),
@@ -935,10 +1126,17 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                                   onPressed: () => _stopTrip(),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: AppColors.error,
-                                    side: const BorderSide(color: AppColors.error),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    side: const BorderSide(
+                                      color: AppColors.error,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                   ),
-                                  icon: Icon(Icons.flag_rounded, size: context.tapIconSize),
+                                  icon: Icon(
+                                    Icons.flag_rounded,
+                                    size: context.tapIconSize,
+                                  ),
                                   label: const Text('End Trip'),
                                 ),
                               ),
@@ -958,11 +1156,18 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   }
 
   /// Step 2: Builds the real-time Driver Punctuality & Schedule Comparison Card (Delay Meter).
-  Widget _buildDelayMeterCard(TripModel trip, Map<String, Station> stationsMap) {
-    if (_currentBus == null) return const SizedBox.shrink();
+  Widget _buildDelayMeterCard(
+    TripModel trip,
+    Map<String, Station> stationsMap,
+  ) {
+    if (_currentBus == null) {
+      return const SizedBox.shrink();
+    }
 
     final hasNextStop = trip.currentStopIndex + 1 < trip.stops.length;
-    final targetStopIndex = hasNextStop ? trip.currentStopIndex + 1 : trip.currentStopIndex;
+    final targetStopIndex = hasNextStop
+        ? trip.currentStopIndex + 1
+        : trip.currentStopIndex;
     final targetStopId = trip.stops[targetStopIndex];
     final targetStopName = stationsMap[targetStopId]?.name ?? targetStopId;
 
@@ -997,7 +1202,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  hasNextStop ? 'Target: $targetStopName' : 'Destination: $targetStopName',
+                  hasNextStop
+                      ? 'Target: $targetStopName'
+                      : 'Destination: $targetStopName',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -1006,7 +1213,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-              _buildPunctualityBadge(etaResult.delayType, etaResult.delayMinutes),
+              _buildPunctualityBadge(
+                etaResult.delayType,
+                etaResult.delayMinutes,
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1034,7 +1244,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                     ),
                     const SizedBox(height: 2),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: delayColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(6),
@@ -1126,10 +1339,17 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                           ),
                           TextButton(
                             onPressed: () async {
-                              await _liveBusService.clearDelay(_selectedBusId);
-                              _showSnack(
-                                'Delay notice cleared. Normal schedule resumed.',
-                              );
+                              try {
+                                await _liveBusService.clearDelay(
+                                  _selectedBusId,
+                                );
+                                _showSnack('Delay notice removal saved.');
+                              } catch (e) {
+                                _showSnack(
+                                  'Delay removal failed: $e. Retry.',
+                                  isError: true,
+                                );
+                              }
                             },
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.red.shade700,
@@ -1158,7 +1378,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      icon: Icon(Icons.traffic_rounded, size: context.tapIconSize),
+                      icon: Icon(
+                        Icons.traffic_rounded,
+                        size: context.tapIconSize,
+                      ),
                       label: Text(
                         hasActiveDelay
                             ? 'Update Delay / Traffic Reason'
@@ -1218,161 +1441,176 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.traffic_rounded,
+                            color: Colors.deepOrange,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.traffic_rounded,
-                          color: Colors.deepOrange,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Report Delay / Incident',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Report Delay / Incident',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                            Text(
-                              'Alerts all passenger screens and updates live ETAs.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.onSurfaceVariant,
+                              Text(
+                                'Alerts all passenger screens and updates live ETAs.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.onSurfaceVariant,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Estimated Delay Time',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: delayOptions.map((mins) {
-                      final isSelected = selectedMinutes == mins;
-                      return ChoiceChip(
-                        label: Text('+$mins mins'),
-                        selected: isSelected,
-                        selectedColor: Colors.orange.shade100,
-                        labelStyle: TextStyle(
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected
-                              ? Colors.orange.shade900
-                              : AppColors.onSurface,
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(context).pop(),
                         ),
-                        onSelected: (val) {
-                          if (val) {
-                            setModalState(() {
-                              selectedMinutes = mins;
-                            });
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Delay Reason',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: reasons.map((r) {
-                      final label = r['label'] as String;
-                      final icon = r['icon'] as IconData;
-                      final isSelected = selectedReason == label;
-
-                      return ChoiceChip(
-                        avatar: Icon(
-                          icon,
-                          size: 16,
-                          color: isSelected
-                              ? Colors.orange.shade900
-                              : AppColors.onSurfaceVariant,
-                        ),
-                        label: Text(label),
-                        selected: isSelected,
-                        selectedColor: Colors.orange.shade100,
-                        labelStyle: TextStyle(
-                          fontSize: 12,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected
-                              ? Colors.orange.shade900
-                              : AppColors.onSurface,
-                        ),
-                        onSelected: (val) {
-                          if (val) {
-                            setModalState(() {
-                              selectedReason = label;
-                            });
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton.icon(
-                    onPressed: () async {
-                      Navigator.of(context).pop();
-                      await _liveBusService.reportDelay(
-                        busId: _selectedBusId,
-                        reason: selectedReason,
-                        delayMinutes: selectedMinutes,
-                      );
-                      _showSnack(
-                        'Delay notice broadcasted: $selectedReason (+$selectedMinutes mins)',
-                      );
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.deepOrange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      ],
                     ),
-                    icon: const Icon(Icons.broadcast_on_personal_rounded),
-                    label: Text(
-                      'Broadcast Delay (+$selectedMinutes mins)',
-                      style: const TextStyle(
-                        fontSize: 15,
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Estimated Delay Time',
+                      style: TextStyle(
+                        fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: delayOptions.map((mins) {
+                        final isSelected = selectedMinutes == mins;
+                        return ChoiceChip(
+                          label: Text('+$mins mins'),
+                          selected: isSelected,
+                          selectedColor: Colors.orange.shade100,
+                          labelStyle: TextStyle(
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? Colors.orange.shade900
+                                : AppColors.onSurface,
+                          ),
+                          onSelected: (val) {
+                            if (val) {
+                              setModalState(() {
+                                selectedMinutes = mins;
+                              });
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Delay Reason',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: reasons.map((r) {
+                        final label = r['label'] as String;
+                        final icon = r['icon'] as IconData;
+                        final isSelected = selectedReason == label;
+
+                        return ChoiceChip(
+                          avatar: Icon(
+                            icon,
+                            size: 16,
+                            color: isSelected
+                                ? Colors.orange.shade900
+                                : AppColors.onSurfaceVariant,
+                          ),
+                          label: Text(label),
+                          selected: isSelected,
+                          selectedColor: Colors.orange.shade100,
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? Colors.orange.shade900
+                                : AppColors.onSurface,
+                          ),
+                          onSelected: (val) {
+                            if (val) {
+                              setModalState(() {
+                                selectedReason = label;
+                              });
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        Navigator.of(context).pop();
+                        try {
+                          await _liveBusService.reportDelay(
+                            busId: _selectedBusId,
+                            reason: selectedReason,
+                            delayMinutes: selectedMinutes,
+                          );
+                          _showSnack(
+                            'Delay notice saved: $selectedReason (+$selectedMinutes mins)',
+                          );
+                        } catch (e) {
+                          _showSnack(
+                            'Delay upload failed: $e. Retry.',
+                            isError: true,
+                          );
+                        }
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.deepOrange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.broadcast_on_personal_rounded),
+                      label: Text(
+                        'Broadcast Delay (+$selectedMinutes mins)',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
-      );
-    },
-  );
-}
+            );
+          },
+        );
+      },
+    );
+  }
 
   /// Builds a pre-trip punctuality badge and departure timetable check.
   Widget _buildPreTripPunctualityCard() {
@@ -1404,7 +1642,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       badgeIcon = Icons.warning_amber_rounded;
     }
 
-    final firstStopName = bus.stops.isNotEmpty ? _resolveStopName(bus.stops.first) : 'Origin';
+    final firstStopName = bus.stops.isNotEmpty
+        ? _resolveStopName(bus.stops.first)
+        : 'Origin';
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1454,12 +1694,19 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.access_time, size: 14, color: AppColors.onSurfaceVariant),
+              const Icon(
+                Icons.access_time,
+                size: 14,
+                color: AppColors.onSurfaceVariant,
+              ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   'Scheduled Dep: $depStr ($firstStopName)',
-                  style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
@@ -1601,10 +1848,14 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   Widget _buildDelayMeterGauge(int delayMinutes) {
     const minMins = -5.0;
     const maxMins = 15.0;
-    final clamped = delayMinutes.clamp(minMins.toInt(), maxMins.toInt()).toDouble();
+    final clamped = delayMinutes
+        .clamp(minMins.toInt(), maxMins.toInt())
+        .toDouble();
     final fraction = (clamped - minMins) / (maxMins - minMins);
 
-    final delayColor = _getDelayColor(DelayEtaCalculator.getDelayType(delayMinutes));
+    final delayColor = _getDelayColor(
+      DelayEtaCalculator.getDelayType(delayMinutes),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1614,15 +1865,27 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
           children: [
             Text(
               'Running Early',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue.shade700),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue.shade700,
+              ),
             ),
             Text(
               'On Time Target',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade700),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.green.shade700,
+              ),
             ),
             Text(
               'Delayed',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange.shade800),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange.shade800,
+              ),
             ),
           ],
         ),
@@ -1630,7 +1893,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         LayoutBuilder(
           builder: (context, constraints) {
             final trackWidth = constraints.maxWidth;
-            final pointerLeft = (fraction * trackWidth).clamp(8.0, trackWidth - 8.0) - 8.0;
+            final pointerLeft =
+                (fraction * trackWidth).clamp(8.0, trackWidth - 8.0) - 8.0;
 
             return Stack(
               clipBehavior: Clip.none,
@@ -1663,10 +1927,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: delayColor,
-                        width: 3,
-                      ),
+                      border: Border.all(color: delayColor, width: 3),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.2),
@@ -1685,9 +1946,28 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('-5m', style: TextStyle(fontSize: 9, color: AppColors.onSurfaceVariant.withValues(alpha: 0.7))),
-            Text('0 (On Schedule)', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.green.shade800)),
-            Text('+15m', style: TextStyle(fontSize: 9, color: AppColors.onSurfaceVariant.withValues(alpha: 0.7))),
+            Text(
+              '-5m',
+              style: TextStyle(
+                fontSize: 9,
+                color: AppColors.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
+            ),
+            Text(
+              '0 (On Schedule)',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: Colors.green.shade800,
+              ),
+            ),
+            Text(
+              '+15m',
+              style: TextStyle(
+                fontSize: 9,
+                color: AppColors.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
+            ),
           ],
         ),
       ],
@@ -1714,10 +1994,11 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   }
 
   Widget _buildRouteSelectorCard() {
-    final currentUserId = _authService.currentUser?.uid ?? 'operator_dev';
+    final currentUserId = _authService.currentUser?.uid ?? '';
     final isAssignedToMe =
         _currentBus != null && _currentBus!.driverId == currentUserId;
-    final isUnassigned = _currentBus == null ||
+    final isUnassigned =
+        _currentBus == null ||
         _currentBus!.driverId == null ||
         _currentBus!.driverId!.isEmpty;
 
@@ -1750,8 +2031,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                 ),
                 if (isAssignedToMe)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.green.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
@@ -1760,8 +2043,11 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.verified,
-                            size: 14, color: Colors.green.shade700),
+                        Icon(
+                          Icons.verified,
+                          size: 14,
+                          color: Colors.green.shade700,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'Assigned to You',
@@ -1778,10 +2064,13 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   TextButton.icon(
                     onPressed: _claimBusAssignment,
                     icon: const Icon(Icons.person_add, size: 16),
-                    label: const Text('Assign to Me',
-                        style: TextStyle(fontSize: 12)),
+                    label: const Text(
+                      'Assign to Me',
+                      style: TextStyle(fontSize: 12),
+                    ),
                     style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact),
+                      visualDensity: VisualDensity.compact,
+                    ),
                   )
                 else
                   TextButton.icon(
@@ -1807,9 +2096,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               key: ValueKey(_selectedBusId),
               initialValue: sortedBuses.any((b) => b.id == _selectedBusId)
                   ? _selectedBusId
-                  : (sortedBuses.isNotEmpty
-                      ? sortedBuses.first.id
-                      : null),
+                  : (sortedBuses.isNotEmpty ? sortedBuses.first.id : null),
               decoration: InputDecoration(
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -1824,8 +2111,12 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                 final isMyBus = b.driverId == currentUserId;
                 final status = _getBusRunStatus(b);
                 final depTime = b.effectiveDepartureTime;
-                final origin = b.stops.isNotEmpty ? _resolveStopName(b.stops.first) : '';
-                final dest = b.stops.length > 1 ? _resolveStopName(b.stops.last) : '';
+                final origin = b.stops.isNotEmpty
+                    ? _resolveStopName(b.stops.first)
+                    : '';
+                final dest = b.stops.length > 1
+                    ? _resolveStopName(b.stops.last)
+                    : '';
                 final routeEndpoints = (origin.isNotEmpty && dest.isNotEmpty)
                     ? ' — $origin → $dest'
                     : '';
@@ -1851,7 +2142,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: isMyBus ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isMyBus
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                             color: status.label == 'Departed'
                                 ? AppColors.onSurfaceVariant
                                 : null,
@@ -1862,7 +2155,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                       // Status badge
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: status.color.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
@@ -1880,7 +2175,11 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   ),
                 );
               }).toList(),
-              onChanged: _isTripActive
+              onChanged:
+                  _isTripActive ||
+                      _isInitializing ||
+                      _operatorWriteBusy ||
+                      _tripId != null
                   ? null
                   : (val) {
                       if (val == null) return;
@@ -1916,9 +2215,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       decoration: BoxDecoration(
         color: status.color.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: status.color.withValues(alpha: 0.25),
-        ),
+        border: Border.all(color: status.color.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1938,8 +2235,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: status.color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -1965,18 +2261,32 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.access_time, size: 14, color: AppColors.onSurfaceVariant),
+              const Icon(
+                Icons.access_time,
+                size: 14,
+                color: AppColors.onSurfaceVariant,
+              ),
               const SizedBox(width: 4),
               Text(
                 'Departure: $depTime',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(width: 12),
-              const Icon(Icons.straighten, size: 14, color: AppColors.onSurfaceVariant),
+              const Icon(
+                Icons.straighten,
+                size: 14,
+                color: AppColors.onSurfaceVariant,
+              ),
               const SizedBox(width: 4),
               Text(
                 '${bus.stops.length} stops',
-                style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -1988,18 +2298,28 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               Expanded(
                 child: Text(
                   _resolveStopName(firstStop),
-                  style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.onSurfaceVariant,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Icon(Icons.arrow_forward, size: 12, color: AppColors.onSurfaceVariant),
+              const Icon(
+                Icons.arrow_forward,
+                size: 12,
+                color: AppColors.onSurfaceVariant,
+              ),
               const SizedBox(width: 4),
               const Icon(Icons.flag, size: 12, color: Colors.red),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   _resolveStopName(lastStop),
-                  style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.onSurfaceVariant,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -2013,9 +2333,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   /// Resolves a stop ID to a human-readable station name from the seed data.
   String _resolveStopName(String stopId) {
     final station = SeedData.colomboStations.cast<Station?>().firstWhere(
-          (s) => s?.id == stopId,
-          orElse: () => null,
-        );
+      (s) => s?.id == stopId,
+      orElse: () => null,
+    );
     return station?.name ?? stopId.replaceAll('st_', '').replaceAll('_', ' ');
   }
 
@@ -2069,9 +2389,22 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                 '${_heading.toStringAsFixed(0)}° (${_getCardinalDirection(_heading)})',
                 Icons.explore,
               ),
+              Text(
+                _lastPublishedAt != null &&
+                        DateTime.now().difference(_lastPublishedAt!) >
+                            const Duration(minutes: 5) &&
+                        _isTripActive
+                    ? 'Shared GPS stale; $_publicationStatus'
+                    : _publicationStatus,
+                style: const TextStyle(fontSize: 12),
+              ),
+              if (_lastPublishedAt != null)
+                Text(
+                  'Last shared receipt: ${_lastPublishedAt!.hour}:${_lastPublishedAt!.minute.toString().padLeft(2, '0')}',
+                ),
               if (_lastUpdateTimestamp != null)
                 _buildTelemetryRow(
-                  'Last Updated:',
+                  'Local GPS fix:',
                   '${_lastUpdateTimestamp!.hour.toString().padLeft(2, '0')}:${_lastUpdateTimestamp!.minute.toString().padLeft(2, '0')}:${_lastUpdateTimestamp!.second.toString().padLeft(2, '0')}',
                   Icons.access_time,
                 ),
@@ -2107,8 +2440,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   }
 
   Widget _buildAccessibilityControlsCard() {
-    final currentUserId = _authService.currentUser?.uid ?? 'operator_dev';
-    final isAssignedDriver = _currentBus == null ||
+    final currentUserId = _authService.currentUser?.uid ?? '';
+    final isAssignedDriver =
+        _currentBus == null ||
         _currentBus!.driverId == null ||
         _currentBus!.driverId == currentUserId;
 
@@ -2144,25 +2478,24 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               title: const Text('Wheelchair Ramp Operational'),
               subtitle: Text(
                 _rampOperational
-                    ? 'Ramp operational & verified (Rider status: Safe)'
+                    ? 'Last received driver observation: working'
                     : 'Ramp reported broken (Rider status: Warning)',
               ),
               value: _rampOperational,
               activeThumbColor: AppColors.primaryContainer,
-              onChanged: isAssignedDriver ? _onRampToggled : null,
+              onChanged: isAssignedDriver && !_operatorWriteBusy
+                  ? _onRampToggled
+                  : null,
             ),
             const Divider(),
             SwitchListTile(
               title: const Text('Low-Floor Elevator / Lift Working'),
-              subtitle: const Text('Boarding lift available at stops'),
+              subtitle: const Text(
+                'Stop lift observations are reported separately',
+              ),
               value: _elevatorWorking,
               activeThumbColor: AppColors.primaryContainer,
-              onChanged: isAssignedDriver
-                  ? (val) {
-                      setState(() => _elevatorWorking = val);
-                      _pushAccessibilityUpdate();
-                    }
-                  : null,
+              onChanged: null,
             ),
             const Divider(),
             Padding(
@@ -2179,7 +2512,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                     items: _occupancyOptions.map((opt) {
                       return DropdownMenuItem(value: opt, child: Text(opt));
                     }).toList(),
-                    onChanged: isAssignedDriver ? _onOccupancyChanged : null,
+                    onChanged: isAssignedDriver && !_operatorWriteBusy
+                        ? _onOccupancyChanged
+                        : null,
                   ),
                 ],
               ),
@@ -2198,34 +2533,56 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: StreamBuilder<List<BoardingRequest>>(
-          stream:
-              _firestoreService.streamBoardingRequestsForBus(_selectedBusId),
+          key: ValueKey(_selectedBusId),
+          stream: _firestoreService.streamBoardingRequestsForBus(
+            _selectedBusId,
+          ),
           builder: (context, snapshot) {
             final allRequests = snapshot.data ?? [];
             final pendingRequests = allRequests
-                .where((r) => r.status.toLowerCase() == 'pending')
+                .where(
+                  (r) => const [
+                    'pending',
+                    'acknowledged',
+                  ].contains(r.status.toLowerCase()),
+                )
                 .toList();
             final completedRequests = allRequests
-                .where((r) => r.status.toLowerCase() != 'pending')
+                .where(
+                  (r) => !const [
+                    'pending',
+                    'acknowledged',
+                  ].contains(r.status.toLowerCase()),
+                )
                 .toList();
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (snapshot.hasError)
+                  const Text(
+                    'Shared request updates are unavailable. Displayed requests may be out of date.',
+                  ),
                 Row(
                   children: [
-                    const Icon(Icons.assist_walker_rounded,
-                        color: AppColors.primary),
+                    const Icon(
+                      Icons.assist_walker_rounded,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 8),
                     const Text(
                       'Boarding Assistance Requests',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: pendingRequests.isNotEmpty
                             ? AppColors.primaryContainer
@@ -2233,7 +2590,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${pendingRequests.length} Pending',
+                        '${pendingRequests.length} Active',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -2259,7 +2616,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'No pending boarding requests for this bus.',
+                            'No active assistance requests for this bus.',
                             style: TextStyle(color: AppColors.onSurfaceVariant),
                           ),
                         ],
@@ -2286,7 +2643,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                     child: ExpansionTile(
                       tilePadding: EdgeInsets.zero,
                       title: Text(
-                        'Completed / Acknowledged (${completedRequests.length})',
+                        'Closed requests (${completedRequests.length})',
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -2319,7 +2676,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: isCompleted
                                       ? Colors.green.withValues(alpha: 0.15)
@@ -2358,8 +2717,9 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(8),
-        border:
-            Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: AppColors.outlineVariant.withValues(alpha: 0.5),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2370,28 +2730,37 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               const SizedBox(width: 6),
               Text(
                 req.riderName,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
               const Spacer(),
               Text(
                 TimeUtils.formatRelativeTime(req.createdAt),
                 style: const TextStyle(
-                    fontSize: 12, color: AppColors.onSurfaceVariant),
+                  fontSize: 12,
+                  color: AppColors.onSurfaceVariant,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Row(
             children: [
-              const Icon(Icons.location_on,
-                  size: 16, color: AppColors.onSurfaceVariant),
+              const Icon(
+                Icons.location_on,
+                size: 16,
+                color: AppColors.onSurfaceVariant,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Stop: ${req.stopName}',
+                  '${req.purpose == 'alighting' ? 'Getting off' : 'Boarding'} at: ${req.stopName}',
                   style: const TextStyle(
-                      fontSize: 13, color: AppColors.onSurfaceVariant),
+                    fontSize: 13,
+                    color: AppColors.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
@@ -2402,13 +2771,13 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             runSpacing: 4,
             children: req.assistanceTypes.map((type) {
               return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.primaryContainer.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.3)),
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   type,
@@ -2422,42 +2791,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
             }).toList(),
           ),
           const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              OutlinedButton(
-                onPressed: () async {
-                  await _firestoreService.updateBoardingRequestStatus(
-                    req.id,
-                    'acknowledged',
-                  );
-                  _showSnack('Request acknowledged');
-                },
-                style: OutlinedButton.styleFrom(
-                  minimumSize: Size(0, context.minTapHeight),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                ),
-                child: const Text('Acknowledge'),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: () async {
-                  await _firestoreService.updateBoardingRequestStatus(
-                    req.id,
-                    'completed',
-                  );
-                  _showSnack('Request marked completed');
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  foregroundColor: Colors.white,
-                  minimumSize: Size(0, context.minTapHeight),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                ),
-                icon: Icon(Icons.check, size: context.tapIconSize),
-                label: const Text('Complete'),
-              ),
-            ],
+          AssistanceOperatorActions(
+            key: ValueKey(req.id),
+            request: req,
+            repository: _firestoreService,
           ),
         ],
       ),

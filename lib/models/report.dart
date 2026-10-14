@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../constants/firestore_constants.dart';
+import 'enums/report_condition.dart';
+import 'enums/report_publication_state.dart';
 
 /// Represents a community accessibility condition report for a station or bus.
 ///
@@ -14,6 +17,10 @@ class Report {
     this.severity = 'moderate',
     this.category = 'rampAccess',
     this.subCategory = '',
+    this.condition,
+    this.crowdingLevel = '',
+    this.publicationState = ReportPublicationState.published,
+    this.isDemo = false,
     this.description = '',
     this.photoUrl = '',
     required this.status,
@@ -24,6 +31,8 @@ class Report {
     required this.userId,
     this.confirmedBy = const [],
     this.flaggedBy = const [],
+    this.resolvedBy,
+    this.resolvedAt,
   });
 
   final String id;
@@ -33,7 +42,42 @@ class Report {
   final String problemType;
   final String severity; // 'minor', 'moderate', 'major'
   final String category; // 'rampAccess', 'elevatorOut', 'crowding', 'cleanliness', 'safetyHazard', etc.
-  final String subCategory; // Specific problem detail e.g. 'Ramp broken / Motor jammed'
+  final String
+  subCategory; // Specific problem detail e.g. 'Ramp broken / Motor jammed'
+  final ReportCondition? condition;
+  final String crowdingLevel; // 'low', 'medium', 'high', or legacy ''.
+  final ReportPublicationState publicationState;
+  final bool isDemo;
+  bool get isPublic =>
+      publicationState == ReportPublicationState.published &&
+      !isDemo &&
+      !const {
+        'report_1:user_demo_1',
+        'report_2:user_demo_2',
+        'report_3:user_demo_3',
+      }.contains('$id:$userId');
+
+  ReportCondition get effectiveCondition {
+    // A working ramp does not clear a packed vehicle or blocked wheelchair bay.
+    if (crowdingLevel == 'high' ||
+        RegExp(
+          r'crowding:\s*(crowded|packed)',
+          caseSensitive: false,
+        ).hasMatch(problemType)) {
+      return ReportCondition.barrier;
+    }
+    return observedCondition;
+  }
+
+  /// The selected condition, separate from the independently changing crowding.
+  ReportCondition get observedCondition {
+    if (condition != null) return condition!;
+    if (subCategory.trim().isNotEmpty) {
+      return ReportCondition.fromLegacyText(subCategory);
+    }
+    return ReportCondition.fromLegacyText(problemType.split('•').last);
+  }
+
   final String description;
   final String photoUrl; // URL or asset path or base64 photo
   final String status; // 'active' or 'resolved'
@@ -44,73 +88,100 @@ class Report {
   final String userId;
   final List<String> confirmedBy;
   final List<String> flaggedBy;
+  final String? resolvedBy;
+  final DateTime? resolvedAt;
 
   /// Factory to instantiate a [Report] from a Firestore map and optional document [id].
   factory Report.fromMap(Map<String, dynamic> map, {String? id}) {
     final parsedCreatedAt =
         _parseTimestamp(map[FirestoreConstants.fieldCreatedAt]) ??
-            _parseTimestamp(map['createdAt']) ??
-            DateTime.now();
+        _parseTimestamp(map['createdAt']) ??
+        DateTime.now();
 
     final parsedLastConfirmedAt =
         _parseTimestamp(map[FirestoreConstants.fieldLastConfirmedAt]) ??
-            _parseTimestamp(map['lastConfirmedAt']);
+        _parseTimestamp(map['lastConfirmedAt']);
 
     final rawConfirmedBy =
         map[FirestoreConstants.fieldConfirmedBy] as List<dynamic>? ??
-            map['confirmedBy'] as List<dynamic>? ??
-            [];
+        map['confirmedBy'] as List<dynamic>? ??
+        [];
     final parsedConfirmedBy = rawConfirmedBy.map((e) => e.toString()).toList();
 
     final rawFlaggedBy =
         map[FirestoreConstants.fieldFlaggedBy] as List<dynamic>? ??
-            map['flaggedBy'] as List<dynamic>? ??
-            [];
+        map['flaggedBy'] as List<dynamic>? ??
+        [];
     final parsedFlaggedBy = rawFlaggedBy.map((e) => e.toString()).toList();
 
     return Report(
+      resolvedBy: map['resolvedBy'] as String?,
+      resolvedAt: _parseTimestamp(map['resolvedAt']),
       id: id ?? map['id']?.toString() ?? '',
-      targetType: map[FirestoreConstants.fieldTargetType]?.toString() ??
+      targetType:
+          map[FirestoreConstants.fieldTargetType]?.toString() ??
           map['targetType']?.toString() ??
           'station',
-      targetId: map[FirestoreConstants.fieldTargetId]?.toString() ??
+      targetId:
+          map[FirestoreConstants.fieldTargetId]?.toString() ??
           map['targetId']?.toString() ??
           '',
-      targetName: map[FirestoreConstants.fieldTargetName]?.toString() ??
+      targetName:
+          map[FirestoreConstants.fieldTargetName]?.toString() ??
           map['targetName']?.toString() ??
           '',
-      problemType: map[FirestoreConstants.fieldProblemType]?.toString() ??
+      problemType:
+          map[FirestoreConstants.fieldProblemType]?.toString() ??
           map['problemType']?.toString() ??
           '',
-      severity: map[FirestoreConstants.fieldSeverity]?.toString() ??
+      severity:
+          map[FirestoreConstants.fieldSeverity]?.toString() ??
           map['severity']?.toString() ??
           'moderate',
-      category: map[FirestoreConstants.fieldCategory]?.toString() ??
+      category:
+          map[FirestoreConstants.fieldCategory]?.toString() ??
           map['category']?.toString() ??
           'rampAccess',
-      subCategory: map[FirestoreConstants.fieldSubCategory]?.toString() ??
+      subCategory:
+          map[FirestoreConstants.fieldSubCategory]?.toString() ??
           map['subCategory']?.toString() ??
           '',
-      description: map[FirestoreConstants.fieldDescription]?.toString() ??
+      condition: map.containsKey('condition')
+          ? ReportCondition.values.firstWhere(
+              (value) => value.name == map['condition'],
+              orElse: () => ReportCondition.unknown,
+            )
+          : null,
+      crowdingLevel: map['crowdingLevel']?.toString() ?? '',
+      publicationState: ReportPublicationState.values.firstWhere(
+        (state) => state.name == (map['publicationState'] ?? 'published'),
+        orElse: () => ReportPublicationState.failed,
+      ),
+      isDemo: map['isDemo'] == true,
+      description:
+          map[FirestoreConstants.fieldDescription]?.toString() ??
           map['description']?.toString() ??
           '',
-      photoUrl: map[FirestoreConstants.fieldPhotoUrl]?.toString() ??
+      photoUrl:
+          map[FirestoreConstants.fieldPhotoUrl]?.toString() ??
           map['photoUrl']?.toString() ??
           '',
-      status: map[FirestoreConstants.fieldStatus]?.toString() ??
+      status:
+          map[FirestoreConstants.fieldStatus]?.toString() ??
           map['status']?.toString() ??
           'active',
       createdAt: parsedCreatedAt,
       lastConfirmedAt: parsedLastConfirmedAt,
       confirmCount:
           (map[FirestoreConstants.fieldConfirmCount] as num?)?.toInt() ??
-              (map['confirmCount'] as num?)?.toInt() ??
-              0,
+          (map['confirmCount'] as num?)?.toInt() ??
+          0,
       falseCount:
           (map[FirestoreConstants.fieldFalseCount] as num?)?.toInt() ??
-              (map['falseCount'] as num?)?.toInt() ??
-              0,
-      userId: map[FirestoreConstants.fieldUserId]?.toString() ??
+          (map['falseCount'] as num?)?.toInt() ??
+          0,
+      userId:
+          map[FirestoreConstants.fieldUserId]?.toString() ??
           map['userId']?.toString() ??
           '',
       confirmedBy: parsedConfirmedBy,
@@ -129,6 +200,8 @@ class Report {
   /// Converts the [Report] instance into a Firestore map representation.
   Map<String, dynamic> toMap({bool isServerTimestamp = false}) {
     return {
+      if (resolvedBy != null) 'resolvedBy': resolvedBy,
+      if (resolvedAt != null) 'resolvedAt': Timestamp.fromDate(resolvedAt!),
       FirestoreConstants.fieldTargetType: targetType,
       FirestoreConstants.fieldTargetId: targetId,
       FirestoreConstants.fieldTargetName: targetName,
@@ -136,6 +209,10 @@ class Report {
       FirestoreConstants.fieldSeverity: severity,
       FirestoreConstants.fieldCategory: category,
       FirestoreConstants.fieldSubCategory: subCategory,
+      if (condition != null) 'condition': condition!.name,
+      if (crowdingLevel.isNotEmpty) 'crowdingLevel': crowdingLevel,
+      'publicationState': publicationState.name,
+      'isDemo': isDemo,
       FirestoreConstants.fieldDescription: description,
       FirestoreConstants.fieldPhotoUrl: photoUrl,
       FirestoreConstants.fieldStatus: status,
@@ -167,6 +244,10 @@ class Report {
     String? severity,
     String? category,
     String? subCategory,
+    ReportCondition? condition,
+    String? crowdingLevel,
+    ReportPublicationState? publicationState,
+    bool? isDemo,
     String? description,
     String? photoUrl,
     String? status,
@@ -177,8 +258,13 @@ class Report {
     String? userId,
     List<String>? confirmedBy,
     List<String>? flaggedBy,
+    String? resolvedBy,
+    DateTime? resolvedAt,
+    bool clearLastConfirmedAt = false,
   }) {
     return Report(
+      resolvedBy: resolvedBy ?? this.resolvedBy,
+      resolvedAt: resolvedAt ?? this.resolvedAt,
       id: id ?? this.id,
       targetType: targetType ?? this.targetType,
       targetId: targetId ?? this.targetId,
@@ -187,11 +273,17 @@ class Report {
       severity: severity ?? this.severity,
       category: category ?? this.category,
       subCategory: subCategory ?? this.subCategory,
+      condition: condition ?? this.condition,
+      crowdingLevel: crowdingLevel ?? this.crowdingLevel,
+      publicationState: publicationState ?? this.publicationState,
+      isDemo: isDemo ?? this.isDemo,
       description: description ?? this.description,
       photoUrl: photoUrl ?? this.photoUrl,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
-      lastConfirmedAt: lastConfirmedAt ?? this.lastConfirmedAt,
+      lastConfirmedAt: clearLastConfirmedAt
+          ? null
+          : lastConfirmedAt ?? this.lastConfirmedAt,
       confirmCount: confirmCount ?? this.confirmCount,
       falseCount: falseCount ?? this.falseCount,
       userId: userId ?? this.userId,

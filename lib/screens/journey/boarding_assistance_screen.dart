@@ -4,25 +4,68 @@ import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/boarding_request.dart';
+import '../../models/assistance_target.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
+import '../../services/assistance_submission_service.dart';
+import 'assistance_request_status_screen.dart';
+
+/// Every entry point carries an exact resolved target; missing context stays unknown.
+void openBoardingAssistance(
+  BuildContext context, {
+  required AssistanceTarget? target,
+  int? minutesAway,
+}) {
+  if (target == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'The assistance bus or stop is unknown. Select a journey with an exact stop first.',
+        ),
+      ),
+    );
+    return;
+  }
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => BoardingAssistanceScreen(
+        busId: target.busId,
+        stationId: target.stationId,
+        stopName: target.stopName,
+        busLabel: target.busLabel,
+        purpose: target.purpose,
+        minutesAway: minutesAway != null && minutesAway >= 0
+            ? minutesAway
+            : null,
+      ),
+    ),
+  );
+}
 
 /// Boarding Assistance request screen — ramp, extra time, boarding help.
 class BoardingAssistanceScreen extends StatefulWidget {
   const BoardingAssistanceScreen({
     super.key,
-    this.busId = 'bus_138_outbound',
-    this.stopName = 'Colombo Fort Station',
-    this.stationId = 'st_fort',
-    this.busLabel = 'Route 138',
-    this.minutesAway = 3,
+    required this.busId,
+    required this.stopName,
+    required this.stationId,
+    required this.busLabel,
+    this.minutesAway,
+    this.purpose = AssistancePurpose.boarding,
+    this.firestoreService,
+    this.authService,
+    this.submissionService,
   });
 
   final String busId;
   final String stopName;
   final String stationId;
   final String busLabel;
-  final int minutesAway;
+  final int? minutesAway;
+  final AssistancePurpose purpose;
+  final FirestoreService? firestoreService;
+  final AuthService? authService;
+  final AssistanceSubmissionService? submissionService;
 
   @override
   State<BoardingAssistanceScreen> createState() =>
@@ -31,8 +74,9 @@ class BoardingAssistanceScreen extends StatefulWidget {
 
 class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
   static const double _desktopBreakpoint = 768;
-  final FirestoreService _firestoreService = FirestoreService();
-  final AuthService _authService = AuthService();
+  FirestoreService get _firestoreService =>
+      widget.firestoreService ?? FirestoreService();
+  AuthService get _authService => widget.authService ?? AuthService();
 
   bool _deployRamp = false;
   bool _extraTime = false;
@@ -42,6 +86,7 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
   bool get _hasSelection => _deployRamp || _extraTime || _boardingHelp;
 
   void _showSnack(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
@@ -55,47 +100,110 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
       return;
     }
 
+    if ([
+      widget.busId,
+      widget.stationId,
+      widget.stopName,
+      widget.busLabel,
+    ].any((value) => value.trim().isEmpty)) {
+      _showSnack(
+        'Choose the exact bus and stop from your journey before requesting assistance.',
+      );
+      return;
+    }
+
     final selected = <String>[
       if (_deployRamp) 'Deploy Ramp',
       if (_extraTime) 'Extra Time',
-      if (_boardingHelp) 'Boarding Help',
+      if (_boardingHelp)
+        widget.purpose == AssistancePurpose.alighting
+            ? 'Alighting Help'
+            : 'Boarding Help',
     ];
 
     setState(() => _isSubmitting = true);
 
     try {
+      final bus = await _firestoreService.getBusById(widget.busId);
+      final station = await _firestoreService.getStationById(widget.stationId);
+      if (!mounted) return;
+      if (bus == null ||
+          bus.id != widget.busId ||
+          station == null ||
+          station.id != widget.stationId ||
+          !bus.stops.contains(station.id)) {
+        _showSnack(
+          'This stop could not be verified on the selected bus. Return to your journey and choose the correct target.',
+        );
+        return;
+      }
+      final approved = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Confirm assistance target'),
+          content: Text(
+            '${bus.displayBusNo} (Route ${bus.routeNo})\n'
+            '${widget.purpose == AssistancePurpose.alighting ? 'Getting off' : 'Boarding'} at ${station.name}\n'
+            '${selected.join(', ')}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Edit request'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Confirm and send'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || approved != true) return;
       final user = _authService.currentUser;
-      final riderId = user?.uid ?? 'guest_rider';
-      final riderName = (user?.displayName != null && user!.displayName!.isNotEmpty)
+      if (user == null || user.uid.isEmpty) {
+        _showSnack('Please sign in before sending an assistance request.');
+        return;
+      }
+      final riderId = user.uid;
+      final riderName =
+          (user.displayName != null && user.displayName!.isNotEmpty)
           ? user.displayName!
-          : (user?.email != null && user!.email!.isNotEmpty
-              ? user.email!
-              : 'Rider (${riderId.length > 6 ? riderId.substring(0, 6) : riderId})');
+          : (user.email != null && user.email!.isNotEmpty
+                ? user.email!
+                : 'Rider (${riderId.length > 6 ? riderId.substring(0, 6) : riderId})');
 
       final request = BoardingRequest(
-        id: 'req_${DateTime.now().millisecondsSinceEpoch}',
+        id: '',
         riderId: riderId,
         riderName: riderName,
-        busId: widget.busId,
-        routeNo: widget.busLabel,
-        stationId: widget.stationId,
-        stopName: widget.stopName,
+        busId: bus.id,
+        routeNo: bus.routeNo,
+        stationId: station.id,
+        stopName: station.name,
+        purpose: widget.purpose.name,
         assistanceTypes: selected,
         status: 'pending',
         createdAt: DateTime.now(),
       );
 
-      await _firestoreService.createBoardingRequest(request);
-
-      _showSnack(
-        'Assistance request sent: ${selected.join(', ')}. Status: Pending',
+      final service =
+          widget.submissionService ?? AssistanceSubmissionService.instance;
+      final entry = await service.enqueue(request);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => AssistanceRequestStatusScreen(
+            request: entry.request,
+            service: service,
+            repository: _firestoreService,
+            startUpload: true,
+          ),
+        ),
       );
-
-      if (mounted) {
-        Navigator.of(context).maybePop();
-      }
     } catch (e) {
-      _showSnack('Could not send assistance request: $e');
+      _showSnack(
+        'Could not prepare the request. Check your sign-in and device storage, then try again.',
+      );
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -118,12 +226,7 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
           ),
           Expanded(
             child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                isDesktop ? 24 : 24,
-              ),
+              padding: EdgeInsets.fromLTRB(16, 16, 16, isDesktop ? 24 : 24),
               children: [
                 Center(
                   child: ConstrainedBox(
@@ -134,7 +237,8 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                         _ArrivingSoonCard(
                           busLabel: widget.busLabel,
                           minutesAway: widget.minutesAway,
-                          stopName: widget.stopName,
+                          stopName:
+                              '${widget.purpose == AssistancePurpose.alighting ? 'Getting off' : 'Boarding'} at ${widget.stopName}',
                         ),
                         const SizedBox(height: 16),
                         const _CommunityStatusBadge(),
@@ -162,9 +266,8 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                                 icon: Icons.accessible,
                                 label: 'Deploy Ramp',
                                 selected: _deployRamp,
-                                onTap: () => setState(
-                                  () => _deployRamp = !_deployRamp,
-                                ),
+                                onTap: () =>
+                                    setState(() => _deployRamp = !_deployRamp),
                               ),
                               _AssistanceTile(
                                 icon: Icons.schedule,
@@ -175,7 +278,11 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                               ),
                               _AssistanceTile(
                                 icon: Icons.waving_hand,
-                                label: 'Boarding Help',
+                                label:
+                                    widget.purpose ==
+                                        AssistancePurpose.alighting
+                                    ? 'Getting Off Help'
+                                    : 'Boarding Help',
                                 selected: _boardingHelp,
                                 onTap: () => setState(
                                   () => _boardingHelp = !_boardingHelp,
@@ -213,14 +320,17 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                         SizedBox(
                           height: context.buttonHeight,
                           child: FilledButton.icon(
-                            onPressed: _sendRequest,
+                            onPressed: _isSubmitting ? null : _sendRequest,
                             style: FilledButton.styleFrom(
                               backgroundColor: isHC
                                   ? const Color(0xFF001F3F)
                                   : AppColors.primaryContainer,
                               foregroundColor: AppColors.onPrimary,
                               side: isHC
-                                  ? const BorderSide(color: Colors.black, width: 2)
+                                  ? const BorderSide(
+                                      color: Colors.black,
+                                      width: 2,
+                                    )
                                   : null,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
@@ -276,10 +386,7 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.onBack,
-    required this.onMenu,
-  });
+  const _TopBar({required this.onBack, required this.onMenu});
 
   final VoidCallback onBack;
   final VoidCallback onMenu;
@@ -306,7 +413,10 @@ class _TopBar extends StatelessWidget {
                 IconButton(
                   constraints: context.appBarActionConstraints,
                   onPressed: onBack,
-                  icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize),
+                  icon: Icon(
+                    Icons.arrow_back_rounded,
+                    size: context.tapIconSize,
+                  ),
                   color: isHC ? Colors.black : AppColors.primary,
                   tooltip: 'Back',
                 ),
@@ -346,7 +456,7 @@ class _ArrivingSoonCard extends StatelessWidget {
   });
 
   final String busLabel;
-  final int minutesAway;
+  final int? minutesAway;
   final String stopName;
 
   @override
@@ -379,7 +489,9 @@ class _ArrivingSoonCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$busLabel arriving in $minutesAway mins',
+                  minutesAway == null
+                      ? busLabel
+                      : '$busLabel — estimated arrival in $minutesAway mins',
                   style: TextStyle(
                     fontSize: 18,
                     height: 24 / 18,
@@ -422,7 +534,7 @@ class _ArrivingSoonCard extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  '$minutesAway',
+                  minutesAway?.toString() ?? '—',
                   style: TextStyle(
                     fontSize: 22,
                     height: 28 / 22,
@@ -433,7 +545,7 @@ class _ArrivingSoonCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'MIN',
+                  minutesAway == null ? 'ETA unknown' : 'MIN (est.)',
                   style: TextStyle(
                     fontSize: 12,
                     height: 16 / 12,
@@ -484,7 +596,7 @@ class _CommunityStatusBadge extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Ramp verified operational by 12 users today',
+              'Assistance is confirmed only after the driver acknowledges your request.',
               style: TextStyle(
                 fontSize: 14,
                 height: 20 / 14,
@@ -520,8 +632,8 @@ class _AssistanceTile extends StatelessWidget {
       color: isHC
           ? Colors.white
           : (selected
-              ? AppColors.primaryContainer.withValues(alpha: 0.1)
-              : AppColors.surfaceContainerLowest),
+                ? AppColors.primaryContainer.withValues(alpha: 0.1)
+                : AppColors.surfaceContainerLowest),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -537,7 +649,9 @@ class _AssistanceTile extends StatelessWidget {
                     width: selected ? 3 : 2,
                   )
                 : Border.all(
-                    color: selected ? AppColors.primary : AppColors.outlineVariant,
+                    color: selected
+                        ? AppColors.primary
+                        : AppColors.outlineVariant,
                     width: selected ? 1.5 : 1,
                   ),
             boxShadow: isHC
@@ -559,8 +673,8 @@ class _AssistanceTile extends StatelessWidget {
                 color: isHC
                     ? (selected ? const Color(0xFF001F3F) : Colors.black)
                     : (selected
-                        ? AppColors.primary
-                        : AppColors.onSurfaceVariant),
+                          ? AppColors.primary
+                          : AppColors.onSurfaceVariant),
               ),
               const SizedBox(height: 8),
               Text(
@@ -582,4 +696,3 @@ class _AssistanceTile extends StatelessWidget {
     );
   }
 }
-

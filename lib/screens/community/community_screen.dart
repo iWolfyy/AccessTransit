@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -9,6 +8,7 @@ import '../../models/bus.dart';
 import '../../models/report.dart';
 import '../../models/station.dart';
 import '../../services/firestore_service.dart';
+import '../../widgets/report_outbox_list.dart';
 import '../journey/report_condition_screen.dart';
 import 'report_details_screen.dart';
 
@@ -52,11 +52,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   void _openReportIssue() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const ReportConditionScreen(),
-      ),
-    );
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ReportConditionScreen()));
   }
 
   String _resolveTargetTitle(Report report) {
@@ -64,7 +61,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
       return report.targetName;
     }
     if (report.targetType.toLowerCase() == 'station') {
-      return _stationsMap[report.targetId]?.name ?? 'Station ${report.targetId}';
+      return _stationsMap[report.targetId]?.name ??
+          'Station ${report.targetId}';
     } else {
       final bus = _busesMap[report.targetId];
       if (bus != null) {
@@ -78,65 +76,53 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final targetTitle = _resolveTargetTitle(report);
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ReportDetailsScreen(
-          report: report,
-          targetTitle: targetTitle,
-        ),
+        builder: (_) =>
+            ReportDetailsScreen(report: report, targetTitle: targetTitle),
       ),
     );
   }
 
-  Future<void> _handleCardConfirm(Report report) async {
-    final userId = currentUserId ?? 'guest_user';
-    if (report.confirmedBy.contains(userId)) {
+  final Set<String> _pendingActions = {};
+  Future<void> _handleCardConfirm(Report report) => _performCard(report, true);
+  Future<void> _handleCardFlag(Report report) => _performCard(report, false);
+  Future<void> _performCard(Report report, bool confirm) async {
+    if (_pendingActions.contains(report.id)) return;
+    final actor = _firestoreService.currentReportActorId;
+    if (actor == null || actor.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You already confirmed this report as True.')),
+        const SnackBar(
+          content: Text('Sign in before changing a shared report.'),
+        ),
       );
       return;
     }
+    setState(() => _pendingActions.add(report.id));
     try {
-      await _firestoreService.confirmReport(report.id, userId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('True flag recorded! Thank you.')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Action failed: ${e.toString().replaceAll('Exception: ', '')}')),
-      );
-    }
-  }
-
-  Future<void> _handleCardFlag(Report report) async {
-    final userId = currentUserId ?? 'guest_user';
-    if (report.flaggedBy.contains(userId)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You already flagged this report as False.')),
-      );
-      return;
-    }
-    try {
-      final newCount = report.falseCount + 1;
-      await _firestoreService.flagReport(report.id, userId);
-      if (newCount >= 3) {
+      final result =
+          await (confirm
+                  ? _firestoreService.confirmReport(report.id, actor)
+                  : _firestoreService.flagReport(report.id, actor))
+              .timeout(const Duration(seconds: 15));
+      if (mounted && _firestoreService.currentReportActorId == actor) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(result.message)));
+      }
+    } catch (_) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Report deleted and hidden due to 3 false flags.'),
-            backgroundColor: Colors.redAccent,
+            content: Text(
+              'Change is not confirmed. Check your connection and sign-in, then retry.',
+            ),
           ),
         );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('False flag recorded ($newCount/3 flags). Report deletes at 3.')),
-        );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Action failed: ${e.toString().replaceAll('Exception: ', '')}')),
-      );
+    } finally {
+      if (mounted) setState(() => _pendingActions.remove(report.id));
     }
   }
 
-  String? get currentUserId => FirebaseAuth.instance.currentUser?.uid;
+  String? get currentUserId => _firestoreService.currentReportActorId;
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +183,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+            side: isHC
+                ? const BorderSide(color: Colors.black, width: 2)
+                : BorderSide.none,
           ),
           icon: Icon(Icons.add_alert_rounded, size: context.tapIconSize),
           label: Text(
@@ -222,9 +210,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
             ),
             Expanded(
               child: StreamBuilder<List<Report>>(
-                stream: _firestoreService.streamReports(
-                  userId: _tab == _CommunityTab.myReports ? currentUserId : null,
-                ),
+                stream: _tab == _CommunityTab.myReports && currentUserId == null
+                    ? Stream.value([])
+                    : _firestoreService.streamReports(
+                        userId: _tab == _CommunityTab.myReports
+                            ? currentUserId
+                            : null,
+                      ),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData) {
@@ -260,6 +252,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                             children: [
                               // If My Reports tab is active, show the points & contribution banner
                               if (_tab == _CommunityTab.myReports) ...[
+                                ReportOutboxList(userId: currentUserId),
                                 _MyContributionsBanner(
                                   reportCount: reports.length,
                                   onNewReport: _openReportIssue,
@@ -272,15 +265,28 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               else ...[
                                 // Active reports section
                                 if (activeReports.isNotEmpty) ...[
-                                  for (var i = 0; i < activeReports.length; i++) ...[
+                                  for (
+                                    var i = 0;
+                                    i < activeReports.length;
+                                    i++
+                                  ) ...[
                                     if (i > 0) const SizedBox(height: 12),
                                     _ModernReportCard(
                                       report: activeReports[i],
-                                      targetTitle: _resolveTargetTitle(activeReports[i]),
+                                      userId: currentUserId ?? '',
+                                      isSaving: _pendingActions.contains(
+                                        activeReports[i].id,
+                                      ),
+                                      targetTitle: _resolveTargetTitle(
+                                        activeReports[i],
+                                      ),
                                       isActive: true,
-                                      onTap: () => _openReportDetails(activeReports[i]),
-                                      onConfirm: () => _handleCardConfirm(activeReports[i]),
-                                      onFlag: () => _handleCardFlag(activeReports[i]),
+                                      onTap: () =>
+                                          _openReportDetails(activeReports[i]),
+                                      onConfirm: () =>
+                                          _handleCardConfirm(activeReports[i]),
+                                      onFlag: () =>
+                                          _handleCardFlag(activeReports[i]),
                                     ),
                                   ],
                                 ],
@@ -292,11 +298,15 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                     children: [
                                       Expanded(
                                         child: Divider(
-                                          color: isHC ? Colors.black : AppColors.outlineVariant,
+                                          color: isHC
+                                              ? Colors.black
+                                              : AppColors.outlineVariant,
                                         ),
                                       ),
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
                                         child: Text(
                                           'Resolved & Past Reports',
                                           style: TextStyle(
@@ -308,21 +318,38 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                       ),
                                       Expanded(
                                         child: Divider(
-                                          color: isHC ? Colors.black : AppColors.outlineVariant,
+                                          color: isHC
+                                              ? Colors.black
+                                              : AppColors.outlineVariant,
                                         ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 12),
-                                  for (var i = 0; i < inactiveReports.length; i++) ...[
+                                  for (
+                                    var i = 0;
+                                    i < inactiveReports.length;
+                                    i++
+                                  ) ...[
                                     if (i > 0) const SizedBox(height: 12),
                                     _ModernReportCard(
                                       report: inactiveReports[i],
-                                      targetTitle: _resolveTargetTitle(inactiveReports[i]),
+                                      userId: currentUserId ?? '',
+                                      isSaving: _pendingActions.contains(
+                                        inactiveReports[i].id,
+                                      ),
+                                      targetTitle: _resolveTargetTitle(
+                                        inactiveReports[i],
+                                      ),
                                       isActive: false,
-                                      onTap: () => _openReportDetails(inactiveReports[i]),
-                                      onConfirm: () => _handleCardConfirm(inactiveReports[i]),
-                                      onFlag: () => _handleCardFlag(inactiveReports[i]),
+                                      onTap: () => _openReportDetails(
+                                        inactiveReports[i],
+                                      ),
+                                      onConfirm: () => _handleCardConfirm(
+                                        inactiveReports[i],
+                                      ),
+                                      onFlag: () =>
+                                          _handleCardFlag(inactiveReports[i]),
                                     ),
                                   ],
                                 ],
@@ -363,7 +390,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 border: isHC ? Border.all(color: Colors.black, width: 2) : null,
               ),
               child: Icon(
-                isMyReports ? Icons.assignment_turned_in_outlined : Icons.check_circle_outline_rounded,
+                isMyReports
+                    ? Icons.assignment_turned_in_outlined
+                    : Icons.check_circle_outline_rounded,
                 size: 40,
                 color: isHC ? Colors.black : AppColors.primary,
               ),
@@ -399,8 +428,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   color: isHC ? Colors.black : AppColors.primary,
                   width: isHC ? 2 : 1,
                 ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
               ),
               icon: Icon(
                 Icons.add_alert_rounded,
@@ -421,10 +455,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
 /// Equal 2-Segmented Tab Bar matching LMT Go
 class _ModernFilterTabs extends StatelessWidget {
-  const _ModernFilterTabs({
-    required this.selected,
-    required this.onChanged,
-  });
+  const _ModernFilterTabs({required this.selected, required this.onChanged});
 
   final _CommunityTab selected;
   final ValueChanged<_CommunityTab> onChanged;
@@ -507,9 +538,7 @@ class _TabButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         constraints: BoxConstraints(minHeight: context.chipHeight),
-        padding: EdgeInsets.symmetric(
-          vertical: hasLargeTargets ? 14 : 10,
-        ),
+        padding: EdgeInsets.symmetric(vertical: hasLargeTargets ? 14 : 10),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(12),
@@ -561,7 +590,6 @@ class _MyContributionsBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHC = context.isHighContrast;
-    final earnedPoints = reportCount * 10;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -584,7 +612,11 @@ class _MyContributionsBanner extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
             ),
-            child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 24),
+            child: const Icon(
+              Icons.emoji_events_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -601,7 +633,7 @@ class _MyContributionsBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$reportCount reports submitted • $earnedPoints Contribution Points',
+                  '$reportCount shared reports currently listed. Rewards are not calculated here.',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
@@ -626,6 +658,8 @@ class _ModernReportCard extends StatelessWidget {
     required this.onTap,
     required this.onConfirm,
     required this.onFlag,
+    required this.userId,
+    this.isSaving = false,
   });
 
   final Report report;
@@ -634,6 +668,8 @@ class _ModernReportCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onConfirm;
   final VoidCallback onFlag;
+  final String userId;
+  final bool isSaving;
 
   @override
   Widget build(BuildContext context) {
@@ -642,7 +678,6 @@ class _ModernReportCard extends StatelessWidget {
     final isResolved = report.status.toLowerCase() == 'resolved';
     final isExpired = !isActive && !isResolved;
 
-    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
     final hasConfirmed = report.confirmedBy.contains(userId);
     final hasFlagged = report.flaggedBy.contains(userId);
 
@@ -651,7 +686,7 @@ class _ModernReportCard extends StatelessWidget {
       badgeType = _ReportBadge.resolved;
     } else if (isExpired) {
       badgeType = _ReportBadge.expired;
-    } else if (report.confirmCount > 0) {
+    } else if (report.confirmCount > 0 && StatusLogic.isReportFresh(report)) {
       badgeType = _ReportBadge.verified;
     } else {
       badgeType = _ReportBadge.active;
@@ -701,10 +736,14 @@ class _ModernReportCard extends StatelessWidget {
                           ? Colors.white
                           : AppColors.primaryContainer.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(10),
-                      border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+                      border: isHC
+                          ? Border.all(color: Colors.black, width: 1.5)
+                          : null,
                     ),
                     child: Icon(
-                      isBus ? Icons.directions_bus_rounded : Icons.store_mall_directory_rounded,
+                      isBus
+                          ? Icons.directions_bus_rounded
+                          : Icons.store_mall_directory_rounded,
                       size: hasLargeTargets ? 26 : 20,
                       color: isHC ? Colors.black : AppColors.primary,
                     ),
@@ -741,6 +780,10 @@ class _ModernReportCard extends StatelessWidget {
 
               // Problem Condition Title
               Text(
+                '${StatusLogic.freshnessLabel(report)} · Last checked: ${TimeUtils.formatRelativeTime(StatusLogic.lastCheckedAt(report))}',
+                style: TextStyle(color: context.subtextColor),
+              ),
+              Text(
                 report.problemType,
                 style: TextStyle(
                   fontSize: hasLargeTargets ? 18.5 : 16,
@@ -771,13 +814,18 @@ class _ModernReportCard extends StatelessWidget {
                 children: [
                   // True Flag count pill
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: isHC
-                          ? (hasConfirmed ? const Color(0xFF003833) : Colors.white)
+                          ? (hasConfirmed
+                                ? const Color(0xFF003833)
+                                : Colors.white)
                           : (hasConfirmed
-                              ? AppColors.success.withValues(alpha: 0.2)
-                              : AppColors.success.withValues(alpha: 0.1)),
+                                ? AppColors.success.withValues(alpha: 0.2)
+                                : AppColors.success.withValues(alpha: 0.1)),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isHC ? Colors.black : AppColors.success,
@@ -791,7 +839,9 @@ class _ModernReportCard extends StatelessWidget {
                           Icons.thumb_up_alt_rounded,
                           size: 13,
                           color: isHC
-                              ? (hasConfirmed ? Colors.white : const Color(0xFF003833))
+                              ? (hasConfirmed
+                                    ? Colors.white
+                                    : const Color(0xFF003833))
                               : AppColors.success,
                         ),
                         const SizedBox(width: 5),
@@ -801,7 +851,9 @@ class _ModernReportCard extends StatelessWidget {
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: isHC
-                                ? (hasConfirmed ? Colors.white : const Color(0xFF003833))
+                                ? (hasConfirmed
+                                      ? Colors.white
+                                      : const Color(0xFF003833))
                                 : AppColors.success,
                           ),
                         ),
@@ -813,18 +865,25 @@ class _ModernReportCard extends StatelessWidget {
 
                   // False Flag count pill (hides at 3)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: isHC
-                          ? (hasFlagged ? const Color(0xFF8B0000) : Colors.white)
+                          ? (hasFlagged
+                                ? const Color(0xFF8B0000)
+                                : Colors.white)
                           : (report.falseCount > 0
-                              ? AppColors.error.withValues(alpha: 0.15)
-                              : AppColors.surfaceContainer),
+                                ? AppColors.error.withValues(alpha: 0.15)
+                                : AppColors.surfaceContainer),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isHC
                             ? const Color(0xFF8B0000)
-                            : (report.falseCount > 0 ? AppColors.error : AppColors.outline),
+                            : (report.falseCount > 0
+                                  ? AppColors.error
+                                  : AppColors.outline),
                         width: isHC ? 1.5 : 1,
                       ),
                     ),
@@ -835,8 +894,12 @@ class _ModernReportCard extends StatelessWidget {
                           Icons.flag_rounded,
                           size: 13,
                           color: isHC
-                              ? (hasFlagged ? Colors.white : const Color(0xFF8B0000))
-                              : (report.falseCount > 0 ? AppColors.error : AppColors.outline),
+                              ? (hasFlagged
+                                    ? Colors.white
+                                    : const Color(0xFF8B0000))
+                              : (report.falseCount > 0
+                                    ? AppColors.error
+                                    : AppColors.outline),
                         ),
                         const SizedBox(width: 5),
                         Text(
@@ -845,8 +908,12 @@ class _ModernReportCard extends StatelessWidget {
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: isHC
-                                ? (hasFlagged ? Colors.white : const Color(0xFF8B0000))
-                                : (report.falseCount > 0 ? AppColors.error : AppColors.outline),
+                                ? (hasFlagged
+                                      ? Colors.white
+                                      : const Color(0xFF8B0000))
+                                : (report.falseCount > 0
+                                      ? AppColors.error
+                                      : AppColors.outline),
                           ),
                         ),
                       ],
@@ -857,13 +924,18 @@ class _ModernReportCard extends StatelessWidget {
 
                   if (report.photoUrl.isNotEmpty) ...[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: isHC
                             ? Colors.white
                             : AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
-                        border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+                        border: isHC
+                            ? Border.all(color: Colors.black, width: 1.5)
+                            : null,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -891,7 +963,9 @@ class _ModernReportCard extends StatelessWidget {
 
               const SizedBox(height: 12),
               Divider(
-                color: isHC ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.5),
+                color: isHC
+                    ? Colors.black
+                    : AppColors.outlineVariant.withValues(alpha: 0.5),
                 height: 1,
               ),
               const SizedBox(height: 10),
@@ -904,16 +978,29 @@ class _ModernReportCard extends StatelessWidget {
                     child: SizedBox(
                       height: 38,
                       child: OutlinedButton.icon(
-                        onPressed: onConfirm,
+                        onPressed:
+                            isSaving ||
+                                hasConfirmed ||
+                                isResolved ||
+                                userId.isEmpty ||
+                                report.userId == userId
+                            ? null
+                            : onConfirm,
                         style: OutlinedButton.styleFrom(
                           backgroundColor: hasConfirmed
-                              ? (isHC ? const Color(0xFF003833) : AppColors.success.withValues(alpha: 0.15))
+                              ? (isHC
+                                    ? const Color(0xFF003833)
+                                    : AppColors.success.withValues(alpha: 0.15))
                               : (isHC ? Colors.white : null),
                           foregroundColor: isHC
-                              ? (hasConfirmed ? Colors.white : const Color(0xFF003833))
+                              ? (hasConfirmed
+                                    ? Colors.white
+                                    : const Color(0xFF003833))
                               : AppColors.success,
                           side: BorderSide(
-                            color: isHC ? const Color(0xFF003833) : AppColors.success,
+                            color: isHC
+                                ? const Color(0xFF003833)
+                                : AppColors.success,
                             width: isHC ? 1.5 : 1,
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -922,12 +1009,19 @@ class _ModernReportCard extends StatelessWidget {
                           ),
                         ),
                         icon: Icon(
-                          hasConfirmed ? Icons.check_circle_rounded : Icons.thumb_up_outlined,
+                          hasConfirmed
+                              ? Icons.check_circle_rounded
+                              : Icons.thumb_up_outlined,
                           size: 15,
                         ),
                         label: Text(
-                          hasConfirmed ? 'True (${report.confirmCount})' : 'True Flag (${report.confirmCount})',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          hasConfirmed
+                              ? 'True (${report.confirmCount})'
+                              : 'True Flag (${report.confirmCount})',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -940,16 +1034,29 @@ class _ModernReportCard extends StatelessWidget {
                     child: SizedBox(
                       height: 38,
                       child: OutlinedButton.icon(
-                        onPressed: isResolved ? null : onFlag,
+                        onPressed:
+                            isSaving ||
+                                hasFlagged ||
+                                isResolved ||
+                                userId.isEmpty ||
+                                report.userId == userId
+                            ? null
+                            : onFlag,
                         style: OutlinedButton.styleFrom(
                           backgroundColor: hasFlagged
-                              ? (isHC ? const Color(0xFF8B0000) : AppColors.error.withValues(alpha: 0.15))
+                              ? (isHC
+                                    ? const Color(0xFF8B0000)
+                                    : AppColors.error.withValues(alpha: 0.15))
                               : (isHC ? Colors.white : null),
                           foregroundColor: isHC
-                              ? (hasFlagged ? Colors.white : const Color(0xFF8B0000))
+                              ? (hasFlagged
+                                    ? Colors.white
+                                    : const Color(0xFF8B0000))
                               : AppColors.error,
                           side: BorderSide(
-                            color: isHC ? const Color(0xFF8B0000) : AppColors.error,
+                            color: isHC
+                                ? const Color(0xFF8B0000)
+                                : AppColors.error,
                             width: isHC ? 1.5 : 1,
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -962,8 +1069,13 @@ class _ModernReportCard extends StatelessWidget {
                           size: 15,
                         ),
                         label: Text(
-                          hasFlagged ? 'False (${report.falseCount}/3)' : 'False Flag (${report.falseCount}/3)',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          hasFlagged
+                              ? 'False (${report.falseCount}/3)'
+                              : 'False Flag (${report.falseCount}/3)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -983,29 +1095,29 @@ class _ModernReportCard extends StatelessWidget {
     if (isHC) {
       final (borderClr, fgClr, icon, label) = switch (badge) {
         _ReportBadge.active => (
-            const Color(0xFF8B0000),
-            const Color(0xFF8B0000),
-            Icons.error_outline_rounded,
-            'Active',
-          ),
+          const Color(0xFF8B0000),
+          const Color(0xFF8B0000),
+          Icons.error_outline_rounded,
+          'Active',
+        ),
         _ReportBadge.verified => (
-            const Color(0xFF003833),
-            const Color(0xFF003833),
-            Icons.verified_rounded,
-            'Verified',
-          ),
+          const Color(0xFF003833),
+          const Color(0xFF003833),
+          Icons.verified_rounded,
+          'Verified',
+        ),
         _ReportBadge.resolved => (
-            const Color(0xFF001F3F),
-            const Color(0xFF001F3F),
-            Icons.check_circle_rounded,
-            'Resolved',
-          ),
+          const Color(0xFF001F3F),
+          const Color(0xFF001F3F),
+          Icons.check_circle_rounded,
+          'Resolved',
+        ),
         _ReportBadge.expired => (
-            Colors.black,
-            Colors.black,
-            Icons.history_rounded,
-            'Past',
-          ),
+          Colors.black,
+          Colors.black,
+          Icons.history_rounded,
+          'Past',
+        ),
       };
 
       return Container(
@@ -1035,29 +1147,29 @@ class _ModernReportCard extends StatelessWidget {
 
     final (bg, fg, icon, label) = switch (badge) {
       _ReportBadge.active => (
-          AppColors.errorContainer,
-          AppColors.onErrorContainer,
-          Icons.error_outline_rounded,
-          'Active',
-        ),
+        AppColors.errorContainer,
+        AppColors.onErrorContainer,
+        Icons.error_outline_rounded,
+        'Active',
+      ),
       _ReportBadge.verified => (
-          AppColors.success.withValues(alpha: 0.15),
-          AppColors.success,
-          Icons.verified_rounded,
-          'Verified',
-        ),
+        AppColors.success.withValues(alpha: 0.15),
+        AppColors.success,
+        Icons.verified_rounded,
+        'Verified',
+      ),
       _ReportBadge.resolved => (
-          AppColors.primaryContainer.withValues(alpha: 0.3),
-          AppColors.primary,
-          Icons.check_circle_rounded,
-          'Resolved',
-        ),
+        AppColors.primaryContainer.withValues(alpha: 0.3),
+        AppColors.primary,
+        Icons.check_circle_rounded,
+        'Resolved',
+      ),
       _ReportBadge.expired => (
-          AppColors.surfaceContainer,
-          AppColors.outline,
-          Icons.history_rounded,
-          'Past',
-        ),
+        AppColors.surfaceContainer,
+        AppColors.outline,
+        Icons.history_rounded,
+        'Past',
+      ),
     };
 
     return Container(

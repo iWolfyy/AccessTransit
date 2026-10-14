@@ -8,8 +8,7 @@ import '../models/user_model.dart';
 ///
 /// Document path: `users/{uid}` where [uid] is the Firebase Auth user ID.
 class UserService {
-  UserService({FirebaseFirestore? firestore})
-      : _customFirestore = firestore;
+  UserService({FirebaseFirestore? firestore}) : _customFirestore = firestore;
 
   final FirebaseFirestore? _customFirestore;
 
@@ -34,17 +33,31 @@ class UserService {
     return usersCollection?.doc(uid);
   }
 
-  /// Creates a new user profile document in Firestore.
-  Future<void> createUser(UserModel user) async {
-    _localUserFallback[user.uid] = user;
-    try {
-      final doc = userDocument(user.uid);
-      if (doc != null) {
-        await doc.set(user.toMap(isCreate: true));
-      }
-    } catch (e) {
-      debugPrint('UserService.createUser fallback: $e');
+  /// Creates a missing profile, preserving and returning any existing profile.
+  ///
+  /// The transaction makes registration retries safe across devices. Firestore
+  /// failures propagate so a failed read cannot be mistaken for a missing user.
+  Future<UserModel> createUser(UserModel user) async {
+    final db = _db;
+    if (db == null) {
+      return _localUserFallback.putIfAbsent(user.uid, () => user);
     }
+
+    final doc = db.collection(FirestoreConstants.usersCollection).doc(user.uid);
+    final profile = await db.runTransaction<UserModel>((transaction) async {
+      final snapshot = await transaction.get(doc);
+      if (snapshot.exists) {
+        final data = Map<String, dynamic>.from(snapshot.data()!);
+        data[FirestoreConstants.fieldUid] = user.uid;
+        return UserModel.fromMap(data);
+      }
+
+      transaction.set(doc, user.toMap(isCreate: true));
+      return user;
+    });
+
+    _localUserFallback[user.uid] = profile;
+    return profile;
   }
 
   /// Updates an existing user profile document in Firestore.
@@ -144,7 +157,6 @@ class UserService {
         reportsSubmitted: (reportsDelta).clamp(0, 999999),
         verifiedCount: (verificationsDelta).clamp(0, 999999),
       );
-      _localUserFallback[uid] = newUser;
       try {
         final doc = userDocument(uid);
         if (doc != null) {
@@ -152,21 +164,24 @@ class UserService {
         }
       } catch (e) {
         debugPrint('UserService.updateUserStats fallback set: $e');
+        return;
       }
+      _localUserFallback[uid] = newUser;
       return;
     }
 
     final newPoints = (user.points + pointsDelta).clamp(0, 999999);
     final newReports = (user.reportsSubmitted + reportsDelta).clamp(0, 999999);
-    final newVerifications = (user.verifiedCount + verificationsDelta).clamp(0, 999999);
+    final newVerifications = (user.verifiedCount + verificationsDelta).clamp(
+      0,
+      999999,
+    );
 
     final updatedUser = user.copyWith(
       points: newPoints,
       reportsSubmitted: newReports,
       verifiedCount: newVerifications,
     );
-
-    _localUserFallback[uid] = updatedUser;
 
     try {
       final doc = userDocument(uid);
@@ -179,7 +194,9 @@ class UserService {
       }
     } catch (e) {
       debugPrint('UserService.updateUserStats fallback update: $e');
+      return;
     }
+    // Rejected client counter writes must not manufacture rewards in memory.
+    _localUserFallback[uid] = updatedUser;
   }
 }
-

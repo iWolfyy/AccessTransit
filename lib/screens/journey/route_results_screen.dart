@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 import '../../data/seed_data.dart';
 import '../../logic/bus_matcher.dart';
+import '../../logic/passenger_journey_plan.dart';
 import '../../logic/status_logic.dart';
 import '../../models/bus.dart';
 import '../../models/bus_route.dart';
@@ -14,7 +15,7 @@ import '../../models/trip_model.dart';
 import '../../services/accessibility_preferences_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/trip_service.dart';
-import 'live_journey_screen.dart';
+import 'route_details_screen.dart';
 
 /// Route result item used for passenger route selection.
 /// Enhanced in Phase 2 with LMT Go inspired fields: departure/arrival times,
@@ -48,6 +49,14 @@ class RouteResultItem {
     this.rawBus,
     this.statusResult,
     this.nextDepartureDateTime,
+    this.matchesAccessibleFilter = false,
+    this.fromStationId,
+    this.toStationId,
+    this.wheelchairAccessRequired = false,
+    this.stepFreeOnly = false,
+    this.journeyStations = const {},
+    this.selectedDate,
+    this.selectedTimeMinutes,
   });
 
   final String id;
@@ -77,9 +86,17 @@ class RouteResultItem {
   final Bus? rawBus;
   final BusStatusResult? statusResult;
   final DateTime? nextDepartureDateTime;
+  final bool matchesAccessibleFilter;
+  final String? fromStationId;
+  final String? toStationId;
+  final bool wheelchairAccessRequired;
+  final bool stepFreeOnly;
+  final Map<String, Station> journeyStations;
+  final DateTime? selectedDate;
+  final int? selectedTimeMinutes;
 }
 
-enum AccessibilityStatus { accessible, partial, notAccessible }
+enum AccessibilityStatus { accessible, partial, notAccessible, unknown }
 
 /// Route Results screen — LMT Go styled available bus cards with accessibility-first enhancements.
 class RouteResultsScreen extends StatefulWidget {
@@ -90,6 +107,7 @@ class RouteResultsScreen extends StatefulWidget {
     this.origin = 'Colombo Fort Station',
     this.destination = 'Kottawa Highway Bus Station',
     this.selectedDate,
+    this.selectedTime,
     this.wheelchairAccessRequired,
     this.stepFreeOnly,
     this.minimizeWalking,
@@ -100,6 +118,7 @@ class RouteResultsScreen extends StatefulWidget {
   final String origin;
   final String destination;
   final DateTime? selectedDate;
+  final TimeOfDay? selectedTime;
   final bool? wheelchairAccessRequired;
   final bool? stepFreeOnly;
   final bool? minimizeWalking;
@@ -119,7 +138,6 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   late String _selectedFilterTab; // 'All', 'Accessible', 'Fastest'
   late final bool _isWheelchair;
   late final bool _isStepFree;
-  late final bool _isMinimizeWalking;
 
   @override
   void initState() {
@@ -127,7 +145,6 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
     final prefs = AccessibilityPreferencesService.instance;
     _isWheelchair = widget.wheelchairAccessRequired ?? prefs.isWheelchairOnly;
     _isStepFree = widget.stepFreeOnly ?? prefs.isStepFree;
-    _isMinimizeWalking = widget.minimizeWalking ?? prefs.minimizeWalking;
     _selectedFilterTab = _isWheelchair ? 'Accessible' : 'All';
     _loadInitialData();
   }
@@ -138,7 +155,9 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       final fetchedStations = await _firestoreService.getStations();
       final fetchedRoutes = await _firestoreService.getRoutes();
 
-      final buses = fetchedBuses.isNotEmpty ? fetchedBuses : SeedData.sampleBuses;
+      final buses = fetchedBuses.isNotEmpty
+          ? fetchedBuses
+          : SeedData.sampleBuses;
       final stationsList = fetchedStations.isNotEmpty
           ? fetchedStations
           : SeedData.colomboStations;
@@ -172,11 +191,12 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   void _onSelectRoute(RouteResultItem route) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => LiveJourneyScreen(
-          origin: widget.origin,
-          destination: widget.destination,
+        builder: (_) => RouteDetailsScreen(
+          origin: route.origin,
+          destination: route.destination,
           route: route,
-          busId: route.busId,
+          bus: route.rawBus,
+          statusResult: route.statusResult,
         ),
       ),
     );
@@ -189,170 +209,232 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       case AccessibilityStatus.partial:
         return 1; // Warning second
       case AccessibilityStatus.notAccessible:
-        return 2; // Not accessible third
+        return 3;
+      case AccessibilityStatus.unknown:
+        return 2;
     }
-  }
-
-  int _calculateEstimatedPrice(int durationMinutes, int stopsCount) {
-    // Authentic Sri Lankan bus transit fare calculation:
-    // Base fare: LKR 35 + ~LKR 2.2 per minute + ~LKR 5 per intermediate stop
-    final price = 35 + (durationMinutes * 2.2) + (stopsCount * 4);
-    // Round to nearest 5 or 10 LKR
-    return ((price / 5).round() * 5).clamp(40, 450);
   }
 
   List<RouteResultItem> _buildAndFilterRouteItems(
     List<Report> activeReports, {
     List<Bus>? buses,
+    bool applyTabFilter = true,
   }) {
-    final busesToMatch = (buses != null && buses.isNotEmpty) ? buses : _allBuses;
+    final busesToMatch = (buses != null && buses.isNotEmpty)
+        ? buses
+        : _allBuses;
 
     // 1. Direct bus matching
-    var matchedBuses = BusMatcher.findDirectBuses(
+    final matchedBuses = BusMatcher.findDirectBuses(
       busesToMatch,
       widget.fromStationId,
       widget.toStationId,
     );
 
-    // Filter by user's initial search query requirements
-    if (_isStepFree) {
-      matchedBuses = matchedBuses.where((bus) => bus.lowFloor).toList();
-    }
-
     final now = DateTime.now();
-    final todayBase = DateTime(now.year, now.month, now.day);
+    final travelDate = widget.selectedDate ?? now;
+    final day = DateTime(travelDate.year, travelDate.month, travelDate.day);
+    final departNow =
+        widget.selectedTime == null && DateUtils.isSameDay(day, now);
+    final notBefore = widget.selectedTime != null
+        ? DateTime(
+            day.year,
+            day.month,
+            day.day,
+            widget.selectedTime!.hour,
+            widget.selectedTime!.minute,
+          )
+        : departNow
+        ? now.subtract(const Duration(minutes: 10))
+        : day;
 
     // 2. Compute status & reasons
-    final List<RouteResultItem> items = matchedBuses.map((bus) {
-      final statusResult = StatusLogic.getBusStatus(
-        bus,
-        activeReports,
-        stationsMap: _stationsMap,
-      );
+    final List<RouteResultItem> items = matchedBuses
+        .map<RouteResultItem?>((bus) {
+          final plan = PassengerJourneyPlan.forBus(
+            bus: bus,
+            fromId: widget.fromStationId,
+            toId: widget.toStationId,
+            travelDate: day,
+            notBefore: notBefore,
+            rollToNextDay: departNow,
+          );
+          if (plan == null) return null;
+          final requestedStatus = StatusLogic.getBusStatus(
+            bus,
+            activeReports,
+            stationsMap: _stationsMap,
+            fromStationId: widget.fromStationId,
+            toStationId: widget.toStationId,
+            wheelchairAccessRequired: _isWheelchair,
+            stepFreeOnly: _isStepFree,
+          );
+          if ((_isWheelchair || _isStepFree) &&
+              requestedStatus.status != AccessibilityStatus.accessible) {
+            return null;
+          }
+          final accessibleStatus = StatusLogic.getBusStatus(
+            bus,
+            activeReports,
+            stationsMap: _stationsMap,
+            fromStationId: widget.fromStationId,
+            toStationId: widget.toStationId,
+            wheelchairAccessRequired: true,
+            stepFreeOnly: _isStepFree,
+          );
+          final matchesAccessible =
+              accessibleStatus.status == AccessibilityStatus.accessible;
+          final statusResult = _selectedFilterTab == 'Accessible'
+              ? accessibleStatus
+              : requestedStatus;
 
-      final routeObj = _routesMap[bus.routeId] ??
-          _routesMap.values.cast<BusRoute?>().firstWhere(
+          final routeObj =
+              _routesMap[bus.routeId] ??
+              _routesMap.values.cast<BusRoute?>().firstWhere(
                 (r) => r?.routeNo == bus.routeNo,
                 orElse: () => null,
               );
 
-      final routeName = routeObj?.routeName ?? 'Route ${bus.routeNo}';
-      final displayBusNo = bus.displayBusNo;
+          final routeName = routeObj?.routeName ?? 'Route ${bus.routeNo}';
+          final displayBusNo = bus.displayBusNo;
 
-      // Determine scheduled departure at the passenger's boarding station
-      final fromIdx = bus.stops.indexWhere((s) =>
-          s.toLowerCase() == widget.fromStationId.toLowerCase() ||
-          (_stationsMap[s]?.name.toLowerCase() == widget.fromStationId.toLowerCase()) ||
-          (_stationsMap[s]?.name.toLowerCase() == widget.origin.toLowerCase()));
-      final targetIdx = fromIdx != -1 ? fromIdx : 0;
-      final stopTimeStr = bus.getScheduledTimeForStop(targetIdx);
+          // Determine scheduled departure at the passenger's boarding station
+          final nextDepDateTime = plan.departure;
+          final stopTimeStr = TimeUtils.formatTimeString(nextDepDateTime);
+          final isToday = DateUtils.isSameDay(nextDepDateTime, now);
+          final isTomorrow = DateUtils.isSameDay(
+            nextDepDateTime,
+            DateTime(now.year, now.month, now.day + 1),
+          );
 
-      var nextDepDateTime = TimeUtils.parseTimeStringToDateTime(stopTimeStr, todayBase);
-      bool isTomorrow = false;
-      if (nextDepDateTime.isBefore(now.subtract(const Duration(minutes: 10)))) {
-        nextDepDateTime = nextDepDateTime.add(const Duration(days: 1));
-        isTomorrow = true;
-      }
+          final diffMins = nextDepDateTime.difference(now).inMinutes;
 
-      final diffMins = nextDepDateTime.difference(now).inMinutes;
+          final String scheduledDepartureDisplay;
+          final String etaLabelDisplay;
+          if (!isToday && !isTomorrow) {
+            final dateLabel = TimeUtils.formatDateString(nextDepDateTime);
+            scheduledDepartureDisplay = '$dateLabel, $stopTimeStr';
+            etaLabelDisplay = '$dateLabel at $stopTimeStr';
+          } else if (isTomorrow) {
+            scheduledDepartureDisplay = 'Tomorrow, $stopTimeStr';
+            etaLabelDisplay = 'Tomorrow at $stopTimeStr';
+          } else {
+            if (diffMins <= 1 && departNow) {
+              scheduledDepartureDisplay = '$stopTimeStr (Now)';
+              etaLabelDisplay = 'Arriving now • $stopTimeStr';
+            } else if (diffMins >= 0 && diffMins < 60 && departNow) {
+              scheduledDepartureDisplay = '$stopTimeStr (in ${diffMins}m)';
+              etaLabelDisplay =
+                  'Departs in $diffMins mins • Today, $stopTimeStr';
+            } else {
+              scheduledDepartureDisplay = 'Today, $stopTimeStr';
+              etaLabelDisplay = 'Today at $stopTimeStr';
+            }
+          }
 
-      final String scheduledDepartureDisplay;
-      final String etaLabelDisplay;
-      if (isTomorrow) {
-        scheduledDepartureDisplay = 'Tomorrow, $stopTimeStr';
-        etaLabelDisplay = 'Tomorrow at $stopTimeStr';
-      } else {
-        if (diffMins <= 1 && diffMins >= 0) {
-          scheduledDepartureDisplay = '$stopTimeStr (Now)';
-          etaLabelDisplay = 'Arriving now • $stopTimeStr';
-        } else if (diffMins < 60) {
-          scheduledDepartureDisplay = '$stopTimeStr (in ${diffMins}m)';
-          etaLabelDisplay = 'Departs in $diffMins mins • Today, $stopTimeStr';
-        } else {
-          scheduledDepartureDisplay = 'Today, $stopTimeStr';
-          etaLabelDisplay = 'Today at $stopTimeStr';
-        }
-      }
+          final durationMinutes = plan.durationMinutes;
+          final arrivalDateTime = plan.arrival;
+          final departureTimeFormatted = TimeUtils.formatTimeString(
+            nextDepDateTime,
+          );
+          final arrivalTimeFormatted = TimeUtils.formatTimeString(
+            arrivalDateTime,
+          );
 
-      final durationMinutes = (bus.stops.length * 6).clamp(12, 110);
-      final arrivalDateTime = nextDepDateTime.add(Duration(minutes: durationMinutes));
-      final departureTimeFormatted = TimeUtils.formatTimeString(nextDepDateTime);
-      final arrivalTimeFormatted = TimeUtils.formatTimeString(arrivalDateTime);
+          // Determine live operational status label
+          final String liveStatus;
+          final bool isBusLive;
+          if (!departNow || !isToday) {
+            liveStatus = 'Scheduled';
+            isBusLive = false;
+          } else if (diffMins <= 5 && diffMins >= -30) {
+            liveStatus = 'Ongoing';
+            isBusLive = true;
+          } else if (diffMins < 20 && diffMins > 5) {
+            liveStatus = 'Approaching';
+            isBusLive = true;
+          } else if (statusResult.reasons.any(
+            (r) => r.toLowerCase().contains('delay'),
+          )) {
+            liveStatus = 'Delayed';
+            isBusLive = false;
+          } else {
+            liveStatus = 'Scheduled';
+            isBusLive = false;
+          }
 
-      // Determine live operational status label
-      final String liveStatus;
-      final bool isBusLive;
-      if (diffMins <= 5 && diffMins >= -30) {
-        liveStatus = 'Ongoing';
-        isBusLive = true;
-      } else if (diffMins < 20 && diffMins > 5) {
-        liveStatus = 'Approaching';
-        isBusLive = true;
-      } else if (statusResult.status == AccessibilityStatus.partial ||
-          statusResult.reasons.any((r) => r.toLowerCase().contains('delay'))) {
-        liveStatus = 'Delayed';
-        isBusLive = false;
-      } else {
-        liveStatus = 'Scheduled';
-        isBusLive = false;
-      }
+          final summaryText = statusResult.reasons.isNotEmpty
+              ? statusResult.reasons.first
+              : (bus.wheelchairAccessible
+                    ? 'Wheelchair Ramp Ready · Step-free entry'
+                    : (bus.hasRamp
+                          ? 'Ramp equipped · Check operator assistance'
+                          : 'Standard bus service'));
 
-      final summaryText = statusResult.reasons.isNotEmpty
-          ? statusResult.reasons.first
-          : (bus.wheelchairAccessible
-              ? 'Wheelchair Ramp Ready · Step-free entry'
-              : (bus.hasRamp
-                  ? 'Ramp equipped · Check operator assistance'
-                  : 'Standard bus service'));
+          String crowdLabel = 'Low';
+          if (bus.occupancy.toLowerCase() == 'medium') crowdLabel = 'Medium';
+          if (bus.occupancy.toLowerCase() == 'high') crowdLabel = 'High';
 
-      String crowdLabel = 'Low';
-      if (bus.occupancy.toLowerCase() == 'medium') crowdLabel = 'Medium';
-      if (bus.occupancy.toLowerCase() == 'high') crowdLabel = 'High';
+          final fromName =
+              _stationsMap[widget.fromStationId]?.name ?? widget.origin;
+          final toName =
+              _stationsMap[widget.toStationId]?.name ?? widget.destination;
 
-      final fromName = _stationsMap[widget.fromStationId]?.name ?? widget.origin;
-      final toName = _stationsMap[widget.toStationId]?.name ?? widget.destination;
+          final estimatedPrice = plan.estimatedPriceLkr;
 
-      final estimatedPrice = _calculateEstimatedPrice(durationMinutes, bus.stops.length);
-
-      return RouteResultItem(
-        id: bus.id,
-        title: 'Route ${bus.routeNo} • $displayBusNo',
-        busNo: displayBusNo,
-        routeNo: bus.routeNo,
-        routeName: routeName,
-        scheduledDeparture: scheduledDepartureDisplay,
-        departureTimeStr: departureTimeFormatted,
-        arrivalTimeStr: arrivalTimeFormatted,
-        durationMinutes: durationMinutes,
-        etaLabel: etaLabelDisplay,
-        estimatedPriceLkr: estimatedPrice,
-        liveStatusLabel: liveStatus,
-        isLive: isBusLive,
-        transfers: 0,
-        crowdLevel: crowdLabel,
-        accessibilityStatus: statusResult.status,
-        accessibilityLabel: statusResult.statusLabel,
-        safetyLabel: bus.wheelchairAccessible
-            ? 'Wheelchair Accessible Bus'
-            : (bus.hasRamp ? 'Standard Ramp Bus' : 'Standard Bus'),
-        summary: '$routeName · $summaryText',
-        busId: bus.id,
-        origin: fromName,
-        destination: toName,
-        intermediateStops: bus.stops,
-        recommended: statusResult.status == AccessibilityStatus.accessible && bus.wheelchairAccessible,
-        rawBus: bus,
-        statusResult: statusResult,
-        nextDepartureDateTime: nextDepDateTime,
-      );
-    }).toList();
+          return RouteResultItem(
+            id: bus.id,
+            title: 'Route ${bus.routeNo} • $displayBusNo',
+            busNo: displayBusNo,
+            routeNo: bus.routeNo,
+            routeName: routeName,
+            scheduledDeparture: scheduledDepartureDisplay,
+            departureTimeStr: departureTimeFormatted,
+            arrivalTimeStr: arrivalTimeFormatted,
+            durationMinutes: durationMinutes,
+            etaLabel: etaLabelDisplay,
+            estimatedPriceLkr: estimatedPrice,
+            liveStatusLabel: liveStatus,
+            isLive: isBusLive,
+            transfers: 0,
+            crowdLevel: crowdLabel,
+            accessibilityStatus: statusResult.status,
+            accessibilityLabel: statusResult.statusLabel,
+            safetyLabel: bus.wheelchairAccessible
+                ? 'Wheelchair Accessible Bus'
+                : (bus.hasRamp ? 'Standard Ramp Bus' : 'Standard Bus'),
+            summary: '$routeName · $summaryText',
+            busId: bus.id,
+            origin: fromName,
+            destination: toName,
+            intermediateStops: plan.stops.sublist(1, plan.stops.length - 1),
+            recommended: matchesAccessible,
+            matchesAccessibleFilter: matchesAccessible,
+            fromStationId: widget.fromStationId,
+            toStationId: widget.toStationId,
+            wheelchairAccessRequired:
+                _isWheelchair || _selectedFilterTab == 'Accessible',
+            stepFreeOnly: _isStepFree,
+            journeyStations: {
+              for (final id in [widget.fromStationId, widget.toStationId])
+                if (_stationsMap.containsKey(id)) id: _stationsMap[id]!,
+            },
+            rawBus: bus,
+            statusResult: statusResult,
+            nextDepartureDateTime: nextDepDateTime,
+            selectedDate: day,
+            selectedTimeMinutes: widget.selectedTime == null
+                ? null
+                : widget.selectedTime!.hour * 60 + widget.selectedTime!.minute,
+          );
+        })
+        .whereType<RouteResultItem>()
+        .toList();
 
     // 3. Filter by Tab ('All', 'Accessible', 'Fastest')
     var filtered = items;
-    if (_selectedFilterTab == 'Accessible') {
-      filtered = filtered
-          .where((r) => r.rawBus?.wheelchairAccessible == true || r.rawBus?.hasRamp == true)
-          .toList();
+    if (applyTabFilter && _selectedFilterTab == 'Accessible') {
+      filtered = filtered.where((r) => r.matchesAccessibleFilter).toList();
     }
 
     // 4. Sort
@@ -364,8 +446,8 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       // Prioritize wheelchair accessible buses when wheelchair access is required
       // or when the Accessible tab is selected
       if (_isWheelchair || _selectedFilterTab == 'Accessible') {
-        final aAcc = (a.rawBus?.wheelchairAccessible == true || a.rawBus?.hasRamp == true);
-        final bAcc = (b.rawBus?.wheelchairAccessible == true || b.rawBus?.hasRamp == true);
+        final aAcc = a.matchesAccessibleFilter;
+        final bAcc = b.matchesAccessibleFilter;
         if (aAcc != bAcc) {
           return aAcc ? -1 : 1; // Accessible buses first
         }
@@ -374,14 +456,6 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
         final rankB = _statusRank(b.accessibilityStatus);
         if (rankA != rankB) {
           return rankA.compareTo(rankB); // Verified accessible status first
-        }
-      }
-
-      // Prioritize fewer stops / shortest walking distance when minimize walking is enabled
-      if (_isMinimizeWalking) {
-        final stopsComp = a.intermediateStops.length.compareTo(b.intermediateStops.length);
-        if (stopsComp != 0) {
-          return stopsComp;
         }
       }
 
@@ -410,9 +484,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       backgroundColor: context.surfaceColor,
       body: Column(
         children: [
-          _TopBar(
-            onBack: () => Navigator.of(context).maybePop(),
-          ),
+          _TopBar(onBack: () => Navigator.of(context).maybePop()),
           Expanded(
             child: _isLoadingData
                 ? const Center(child: CircularProgressIndicator())
@@ -424,23 +496,21 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                       return StreamBuilder<List<Report>>(
                         stream: _firestoreService.streamReports(),
                         builder: (context, snapshot) {
-                          final reports = snapshot.data ?? SeedData.getSampleReports();
+                          final reports = snapshot.data ?? const <Report>[];
                           final routes = _buildAndFilterRouteItems(
                             reports,
                             buses: buses,
                           );
 
-                          final totalAvailable = BusMatcher.findDirectBuses(
-                            buses,
-                            widget.fromStationId,
-                            widget.toStationId,
-                          ).length;
-
-                          final accessibleCount = BusMatcher.findDirectBuses(
-                            buses,
-                            widget.fromStationId,
-                            widget.toStationId,
-                          ).where((b) => b.wheelchairAccessible || b.hasRamp).length;
+                          final available = _buildAndFilterRouteItems(
+                            reports,
+                            buses: buses,
+                            applyTabFilter: false,
+                          );
+                          final totalAvailable = available.length;
+                          final accessibleCount = available
+                              .where((r) => r.matchesAccessibleFilter)
+                              .length;
 
                           return ListView(
                             padding: EdgeInsets.fromLTRB(
@@ -452,9 +522,12 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                             children: [
                               Center(
                                 child: ConstrainedBox(
-                                  constraints: const BoxConstraints(maxWidth: 768),
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 768,
+                                  ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
                                       // Clean Trip Corridor Header
                                       _TripSummaryCard(
@@ -462,8 +535,16 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                                         destination: widget.destination,
                                         matchedCount: routes.length,
                                         selectedDate: widget.selectedDate,
+                                        selectedTime: widget.selectedTime,
                                       ),
                                       const SizedBox(height: 14),
+                                      if (widget.minimizeWalking == true)
+                                        const Padding(
+                                          padding: EdgeInsets.only(bottom: 14),
+                                          child: Text(
+                                            'Walking distance is unavailable for this journey. Results are not ranked by walking distance.',
+                                          ),
+                                        ),
 
                                       // LMT Go Style Accessible Filter Tabs
                                       _LmtGoFilterTabs(
@@ -471,7 +552,9 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                                         allCount: totalAvailable,
                                         accessibleCount: accessibleCount,
                                         onTabSelected: (tab) {
-                                          setState(() => _selectedFilterTab = tab);
+                                          setState(
+                                            () => _selectedFilterTab = tab,
+                                          );
                                         },
                                       ),
                                       const SizedBox(height: 16),
@@ -485,7 +568,9 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                                             Icon(
                                               Icons.directions_bus_rounded,
                                               size: 18,
-                                              color: isHighContrast ? Colors.black : AppColors.primary,
+                                              color: isHighContrast
+                                                  ? Colors.black
+                                                  : AppColors.primary,
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
@@ -493,7 +578,9 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                                               style: TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w700,
-                                                color: isHighContrast ? Colors.black : AppColors.onSurface,
+                                                color: isHighContrast
+                                                    ? Colors.black
+                                                    : AppColors.onSurface,
                                               ),
                                             ),
                                           ],
@@ -501,10 +588,13 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                                         const SizedBox(height: 10),
                                         ...routes.map(
                                           (route) => Padding(
-                                            padding: const EdgeInsets.only(bottom: 14),
+                                            padding: const EdgeInsets.only(
+                                              bottom: 14,
+                                            ),
                                             child: _LmtGoRouteCard(
                                               route: route,
-                                              onTap: () => _onSelectRoute(route),
+                                              onTap: () =>
+                                                  _onSelectRoute(route),
                                             ),
                                           ),
                                         ),
@@ -528,23 +618,24 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 
   Widget _buildEmptyState() {
     final isHighContrast = context.isHighContrast;
-    final isFiltered = _selectedFilterTab == 'Accessible' ||
-        _isWheelchair ||
-        _isStepFree;
+    final isFiltered =
+        _selectedFilterTab == 'Accessible' || _isWheelchair || _isStepFree;
 
     final emptyTitle = isFiltered
         ? 'No Accessible Buses Found'
         : 'No Direct Buses Found';
 
     final emptyDesc = isFiltered
-        ? 'No buses with wheelchair ramps or step-free entries are available for this corridor right now. Try selecting the "All Buses" tab.'
+        ? 'No scheduled journeys have known access matching these requirements. Stop access may be unknown or an active barrier may be reported. Review your accessibility filters.'
         : 'There are currently no direct bus routes connecting ${widget.origin} to ${widget.destination}.';
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : BorderSide.none,
+        side: isHighContrast
+            ? const BorderSide(color: Colors.black, width: 2.0)
+            : BorderSide.none,
       ),
       color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
       child: Padding(
@@ -552,7 +643,9 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
         child: Column(
           children: [
             Icon(
-              isFiltered ? Icons.accessible_forward : Icons.directions_bus_outlined,
+              isFiltered
+                  ? Icons.accessible_forward
+                  : Icons.directions_bus_outlined,
               size: 56,
               color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
             ),
@@ -571,8 +664,12 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                color: isHighContrast
+                    ? const Color(0xFF1A1A1A)
+                    : AppColors.onSurfaceVariant,
+                fontWeight: isHighContrast
+                    ? FontWeight.w600
+                    : FontWeight.normal,
               ),
             ),
             if (isFiltered && _selectedFilterTab == '♿ Accessible') ...[
@@ -605,7 +702,9 @@ class _TopBar extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           border: isHighContrast
-              ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+              ? const Border(
+                  bottom: BorderSide(color: Colors.black, width: 2.0),
+                )
               : null,
         ),
         child: SafeArea(
@@ -634,15 +733,21 @@ class _TopBar extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
-                          color: isHighContrast ? Colors.black : AppColors.primary,
+                          color: isHighContrast
+                              ? Colors.black
+                              : AppColors.primary,
                         ),
                       ),
                       Text(
                         'Select a bus to track live journey',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                          fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                          color: isHighContrast
+                              ? const Color(0xFF1A1A1A)
+                              : AppColors.onSurfaceVariant,
+                          fontWeight: isHighContrast
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -664,17 +769,22 @@ class _TripSummaryCard extends StatelessWidget {
     required this.destination,
     required this.matchedCount,
     this.selectedDate,
+    this.selectedTime,
   });
 
   final String origin;
   final String destination;
   final int matchedCount;
   final DateTime? selectedDate;
+  final TimeOfDay? selectedTime;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
     final dateStr = TimeUtils.formatDateString(selectedDate ?? DateTime.now());
+    final travelLabel = selectedTime == null
+        ? dateStr
+        : '$dateStr at ${selectedTime!.format(context)}';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -700,7 +810,11 @@ class _TripSummaryCard extends StatelessWidget {
           // Origin to Destination Row
           Row(
             children: [
-              Icon(Icons.trip_origin_rounded, size: 16, color: isHighContrast ? Colors.black : AppColors.secondary),
+              Icon(
+                Icons.trip_origin_rounded,
+                size: 16,
+                color: isHighContrast ? Colors.black : AppColors.secondary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -716,9 +830,19 @@ class _TripSummaryCard extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Icon(Icons.arrow_forward_rounded, size: 16, color: isHighContrast ? Colors.black : AppColors.primary),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 16,
+                  color: isHighContrast ? Colors.black : AppColors.primary,
+                ),
               ),
-              Icon(Icons.location_on_rounded, size: 16, color: isHighContrast ? const Color(0xFF8B0000) : AppColors.error),
+              Icon(
+                Icons.location_on_rounded,
+                size: 16,
+                color: isHighContrast
+                    ? const Color(0xFF8B0000)
+                    : AppColors.error,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -735,20 +859,33 @@ class _TripSummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Divider(height: 1, color: isHighContrast ? Colors.black : AppColors.surfaceVariant),
+          Divider(
+            height: 1,
+            color: isHighContrast ? Colors.black : AppColors.surfaceVariant,
+          ),
           const SizedBox(height: 8),
           // Info row: Date & status
           Row(
             children: [
-              Icon(Icons.event_note_rounded, size: 15, color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant),
+              Icon(
+                Icons.event_note_rounded,
+                size: 15,
+                color: isHighContrast
+                    ? Colors.black
+                    : AppColors.onSurfaceVariant,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  dateStr,
+                  travelLabel,
                   style: TextStyle(
                     fontSize: 13,
-                    color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                    fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                    color: isHighContrast
+                        ? const Color(0xFF1A1A1A)
+                        : AppColors.onSurfaceVariant,
+                    fontWeight: isHighContrast
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -760,7 +897,9 @@ class _TripSummaryCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isHighContrast ? Colors.white : AppColors.primaryFixed,
                   borderRadius: BorderRadius.circular(6),
-                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: Text(
                   '$matchedCount buses available',
@@ -849,8 +988,12 @@ class _TabItem extends StatelessWidget {
       borderColor = Colors.black;
       contentColor = isSelected ? Colors.white : Colors.black;
     } else {
-      bgColor = isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerLowest;
-      borderColor = isSelected ? AppColors.primaryContainer : AppColors.outlineVariant;
+      bgColor = isSelected
+          ? AppColors.primaryContainer
+          : AppColors.surfaceContainerLowest;
+      borderColor = isSelected
+          ? AppColors.primaryContainer
+          : AppColors.outlineVariant;
       contentColor = isSelected ? AppColors.onPrimary : AppColors.onSurface;
     }
 
@@ -860,7 +1003,10 @@ class _TabItem extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        constraints: BoxConstraints(minHeight: context.chipHeight, minWidth: context.chipHeight),
+        constraints: BoxConstraints(
+          minHeight: context.chipHeight,
+          minWidth: context.chipHeight,
+        ),
         alignment: Alignment.center,
         padding: EdgeInsets.symmetric(
           horizontal: hasLargeTargets ? 20 : 16,
@@ -890,7 +1036,11 @@ class _TabItem extends StatelessWidget {
               Icon(
                 icon,
                 size: hasLargeTargets ? 20 : 16,
-                color: isHighContrast ? contentColor : (isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant),
+                color: isHighContrast
+                    ? contentColor
+                    : (isSelected
+                          ? AppColors.onPrimary
+                          : AppColors.onSurfaceVariant),
               ),
               const SizedBox(width: 6),
             ],
@@ -911,10 +1061,7 @@ class _TabItem extends StatelessWidget {
 
 /// LMT Go Style Available Bus Card
 class _LmtGoRouteCard extends StatelessWidget {
-  const _LmtGoRouteCard({
-    required this.route,
-    required this.onTap,
-  });
+  const _LmtGoRouteCard({required this.route, required this.onTap});
 
   final RouteResultItem route;
   final VoidCallback onTap;
@@ -924,15 +1071,27 @@ class _LmtGoRouteCard extends StatelessWidget {
     final isHighContrast = context.isHighContrast;
     final hasLargeTargets = context.hasLargeTargets;
     final rawBus = route.rawBus;
-    final hasRamp = rawBus?.wheelchairAccessible == true || rawBus?.hasRamp == true;
+    final hasRamp = rawBus?.wheelchairAccessible == true;
     final hasLowFloor = rawBus?.lowFloor == true;
 
     // LMT Go Status Pill Color (WCAG AA/AAA compliant contrast)
     final (statusBg, statusFg) = switch (route.liveStatusLabel.toLowerCase()) {
-      'ongoing' => (isHighContrast ? const Color(0xFF003833) : const Color(0xFFE8F5E9), isHighContrast ? Colors.white : const Color(0xFF1B5E20)),
-      'approaching' => (isHighContrast ? const Color(0xFF001F3F) : const Color(0xFFE3F2FD), isHighContrast ? Colors.white : const Color(0xFF0D47A1)),
-      'delayed' => (isHighContrast ? const Color(0xFF8B0000) : const Color(0xFFFFEBEE), isHighContrast ? Colors.white : const Color(0xFFB71C1C)),
-      _ => (isHighContrast ? const Color(0xFF1A1A1A) : AppColors.surfaceContainer, isHighContrast ? Colors.white : AppColors.onSurfaceVariant),
+      'ongoing' => (
+        isHighContrast ? const Color(0xFF003833) : const Color(0xFFE8F5E9),
+        isHighContrast ? Colors.white : const Color(0xFF1B5E20),
+      ),
+      'approaching' => (
+        isHighContrast ? const Color(0xFF001F3F) : const Color(0xFFE3F2FD),
+        isHighContrast ? Colors.white : const Color(0xFF0D47A1),
+      ),
+      'delayed' => (
+        isHighContrast ? const Color(0xFF8B0000) : const Color(0xFFFFEBEE),
+        isHighContrast ? Colors.white : const Color(0xFFB71C1C),
+      ),
+      _ => (
+        isHighContrast ? const Color(0xFF1A1A1A) : AppColors.surfaceContainer,
+        isHighContrast ? Colors.white : AppColors.onSurfaceVariant,
+      ),
     };
 
     return Material(
@@ -953,7 +1112,9 @@ class _LmtGoRouteCard extends StatelessWidget {
             border: Border.all(
               color: isHighContrast
                   ? Colors.black
-                  : (route.recommended ? AppColors.secondary : AppColors.surfaceVariant),
+                  : (route.recommended
+                        ? AppColors.secondary
+                        : AppColors.surfaceVariant),
               width: isHighContrast ? 2.0 : (route.recommended ? 1.5 : 1),
             ),
           ),
@@ -977,9 +1138,13 @@ class _LmtGoRouteCard extends StatelessWidget {
                             vertical: hasLargeTargets ? 6 : 4,
                           ),
                           decoration: BoxDecoration(
-                            color: isHighContrast ? const Color(0xFF8B0000) : const Color(0xFFC62828),
+                            color: isHighContrast
+                                ? const Color(0xFF8B0000)
+                                : const Color(0xFFC62828),
                             borderRadius: BorderRadius.circular(8),
-                            border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                            border: isHighContrast
+                                ? Border.all(color: Colors.black, width: 1.5)
+                                : null,
                           ),
                           child: Text(
                             route.routeNo ?? 'Route',
@@ -999,10 +1164,16 @@ class _LmtGoRouteCard extends StatelessWidget {
                             vertical: hasLargeTargets ? 5 : 4,
                           ),
                           decoration: BoxDecoration(
-                            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+                            color: isHighContrast
+                                ? Colors.white
+                                : AppColors.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.5),
+                              color: isHighContrast
+                                  ? Colors.black
+                                  : AppColors.outlineVariant.withValues(
+                                      alpha: 0.5,
+                                    ),
                               width: isHighContrast ? 1.5 : 1.0,
                             ),
                           ),
@@ -1012,7 +1183,9 @@ class _LmtGoRouteCard extends StatelessWidget {
                               Icon(
                                 Icons.directions_bus,
                                 size: hasLargeTargets ? 15 : 13,
-                                color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                                color: isHighContrast
+                                    ? Colors.black
+                                    : AppColors.onSurfaceVariant,
                               ),
                               const SizedBox(width: 4),
                               Text(
@@ -1020,7 +1193,9 @@ class _LmtGoRouteCard extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: hasLargeTargets ? 13 : 12,
                                   fontWeight: FontWeight.w700,
-                                  color: isHighContrast ? Colors.black : AppColors.onSurface,
+                                  color: isHighContrast
+                                      ? Colors.black
+                                      : AppColors.onSurface,
                                 ),
                               ),
                             ],
@@ -1036,7 +1211,9 @@ class _LmtGoRouteCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: statusBg,
                             borderRadius: BorderRadius.circular(999),
-                            border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                            border: isHighContrast
+                                ? Border.all(color: Colors.black, width: 1.5)
+                                : null,
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1045,7 +1222,9 @@ class _LmtGoRouteCard extends StatelessWidget {
                                 width: 6,
                                 height: 6,
                                 decoration: BoxDecoration(
-                                  color: isHighContrast ? Colors.white : statusFg,
+                                  color: isHighContrast
+                                      ? Colors.white
+                                      : statusFg,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -1088,7 +1267,9 @@ class _LmtGoRouteCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: isHighContrast ? Colors.black : AppColors.onSurface,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1100,11 +1281,18 @@ class _LmtGoRouteCard extends StatelessWidget {
 
               // 3. Middle Timeline Row: "Departs at" ── [Duration] ──> "Arrives at"
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
-                  color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+                  color: isHighContrast
+                      ? Colors.white
+                      : AppColors.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(12),
-                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: Row(
                   children: [
@@ -1117,7 +1305,9 @@ class _LmtGoRouteCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: isHighContrast ? const Color(0xFF2B2B2B) : AppColors.onSurfaceVariant,
+                            color: isHighContrast
+                                ? const Color(0xFF2B2B2B)
+                                : AppColors.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -1126,7 +1316,9 @@ class _LmtGoRouteCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: isHighContrast ? Colors.black : AppColors.onSurface,
+                            color: isHighContrast
+                                ? Colors.black
+                                : AppColors.onSurface,
                           ),
                         ),
                       ],
@@ -1143,7 +1335,9 @@ class _LmtGoRouteCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: isHighContrast ? Colors.black : AppColors.primary,
+                                color: isHighContrast
+                                    ? Colors.black
+                                    : AppColors.primary,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -1153,20 +1347,26 @@ class _LmtGoRouteCard extends StatelessWidget {
                                   width: 6,
                                   height: 6,
                                   decoration: BoxDecoration(
-                                    color: isHighContrast ? Colors.black : AppColors.secondary,
+                                    color: isHighContrast
+                                        ? Colors.black
+                                        : AppColors.secondary,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
                                 Expanded(
                                   child: Divider(
                                     thickness: 1.5,
-                                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                                    color: isHighContrast
+                                        ? Colors.black
+                                        : AppColors.outlineVariant,
                                   ),
                                 ),
                                 Icon(
                                   Icons.arrow_forward_rounded,
                                   size: 16,
-                                  color: isHighContrast ? Colors.black : AppColors.primary,
+                                  color: isHighContrast
+                                      ? Colors.black
+                                      : AppColors.primary,
                                 ),
                               ],
                             ),
@@ -1184,7 +1384,9 @@ class _LmtGoRouteCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: isHighContrast ? const Color(0xFF2B2B2B) : AppColors.onSurfaceVariant,
+                            color: isHighContrast
+                                ? const Color(0xFF2B2B2B)
+                                : AppColors.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -1193,7 +1395,9 @@ class _LmtGoRouteCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: isHighContrast ? Colors.black : AppColors.onSurface,
+                            color: isHighContrast
+                                ? Colors.black
+                                : AppColors.onSurface,
                           ),
                         ),
                       ],
@@ -1208,12 +1412,33 @@ class _LmtGoRouteCard extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
+                    _MiniFeatureBadge(
+                      icon:
+                          route.accessibilityStatus ==
+                              AccessibilityStatus.unknown
+                          ? Icons.help_outline
+                          : Icons.info_outline,
+                      label: route.accessibilityLabel,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurface,
+                      bgColor: isHighContrast
+                          ? Colors.white
+                          : AppColors.surfaceContainer,
+                    ),
+                    const SizedBox(width: 6),
                     if (hasRamp) ...[
                       _MiniFeatureBadge(
                         icon: Icons.accessible_rounded,
                         label: 'Ramp Available',
-                        color: isHighContrast ? Colors.black : AppColors.secondary,
-                        bgColor: isHighContrast ? Colors.white : AppColors.secondaryContainer.withValues(alpha: 0.4),
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.secondary,
+                        bgColor: isHighContrast
+                            ? Colors.white
+                            : AppColors.secondaryContainer.withValues(
+                                alpha: 0.4,
+                              ),
                       ),
                       const SizedBox(width: 6),
                     ],
@@ -1221,20 +1446,27 @@ class _LmtGoRouteCard extends StatelessWidget {
                       _MiniFeatureBadge(
                         icon: Icons.elevator_outlined,
                         label: 'Low Floor',
-                        color: isHighContrast ? Colors.black : AppColors.primary,
-                        bgColor: isHighContrast ? Colors.white : AppColors.primaryFixed,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.primary,
+                        bgColor: isHighContrast
+                            ? Colors.white
+                            : AppColors.primaryFixed,
                       ),
                       const SizedBox(width: 6),
                     ],
                     _MiniFeatureBadge(
                       icon: Icons.people_outline_rounded,
                       label: '${route.crowdLevel} Crowd',
-                      color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
-                      bgColor: isHighContrast ? Colors.white : AppColors.surfaceContainer,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurfaceVariant,
+                      bgColor: isHighContrast
+                          ? Colors.white
+                          : AppColors.surfaceContainer,
                     ),
                     const SizedBox(width: 6),
-                    if (route.isLive)
-                      _LiveTripBadge(busId: route.busId),
+                    if (route.isLive) _LiveTripBadge(busId: route.busId),
                   ],
                 ),
               ),
@@ -1267,7 +1499,9 @@ class _MiniFeatureBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: isHighContrast ? Colors.white : bgColor,
         borderRadius: BorderRadius.circular(8),
-        border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 1.5)
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1303,13 +1537,20 @@ class _LiveTripBadge extends StatelessWidget {
         if (trip == null || !trip.isInProgress) return const SizedBox.shrink();
 
         final depTime = trip.actualDepartureTime ?? trip.createdAt;
-        final elapsedMinutes = DateTime.now().difference(depTime).inMinutes.clamp(0, 999);
-        final label = elapsedMinutes == 0 ? 'Departed now' : '$elapsedMinutes m ago';
+        final elapsedMinutes = DateTime.now()
+            .difference(depTime)
+            .inMinutes
+            .clamp(0, 999);
+        final label = elapsedMinutes == 0
+            ? 'Departed now'
+            : '$elapsedMinutes m ago';
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: isHighContrast ? Colors.white : Colors.green.withValues(alpha: 0.15),
+            color: isHighContrast
+                ? Colors.white
+                : Colors.green.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: isHighContrast ? Colors.black : Colors.green.shade600,
@@ -1319,7 +1560,11 @@ class _LiveTripBadge extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.directions_bus_filled, size: 14, color: isHighContrast ? Colors.black : Colors.green.shade800),
+              Icon(
+                Icons.directions_bus_filled,
+                size: 14,
+                color: isHighContrast ? Colors.black : Colors.green.shade800,
+              ),
               const SizedBox(width: 4),
               Text(
                 label,

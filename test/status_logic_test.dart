@@ -2,7 +2,8 @@ import 'package:access_transit/logic/status_logic.dart';
 import 'package:access_transit/models/bus.dart';
 import 'package:access_transit/models/report.dart';
 import 'package:access_transit/models/station.dart';
-import 'package:access_transit/screens/journey/route_results_screen.dart' show AccessibilityStatus;
+import 'package:access_transit/screens/journey/route_results_screen.dart'
+    show AccessibilityStatus;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -64,7 +65,7 @@ void main() {
       expect(StatusLogic.isReportActive(freshReport, currentTime: now), isTrue);
     });
 
-    test('isReportActive returns false for reports older than 24 hours (expiry check)', () {
+    test('older structural faults remain unresolved but need rechecking', () {
       final expiredReport = Report(
         id: 'r2',
         targetType: 'station',
@@ -75,7 +76,11 @@ void main() {
         userId: 'user_1',
       );
 
-      expect(StatusLogic.isReportActive(expiredReport, currentTime: now), isFalse);
+      expect(
+        StatusLogic.isReportActive(expiredReport, currentTime: now),
+        isTrue,
+      );
+      expect(StatusLogic.needsRecheck(expiredReport, currentTime: now), isTrue);
     });
 
     test('isReportActive returns false for resolved reports', () {
@@ -89,7 +94,10 @@ void main() {
         userId: 'user_1',
       );
 
-      expect(StatusLogic.isReportActive(resolvedReport, currentTime: now), isFalse);
+      expect(
+        StatusLogic.isReportActive(resolvedReport, currentTime: now),
+        isFalse,
+      );
     });
 
     test('isReportActive (AC-81): report confirmed 1 hour ago = active', () {
@@ -105,10 +113,13 @@ void main() {
         userId: 'user_1',
       );
 
-      expect(StatusLogic.isReportActive(reportConfirmed1hAgo, currentTime: now), isTrue);
+      expect(
+        StatusLogic.isReportActive(reportConfirmed1hAgo, currentTime: now),
+        isTrue,
+      );
     });
 
-    test('isReportActive (AC-81): report confirmed 25 hours ago = expired/inactive', () {
+    test('structural fault checked 25 hours ago remains unresolved', () {
       final reportConfirmed25hAgo = Report(
         id: 'r5',
         targetType: 'station',
@@ -121,7 +132,14 @@ void main() {
         userId: 'user_1',
       );
 
-      expect(StatusLogic.isReportActive(reportConfirmed25hAgo, currentTime: now), isFalse);
+      expect(
+        StatusLogic.isReportActive(reportConfirmed25hAgo, currentTime: now),
+        isTrue,
+      );
+      expect(
+        StatusLogic.needsRecheck(reportConfirmed25hAgo, currentTime: now),
+        isTrue,
+      );
     });
 
     test('isReportActive (AC-81/AC-83): hidden report (falseCount >= 3) = inactive', () {
@@ -136,7 +154,10 @@ void main() {
         userId: 'user_1',
       );
 
-      expect(StatusLogic.isReportActive(hiddenReport, currentTime: now), isFalse);
+      expect(
+        StatusLogic.isReportActive(hiddenReport, currentTime: now),
+        isFalse,
+      );
     });
 
     test('getBusStatus evaluates Not Accessible branch when no ramp and no low floor', () {
@@ -160,7 +181,10 @@ void main() {
 
       expect(result.status, equals(AccessibilityStatus.partial));
       expect(result.statusLabel, equals('Warning'));
-      expect(result.reasons.first, contains('Vehicle wheelchair ramp is reported out of service'));
+      expect(
+        result.reasons.first,
+        contains('Vehicle wheelchair ramp is reported out of service'),
+      );
     });
 
     test('getBusStatus evaluates Warning branch when active report exists on a stop station', () {
@@ -183,7 +207,10 @@ void main() {
 
       expect(result.status, equals(AccessibilityStatus.partial));
       expect(result.statusLabel, equals('Warning'));
-      expect(result.reasons.any((r) => r.contains('Colombo Fort Station')), isTrue);
+      expect(
+        result.reasons.any((r) => r.contains('Colombo Fort Station')),
+        isTrue,
+      );
     });
 
     test('AC-83 integration lifecycle: create report -> bus Warning -> re-confirm extends Warning -> resolve -> bus Safe', () {
@@ -212,7 +239,7 @@ void main() {
       expect(result.status, equals(AccessibilityStatus.partial));
       expect(result.statusLabel, equals('Warning'));
 
-      // 2. Advance time by 2 hours (25 hours after creation). Without re-confirmation, report expires.
+      // 2. An old unresolved fault must not silently become Safe.
       final timeAfter25h = startTime.add(const Duration(hours: 2));
       result = StatusLogic.getBusStatus(
         safeBus,
@@ -220,8 +247,8 @@ void main() {
         stationsMap: stationsMap,
         currentTime: timeAfter25h,
       );
-      expect(result.status, equals(AccessibilityStatus.accessible));
-      expect(result.statusLabel, equals('Safe'));
+      expect(result.status, equals(AccessibilityStatus.partial));
+      expect(result.reasons.join(' '), contains('needs recheck'));
 
       // 3. Re-confirm report at T+1h (1 hour before expiry). lastConfirmedAt becomes T+1h.
       final confirmedReport = initialReport.copyWith(
@@ -255,4 +282,3 @@ void main() {
     });
   });
 }
-

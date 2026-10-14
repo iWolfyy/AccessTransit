@@ -43,6 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.kotlin/
+firebase-debug.log
+/test/security/node_modules/
+/test/security/dependency-audit.json
 
 # Widget Preview related
 .widget_preview/

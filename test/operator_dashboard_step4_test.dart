@@ -1,3 +1,5 @@
+import 'support/acknowledged_operator_backend.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:access_transit/logic/delay_eta_logic.dart';
 import 'package:access_transit/models/bus.dart';
@@ -24,35 +26,38 @@ void main() {
     );
 
     setUp(() {
-      liveBusService = LiveBusService();
+      liveBusService = AcknowledgedOperatorBackend().liveService();
     });
 
-    test('1. LiveBusService.reportDelay stores delayReason and addedDelayMinutes', () async {
-      await liveBusService.startOrUpdateLiveLocation(
-        BusLocationModel(
+    test(
+      '1. LiveBusService.reportDelay stores delayReason and addedDelayMinutes',
+      () async {
+        await liveBusService.startOrUpdateLiveLocation(
+          BusLocationModel(
+            busId: busId,
+            routeId: 'route_138',
+            latitude: 6.9344,
+            longitude: 79.8530,
+            status: BusStatus.active,
+            nextStop: 'st_maradana',
+            currentStopIndex: 0,
+            etaMinutes: 5,
+          ),
+        );
+
+        // Driver reports a 10 min traffic delay
+        await liveBusService.reportDelay(
           busId: busId,
-          routeId: 'route_138',
-          latitude: 6.9344,
-          longitude: 79.8530,
-          status: BusStatus.active,
-          nextStop: 'st_maradana',
-          currentStopIndex: 0,
-          etaMinutes: 5,
-        ),
-      );
+          reason: 'Traffic Congestion',
+          delayMinutes: 10,
+        );
 
-      // Driver reports a 10 min traffic delay
-      await liveBusService.reportDelay(
-        busId: busId,
-        reason: 'Traffic Congestion',
-        delayMinutes: 10,
-      );
-
-      final loc = await liveBusService.getLiveLocation(busId);
-      expect(loc, isNotNull);
-      expect(loc!.delayReason, equals('Traffic Congestion'));
-      expect(loc.addedDelayMinutes, equals(10));
-    });
+        final loc = await liveBusService.getLiveLocation(busId);
+        expect(loc, isNotNull);
+        expect(loc!.delayReason, equals('Traffic Congestion'));
+        expect(loc.addedDelayMinutes, equals(10));
+      },
+    );
 
     test('2. DelayEtaCalculator incorporates driver delayReason and addedDelayMinutes into ETA', () {
       final now = DateTime(2026, 10, 1, 8, 10);
@@ -94,25 +99,28 @@ void main() {
       expect(loc.addedDelayMinutes, equals(0));
     });
 
-    test('4. Passenger live stream receives real-time delay broadcast', () async {
-      final reasons = <String?>[];
+    test(
+      '4. Passenger live stream receives real-time delay broadcast',
+      () async {
+        final reasons = <String?>[];
 
-      final sub = liveBusService.listenToLiveLocation(busId).listen((loc) {
-        if (loc != null) {
-          reasons.add(loc.delayReason);
-        }
-      });
+        final sub = liveBusService.listenToLiveLocation(busId).listen((loc) {
+          if (loc != null) {
+            reasons.add(loc.delayReason);
+          }
+        });
 
-      await liveBusService.reportDelay(
-        busId: busId,
-        reason: 'Accident Ahead',
-        delayMinutes: 15,
-      );
+        await liveBusService.reportDelay(
+          busId: busId,
+          reason: 'Accident Ahead',
+          delayMinutes: 15,
+        );
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      await sub.cancel();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await sub.cancel();
 
-      expect(reasons, contains('Accident Ahead'));
-    });
+        expect(reasons, contains('Accident Ahead'));
+      },
+    );
   });
 }

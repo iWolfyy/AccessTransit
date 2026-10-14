@@ -1,0 +1,156 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function admin() { return signedIn() && request.auth.token.get('admin', false) == true; }
+    // Approval is provisioned by the project owner/Admin SDK, never by a profile role.
+    function approvedOperator() {
+      return signedIn() && exists(/databases/$(database)/documents/operator_access/$(request.auth.uid))
+        && get(/databases/$(database)/documents/operator_access/$(request.auth.uid)).data.approved == true;
+    }
+    function assignedOperator(busId) {
+      return approvedOperator() && exists(/databases/$(database)/documents/buses/$(busId))
+        && get(/databases/$(database)/documents/buses/$(busId)).data.get('driverId', '') == request.auth.uid;
+    }
+    function text(value, max) { return value is string && value.size() <= max; }
+    function nonempty(value, max) { return text(value, max) && value.size() > 0; }
+    function changesOnly(fields) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields); }
+    match /operator_access/{uid} {
+      allow get: if owner(uid) || admin();
+      allow list, write: if admin();
+    }
+    match /users/{uid} {
+      allow read: if owner(uid) || admin();
+      allow create: if owner(uid) && request.resource.data.keys().hasOnly(
+          ['uid', 'name', 'email', 'phone', 'role', 'createdAt', 'points', 'reportsSubmitted', 'verifiedCount'])
+        && request.resource.data.uid == uid && nonempty(request.resource.data.name, 100)
+        && request.resource.data.email == request.auth.token.email
+        && (request.resource.data.phone == null || text(request.resource.data.phone, 40))
+        && request.resource.data.role in ['passenger', 'operator']
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.points == 0 && request.resource.data.reportsSubmitted == 0
+        && request.resource.data.verifiedCount == 0;
+      allow update: if admin() || (owner(uid) && changesOnly(['name', 'phone', 'email'])
+        && nonempty(request.resource.data.name, 100) && request.resource.data.email == request.auth.token.email
+        && (request.resource.data.phone == null || text(request.resource.data.phone, 40)));
+      allow delete: if admin();
+    }
+    match /journeys/{id} {
+      allow read: if owner(resource.data.passengerId) || admin();
+      allow create: if owner(request.resource.data.passengerId)
+        && request.resource.data.keys().hasOnly(['journeyId', 'passengerId', 'routeId', 'routeNumber',
+          'routeTitle', 'busId', 'origin', 'destination', 'status', 'createdAt'])
+        && request.resource.data.journeyId == id && request.resource.data.createdAt == request.time
+        && request.resource.data.status in ['confirmed', 'active']
+        && exists(/databases/$(database)/documents/buses/$(request.resource.data.busId))
+        && nonempty(request.resource.data.origin, 200) && nonempty(request.resource.data.destination, 200);
+      allow update: if admin() || (owner(resource.data.passengerId) && changesOnly(['status'])
+        && resource.data.status in ['confirmed', 'active'] && request.resource.data.status in ['completed', 'cancelled']);
+      allow delete: if owner(resource.data.passengerId) || admin();
+    }
+    match /stations/{id} { allow read: if true; allow write: if admin(); }
+    match /routes/{id} { allow read: if true; allow write: if admin(); }
+    match /buses/{busId} {
+      allow read: if true;
+      allow create, delete: if admin();
+      allow update: if admin() || (approvedOperator()
+        && (resource.data.get('driverId', '') in ['', null] || resource.data.driverId == request.auth.uid)
+        && request.resource.data.driverId == request.auth.uid
+        && changesOnly(['driverId', 'rampOk', 'occupancy']) && request.resource.data.rampOk is bool
+        && request.resource.data.occupancy in ['low', 'medium', 'high']);
+    }
+    function validTelemetry(busId) {
+      let d = request.resource.data;
+      return d.busId == busId && d.driverId == request.auth.uid && d.operatorId == request.auth.uid
+        && d.latitude is number && d.latitude >= -90 && d.latitude <= 90
+        && d.longitude is number && d.longitude >= -180 && d.longitude <= 180
+        && d.speed is number && d.speed >= 0 && d.speed <= 200
+        && d.timestamp is timestamp && d.timestamp <= request.time
+        && d.status in ['active', 'delayed', 'offline', 'completed'] && d.isBroadcasting is bool;
+    }
+    match /live_locations/{busId} {
+      allow read: if true;
+      allow create, update: if assignedOperator(busId) && validTelemetry(busId);
+      allow delete: if assignedOperator(busId) || admin();
+    }
+    match /active_buses/{busId} { allow read: if true; allow write: if admin(); }
+    match /trips/{id} {
+      allow read: if true;
+      allow create: if assignedOperator(request.resource.data.busId) && request.resource.data.driverId == request.auth.uid
+        && request.resource.data.tripId == id && request.resource.data.createdAt == request.time
+        && request.resource.data.status == 'in_progress';
+      allow update: if assignedOperator(resource.data.busId)
+        && request.resource.data.busId == resource.data.busId && request.resource.data.driverId == resource.data.driverId
+        && changesOnly(['status', 'actualDepartureTime', 'stopTimes', 'currentStopIndex'])
+        && request.resource.data.status in ['in_progress', 'completed'];
+      allow delete: if admin();
+    }
+    function validReport(d) {
+      return d.targetType in ['bus', 'station'] && nonempty(d.targetId, 128)
+        && ((d.targetType == 'bus' && exists(/databases/$(database)/documents/buses/$(d.targetId)))
+          || (d.targetType == 'station' && exists(/databases/$(database)/documents/stations/$(d.targetId))))
+        && text(d.targetName, 200) && nonempty(d.problemType, 300) && text(d.subCategory, 300)
+        && text(d.description, 2000) && text(d.photoUrl, 2048)
+        && (d.photoUrl == '' || d.photoUrl.matches('https://res[.]cloudinary[.]com/dyrynkuh3/.*'))
+        && d.severity in ['minor', 'moderate', 'major']
+        && d.category in ['rampAccess', 'elevatorOut', 'crowding', 'cleanliness', 'safetyHazard', 'driverAssistanceDenied', 'tactilePavingBlocked']
+        && d.get('condition', 'unknown') in ['positive', 'barrier', 'unknown']
+        && d.get('crowdingLevel', '') in ['', 'low', 'medium', 'high'];
+    }
+    function validVotes(d) {
+      return d.confirmedBy is list && d.flaggedBy is list
+        && d.confirmedBy.size() == d.confirmedBy.toSet().size() && d.flaggedBy.size() == d.flaggedBy.toSet().size()
+        && d.confirmedBy.toSet().intersection(d.flaggedBy.toSet()).size() == 0
+        && d.confirmCount == d.confirmedBy.size() && d.falseCount == d.flaggedBy.size();
+    }
+    function ownVoteOnly() {
+      let old = resource.data;
+      let d = request.resource.data;
+      return signedIn() && old.userId != request.auth.uid && old.status == 'active'
+        && changesOnly(['confirmedBy', 'flaggedBy', 'confirmCount', 'falseCount', 'lastConfirmedAt']) && validVotes(d)
+        && d.confirmedBy.toSet().difference(old.confirmedBy.toSet()).hasOnly([request.auth.uid])
+        && old.confirmedBy.toSet().difference(d.confirmedBy.toSet()).hasOnly([request.auth.uid])
+        && d.flaggedBy.toSet().difference(old.flaggedBy.toSet()).hasOnly([request.auth.uid])
+        && old.flaggedBy.toSet().difference(d.flaggedBy.toSet()).hasOnly([request.auth.uid])
+        && ((request.auth.uid in d.confirmedBy && d.lastConfirmedAt == request.time)
+          || (request.auth.uid in d.flaggedBy && d.lastConfirmedAt == old.lastConfirmedAt));
+    }
+    match /reports/{id} {
+      // All client-created records in this collection are explicitly published.
+      allow read: if true;
+      allow create: if owner(request.resource.data.userId)
+        && request.resource.data.keys().hasOnly(['targetType', 'targetId', 'targetName', 'problemType', 'severity', 'category',
+          'subCategory', 'condition', 'crowdingLevel', 'publicationState', 'isDemo', 'description', 'photoUrl', 'status',
+          'createdAt', 'lastConfirmedAt', 'confirmCount', 'falseCount', 'userId', 'confirmedBy', 'flaggedBy'])
+        && validReport(request.resource.data) && validVotes(request.resource.data)
+        && request.resource.data.createdAt == request.time && request.resource.data.lastConfirmedAt == null
+        && request.resource.data.publicationState == 'published' && request.resource.data.isDemo == false
+        && request.resource.data.status == 'active' && request.resource.data.confirmCount == 0 && request.resource.data.falseCount == 0;
+      allow update: if admin() || ownVoteOnly() || (owner(resource.data.userId)
+        && resource.data.status == 'active' && changesOnly(['status']) && request.resource.data.status == 'resolved');
+      allow delete: if admin() || owner(resource.data.userId) || (signedIn() && resource.data.status == 'active'
+        && resource.data.falseCount == 2 && resource.data.flaggedBy.size() == 2
+        && !(request.auth.uid in resource.data.flaggedBy) && request.auth.uid != resource.data.userId);
+    }
+    match /boarding_requests/{id} {
+      allow read: if owner(resource.data.riderId) || assignedOperator(resource.data.busId) || admin();
+      allow create: if owner(request.resource.data.riderId)
+        && request.resource.data.keys().hasOnly(['riderId', 'riderName', 'busId', 'routeNo', 'stationId', 'stopName',
+          'assistanceTypes', 'status', 'createdAt'])
+        && exists(/databases/$(database)/documents/buses/$(request.resource.data.busId))
+        && request.resource.data.stationId in get(/databases/$(database)/documents/buses/$(request.resource.data.busId)).data.stops
+        && nonempty(request.resource.data.riderName, 100) && nonempty(request.resource.data.stopName, 200)
+        && request.resource.data.assistanceTypes is list && request.resource.data.assistanceTypes.size() > 0
+        && request.resource.data.assistanceTypes.hasOnly(['Deploy Ramp', 'Extra Time', 'Boarding Help'])
+        && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
+      allow update: if admin() || (changesOnly(['status']) && (
+        (owner(resource.data.riderId) && resource.data.status in ['pending', 'acknowledged'] && request.resource.data.status == 'cancelled')
+        || (assignedOperator(resource.data.busId) && (
+          (resource.data.status == 'pending' && request.resource.data.status in ['acknowledged', 'rejected'])
+          || (resource.data.status == 'acknowledged' && request.resource.data.status == 'completed')))));
+      allow delete: if admin();
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -1,14 +1,25 @@
 import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+
 import '../core/utils/time_utils.dart';
 import '../models/trip_model.dart';
+import '../models/bus_location_model.dart';
 import 'eta_service.dart';
-import 'live_bus_service.dart';
 
 /// Repository service for managing bus trip executions (`trips/{tripId}`).
 class TripService {
-  TripService({FirebaseFirestore? firestore}) : _customFirestore = firestore;
+  TripService({FirebaseFirestore? firestore, this.tripWriter})
+    : _customFirestore = firestore;
+
+  /// Injected acknowledged backend for deterministic delivery tests.
+  final Future<void> Function(TripModel, TripModel?)? tripWriter;
+
+  void _cache(TripModel trip) {
+    _localTripsFallback[trip.busId] = trip;
+    _localTripsStreamController.add(Map.unmodifiable(_localTripsFallback));
+  }
 
   final FirebaseFirestore? _customFirestore;
 
@@ -22,7 +33,8 @@ class TripService {
   }
 
   static final Map<String, TripModel> _localTripsFallback = {};
-  static final StreamController<Map<String, TripModel>> _localTripsStreamController =
+  static final StreamController<Map<String, TripModel>>
+  _localTripsStreamController =
       StreamController<Map<String, TripModel>>.broadcast();
 
   CollectionReference<Map<String, dynamic>>? get _tripsRef =>
@@ -36,19 +48,33 @@ class TripService {
     required String driverId,
     List<String>? scheduleTimes,
     DateTime? departureTime,
+    String? requestedTripId,
+    BusLocationModel? initialTelemetry,
   }) async {
     final now = DateTime.now();
     final actualDepTime = departureTime ?? now;
-    final tripId = 'trip_${busId}_${now.millisecondsSinceEpoch}';
+    final tripId =
+        requestedTripId ?? 'trip_${busId}_${now.microsecondsSinceEpoch}';
+    if (stops.isEmpty || driverId.isEmpty) {
+      throw StateError('Select a bus itinerary and sign in first');
+    }
 
     Map<String, StopTimingInfo> stopTimes = {};
 
     if (scheduleTimes != null &&
         scheduleTimes.isNotEmpty &&
         scheduleTimes.length == stops.length) {
+      DateTime? previous;
       for (int i = 0; i < stops.length; i++) {
         final timeStr = scheduleTimes[i];
-        final scheduledDt = TimeUtils.parseTimeStringToDateTime(timeStr, actualDepTime);
+        var scheduledDt = TimeUtils.parseTimeStringToDateTime(
+          timeStr,
+          actualDepTime,
+        );
+        while (previous != null && scheduledDt.isBefore(previous)) {
+          scheduledDt = scheduledDt.add(const Duration(days: 1));
+        }
+        previous = scheduledDt;
         stopTimes[stops[i]] = StopTimingInfo(
           estimatedArrival: scheduledDt,
           actualArrival: i == 0 ? actualDepTime : null,
@@ -71,66 +97,129 @@ class TripService {
       createdAt: now,
     );
 
-    // Store in local fallback first
-    _localTripsFallback[busId] = trip;
-    _localTripsStreamController.add(_localTripsFallback);
-
-    try {
-      final ref = _tripsRef?.doc(tripId);
-      if (ref != null) {
-        await ref.set(trip.toMap(isServerTimestamp: true));
+    if (tripWriter != null) {
+      await tripWriter!(trip, null);
+    } else {
+      final db = _db;
+      if (db == null || initialTelemetry == null) {
+        throw StateError(
+          'A shared backend and initial GPS observation are required',
+        );
       }
-    } catch (e) {
-      debugPrint('TripService.startTrip warning: $e');
+      final ref = db.collection('trips').doc(tripId);
+      final live = db.collection('live_locations').doc(busId);
+      final saved = await db
+          .runTransaction<TripModel>((tx) async {
+            final existing = await tx.get(ref);
+            final currentLive = await tx.get(live);
+            if (existing.exists) {
+              final prior = TripModel.fromFirestore(existing);
+              if (prior.driverId != driverId || prior.busId != busId) {
+                throw StateError('Trip identity changed');
+              }
+              if (!prior.isInProgress ||
+                  currentLive.data()?['tripId'] != tripId ||
+                  currentLive.data()?['isBroadcasting'] != true) {
+                throw StateError(
+                  'This trip ended or its broadcast session changed. Refresh before starting.',
+                );
+              }
+              // Resume/retry retains the acknowledged stop timeline and updates only GPS.
+              tx.update(live, {
+                'latitude': initialTelemetry.latitude,
+                'longitude': initialTelemetry.longitude,
+                'speed': initialTelemetry.speed,
+                'heading': initialTelemetry.heading,
+                'timestamp': FieldValue.serverTimestamp(),
+                'lastUpdated': FieldValue.serverTimestamp(),
+              });
+              return prior;
+            }
+            if (currentLive.data()?['isBroadcasting'] == true) {
+              throw StateError(
+                'This bus already has a broadcasting trip. Refresh before starting.',
+              );
+            }
+            tx.set(ref, trip.toMap(isServerTimestamp: true));
+            tx.set(live, {
+              ...initialTelemetry.toMap(isServerTimestamp: true),
+              'tripId': tripId,
+            });
+            return trip;
+          })
+          .timeout(const Duration(seconds: 12));
+      _cache(saved);
+      return saved;
     }
+    _cache(trip);
 
     return trip;
   }
 
   /// 2. Streams the current active trip for a given [busId].
-  Stream<TripModel?> watchActiveTripForBus(String busId) async* {
+  Stream<TripModel?> watchActiveTripForBus(String busId) {
     TripModel? getLocal() {
       final t = _localTripsFallback[busId];
-      if (t != null && t.isInProgress) return t;
-      return null;
+      return t?.isInProgress == true ? t : null;
     }
 
-    yield getLocal();
-
-    final localSub = _localTripsStreamController.stream.listen((_) {});
-
-    try {
-      final col = _tripsRef;
-      if (col != null) {
-        final query = col
-            .where('busId', isEqualTo: busId)
-            .where('status', isEqualTo: 'in_progress');
-
-        await for (final snapshot in query.snapshots()) {
-          if (snapshot.docs.isNotEmpty) {
-            final doc = snapshot.docs.first;
-            final trip = TripModel.fromFirestore(doc);
-            _localTripsFallback[busId] = trip;
-            yield trip;
-          } else {
-            yield getLocal();
-          }
+    late StreamController<TripModel?> controller;
+    StreamSubscription? remote;
+    StreamSubscription? local;
+    controller = StreamController<TripModel?>(
+      onListen: () {
+        controller.add(getLocal());
+        local = _localTripsStreamController.stream.listen(
+          (_) => controller.add(getLocal()),
+        );
+        final col = _tripsRef;
+        if (col != null) {
+          remote = col
+              .where('busId', isEqualTo: busId)
+              .where('status', isEqualTo: 'in_progress')
+              .snapshots(includeMetadataChanges: true)
+              .listen(
+                (snapshot) {
+                  if (snapshot.metadata.hasPendingWrites) {
+                    controller.add(getLocal());
+                    return;
+                  }
+                  if (snapshot.docs.isNotEmpty) {
+                    _localTripsFallback[busId] = TripModel.fromFirestore(
+                      snapshot.docs.first,
+                    );
+                  } else if (!snapshot.metadata.isFromCache) {
+                    _localTripsFallback.remove(busId);
+                  }
+                  controller.add(getLocal());
+                },
+                onError: (Object error) {
+                  controller.addError(error);
+                },
+              );
         }
-      } else {
-        yield getLocal();
-      }
-    } catch (e) {
-      debugPrint('TripService.watchActiveTripForBus fallback: $e');
-      yield getLocal();
-    } finally {
-      await localSub.cancel();
-    }
+      },
+      onCancel: () async {
+        await local?.cancel();
+        await remote?.cancel();
+      },
+    );
+    return controller.stream;
   }
 
   /// 3. Confirms arrival at the next stop, advancing [currentStopIndex] and updating arrival times.
-  Future<TripModel?> confirmNextStopArrival(String busId, {DateTime? arrivalTime}) async {
+  Future<TripModel?> confirmNextStopArrival(
+    String busId, {
+    DateTime? arrivalTime,
+    String? expectedTripId,
+  }) async {
     final active = _localTripsFallback[busId];
     if (active == null || !active.isInProgress) return null;
+    if (expectedTripId != null && active.tripId != expectedTripId) {
+      throw StateError(
+        'The active trip changed. Resume the current trip before confirming arrival.',
+      );
+    }
 
     final nextIndex = active.currentStopIndex + 1;
     if (nextIndex >= active.stops.length) {
@@ -149,64 +238,87 @@ class TripService {
     );
 
     final updatedTrip = active.copyWith(
+      status: nextIndex == active.stops.length - 1
+          ? 'completed'
+          : 'in_progress',
       currentStopIndex: nextIndex,
       stopTimes: updatedStopTimes,
     );
 
-    _localTripsFallback[busId] = updatedTrip;
-    _localTripsStreamController.add(_localTripsFallback);
-
-    try {
-      final ref = _tripsRef?.doc(active.tripId);
-      if (ref != null) {
-        await ref.update(updatedTrip.toMap());
-      }
-    } catch (e) {
-      debugPrint('TripService.confirmNextStopArrival warning: $e');
-    }
-
-    // Instantly sync LiveBusService so passenger screens receive the new next stop
-    try {
-      final hasUpcoming = nextIndex + 1 < active.stops.length;
-      final upcomingStop = hasUpcoming ? active.stops[nextIndex + 1] : active.stops[nextIndex];
-      await LiveBusService().updateNextStop(
-        busId: busId,
-        nextStop: upcomingStop,
-        currentStopIndex: nextIndex,
-      );
-    } catch (e) {
-      debugPrint('TripService.confirmNextStopArrival LiveBusService sync warning: $e');
-    }
-
-    return updatedTrip;
+    final acknowledged = await _commitProgress(active, updatedTrip);
+    _cache(acknowledged);
+    return acknowledged;
   }
 
   /// 4. Completes an active trip.
-  Future<TripModel?> completeTrip(String busId) async {
+  Future<TripModel?> completeTrip(
+    String busId, {
+    String? expectedTripId,
+  }) async {
     final active = _localTripsFallback[busId];
     if (active == null) return null;
+    if (expectedTripId != null && active.tripId != expectedTripId) {
+      throw StateError(
+        'The active trip changed. Refresh before completing it.',
+      );
+    }
 
     final completedTrip = active.copyWith(status: 'completed');
 
-    _localTripsFallback[busId] = completedTrip;
-    _localTripsStreamController.add(_localTripsFallback);
+    final acknowledged = await _commitProgress(active, completedTrip);
+    _cache(acknowledged);
+    return acknowledged;
+  }
 
-    try {
-      final ref = _tripsRef?.doc(active.tripId);
-      if (ref != null) {
-        await ref.update({'status': 'completed'});
-      }
-    } catch (e) {
-      debugPrint('TripService.completeTrip warning: $e');
+  /// Atomically acknowledge the timeline and its corresponding broadcast state.
+  Future<TripModel> _commitProgress(TripModel before, TripModel after) async {
+    if (tripWriter != null) {
+      await tripWriter!(after, before);
+      return after;
     }
-
-    try {
-      await LiveBusService().stopTrip(busId);
-    } catch (e) {
-      debugPrint('TripService.completeTrip stopTrip warning: $e');
-    }
-
-    return completedTrip;
+    final db = _db;
+    if (db == null) throw StateError('Shared trips are unavailable');
+    final ref = db.collection('trips').doc(before.tripId);
+    final live = db.collection('live_locations').doc(before.busId);
+    return db
+        .runTransaction<TripModel>((tx) async {
+          final snapshot = await tx.get(ref);
+          final telemetry = await tx.get(live);
+          if (!snapshot.exists ||
+              telemetry.data()?['tripId'] != before.tripId) {
+            throw StateError(
+              'The trip session changed. Refresh before retrying.',
+            );
+          }
+          final actual = TripModel.fromFirestore(snapshot);
+          if (actual.status == after.status &&
+              actual.currentStopIndex == after.currentStopIndex) {
+            return actual;
+          }
+          if (actual.status != before.status ||
+              actual.currentStopIndex != before.currentStopIndex) {
+            throw StateError('Trip progress changed. Refresh before retrying.');
+          }
+          tx.update(ref, {
+            'status': after.status,
+            'currentStopIndex': after.currentStopIndex,
+            'stopTimes': after.toMap()['stopTimes'],
+          });
+          final next = (after.currentStopIndex + 1).clamp(
+            0,
+            after.stops.length - 1,
+          );
+          tx.update(live, {
+            'currentStopIndex': after.currentStopIndex,
+            'nextStop': after.stops[next],
+            if (!after.isInProgress) 'status': 'completed',
+            if (!after.isInProgress) 'isBroadcasting': false,
+            if (!after.isInProgress) 'addedDelayMinutes': 0,
+            if (!after.isInProgress) 'delayReason': FieldValue.delete(),
+          });
+          return after;
+        })
+        .timeout(const Duration(seconds: 12));
   }
 
   /// Fetches a one-time snapshot of the active trip for a bus.
@@ -217,11 +329,20 @@ class TripService {
         final snapshot = await col
             .where('busId', isEqualTo: busId)
             .where('status', isEqualTo: 'in_progress')
-            .get();
+            .get(const GetOptions(source: Source.server))
+            .timeout(const Duration(seconds: 12));
+        if (snapshot.metadata.hasPendingWrites) {
+          return _localTripsFallback[busId];
+        }
         if (snapshot.docs.isNotEmpty) {
           final trip = TripModel.fromFirestore(snapshot.docs.first);
           _localTripsFallback[busId] = trip;
           return trip;
+        }
+        if (!snapshot.metadata.isFromCache &&
+            !snapshot.metadata.hasPendingWrites) {
+          _localTripsFallback.remove(busId);
+          return null;
         }
       }
     } catch (e) {

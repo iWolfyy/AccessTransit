@@ -37,8 +37,8 @@ class AuthService {
   /// Registers a new AccessTransit user.
   ///
   /// 1. Creates the Firebase Authentication account (or resumes if previous attempt was interrupted).
-  /// 2. Updates the user's displayName in Firebase Auth.
-  /// 3. Creates the corresponding Firestore user profile.
+  /// 2. Creates a missing Firestore profile or preserves an existing profile.
+  /// 3. Syncs the user's displayName from the preserved profile.
   Future<UserModel> register({
     required String name,
     required String email,
@@ -77,13 +77,7 @@ class AuthService {
       throw Exception('Failed to obtain authenticated Firebase user.');
     }
 
-    try {
-      await firebaseUser.updateDisplayName(name);
-    } catch (e) {
-      debugPrint('AuthService.register: updateDisplayName warning: $e');
-    }
-
-    final user = UserModel.fromAuth(
+    final proposedUser = UserModel.fromAuth(
       uid: firebaseUser.uid,
       name: name,
       email: email,
@@ -91,10 +85,12 @@ class AuthService {
       role: role,
     );
 
+    final user = await _userService.createUser(proposedUser);
+
     try {
-      await _userService.createUser(user);
+      await firebaseUser.updateDisplayName(user.name);
     } catch (e) {
-      debugPrint('AuthService.register: createUser warning: $e');
+      debugPrint('AuthService.register: updateDisplayName warning: $e');
     }
 
     return user;

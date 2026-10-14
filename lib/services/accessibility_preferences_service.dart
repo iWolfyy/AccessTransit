@@ -33,7 +33,7 @@ class AccessibilityPreferencesService extends ChangeNotifier {
   bool _isStepFree = false;
   bool _hasLargeTargets = true;
   bool _minimizeWalking = false;
-  bool _voiceGuidance = true;
+  bool _voiceGuidance = false;
   bool _hapticAlerts = false;
   bool _boardingAssistance = false;
   bool _quietRoutes = false;
@@ -65,11 +65,22 @@ class AccessibilityPreferencesService extends ChangeNotifier {
       _isWheelchairOnly = _prefs?.getBool(keyWheelchairOnly) ?? true;
       _isStepFree = _prefs?.getBool(keyStepFree) ?? false;
       _hasLargeTargets = _prefs?.getBool(keyHasLargeTargets) ?? true;
-      _minimizeWalking = _prefs?.getBool(keyMinimizeWalking) ?? false;
-      _voiceGuidance = _prefs?.getBool(keyVoiceGuidance) ?? true;
-      _hapticAlerts = _prefs?.getBool(keyHapticAlerts) ?? false;
-      _boardingAssistance = _prefs?.getBool(keyBoardingAssistance) ?? false;
-      _quietRoutes = _prefs?.getBool(keyQuietRoutes) ?? false;
+      // Migrate old switches that never had a working implementation.
+      _minimizeWalking = false;
+      _voiceGuidance = false;
+      _hapticAlerts = false;
+      _boardingAssistance = false;
+      _quietRoutes = false;
+      await Future.wait([
+        for (final key in [
+          keyMinimizeWalking,
+          keyVoiceGuidance,
+          keyHapticAlerts,
+          keyBoardingAssistance,
+          keyQuietRoutes,
+        ])
+          _prefs!.setBool(key, false),
+      ]);
     } catch (e) {
       debugPrint('AccessibilityPreferencesService init warning: $e');
     } finally {
@@ -112,6 +123,7 @@ class AccessibilityPreferencesService extends ChangeNotifier {
 
   /// Sets Minimize Walking distance preference.
   Future<void> setMinimizeWalking(bool value) async {
+    if (value) return; // Walking paths/distances are not available yet.
     if (_minimizeWalking == value) return;
     _minimizeWalking = value;
     await _prefs?.setBool(keyMinimizeWalking, value);
@@ -120,6 +132,7 @@ class AccessibilityPreferencesService extends ChangeNotifier {
 
   /// Sets Voice Guidance preference.
   Future<void> setVoiceGuidance(bool value) async {
+    if (value) return; // Spoken navigation is not implemented yet.
     if (_voiceGuidance == value) return;
     _voiceGuidance = value;
     await _prefs?.setBool(keyVoiceGuidance, value);
@@ -128,6 +141,7 @@ class AccessibilityPreferencesService extends ChangeNotifier {
 
   /// Sets Haptic Alerts preference.
   Future<void> setHapticAlerts(bool value) async {
+    if (value) return; // Automatic travel alerts are not implemented yet.
     if (_hapticAlerts == value) return;
     _hapticAlerts = value;
     await _prefs?.setBool(keyHapticAlerts, value);
@@ -136,6 +150,8 @@ class AccessibilityPreferencesService extends ChangeNotifier {
 
   /// Sets Boarding Assistance preference.
   Future<void> setBoardingAssistance(bool value) async {
+    // Assistance can be requested manually, not automatically.
+    if (value) return;
     if (_boardingAssistance == value) return;
     _boardingAssistance = value;
     await _prefs?.setBool(keyBoardingAssistance, value);
@@ -144,6 +160,7 @@ class AccessibilityPreferencesService extends ChangeNotifier {
 
   /// Sets Quiet Routes preference.
   Future<void> setQuietRoutes(bool value) async {
+    if (value) return; // No noise observations or quiet-route matching yet.
     if (_quietRoutes == value) return;
     _quietRoutes = value;
     await _prefs?.setBool(keyQuietRoutes, value);
@@ -162,27 +179,34 @@ class AccessibilityPreferencesService extends ChangeNotifier {
     bool? boardingAssistance,
     bool? quietRoutes,
   }) async {
+    // Unsupported preferences cannot become active via batch save either.
+    _minimizeWalking = false;
+    _voiceGuidance = false;
+    _hapticAlerts = false;
+    _boardingAssistance = false;
+    _quietRoutes = false;
     if (isHighContrast != null) _isHighContrast = isHighContrast;
     if (isWheelchairOnly != null) _isWheelchairOnly = isWheelchairOnly;
     if (isStepFree != null) _isStepFree = isStepFree;
     if (hasLargeTargets != null) _hasLargeTargets = hasLargeTargets;
-    if (minimizeWalking != null) _minimizeWalking = minimizeWalking;
-    if (voiceGuidance != null) _voiceGuidance = voiceGuidance;
-    if (hapticAlerts != null) _hapticAlerts = hapticAlerts;
-    if (boardingAssistance != null) _boardingAssistance = boardingAssistance;
-    if (quietRoutes != null) _quietRoutes = quietRoutes;
 
     if (_prefs != null) {
       await Future.wait([
-        if (isHighContrast != null) _prefs!.setBool(keyHighContrast, isHighContrast),
-        if (isWheelchairOnly != null) _prefs!.setBool(keyWheelchairOnly, isWheelchairOnly),
+        if (isHighContrast != null)
+          _prefs!.setBool(keyHighContrast, isHighContrast),
+        if (isWheelchairOnly != null)
+          _prefs!.setBool(keyWheelchairOnly, isWheelchairOnly),
         if (isStepFree != null) _prefs!.setBool(keyStepFree, isStepFree),
-        if (hasLargeTargets != null) _prefs!.setBool(keyHasLargeTargets, hasLargeTargets),
-        if (minimizeWalking != null) _prefs!.setBool(keyMinimizeWalking, minimizeWalking),
-        if (voiceGuidance != null) _prefs!.setBool(keyVoiceGuidance, voiceGuidance),
-        if (hapticAlerts != null) _prefs!.setBool(keyHapticAlerts, hapticAlerts),
-        if (boardingAssistance != null) _prefs!.setBool(keyBoardingAssistance, boardingAssistance),
-        if (quietRoutes != null) _prefs!.setBool(keyQuietRoutes, quietRoutes),
+        if (hasLargeTargets != null)
+          _prefs!.setBool(keyHasLargeTargets, hasLargeTargets),
+        for (final key in [
+          keyMinimizeWalking,
+          keyVoiceGuidance,
+          keyHapticAlerts,
+          keyBoardingAssistance,
+          keyQuietRoutes,
+        ])
+          _prefs!.setBool(key, false),
       ]);
     }
 
@@ -197,7 +221,7 @@ class AccessibilityPreferencesService extends ChangeNotifier {
       isStepFree: false,
       hasLargeTargets: true,
       minimizeWalking: false,
-      voiceGuidance: true,
+      voiceGuidance: false,
       hapticAlerts: false,
       boardingAssistance: false,
       quietRoutes: false,

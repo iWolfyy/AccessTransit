@@ -15,7 +15,8 @@ import 'profile/profile_screen.dart';
 /// live journey, etc.) are still pushed via [Navigator.push] and sit on top of
 /// this shell — they do **not** show the bottom nav bar (Instagram pattern).
 class MainShell extends StatefulWidget {
-  const MainShell({super.key, this.initialUser});
+  const MainShell({super.key, this.initialUser, this.initialTab = 'Home'});
+  final String initialTab;
 
   /// Optional pre-loaded user to pass into [HomeScreen] / [ProfileScreen].
   final UserModel? initialUser;
@@ -26,6 +27,12 @@ class MainShell extends StatefulWidget {
 
 class MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  @override
+  void initState() {
+    super.initState();
+    final index = _tabLabels.indexOf(widget.initialTab);
+    if (index >= 0) _currentIndex = index;
+  }
 
   static const List<String> _tabLabels = [
     'Home',

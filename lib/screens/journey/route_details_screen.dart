@@ -6,6 +6,7 @@ import '../../data/seed_data.dart';
 import '../../logic/delay_eta_logic.dart';
 import '../../logic/status_logic.dart';
 import '../../models/bus.dart';
+import '../../models/assistance_target.dart';
 import '../../models/bus_location_model.dart';
 import '../../models/report.dart';
 import '../../models/station.dart';
@@ -13,13 +14,14 @@ import '../../models/trip_model.dart';
 import '../../services/firestore_service.dart';
 import '../../services/live_bus_service.dart';
 import '../../services/trip_service.dart';
+import '../../widgets/accessibility_evidence_card.dart';
 import 'boarding_assistance_screen.dart';
-import 'live_journey_screen.dart';
+import 'journey_confirmation_screen.dart';
 import 'report_condition_screen.dart';
 import 'route_results_screen.dart';
 
 /// Route Details screen — single page showing Departure Details, Stops Schedule,
-/// Accessibility Verified status, Ticket Price, and Safety.
+/// Accessibility evidence, Ticket Price, and Safety.
 class RouteDetailsScreen extends StatelessWidget {
   const RouteDetailsScreen({
     super.key,
@@ -59,10 +61,26 @@ class RouteDetailsScreen extends StatelessWidget {
                   stream: firestoreService.streamReports(),
                   builder: (context, reportsSnapshot) {
                     final activeReports =
-                        reportsSnapshot.data ?? SeedData.getSampleReports();
+                        reportsSnapshot.data ?? const <Report>[];
+                    // Seeded demonstration records cannot verify real conditions.
+                    final demoKeys = SeedData.getSampleReports()
+                        .map((r) => '${r.id}:${r.userId}')
+                        .toSet();
+                    final evidenceReports = activeReports
+                        .where((r) => !demoKeys.contains('${r.id}:${r.userId}'))
+                        .toList();
 
                     final liveStatusResult = liveBus != null
-                        ? StatusLogic.getBusStatus(liveBus, activeReports)
+                        ? StatusLogic.getBusStatus(
+                            liveBus,
+                            activeReports,
+                            fromStationId: route?.fromStationId ?? origin,
+                            toStationId: route?.toStationId ?? destination,
+                            stationsMap: route?.journeyStations,
+                            wheelchairAccessRequired:
+                                route?.wheelchairAccessRequired ?? false,
+                            stepFreeOnly: route?.stepFreeOnly ?? false,
+                          )
                         : statusResult;
 
                     String liveCrowdLevel = route?.crowdLevel ?? 'Low';
@@ -90,6 +108,10 @@ class RouteDetailsScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                if (route?.nextDepartureDateTime != null)
+                                  Text(
+                                    'Selected timetable departure: ${route!.nextDepartureDateTime} — current GPS does not confirm this scheduled run.',
+                                  ),
                                 // SECTION 1: Departure Details & Stop Schedule
                                 _DepartureAndStopsCard(
                                   origin: origin,
@@ -100,13 +122,23 @@ class RouteDetailsScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 20),
 
-                                // SECTION 2: Accessibility Verified Details
-                                const _AccessibilityVerifiedCard(),
+                                // SECTION 2: Sources and timestamps for each condition.
+                                AccessibilityEvidenceCard(
+                                  reports: evidenceReports,
+                                  busId: effectiveBusId,
+                                  origin: route?.fromStationId ?? origin,
+                                  destination:
+                                      route?.toStationId ?? destination,
+                                  strictStopIds: route != null,
+                                ),
                                 const SizedBox(height: 20),
 
                                 // SECTION 3: Ticket Price
-                                const _TicketPriceCard(
-                                  priceRs: 250,
+                                _TicketPriceCard(
+                                  priceRs: route?.estimatedPriceLkr ?? 0,
+                                ),
+                                const Text(
+                                  'Estimated fare from the journey model; confirm the actual fare with the operator.',
                                 ),
                                 const SizedBox(height: 20),
 
@@ -121,25 +153,30 @@ class RouteDetailsScreen extends StatelessWidget {
                                 // ACTION BUTTONS: Track Live, Confirm Schedule, Report
                                 _ActionButtons(
                                   onTrackLive: () {
+                                    if (route == null) return;
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (_) => LiveJourneyScreen(
-                                          origin: origin,
-                                          destination: destination,
-                                          busId: effectiveBusId,
-                                          route: route,
-                                        ),
+                                        builder: (_) =>
+                                            JourneyConfirmationScreen(
+                                              origin: origin,
+                                              destination: destination,
+                                              route: route!,
+                                            ),
                                       ),
                                     );
                                   },
                                   onConfirmSchedule: () {
-                                    ScaffoldMessenger.of(context)
-                                      ..hideCurrentSnackBar()
-                                      ..showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Bus schedule saved to your trip plan.'),
-                                        ),
-                                      );
+                                    if (route == null) return;
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            JourneyConfirmationScreen(
+                                              origin: origin,
+                                              destination: destination,
+                                              route: route!,
+                                            ),
+                                      ),
+                                    );
                                   },
                                   onReport: () {
                                     Navigator.of(context).push(
@@ -238,7 +275,8 @@ class _DepartureAndStopsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveBus = bus ??
+    final effectiveBus =
+        bus ??
         const Bus(
           id: 'bus_138_nd4521',
           routeNo: '138',
@@ -267,9 +305,7 @@ class _DepartureAndStopsCard extends StatelessWidget {
               builder: (context, stationsSnapshot) {
                 final stationsList =
                     stationsSnapshot.data ?? SeedData.colomboStations;
-                final stationsMap = {
-                  for (final s in stationsList) s.id: s,
-                };
+                final stationsMap = {for (final s in stationsList) s.id: s};
 
                 // Calculate Arrival ETA, Schedule Delays, and Timeline Progression
                 final etaResult = DelayEtaCalculator.calculateArrivalEta(
@@ -291,15 +327,17 @@ class _DepartureAndStopsCard extends StatelessWidget {
                       color: isHC
                           ? Colors.black
                           : (etaResult.isDelayed
-                              ? const Color(0xFFEF4444).withValues(alpha: 0.4)
-                              : AppColors.primary.withValues(alpha: 0.25)),
+                                ? const Color(0xFFEF4444).withValues(alpha: 0.4)
+                                : AppColors.primary.withValues(alpha: 0.25)),
                       width: isHC ? 2 : 1.5,
                     ),
                     boxShadow: isHC
                         ? null
                         : [
                             BoxShadow(
-                              color: AppColors.onSurface.withValues(alpha: 0.05),
+                              color: AppColors.onSurface.withValues(
+                                alpha: 0.05,
+                              ),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),
@@ -317,9 +355,13 @@ class _DepartureAndStopsCard extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                              color: isHC
+                                  ? const Color(0xFF001F3F)
+                                  : AppColors.primaryContainer,
                               borderRadius: BorderRadius.circular(8),
-                              border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+                              border: isHC
+                                  ? Border.all(color: Colors.black, width: 1.5)
+                                  : null,
                             ),
                             child: Text(
                               'Route $busNumber',
@@ -337,9 +379,13 @@ class _DepartureAndStopsCard extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: isHC ? Colors.white : AppColors.surfaceContainer,
+                              color: isHC
+                                  ? Colors.white
+                                  : AppColors.surfaceContainer,
                               borderRadius: BorderRadius.circular(8),
-                              border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+                              border: isHC
+                                  ? Border.all(color: Colors.black, width: 1.5)
+                                  : null,
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -347,7 +393,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                 Icon(
                                   Icons.directions_bus,
                                   size: 14,
-                                  color: isHC ? Colors.black : AppColors.primary,
+                                  color: isHC
+                                      ? Colors.black
+                                      : AppColors.primary,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -355,7 +403,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 12,
-                                    color: isHC ? Colors.black : AppColors.onSurface,
+                                    color: isHC
+                                        ? Colors.black
+                                        : AppColors.onSurface,
                                   ),
                                 ),
                               ],
@@ -371,8 +421,8 @@ class _DepartureAndStopsCard extends StatelessWidget {
                               color: isHC
                                   ? Colors.white
                                   : (etaResult.isLive
-                                      ? const Color(0xFFDCFCE7)
-                                      : AppColors.surfaceContainer),
+                                        ? const Color(0xFFDCFCE7)
+                                        : AppColors.surfaceContainer),
                               borderRadius: BorderRadius.circular(20),
                               border: isHC
                                   ? Border.all(
@@ -393,11 +443,11 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                     shape: BoxShape.circle,
                                     color: isHC
                                         ? (etaResult.isLive
-                                            ? const Color(0xFF003833)
-                                            : Colors.black)
+                                              ? const Color(0xFF003833)
+                                              : Colors.black)
                                         : (etaResult.isLive
-                                            ? const Color(0xFF16A34A)
-                                            : AppColors.onSurfaceVariant),
+                                              ? const Color(0xFF16A34A)
+                                              : AppColors.onSurfaceVariant),
                                   ),
                                 ),
                                 const SizedBox(width: 5),
@@ -408,11 +458,11 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                     fontWeight: FontWeight.bold,
                                     color: isHC
                                         ? (etaResult.isLive
-                                            ? const Color(0xFF003833)
-                                            : Colors.black)
+                                              ? const Color(0xFF003833)
+                                              : Colors.black)
                                         : (etaResult.isLive
-                                            ? const Color(0xFF166534)
-                                            : AppColors.onSurfaceVariant),
+                                              ? const Color(0xFF166534)
+                                              : AppColors.onSurfaceVariant),
                                   ),
                                 ),
                                 if (etaResult.isLive &&
@@ -454,19 +504,25 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                           const Color(0xFFFFF7ED),
                                         ]
                                       : [
-                                          AppColors.primaryContainer.withValues(alpha: 0.12),
-                                          AppColors.primaryContainer.withValues(alpha: 0.04),
+                                          AppColors.primaryContainer.withValues(
+                                            alpha: 0.12,
+                                          ),
+                                          AppColors.primaryContainer.withValues(
+                                            alpha: 0.04,
+                                          ),
                                         ],
                                 ),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: isHC
                                 ? (etaResult.isDelayed
-                                    ? const Color(0xFF8B0000)
-                                    : const Color(0xFF001F3F))
+                                      ? const Color(0xFF8B0000)
+                                      : const Color(0xFF001F3F))
                                 : (etaResult.isDelayed
-                                    ? const Color(0xFFFCA5A5)
-                                    : AppColors.primaryContainer.withValues(alpha: 0.3)),
+                                      ? const Color(0xFFFCA5A5)
+                                      : AppColors.primaryContainer.withValues(
+                                          alpha: 0.3,
+                                        )),
                             width: isHC ? 2 : 1.5,
                           ),
                         ),
@@ -477,7 +533,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Flexible(child: _buildDelayBadge(etaResult, context)),
+                                Flexible(
+                                  child: _buildDelayBadge(etaResult, context),
+                                ),
                                 if (etaResult.isDelayed) ...[
                                   const SizedBox(width: 8),
                                   Container(
@@ -491,7 +549,10 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                           : const Color(0xFFEF4444),
                                       borderRadius: BorderRadius.circular(6),
                                       border: isHC
-                                          ? Border.all(color: Colors.black, width: 1)
+                                          ? Border.all(
+                                              color: Colors.black,
+                                              width: 1,
+                                            )
                                           : null,
                                     ),
                                     child: Text(
@@ -516,12 +577,15 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: isHC ? Colors.white : const Color(0xFFFEF3C7),
+                                  color: isHC
+                                      ? Colors.white
+                                      : const Color(0xFFFEF3C7),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
                                     color: isHC
                                         ? const Color(0xFF8B4500)
-                                        : const Color(0xFFF59E0B).withValues(alpha: 0.5),
+                                        : const Color(0xFFF59E0B)
+                                              .withValues(alpha: 0.5),
                                     width: isHC ? 2 : 1,
                                   ),
                                 ),
@@ -562,8 +626,10 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                     color: isHC
                                         ? Colors.white
                                         : (etaResult.isDelayed
-                                            ? const Color(0xFFDC2626).withValues(alpha: 0.15)
-                                            : AppColors.primaryContainer.withValues(alpha: 0.2)),
+                                              ? const Color(0xFFDC2626)
+                                                    .withValues(alpha: 0.15)
+                                              : AppColors.primaryContainer
+                                                    .withValues(alpha: 0.2)),
                                     shape: BoxShape.circle,
                                     border: isHC
                                         ? Border.all(
@@ -578,18 +644,19 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                     Icons.access_alarm_rounded,
                                     color: isHC
                                         ? (etaResult.isDelayed
-                                            ? const Color(0xFF8B0000)
-                                            : const Color(0xFF001F3F))
+                                              ? const Color(0xFF8B0000)
+                                              : const Color(0xFF001F3F))
                                         : (etaResult.isDelayed
-                                            ? const Color(0xFFDC2626)
-                                            : AppColors.primary),
+                                              ? const Color(0xFFDC2626)
+                                              : AppColors.primary),
                                     size: 28,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         etaResult.countdownText,
@@ -598,11 +665,11 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                           fontWeight: FontWeight.w800,
                                           color: isHC
                                               ? (etaResult.isDelayed
-                                                  ? const Color(0xFF8B0000)
-                                                  : const Color(0xFF001F3F))
+                                                    ? const Color(0xFF8B0000)
+                                                    : const Color(0xFF001F3F))
                                               : (etaResult.isDelayed
-                                                  ? const Color(0xFF991B1B)
-                                                  : AppColors.primary),
+                                                    ? const Color(0xFF991B1B)
+                                                    : AppColors.primary),
                                         ),
                                       ),
                                       const SizedBox(height: 2),
@@ -624,7 +691,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
                             const SizedBox(height: 16),
                             Divider(
                               height: 1,
-                              color: isHC ? Colors.black : AppColors.outlineVariant,
+                              color: isHC
+                                  ? Colors.black
+                                  : AppColors.outlineVariant,
                             ),
                             const SizedBox(height: 12),
 
@@ -633,7 +702,8 @@ class _DepartureAndStopsCard extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'SCHEDULED',
@@ -664,7 +734,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                 Icon(
                                   Icons.arrow_forward_rounded,
                                   size: 18,
-                                  color: isHC ? Colors.black : AppColors.outlineVariant,
+                                  color: isHC
+                                      ? Colors.black
+                                      : AppColors.outlineVariant,
                                 ),
                                 Expanded(
                                   child: Column(
@@ -676,7 +748,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
                                           letterSpacing: 0.5,
-                                          color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                                          color: isHC
+                                              ? const Color(0xFF001F3F)
+                                              : AppColors.primary,
                                         ),
                                       ),
                                       const SizedBox(height: 3),
@@ -687,11 +761,11 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                           fontWeight: FontWeight.w800,
                                           color: isHC
                                               ? (etaResult.isDelayed
-                                                  ? const Color(0xFF8B0000)
-                                                  : const Color(0xFF001F3F))
+                                                    ? const Color(0xFF8B0000)
+                                                    : const Color(0xFF001F3F))
                                               : (etaResult.isDelayed
-                                                  ? const Color(0xFFDC2626)
-                                                  : AppColors.primary),
+                                                    ? const Color(0xFFDC2626)
+                                                    : AppColors.primary),
                                         ),
                                       ),
                                     ],
@@ -707,24 +781,33 @@ class _DepartureAndStopsCard extends StatelessWidget {
                       // 3. BOARDING ASSISTANCE BUTTON
                       OutlinedButton.icon(
                         onPressed: () {
-                          final effectiveRouteNo = route?.title ??
-                              'Route $busNumber';
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => BoardingAssistanceScreen(
-                                busId: busId,
-                                busLabel: effectiveRouteNo,
-                                stopName: origin,
-                                stationId: etaResult.targetStopId,
-                              ),
+                          final target = AssistanceTarget.resolve(
+                            busId: busId,
+                            bus: effectiveBus,
+                            stationId: route?.fromStationId,
+                            stopName: origin,
+                            stations: stationsMap,
+                          );
+                          openBoardingAssistance(
+                            context,
+                            target: target,
+                            minutesAway: target?.minutesFrom(
+                              etaResult,
+                              telemetry: liveLocation,
                             ),
                           );
                         },
                         style: OutlinedButton.styleFrom(
-                          backgroundColor: isHC ? const Color(0xFF001F3F) : null,
-                          foregroundColor: isHC ? Colors.white : AppColors.primaryContainer,
+                          backgroundColor: isHC
+                              ? const Color(0xFF001F3F)
+                              : null,
+                          foregroundColor: isHC
+                              ? Colors.white
+                              : AppColors.primaryContainer,
                           side: BorderSide(
-                            color: isHC ? Colors.black : AppColors.primaryContainer,
+                            color: isHC
+                                ? Colors.black
+                                : AppColors.primaryContainer,
                             width: isHC ? 2 : 1.8,
                           ),
                           minimumSize: const Size(double.infinity, 46),
@@ -884,10 +967,18 @@ class _DepartureAndStopsCard extends StatelessWidget {
     if (isHC) {
       if (stop.isCurrent) {
         nodeColor = const Color(0xFF001F3F);
-        nodeIcon = const Icon(Icons.directions_bus, size: 16, color: Colors.white);
+        nodeIcon = const Icon(
+          Icons.directions_bus,
+          size: 16,
+          color: Colors.white,
+        );
       } else if (stop.isTargetStop) {
         nodeColor = const Color(0xFF8B4500);
-        nodeIcon = const Icon(Icons.person_pin_circle, size: 18, color: Colors.white);
+        nodeIcon = const Icon(
+          Icons.person_pin_circle,
+          size: 18,
+          color: Colors.white,
+        );
       } else if (stop.isPassed) {
         nodeColor = const Color(0xFF003833);
         nodeIcon = const Icon(Icons.check, size: 16, color: Colors.white);
@@ -905,10 +996,18 @@ class _DepartureAndStopsCard extends StatelessWidget {
     } else {
       if (stop.isCurrent) {
         nodeColor = AppColors.primary;
-        nodeIcon = const Icon(Icons.directions_bus, size: 16, color: Colors.white);
+        nodeIcon = const Icon(
+          Icons.directions_bus,
+          size: 16,
+          color: Colors.white,
+        );
       } else if (stop.isTargetStop) {
         nodeColor = const Color(0xFFEAB308); // Gold/amber for passenger stop
-        nodeIcon = const Icon(Icons.person_pin_circle, size: 18, color: Colors.white);
+        nodeIcon = const Icon(
+          Icons.person_pin_circle,
+          size: 18,
+          color: Colors.white,
+        );
       } else if (stop.isPassed) {
         nodeColor = const Color(0xFF16A34A); // Green check
         nodeIcon = const Icon(Icons.check, size: 16, color: Colors.white);
@@ -941,14 +1040,14 @@ class _DepartureAndStopsCard extends StatelessWidget {
       cardBg = stop.isTargetStop
           ? const Color(0xFFFEF9C3).withValues(alpha: 0.5)
           : (stop.isCurrent
-              ? AppColors.primaryContainer.withValues(alpha: 0.12)
-              : AppColors.surfaceContainerLow);
+                ? AppColors.primaryContainer.withValues(alpha: 0.12)
+                : AppColors.surfaceContainerLow);
       cardBorder = Border.all(
         color: stop.isTargetStop
             ? const Color(0xFFEAB308)
             : (stop.isCurrent
-                ? AppColors.primary
-                : AppColors.outlineVariant.withValues(alpha: 0.4)),
+                  ? AppColors.primary
+                  : AppColors.outlineVariant.withValues(alpha: 0.4)),
         width: (stop.isTargetStop || stop.isCurrent) ? 1.8 : 1,
       );
     }
@@ -968,7 +1067,11 @@ class _DepartureAndStopsCard extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: nodeColor,
-              border: (isHC && !stop.isCurrent && !stop.isTargetStop && !stop.isPassed)
+              border:
+                  (isHC &&
+                      !stop.isCurrent &&
+                      !stop.isTargetStop &&
+                      !stop.isPassed)
                   ? Border.all(color: Colors.black, width: 1.5)
                   : null,
             ),
@@ -983,11 +1086,18 @@ class _DepartureAndStopsCard extends StatelessWidget {
                   children: [
                     if (stop.isTargetStop) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: isHC ? const Color(0xFF8B4500) : const Color(0xFFCA8A04),
+                          color: isHC
+                              ? const Color(0xFF8B4500)
+                              : const Color(0xFFCA8A04),
                           borderRadius: BorderRadius.circular(4),
-                          border: isHC ? Border.all(color: Colors.black, width: 1) : null,
+                          border: isHC
+                              ? Border.all(color: Colors.black, width: 1)
+                              : null,
                         ),
                         child: const Text(
                           'YOUR BOARDING STOP',
@@ -1001,11 +1111,18 @@ class _DepartureAndStopsCard extends StatelessWidget {
                       const SizedBox(width: 6),
                     ] else if (stop.isCurrent) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                          color: isHC
+                              ? const Color(0xFF001F3F)
+                              : AppColors.primary,
                           borderRadius: BorderRadius.circular(4),
-                          border: isHC ? Border.all(color: Colors.black, width: 1) : null,
+                          border: isHC
+                              ? Border.all(color: Colors.black, width: 1)
+                              : null,
                         ),
                         child: const Text(
                           'BUS IS HERE NOW',
@@ -1045,18 +1162,23 @@ class _DepartureAndStopsCard extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: stop.isPassed
-                            ? (isHC ? const Color(0xFF003833) : const Color(0xFF16A34A))
+                            ? (isHC
+                                  ? const Color(0xFF003833)
+                                  : const Color(0xFF16A34A))
                             : context.subtextColor,
                       ),
                     ),
-                    if (!stop.isPassed && stop.delayType == DelayType.delayed) ...[
+                    if (!stop.isPassed &&
+                        stop.delayType == DelayType.delayed) ...[
                       const SizedBox(width: 6),
                       Text(
                         '(+${stop.delayMinutes} min late)',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: isHC ? const Color(0xFF8B0000) : const Color(0xFFDC2626),
+                          color: isHC
+                              ? const Color(0xFF8B0000)
+                              : const Color(0xFFDC2626),
                         ),
                       ),
                     ],
@@ -1071,159 +1193,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
   }
 }
 
-/// SECTION 2: Accessibility Verified Card
-class _AccessibilityVerifiedCard extends StatelessWidget {
-  const _AccessibilityVerifiedCard();
-
-  static const _items = [
-    (
-      Icons.accessible_rounded,
-      'Wheelchair Accessible Vehicle',
-      'Ramp & step-free boarding verified',
-    ),
-    (
-      Icons.elevator_outlined,
-      'Step-Free Entrance Path',
-      'Easy low-floor entry for seniors',
-    ),
-    (
-      Icons.verified_user_rounded,
-      'Ramp & Driver Support',
-      'Operational ramp verified by driver today',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final isHC = context.isHighContrast;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: context.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isHC
-              ? const Color(0xFF003833)
-              : Colors.green.shade600.withValues(alpha: 0.3),
-          width: isHC ? 2 : 1.5,
-        ),
-        boxShadow: isHC
-            ? null
-            : [
-                BoxShadow(
-                  color: AppColors.onSurface.withValues(alpha: 0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isHC ? Colors.white : Colors.green.shade100,
-                  shape: BoxShape.circle,
-                  border: isHC
-                      ? Border.all(color: const Color(0xFF003833), width: 1.5)
-                      : null,
-                ),
-                child: Icon(
-                  Icons.check_circle_rounded,
-                  color: isHC ? const Color(0xFF003833) : Colors.green.shade800,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Accessibility Verified',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: context.textColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Column(
-            children: [
-              for (var i = 0; i < _items.length; i++) ...[
-                if (i > 0)
-                  Divider(
-                    height: 16,
-                    color: isHC
-                        ? Colors.black
-                        : AppColors.outlineVariant.withValues(alpha: 0.3),
-                  ),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: isHC ? Colors.white : AppColors.secondaryContainer,
-                        shape: BoxShape.circle,
-                        border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
-                      ),
-                      child: Icon(
-                        _items[i].$1,
-                        color: isHC ? Colors.black : AppColors.onSecondaryContainer,
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _items[i].$2,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: context.textColor,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _items[i].$3,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: context.subtextColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(
-                      Icons.check_circle,
-                      color: isHC ? const Color(0xFF003833) : Colors.green.shade700,
-                      size: 20,
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// SECTION 3: Ticket Price Card
 class _TicketPriceCard extends StatelessWidget {
-  const _TicketPriceCard({
-    this.priceRs = 250,
-  });
+  const _TicketPriceCard({this.priceRs = 250});
 
   final int priceRs;
 
@@ -1294,10 +1266,7 @@ class _TicketPriceCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Standard Single Journey Ticket • Cash or Digital Ticket',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: context.subtextColor,
-                  ),
+                  style: TextStyle(fontSize: 13, color: context.subtextColor),
                 ),
               ],
             ),
@@ -1323,11 +1292,13 @@ class _SafetyAndAccessibilityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHC = context.isHighContrast;
-    final status = statusResult?.status ??
+    final status =
+        statusResult?.status ??
         route?.accessibilityStatus ??
-        AccessibilityStatus.accessible;
-    final reasons = statusResult?.reasons ??
-        [route?.summary ?? 'Accessibility verified by passenger community.'];
+        AccessibilityStatus.unknown;
+    final reasons =
+        statusResult?.reasons ??
+        [route?.summary ?? 'Unknown — no condition evidence available.'];
 
     Color headerColor;
     Color bgColor;
@@ -1340,7 +1311,7 @@ class _SafetyAndAccessibilityCard extends StatelessWidget {
           headerColor = const Color(0xFF003833);
           bgColor = Colors.white;
           statusIcon = Icons.check_circle_rounded;
-          statusTitle = 'SAFE — Verified Accessible Bus';
+          statusTitle = 'ACCESSIBLE VEHICLE FEATURES';
           break;
         case AccessibilityStatus.partial:
           headerColor = const Color(0xFF8B4500);
@@ -1354,6 +1325,12 @@ class _SafetyAndAccessibilityCard extends StatelessWidget {
           statusIcon = Icons.cancel_rounded;
           statusTitle = 'NOT ACCESSIBLE NOTICE';
           break;
+        case AccessibilityStatus.unknown:
+          headerColor = Colors.black;
+          bgColor = Colors.white;
+          statusIcon = Icons.help_outline;
+          statusTitle = 'CONDITION UNKNOWN';
+          break;
       }
     } else {
       switch (status) {
@@ -1361,7 +1338,7 @@ class _SafetyAndAccessibilityCard extends StatelessWidget {
           headerColor = Colors.green.shade800;
           bgColor = Colors.green.shade50;
           statusIcon = Icons.check_circle_rounded;
-          statusTitle = 'SAFE — Verified Accessible Bus';
+          statusTitle = 'ACCESSIBLE VEHICLE FEATURES';
           break;
         case AccessibilityStatus.partial:
           headerColor = Colors.amber.shade900;
@@ -1374,6 +1351,12 @@ class _SafetyAndAccessibilityCard extends StatelessWidget {
           bgColor = AppColors.error.withValues(alpha: 0.08);
           statusIcon = Icons.cancel_rounded;
           statusTitle = 'NOT ACCESSIBLE NOTICE';
+          break;
+        case AccessibilityStatus.unknown:
+          headerColor = AppColors.onSurfaceVariant;
+          bgColor = AppColors.surfaceContainer;
+          statusIcon = Icons.help_outline;
+          statusTitle = 'CONDITION UNKNOWN';
           break;
       }
     }
@@ -1437,14 +1420,16 @@ class _SafetyAndAccessibilityCard extends StatelessWidget {
           _SafetyBulletItem(
             icon: Icons.groups_rounded,
             title: 'Bus Crowd Level',
-            subtitle: '$crowdLevel crowding • Reserved priority seats for seniors',
+            subtitle: '$crowdLevel crowding',
             iconColor: isHC ? Colors.black : AppColors.secondary,
           ),
           const SizedBox(height: 12),
           _SafetyBulletItem(
             icon: Icons.verified_user_rounded,
             title: 'Community Safety Reports',
-            subtitle: reasons.isNotEmpty ? reasons.join(' · ') : 'Verified by community riders',
+            subtitle: reasons.isNotEmpty
+                ? reasons.join(' · ')
+                : 'Unknown — no condition evidence available.',
             iconColor: isHC ? Colors.black : Colors.blue.shade700,
           ),
         ],
@@ -1488,10 +1473,7 @@ class _SafetyBulletItem extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: context.subtextColor,
-                ),
+                style: TextStyle(fontSize: 13, color: context.subtextColor),
               ),
             ],
           ),
@@ -1524,10 +1506,14 @@ class _ActionButtons extends StatelessWidget {
           child: FilledButton.icon(
             onPressed: onTrackLive,
             style: FilledButton.styleFrom(
-              backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+              backgroundColor: isHC
+                  ? const Color(0xFF001F3F)
+                  : AppColors.primaryContainer,
               foregroundColor: Colors.white,
               elevation: isHC ? 0 : null,
-              side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+              side: isHC
+                  ? const BorderSide(color: Colors.black, width: 2)
+                  : BorderSide.none,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -1537,7 +1523,7 @@ class _ActionButtons extends StatelessWidget {
               ),
             ),
             icon: Icon(Icons.map_rounded, size: context.tapIconSize),
-            label: const Text('Track Live on Map'),
+            label: const Text('Review and confirm journey'),
           ),
         ),
         const SizedBox(height: 12),
@@ -1549,7 +1535,9 @@ class _ActionButtons extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: isHC ? Colors.white : null,
               foregroundColor: isHC ? Colors.black : AppColors.primary,
-              side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+              side: isHC
+                  ? const BorderSide(color: Colors.black, width: 2)
+                  : BorderSide.none,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -1570,9 +1558,13 @@ class _ActionButtons extends StatelessWidget {
             onPressed: onReport,
             style: OutlinedButton.styleFrom(
               backgroundColor: isHC ? Colors.white : null,
-              foregroundColor: isHC ? const Color(0xFF8B0000) : AppColors.primaryContainer,
+              foregroundColor: isHC
+                  ? const Color(0xFF8B0000)
+                  : AppColors.primaryContainer,
               side: BorderSide(
-                color: isHC ? const Color(0xFF8B0000) : AppColors.outlineVariant,
+                color: isHC
+                    ? const Color(0xFF8B0000)
+                    : AppColors.outlineVariant,
                 width: isHC ? 2 : 1.5,
               ),
               shape: RoundedRectangleBorder(
@@ -1583,7 +1575,10 @@ class _ActionButtons extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            icon: Icon(Icons.report_problem_outlined, size: context.tapIconSize),
+            icon: Icon(
+              Icons.report_problem_outlined,
+              size: context.tapIconSize,
+            ),
             label: const Text('Report Accessibility Condition'),
           ),
         ),
@@ -1591,4 +1586,3 @@ class _ActionButtons extends StatelessWidget {
     );
   }
 }
-

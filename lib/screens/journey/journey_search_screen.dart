@@ -61,14 +61,18 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
 
   @override
   void dispose() {
-    AccessibilityPreferencesService.instance.removeListener(_onPreferencesChanged);
+    AccessibilityPreferencesService.instance.removeListener(
+      _onPreferencesChanged,
+    );
     super.dispose();
   }
 
   Future<void> _loadStations() async {
     try {
       final routes = await _firestoreService.getRoutes();
-      final hasNewSlRoutes = routes.any((r) => r.id == 'route_138_pettah_homagama');
+      final hasNewSlRoutes = routes.any(
+        (r) => r.id == 'route_138_pettah_homagama',
+      );
       if (!hasNewSlRoutes) {
         await SeedData().seedAll();
       }
@@ -84,11 +88,17 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
           // Default: Pettah (st_pettah) to Mount Lavinia (st_mt_lavinia) for Route 100!
           _selectedFromStation = list.firstWhere(
             (s) => s.id == 'st_pettah',
-            orElse: () => list.firstWhere((s) => s.id == 'st_fort', orElse: () => list.first),
+            orElse: () => list.firstWhere(
+              (s) => s.id == 'st_fort',
+              orElse: () => list.first,
+            ),
           );
           _selectedToStation = list.firstWhere(
             (s) => s.id == 'st_mt_lavinia',
-            orElse: () => list.firstWhere((s) => s.id == 'st_kottawa', orElse: () => list.last),
+            orElse: () => list.firstWhere(
+              (s) => s.id == 'st_kottawa',
+              orElse: () => list.last,
+            ),
           );
           _isLoadingStations = false;
         });
@@ -110,7 +120,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        const SnackBar(content: Text('Updating Sri Lankan transit database...')),
+        const SnackBar(
+          content: Text('Updating Sri Lankan transit database...'),
+        ),
       );
     try {
       await SeedData().seedAll();
@@ -120,7 +132,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
           ..hideCurrentSnackBar()
           ..showSnackBar(
             const SnackBar(
-              content: Text('Database updated with authentic Sri Lankan routes & buses!'),
+              content: Text(
+                'Database updated with authentic Sri Lankan routes & buses!',
+              ),
               backgroundColor: AppColors.primaryContainer,
             ),
           );
@@ -165,7 +179,10 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
     if (_stations.isEmpty) return;
     final myHub = _stations.firstWhere(
       (s) => s.id == 'st_pettah',
-      orElse: () => _stations.firstWhere((s) => s.id == 'st_fort', orElse: () => _stations.first),
+      orElse: () => _stations.firstWhere(
+        (s) => s.id == 'st_fort',
+        orElse: () => _stations.first,
+      ),
     );
     setState(() => _selectedFromStation = myHub);
     ScaffoldMessenger.of(context)
@@ -181,8 +198,14 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
 
   void _selectCorridor(String fromId, String toId) {
     if (_stations.isEmpty) return;
-    final from = _stations.firstWhere((s) => s.id == fromId, orElse: () => _stations.first);
-    final to = _stations.firstWhere((s) => s.id == toId, orElse: () => _stations.last);
+    final from = _stations.firstWhere(
+      (s) => s.id == fromId,
+      orElse: () => _stations.first,
+    );
+    final to = _stations.firstWhere(
+      (s) => s.id == toId,
+      orElse: () => _stations.last,
+    );
     setState(() {
       _selectedFromStation = from;
       _selectedToStation = to;
@@ -207,14 +230,18 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
       backgroundColor: context.surfaceColor,
       shape: RoundedRectangleBorder(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+        side: isHighContrast
+            ? const BorderSide(color: Colors.black, width: 2)
+            : BorderSide.none,
       ),
       builder: (context) {
         return _StationSearchModal(
           title: isFrom ? 'Select Boarding Point' : 'Select Destination Stop',
           isFrom: isFrom,
           stations: _stations,
-          selectedStationId: isFrom ? _selectedFromStation?.id : _selectedToStation?.id,
+          selectedStationId: isFrom
+              ? _selectedFromStation?.id
+              : _selectedToStation?.id,
           onSelect: (station) {
             Navigator.of(context).pop();
             setState(() {
@@ -239,7 +266,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
       backgroundColor: context.surfaceColor,
       shape: RoundedRectangleBorder(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+        side: isHighContrast
+            ? const BorderSide(color: Colors.black, width: 2)
+            : BorderSide.none,
       ),
       builder: (context) {
         return _VoiceSearchModal(
@@ -259,7 +288,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
               ..showSnackBar(
                 SnackBar(
                   content: Text('🎙️ Recognized: ${station.name}'),
-                  backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                  backgroundColor: isHighContrast
+                      ? const Color(0xFF001F3F)
+                      : AppColors.primary,
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -276,7 +307,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
       backgroundColor: context.surfaceColor,
       shape: RoundedRectangleBorder(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+        side: isHighContrast
+            ? const BorderSide(color: Colors.black, width: 2)
+            : BorderSide.none,
       ),
       builder: (context) {
         return SafeArea(
@@ -299,7 +332,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: isHighContrast ? Colors.black : AppColors.onSurface,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.onSurface,
                       ),
                     ),
                     const Spacer(),
@@ -314,27 +349,44 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                 ),
                 const SizedBox(height: 16),
                 ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
                       color: isHighContrast
                           ? Colors.black
-                          : (_selectedTime == null && DateUtils.isSameDay(_selectedDate, DateTime.now())
-                              ? AppColors.primary
-                              : AppColors.outlineVariant),
+                          : (_selectedTime == null &&
+                                    DateUtils.isSameDay(
+                                      _selectedDate,
+                                      DateTime.now(),
+                                    )
+                                ? AppColors.primary
+                                : AppColors.outlineVariant),
                       width: isHighContrast ? 2.0 : 1.5,
                     ),
                   ),
                   tileColor: isHighContrast
-                      ? (_selectedTime == null && DateUtils.isSameDay(_selectedDate, DateTime.now())
-                          ? const Color(0xFF001F3F).withValues(alpha: 0.12)
-                          : Colors.white)
-                      : (_selectedTime == null && DateUtils.isSameDay(_selectedDate, DateTime.now())
-                          ? AppColors.primaryFixed.withValues(alpha: 0.3)
-                          : AppColors.surfaceContainerLowest),
+                      ? (_selectedTime == null &&
+                                DateUtils.isSameDay(
+                                  _selectedDate,
+                                  DateTime.now(),
+                                )
+                            ? const Color(0xFF001F3F).withValues(alpha: 0.12)
+                            : Colors.white)
+                      : (_selectedTime == null &&
+                                DateUtils.isSameDay(
+                                  _selectedDate,
+                                  DateTime.now(),
+                                )
+                            ? AppColors.primaryFixed.withValues(alpha: 0.3)
+                            : AppColors.surfaceContainerLowest),
                   leading: CircleAvatar(
-                    backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                    backgroundColor: isHighContrast
+                        ? const Color(0xFF001F3F)
+                        : AppColors.primary,
                     foregroundColor: Colors.white,
                     child: const Icon(Icons.bolt_rounded, size: 24),
                   ),
@@ -351,13 +403,19 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       color: isHighContrast ? const Color(0xFF1A1A1A) : null,
-                      fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: isHighContrast
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
-                  trailing: _selectedTime == null && DateUtils.isSameDay(_selectedDate, DateTime.now())
+                  trailing:
+                      _selectedTime == null &&
+                          DateUtils.isSameDay(_selectedDate, DateTime.now())
                       ? Icon(
                           Icons.check_circle,
-                          color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                          color: isHighContrast
+                              ? const Color(0xFF001F3F)
+                              : AppColors.primary,
                           size: 26,
                         )
                       : null,
@@ -371,17 +429,26 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                 ),
                 const SizedBox(height: 12),
                 ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
-                      color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.outlineVariant,
                       width: isHighContrast ? 2.0 : 1.0,
                     ),
                   ),
-                  tileColor: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+                  tileColor: isHighContrast
+                      ? Colors.white
+                      : AppColors.surfaceContainerLowest,
                   leading: CircleAvatar(
-                    backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.surfaceContainer,
+                    backgroundColor: isHighContrast
+                        ? const Color(0xFF001F3F)
+                        : AppColors.surfaceContainer,
                     child: Icon(
                       Icons.access_time_filled_rounded,
                       color: isHighContrast ? Colors.white : AppColors.primary,
@@ -403,7 +470,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       color: isHighContrast ? const Color(0xFF1A1A1A) : null,
-                      fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: isHighContrast
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                   trailing: Icon(
@@ -418,17 +487,26 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                 ),
                 const SizedBox(height: 12),
                 ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
-                      color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.outlineVariant,
                       width: isHighContrast ? 2.0 : 1.0,
                     ),
                   ),
-                  tileColor: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+                  tileColor: isHighContrast
+                      ? Colors.white
+                      : AppColors.surfaceContainerLowest,
                   leading: CircleAvatar(
-                    backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.surfaceContainer,
+                    backgroundColor: isHighContrast
+                        ? const Color(0xFF001F3F)
+                        : AppColors.surfaceContainer,
                     child: Icon(
                       Icons.calendar_today_rounded,
                       color: isHighContrast ? Colors.white : AppColors.primary,
@@ -448,7 +526,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       color: isHighContrast ? const Color(0xFF1A1A1A) : null,
-                      fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: isHighContrast
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                   trailing: Icon(
@@ -477,7 +557,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
       backgroundColor: context.surfaceColor,
       shape: RoundedRectangleBorder(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+        side: isHighContrast
+            ? const BorderSide(color: Colors.black, width: 2)
+            : BorderSide.none,
       ),
       builder: (context) {
         return StatefulBuilder(
@@ -493,7 +575,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                       children: [
                         Icon(
                           Icons.accessibility_new_rounded,
-                          color: isHighContrast ? Colors.black : AppColors.secondary,
+                          color: isHighContrast
+                              ? Colors.black
+                              : AppColors.secondary,
                           size: 28,
                         ),
                         const SizedBox(width: 10),
@@ -502,7 +586,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: isHighContrast ? Colors.black : AppColors.onSurface,
+                            color: isHighContrast
+                                ? Colors.black
+                                : AppColors.onSurface,
                           ),
                         ),
                         const Spacer(),
@@ -520,8 +606,12 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                       'Customize for this trip only. Your permanent Accessibility Preferences in settings will not be affected.',
                       style: TextStyle(
                         fontSize: 14,
-                        color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                        fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                        color: isHighContrast
+                            ? const Color(0xFF1A1A1A)
+                            : AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -532,22 +622,35 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                           child: OutlinedButton(
                             style: OutlinedButton.styleFrom(
                               minimumSize: const Size(0, 48),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               side: BorderSide(
                                 color: isHighContrast
                                     ? Colors.black
-                                    : (_wheelchairAccess && _stepFreeOnly ? AppColors.secondary : AppColors.outlineVariant),
-                                width: (_wheelchairAccess && _stepFreeOnly || isHighContrast) ? 2 : 1,
+                                    : (_wheelchairAccess && _stepFreeOnly
+                                          ? AppColors.secondary
+                                          : AppColors.outlineVariant),
+                                width:
+                                    (_wheelchairAccess && _stepFreeOnly ||
+                                        isHighContrast)
+                                    ? 2
+                                    : 1,
                               ),
-                              backgroundColor: _wheelchairAccess && _stepFreeOnly
-                                  ? (isHighContrast ? const Color(0xFF001F3F).withValues(alpha: 0.15) : AppColors.secondaryContainer.withValues(alpha: 0.3))
+                              backgroundColor:
+                                  _wheelchairAccess && _stepFreeOnly
+                                  ? (isHighContrast
+                                        ? const Color(0xFF001F3F)
+                                              .withValues(alpha: 0.15)
+                                        : AppColors.secondaryContainer
+                                              .withValues(alpha: 0.3))
                                   : null,
                             ),
                             onPressed: () {
                               setSheetState(() {
                                 _wheelchairAccess = true;
                                 _stepFreeOnly = true;
-                                _minimizeWalking = true;
+                                _minimizeWalking = false;
                               });
                               setState(() {});
                             },
@@ -566,27 +669,40 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                           child: OutlinedButton(
                             style: OutlinedButton.styleFrom(
                               minimumSize: const Size(0, 48),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               side: BorderSide(
                                 color: isHighContrast
                                     ? Colors.black
-                                    : (!_wheelchairAccess && _stepFreeOnly ? AppColors.secondary : AppColors.outlineVariant),
-                                width: (!_wheelchairAccess && _stepFreeOnly || isHighContrast) ? 2 : 1,
+                                    : (!_wheelchairAccess && _stepFreeOnly
+                                          ? AppColors.secondary
+                                          : AppColors.outlineVariant),
+                                width:
+                                    (!_wheelchairAccess && _stepFreeOnly ||
+                                        isHighContrast)
+                                    ? 2
+                                    : 1,
                               ),
-                              backgroundColor: !_wheelchairAccess && _stepFreeOnly
-                                  ? (isHighContrast ? const Color(0xFF001F3F).withValues(alpha: 0.15) : AppColors.secondaryContainer.withValues(alpha: 0.3))
+                              backgroundColor:
+                                  !_wheelchairAccess && _stepFreeOnly
+                                  ? (isHighContrast
+                                        ? const Color(0xFF001F3F)
+                                              .withValues(alpha: 0.15)
+                                        : AppColors.secondaryContainer
+                                              .withValues(alpha: 0.3))
                                   : null,
                             ),
                             onPressed: () {
                               setSheetState(() {
                                 _wheelchairAccess = false;
                                 _stepFreeOnly = true;
-                                _minimizeWalking = true;
+                                _minimizeWalking = false;
                               });
                               setState(() {});
                             },
                             child: Text(
-                              '🧓 Elderly / Gentle',
+                              'Step-free',
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 14,
@@ -601,12 +717,20 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                           child: OutlinedButton(
                             style: OutlinedButton.styleFrom(
                               minimumSize: const Size(54, 48),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : null,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              side: isHighContrast
+                                  ? const BorderSide(
+                                      color: Colors.black,
+                                      width: 2,
+                                    )
+                                  : null,
                             ),
                             onPressed: () {
                               setSheetState(() {
-                                final prefs = AccessibilityPreferencesService.instance;
+                                final prefs =
+                                    AccessibilityPreferencesService.instance;
                                 _wheelchairAccess = prefs.isWheelchairOnly;
                                 _stepFreeOnly = prefs.isStepFree;
                                 _minimizeWalking = prefs.minimizeWalking;
@@ -651,27 +775,34 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                     _AccessibilitySwitchTile(
                       icon: Icons.directions_walk_rounded,
                       title: 'Minimize Walking Distance',
-                      subtitle: 'Prefer direct connections closest to entrance points',
-                      value: _minimizeWalking,
-                      onChanged: (val) {
-                        setSheetState(() => _minimizeWalking = val);
-                        setState(() => _minimizeWalking = val);
-                      },
+                      subtitle:
+                          'Not available yet — walking distance is unknown',
+                      value: false,
+                      onChanged: null,
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
                       height: 56,
                       child: FilledButton(
                         style: FilledButton.styleFrom(
-                          backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                          backgroundColor: isHighContrast
+                              ? const Color(0xFF001F3F)
+                              : AppColors.primaryContainer,
                           foregroundColor: Colors.white,
-                          side: isHighContrast ? const BorderSide(color: Colors.black, width: 2) : null,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          side: isHighContrast
+                              ? const BorderSide(color: Colors.black, width: 2)
+                              : null,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         onPressed: () => Navigator.of(context).pop(),
                         child: const Text(
                           'Apply to This Trip',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -689,7 +820,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2025),
+      firstDate: DateUtils.dateOnly(DateTime.now()),
       lastDate: DateTime(2030),
     );
     if (picked != null && picked != _selectedDate) {
@@ -712,7 +843,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Please select origin and destination stations.')),
+          const SnackBar(
+            content: Text('Please select origin and destination stations.'),
+          ),
         );
       return;
     }
@@ -722,7 +855,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Origin and destination stations cannot be the same.'),
+            content: Text(
+              'Origin and destination stations cannot be the same.',
+            ),
             backgroundColor: AppColors.error,
           ),
         );
@@ -737,6 +872,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
           origin: _selectedFromStation!.name,
           destination: _selectedToStation!.name,
           selectedDate: _selectedDate,
+          selectedTime: _selectedTime,
           wheelchairAccessRequired: _wheelchairAccess,
           stepFreeOnly: _stepFreeOnly,
           minimizeWalking: _minimizeWalking,
@@ -766,12 +902,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
           ),
           Expanded(
             child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                isDesktop ? 24 : 24,
-              ),
+              padding: EdgeInsets.fromLTRB(16, 16, 16, isDesktop ? 24 : 24),
               children: [
                 Center(
                   child: ConstrainedBox(
@@ -807,9 +938,13 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                           onTap: _showAccessibilityFilterSheet,
                           onClearFilter: (filter) {
                             setState(() {
-                              if (filter == 'Ramp Required') _wheelchairAccess = false;
+                              if (filter == 'Ramp Required') {
+                                _wheelchairAccess = false;
+                              }
                               if (filter == 'Step-Free') _stepFreeOnly = false;
-                              if (filter == 'Min Walk') _minimizeWalking = false;
+                              if (filter == 'Min Walk') {
+                                _minimizeWalking = false;
+                              }
                             });
                           },
                         ),
@@ -826,7 +961,10 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                                   : AppColors.primaryContainer,
                               foregroundColor: Colors.white,
                               side: isHighContrast
-                                  ? const BorderSide(color: Colors.black, width: 2.0)
+                                  ? const BorderSide(
+                                      color: Colors.black,
+                                      width: 2.0,
+                                    )
                                   : null,
                               elevation: isHighContrast ? 0 : 2,
                               shape: RoundedRectangleBorder(
@@ -852,9 +990,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                         const SizedBox(height: 28),
 
                         // Popular Corridors & Quick Trips (One-tap selection)
-                        _RecentSavedSection(
-                          onSelectCorridor: _selectCorridor,
-                        ),
+                        _RecentSavedSection(onSelectCorridor: _selectCorridor),
                       ],
                     ),
                   ),
@@ -870,10 +1006,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.onProfile,
-    this.onSync,
-  });
+  const _TopBar({required this.onProfile, this.onSync});
 
   final VoidCallback onProfile;
   final VoidCallback? onSync;
@@ -907,7 +1040,9 @@ class _TopBar extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
-                        color: isHighContrast ? Colors.black : AppColors.primary,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.primary,
                       ),
                     ),
                   ),
@@ -925,10 +1060,14 @@ class _TopBar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                     child: CircleAvatar(
                       radius: 20,
-                      backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.surfaceContainer,
+                      backgroundColor: isHighContrast
+                          ? const Color(0xFF001F3F)
+                          : AppColors.surfaceContainer,
                       child: Icon(
                         Icons.person,
-                        color: isHighContrast ? Colors.white : AppColors.primaryContainer,
+                        color: isHighContrast
+                            ? Colors.white
+                            : AppColors.primaryContainer,
                         size: 22,
                       ),
                     ),
@@ -1006,7 +1145,9 @@ class _SearchInputsCard extends StatelessWidget {
                   headerColor: AppColors.secondary,
                   stationName: fromStation?.name ?? 'Choose Boarding Point',
                   subtitle: fromStation != null
-                      ? (fromStation!.hasRamp ? '♿ Wheelchair Ramp Available' : 'Standard Stop')
+                      ? (fromStation!.hasRamp
+                            ? '♿ Wheelchair Ramp Available'
+                            : 'Standard Stop')
                       : 'Tap to select boarding station',
                   onTap: onTapFrom,
                   onVoiceTap: onVoiceSearchFrom,
@@ -1024,7 +1165,9 @@ class _SearchInputsCard extends StatelessWidget {
                         width: 2.5,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                          color: isHighContrast
+                              ? Colors.black
+                              : AppColors.outlineVariant,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -1032,7 +1175,9 @@ class _SearchInputsCard extends StatelessWidget {
                       Expanded(
                         child: Divider(
                           height: 1,
-                          color: isHighContrast ? Colors.black : AppColors.surfaceVariant,
+                          color: isHighContrast
+                              ? Colors.black
+                              : AppColors.surfaceVariant,
                           thickness: isHighContrast ? 1.5 : 1,
                         ),
                       ),
@@ -1041,9 +1186,16 @@ class _SearchInputsCard extends StatelessWidget {
                         button: true,
                         label: 'Swap boarding point and destination',
                         child: Material(
-                          color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+                          color: isHighContrast
+                              ? Colors.white
+                              : AppColors.surfaceContainerLow,
                           shape: CircleBorder(
-                            side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : BorderSide.none,
+                            side: isHighContrast
+                                ? const BorderSide(
+                                    color: Colors.black,
+                                    width: 2.0,
+                                  )
+                                : BorderSide.none,
                           ),
                           elevation: isHighContrast ? 0 : 1.5,
                           child: InkWell(
@@ -1055,7 +1207,9 @@ class _SearchInputsCard extends StatelessWidget {
                               alignment: Alignment.center,
                               child: Icon(
                                 Icons.swap_vert_rounded,
-                                color: isHighContrast ? Colors.black : AppColors.primary,
+                                color: isHighContrast
+                                    ? Colors.black
+                                    : AppColors.primary,
                                 size: context.tapIconSize + 2,
                               ),
                             ),
@@ -1076,7 +1230,9 @@ class _SearchInputsCard extends StatelessWidget {
                   headerColor: AppColors.error,
                   stationName: toStation?.name ?? 'Choose Destination',
                   subtitle: toStation != null
-                      ? (toStation!.hasRamp ? '♿ Accessible Destination' : 'Standard Stop')
+                      ? (toStation!.hasRamp
+                            ? '♿ Accessible Destination'
+                            : 'Standard Stop')
                       : 'Tap to select destination station',
                   onTap: onTapTo,
                   onVoiceTap: onVoiceSearchTo,
@@ -1131,11 +1287,15 @@ class _LocationInputField extends StatelessWidget {
             vertical: hasLargeTargets ? 18 : 12,
           ),
           decoration: BoxDecoration(
-            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+            color: isHighContrast
+                ? Colors.white
+                : AppColors.surfaceContainerLow,
             borderRadius: BorderRadius.circular(14),
             border: isHighContrast
                 ? Border.all(color: Colors.black, width: 2.0)
-                : Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+                : Border.all(
+                    color: AppColors.outlineVariant.withValues(alpha: 0.6),
+                  ),
           ),
           child: Row(
             children: [
@@ -1152,7 +1312,11 @@ class _LocationInputField extends StatelessWidget {
                       ? Border.all(color: Colors.black, width: 1.5)
                       : null,
                 ),
-                child: Icon(icon, color: effectiveIconColor, size: hasLargeTargets ? 24 : 20),
+                child: Icon(
+                  icon,
+                  color: effectiveIconColor,
+                  size: hasLargeTargets ? 24 : 20,
+                ),
               ),
               const SizedBox(width: 12),
               // Text contents
@@ -1181,23 +1345,41 @@ class _LocationInputField extends StatelessWidget {
                             onTap: onUseMyLocation,
                             borderRadius: BorderRadius.circular(6),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryFixed,
+                                color: isHighContrast
+                                    ? const Color(0xFF001F3F)
+                                    : AppColors.primaryFixed,
                                 borderRadius: BorderRadius.circular(6),
-                                border: isHighContrast ? Border.all(color: Colors.black, width: 1.0) : null,
+                                border: isHighContrast
+                                    ? Border.all(
+                                        color: Colors.black,
+                                        width: 1.0,
+                                      )
+                                    : null,
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.my_location, size: 11, color: isHighContrast ? Colors.white : AppColors.primary),
+                                  Icon(
+                                    Icons.my_location,
+                                    size: 11,
+                                    color: isHighContrast
+                                        ? Colors.white
+                                        : AppColors.primary,
+                                  ),
                                   const SizedBox(width: 3),
                                   Text(
                                     'My Location',
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
-                                      color: isHighContrast ? Colors.white : AppColors.primary,
+                                      color: isHighContrast
+                                          ? Colors.white
+                                          : AppColors.primary,
                                     ),
                                   ),
                                 ],
@@ -1213,7 +1395,9 @@ class _LocationInputField extends StatelessWidget {
                       style: TextStyle(
                         fontSize: hasLargeTargets ? 19 : 17,
                         fontWeight: FontWeight.w700,
-                        color: isHighContrast ? Colors.black : AppColors.onSurface,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1223,8 +1407,12 @@ class _LocationInputField extends StatelessWidget {
                       subtitle,
                       style: TextStyle(
                         fontSize: hasLargeTargets ? 13.5 : 12,
-                        fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
-                        color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                        color: isHighContrast
+                            ? const Color(0xFF1A1A1A)
+                            : AppColors.onSurfaceVariant,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1236,10 +1424,15 @@ class _LocationInputField extends StatelessWidget {
               // Voice Input button
               Semantics(
                 button: true,
-                label: isFrom ? 'Voice search for boarding point' : 'Voice search for destination',
+                label: isFrom
+                    ? 'Voice search for boarding point'
+                    : 'Voice search for destination',
                 child: IconButton(
                   onPressed: onVoiceTap,
-                  icon: Icon(Icons.mic, color: isHighContrast ? Colors.black : AppColors.primary),
+                  icon: Icon(
+                    Icons.mic,
+                    color: isHighContrast ? Colors.black : AppColors.primary,
+                  ),
                   iconSize: context.tapIconSize,
                   tooltip: 'Speak stop name',
                   padding: EdgeInsets.zero,
@@ -1249,7 +1442,13 @@ class _LocationInputField extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(Icons.arrow_drop_down, color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant, size: hasLargeTargets ? 28 : 22),
+              Icon(
+                Icons.arrow_drop_down,
+                color: isHighContrast
+                    ? Colors.black
+                    : AppColors.onSurfaceVariant,
+                size: hasLargeTargets ? 28 : 22,
+              ),
             ],
           ),
         ),
@@ -1282,7 +1481,8 @@ class _TravelTimeCard extends StatelessWidget {
     } else if (selectedTime != null && isToday) {
       timeLabel = 'Today at ${selectedTime!.format(context)}';
     } else if (selectedTime != null) {
-      timeLabel = '${TimeUtils.formatDateString(selectedDate)} at ${selectedTime!.format(context)}';
+      timeLabel =
+          '${TimeUtils.formatDateString(selectedDate)} at ${selectedTime!.format(context)}';
     } else {
       timeLabel = TimeUtils.formatDateString(selectedDate);
     }
@@ -1293,7 +1493,9 @@ class _TravelTimeCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+          color: isHighContrast
+              ? Colors.white
+              : AppColors.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(16),
           border: isHighContrast
               ? Border.all(color: Colors.black, width: 2.0)
@@ -1314,7 +1516,9 @@ class _TravelTimeCard extends StatelessWidget {
               radius: 20,
               backgroundColor: isHighContrast
                   ? const Color(0xFFE5E5E5)
-                  : (isDepartNow ? AppColors.primaryFixed : AppColors.surfaceContainer),
+                  : (isDepartNow
+                        ? AppColors.primaryFixed
+                        : AppColors.surfaceContainer),
               child: Icon(
                 isDepartNow ? Icons.bolt_rounded : Icons.schedule_rounded,
                 color: isHighContrast ? Colors.black : AppColors.primary,
@@ -1332,7 +1536,9 @@ class _TravelTimeCard extends StatelessWidget {
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.5,
-                      color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -1341,7 +1547,9 @@ class _TravelTimeCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
-                      color: isHighContrast ? Colors.black : AppColors.onSurface,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurface,
                     ),
                   ),
                 ],
@@ -1350,9 +1558,13 @@ class _TravelTimeCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: isHighContrast ? const Color(0xFF001F3F) : AppColors.surfaceContainer,
+                color: isHighContrast
+                    ? const Color(0xFF001F3F)
+                    : AppColors.surfaceContainer,
                 borderRadius: BorderRadius.circular(10),
-                border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                border: isHighContrast
+                    ? Border.all(color: Colors.black, width: 1.5)
+                    : null,
               ),
               child: Row(
                 children: [
@@ -1365,7 +1577,11 @@ class _TravelTimeCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 2),
-                  Icon(Icons.expand_more, size: 16, color: isHighContrast ? Colors.white : AppColors.primary),
+                  Icon(
+                    Icons.expand_more,
+                    size: 16,
+                    color: isHighContrast ? Colors.white : AppColors.primary,
+                  ),
                 ],
               ),
             ),
@@ -1415,7 +1631,11 @@ class _AccessibilityFilterRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.accessibility_new_rounded, size: 22, color: isHighContrast ? Colors.black : AppColors.secondary),
+              Icon(
+                Icons.accessibility_new_rounded,
+                size: 22,
+                color: isHighContrast ? Colors.black : AppColors.secondary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1434,25 +1654,48 @@ class _AccessibilityFilterRow extends StatelessWidget {
                 onTap: onTap,
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+                  constraints: const BoxConstraints(
+                    minHeight: 48,
+                    minWidth: 48,
+                  ),
                   alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: isHighContrast ? const Color(0xFF001F3F) : AppColors.secondaryContainer.withValues(alpha: 0.4),
+                    color: isHighContrast
+                        ? const Color(0xFF001F3F)
+                        : AppColors.secondaryContainer.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: isHighContrast ? Colors.black : AppColors.secondary.withValues(alpha: 0.5), width: isHighContrast ? 2.0 : 1.0),
+                    border: Border.all(
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.secondary.withValues(alpha: 0.5),
+                      width: isHighContrast ? 2.0 : 1.0,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.tune_rounded, size: 16, color: isHighContrast ? Colors.white : AppColors.onSecondaryContainer),
+                      Icon(
+                        Icons.tune_rounded,
+                        size: 16,
+                        color: isHighContrast
+                            ? Colors.white
+                            : AppColors.onSecondaryContainer,
+                      ),
                       const SizedBox(width: 4),
                       Text(
-                        activeFilters.isNotEmpty ? '${activeFilters.length} Active' : 'Configure',
+                        activeFilters.isNotEmpty
+                            ? '${activeFilters.length} Active'
+                            : 'Configure',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
-                          color: isHighContrast ? Colors.white : AppColors.onSecondaryContainer,
+                          color: isHighContrast
+                              ? Colors.white
+                              : AppColors.onSecondaryContainer,
                         ),
                       ),
                     ],
@@ -1468,21 +1711,36 @@ class _AccessibilityFilterRow extends StatelessWidget {
               runSpacing: 8,
               children: activeFilters.map((f) {
                 return Chip(
-                  avatar: Icon(Icons.check, size: 14, color: isHighContrast ? Colors.black : AppColors.secondary),
+                  avatar: Icon(
+                    Icons.check,
+                    size: 14,
+                    color: isHighContrast ? Colors.black : AppColors.secondary,
+                  ),
                   label: Text(
                     f,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-                      color: isHighContrast ? Colors.black : AppColors.onSurface,
+                      fontWeight: isHighContrast
+                          ? FontWeight.w800
+                          : FontWeight.w600,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurface,
                     ),
                   ),
                   deleteIcon: const Icon(Icons.close, size: 14),
                   onDeleted: () => onClearFilter(f),
-                  backgroundColor: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
+                  backgroundColor: isHighContrast
+                      ? Colors.white
+                      : AppColors.surfaceContainerLow,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(color: isHighContrast ? Colors.black : AppColors.outlineVariant, width: isHighContrast ? 1.5 : 1.0),
+                    side: BorderSide(
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.outlineVariant,
+                      width: isHighContrast ? 1.5 : 1.0,
+                    ),
                   ),
                   materialTapTargetSize: MaterialTapTargetSize.padded,
                 );
@@ -1494,8 +1752,12 @@ class _AccessibilityFilterRow extends StatelessWidget {
               'All buses shown. Tap Configure to require ramps or step-free access.',
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
-                color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                fontWeight: isHighContrast
+                    ? FontWeight.w600
+                    : FontWeight.normal,
+                color: isHighContrast
+                    ? const Color(0xFF1A1A1A)
+                    : AppColors.onSurfaceVariant,
               ),
             ),
           ],
@@ -1518,7 +1780,7 @@ class _AccessibilitySwitchTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1529,7 +1791,9 @@ class _AccessibilitySwitchTile extends StatelessWidget {
         color: isHighContrast ? Colors.white : AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isHighContrast ? Colors.black : (value ? AppColors.secondary : AppColors.outlineVariant),
+          color: isHighContrast
+              ? Colors.black
+              : (value ? AppColors.secondary : AppColors.outlineVariant),
           width: isHighContrast ? 2.0 : (value ? 1.5 : 1),
         ),
       ),
@@ -1538,12 +1802,16 @@ class _AccessibilitySwitchTile extends StatelessWidget {
         secondary: CircleAvatar(
           backgroundColor: isHighContrast
               ? (value ? const Color(0xFF001F3F) : const Color(0xFFE5E5E5))
-              : (value ? AppColors.secondaryContainer : AppColors.surfaceContainer),
+              : (value
+                    ? AppColors.secondaryContainer
+                    : AppColors.surfaceContainer),
           child: Icon(
             icon,
             color: isHighContrast
                 ? (value ? Colors.white : Colors.black)
-                : (value ? AppColors.onSecondaryContainer : AppColors.onSurfaceVariant),
+                : (value
+                      ? AppColors.onSecondaryContainer
+                      : AppColors.onSurfaceVariant),
             size: 22,
           ),
         ),
@@ -1559,7 +1827,9 @@ class _AccessibilitySwitchTile extends StatelessWidget {
           subtitle,
           style: TextStyle(
             fontSize: 13,
-            color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+            color: isHighContrast
+                ? const Color(0xFF1A1A1A)
+                : AppColors.onSurfaceVariant,
             fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
@@ -1636,7 +1906,9 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: isHighContrast ? Colors.black : AppColors.onSurface,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurface,
                     ),
                   ),
                 ),
@@ -1656,10 +1928,13 @@ class _StationSearchModalState extends State<_StationSearchModal> {
               style: TextStyle(
                 fontSize: 17,
                 color: isHighContrast ? Colors.black : null,
-                fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: isHighContrast
+                    ? FontWeight.w600
+                    : FontWeight.normal,
               ),
               decoration: InputDecoration(
-                hintText: 'Type station or city (e.g. Pettah, Mount Lavinia)...',
+                hintText:
+                    'Type station or city (e.g. Pettah, Mount Lavinia)...',
                 hintStyle: TextStyle(
                   color: isHighContrast ? const Color(0xFF4A4A4A) : null,
                 ),
@@ -1670,7 +1945,10 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                 ),
                 suffixIcon: _query.isNotEmpty
                     ? IconButton(
-                        icon: Icon(Icons.clear, color: isHighContrast ? Colors.black : null),
+                        icon: Icon(
+                          Icons.clear,
+                          color: isHighContrast ? Colors.black : null,
+                        ),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _query = '');
@@ -1678,26 +1956,37 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                       )
                     : null,
                 filled: true,
-                fillColor: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                fillColor: isHighContrast
+                    ? Colors.white
+                    : AppColors.surfaceContainerLowest,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide(
-                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.outlineVariant,
                     width: isHighContrast ? 2.0 : 1.0,
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide(
-                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.outlineVariant,
                     width: isHighContrast ? 2.0 : 1.0,
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide(
-                    color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                    color: isHighContrast
+                        ? const Color(0xFF001F3F)
+                        : AppColors.primary,
                     width: 2.0,
                   ),
                 ),
@@ -1711,17 +2000,29 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                 children: [
                   if (widget.isFrom && widget.onUseMyLocation != null) ...[
                     ActionChip(
-                      avatar: Icon(Icons.my_location, size: 16, color: isHighContrast ? Colors.black : AppColors.primary),
+                      avatar: Icon(
+                        Icons.my_location,
+                        size: 16,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.primary,
+                      ),
                       label: Text(
                         'My Location',
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: isHighContrast ? Colors.black : AppColors.primary,
+                          color: isHighContrast
+                              ? Colors.black
+                              : AppColors.primary,
                         ),
                       ),
-                      backgroundColor: isHighContrast ? Colors.white : AppColors.primaryFixed.withValues(alpha: 0.6),
+                      backgroundColor: isHighContrast
+                          ? Colors.white
+                          : AppColors.primaryFixed.withValues(alpha: 0.6),
                       side: BorderSide(
-                        color: isHighContrast ? Colors.black : AppColors.primaryFixedDim,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.primaryFixedDim,
                         width: isHighContrast ? 2.0 : 1.0,
                       ),
                       onPressed: () {
@@ -1740,13 +2041,22 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                       ),
                     ),
                     selected: !_filterWheelchairOnly,
-                    onSelected: (val) => setState(() => _filterWheelchairOnly = false),
-                    selectedColor: isHighContrast ? const Color(0xFF001F3F).withValues(alpha: 0.2) : AppColors.primaryFixed,
-                    side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : null,
+                    onSelected: (val) =>
+                        setState(() => _filterWheelchairOnly = false),
+                    selectedColor: isHighContrast
+                        ? const Color(0xFF001F3F).withValues(alpha: 0.2)
+                        : AppColors.primaryFixed,
+                    side: isHighContrast
+                        ? const BorderSide(color: Colors.black, width: 2.0)
+                        : null,
                   ),
                   const SizedBox(width: 8),
                   FilterChip(
-                    avatar: Icon(Icons.accessible, size: 16, color: isHighContrast ? Colors.black : null),
+                    avatar: Icon(
+                      Icons.accessible,
+                      size: 16,
+                      color: isHighContrast ? Colors.black : null,
+                    ),
                     label: Text(
                       'Wheelchair Ramp',
                       style: TextStyle(
@@ -1755,9 +2065,14 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                       ),
                     ),
                     selected: _filterWheelchairOnly,
-                    onSelected: (val) => setState(() => _filterWheelchairOnly = val),
-                    selectedColor: isHighContrast ? const Color(0xFF001F3F).withValues(alpha: 0.2) : AppColors.secondaryContainer,
-                    side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : null,
+                    onSelected: (val) =>
+                        setState(() => _filterWheelchairOnly = val),
+                    selectedColor: isHighContrast
+                        ? const Color(0xFF001F3F).withValues(alpha: 0.2)
+                        : AppColors.secondaryContainer,
+                    side: isHighContrast
+                        ? const BorderSide(color: Colors.black, width: 2.0)
+                        : null,
                   ),
                 ],
               ),
@@ -1770,9 +2085,13 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                         'No matching stations found.\nTry a different spelling or clear filters.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                          color: isHighContrast
+                              ? const Color(0xFF1A1A1A)
+                              : AppColors.onSurfaceVariant,
                           fontSize: 16,
-                          fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: isHighContrast
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
                       ),
                     )
@@ -1787,24 +2106,35 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                         final isSelected = s.id == widget.selectedStationId;
 
                         return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           selected: isSelected,
                           selectedTileColor: isHighContrast
                               ? const Color(0xFF001F3F).withValues(alpha: 0.15)
-                              : AppColors.primaryContainer.withValues(alpha: 0.08),
+                              : AppColors.primaryContainer.withValues(
+                                  alpha: 0.08,
+                                ),
                           leading: CircleAvatar(
                             backgroundColor: isHighContrast
-                                ? (isSelected ? const Color(0xFF001F3F) : const Color(0xFFE5E5E5))
+                                ? (isSelected
+                                      ? const Color(0xFF001F3F)
+                                      : const Color(0xFFE5E5E5))
                                 : (isSelected
-                                    ? AppColors.primaryContainer
-                                    : AppColors.surfaceContainer),
+                                      ? AppColors.primaryContainer
+                                      : AppColors.surfaceContainer),
                             child: Icon(
-                              widget.isFrom ? Icons.trip_origin_rounded : Icons.location_on_rounded,
+                              widget.isFrom
+                                  ? Icons.trip_origin_rounded
+                                  : Icons.location_on_rounded,
                               color: isHighContrast
                                   ? (isSelected ? Colors.white : Colors.black)
                                   : (isSelected
-                                      ? AppColors.onPrimary
-                                      : (widget.isFrom ? AppColors.secondary : AppColors.error)),
+                                        ? AppColors.onPrimary
+                                        : (widget.isFrom
+                                              ? AppColors.secondary
+                                              : AppColors.error)),
                               size: 22,
                             ),
                           ),
@@ -1812,33 +2142,57 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                             s.name,
                             style: TextStyle(
                               fontSize: 17,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                              color: isHighContrast ? Colors.black : AppColors.onSurface,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
+                              color: isHighContrast
+                                  ? Colors.black
+                                  : AppColors.onSurface,
                             ),
                           ),
                           subtitle: Row(
                             children: [
                               if (s.hasRamp) ...[
-                                Icon(Icons.accessible, size: 14, color: isHighContrast ? Colors.black : AppColors.secondary),
+                                Icon(
+                                  Icons.accessible,
+                                  size: 14,
+                                  color: isHighContrast
+                                      ? Colors.black
+                                      : AppColors.secondary,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Ramp  ',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: isHighContrast ? Colors.black : AppColors.secondary,
-                                    fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                                    color: isHighContrast
+                                        ? Colors.black
+                                        : AppColors.secondary,
+                                    fontWeight: isHighContrast
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
                                   ),
                                 ),
                               ],
                               if (s.hasElevator) ...[
-                                Icon(Icons.elevator_outlined, size: 14, color: isHighContrast ? Colors.black : AppColors.primary),
+                                Icon(
+                                  Icons.elevator_outlined,
+                                  size: 14,
+                                  color: isHighContrast
+                                      ? Colors.black
+                                      : AppColors.primary,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Elevator  ',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: isHighContrast ? Colors.black : AppColors.primary,
-                                    fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
+                                    color: isHighContrast
+                                        ? Colors.black
+                                        : AppColors.primary,
+                                    fontWeight: isHighContrast
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
                                   ),
                                 ),
                               ],
@@ -1847,15 +2201,31 @@ class _StationSearchModalState extends State<_StationSearchModal> {
                                   'Standard Stop',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                                    fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                                    color: isHighContrast
+                                        ? const Color(0xFF1A1A1A)
+                                        : AppColors.onSurfaceVariant,
+                                    fontWeight: isHighContrast
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
                                   ),
                                 ),
                             ],
                           ),
                           trailing: isSelected
-                              ? Icon(Icons.check_circle, color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer, size: 26)
-                              : Icon(Icons.arrow_forward_ios, size: 14, color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant),
+                              ? Icon(
+                                  Icons.check_circle,
+                                  color: isHighContrast
+                                      ? const Color(0xFF001F3F)
+                                      : AppColors.primaryContainer,
+                                  size: 26,
+                                )
+                              : Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 14,
+                                  color: isHighContrast
+                                      ? Colors.black
+                                      : AppColors.onSurfaceVariant,
+                                ),
                           onTap: () => widget.onSelect(s),
                         );
                       },
@@ -1901,7 +2271,9 @@ class _VoiceSearchModal extends StatelessWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1911,8 +2283,14 @@ class _VoiceSearchModal extends StatelessWidget {
                 label: 'Voice microphone listening animation',
                 child: CircleAvatar(
                   radius: 36,
-                  backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryFixed,
-                  child: Icon(Icons.mic, size: 40, color: isHighContrast ? Colors.white : AppColors.primary),
+                  backgroundColor: isHighContrast
+                      ? const Color(0xFF001F3F)
+                      : AppColors.primaryFixed,
+                  child: Icon(
+                    Icons.mic,
+                    size: 40,
+                    color: isHighContrast ? Colors.white : AppColors.primary,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -1930,8 +2308,12 @@ class _VoiceSearchModal extends StatelessWidget {
                 'Listening... or tap a suggested stop below:',
                 style: TextStyle(
                   fontSize: 14,
-                  color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
-                  fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                  color: isHighContrast
+                      ? const Color(0xFF1A1A1A)
+                      : AppColors.onSurfaceVariant,
+                  fontWeight: isHighContrast
+                      ? FontWeight.w600
+                      : FontWeight.normal,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -1943,18 +2325,29 @@ class _VoiceSearchModal extends StatelessWidget {
                 children: [
                   for (final s in quickSuggestions)
                     ActionChip(
-                      avatar: Icon(Icons.location_on, size: 16, color: isHighContrast ? Colors.black : null),
+                      avatar: Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: isHighContrast ? Colors.black : null,
+                      ),
                       label: Text(
                         s.name,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                          fontWeight: isHighContrast
+                              ? FontWeight.w700
+                              : FontWeight.w600,
                           color: isHighContrast ? Colors.black : null,
                         ),
                       ),
                       backgroundColor: isHighContrast ? Colors.white : null,
-                      side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : null,
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                      side: isHighContrast
+                          ? const BorderSide(color: Colors.black, width: 2.0)
+                          : null,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 6,
+                      ),
                       onPressed: () => onStationRecognized(s),
                     ),
                 ],
@@ -2018,7 +2411,11 @@ class _RecentSavedSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.star_rounded, size: 22, color: isHighContrast ? Colors.black : AppColors.primary),
+            Icon(
+              Icons.star_rounded,
+              size: 22,
+              color: isHighContrast ? Colors.black : AppColors.primary,
+            ),
             const SizedBox(width: 8),
             Text(
               'Popular Accessible Routes',
@@ -2032,7 +2429,9 @@ class _RecentSavedSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Material(
-          color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+          color: isHighContrast
+              ? Colors.white
+              : AppColors.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(18),
           elevation: isHighContrast ? 0 : 1,
           shadowColor: AppColors.onSurface.withValues(alpha: 0.04),
@@ -2047,17 +2446,26 @@ class _RecentSavedSection extends StatelessWidget {
               children: [
                 for (var i = 0; i < _corridors.length; i++) ...[
                   if (i > 0)
-                    Divider(height: 1, color: isHighContrast ? Colors.black : AppColors.surfaceVariant),
+                    Divider(
+                      height: 1,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.surfaceVariant,
+                    ),
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 8,
                     ),
                     leading: CircleAvatar(
-                      backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.surfaceContainer,
+                      backgroundColor: isHighContrast
+                          ? const Color(0xFF001F3F)
+                          : AppColors.surfaceContainer,
                       child: Icon(
                         _corridors[i].$6,
-                        color: isHighContrast ? Colors.white : AppColors.primaryContainer,
+                        color: isHighContrast
+                            ? Colors.white
+                            : AppColors.primaryContainer,
                         size: 24,
                       ),
                     ),
@@ -2066,7 +2474,9 @@ class _RecentSavedSection extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: isHighContrast ? Colors.black : AppColors.onSurface,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.onSurface,
                       ),
                     ),
                     subtitle: Column(
@@ -2078,21 +2488,32 @@ class _RecentSavedSection extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: isHighContrast ? Colors.black : AppColors.primary,
+                            color: isHighContrast
+                                ? Colors.black
+                                : AppColors.primary,
                           ),
                         ),
                         Text(
                           _corridors[i].$5,
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
-                            color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                            fontWeight: isHighContrast
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: isHighContrast
+                                ? const Color(0xFF1A1A1A)
+                                : AppColors.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
-                    trailing: Icon(Icons.arrow_forward_rounded, size: 18, color: isHighContrast ? Colors.black : AppColors.primary),
-                    onTap: () => onSelectCorridor(_corridors[i].$2, _corridors[i].$3),
+                    trailing: Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 18,
+                      color: isHighContrast ? Colors.black : AppColors.primary,
+                    ),
+                    onTap: () =>
+                        onSelectCorridor(_corridors[i].$2, _corridors[i].$3),
                   ),
                 ],
               ],
@@ -2103,4 +2524,3 @@ class _RecentSavedSection extends StatelessWidget {
     );
   }
 }
-

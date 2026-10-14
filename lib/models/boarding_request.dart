@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../constants/firestore_constants.dart';
 
 /// Represents a passenger's request for boarding assistance (AC-86).
@@ -16,6 +17,7 @@ class BoardingRequest {
     required this.assistanceTypes,
     required this.status,
     required this.createdAt,
+    this.purpose = 'boarding',
   });
 
   final String id;
@@ -26,41 +28,62 @@ class BoardingRequest {
   final String stationId;
   final String stopName;
   final List<String> assistanceTypes;
-  final String status; // 'pending', 'acknowledged', 'completed'
+  final String
+  status; // 'pending', 'acknowledged', 'completed', 'rejected', 'cancelled'
+  String get driverStatusLabel => switch (status) {
+    'pending' => 'Awaiting driver acknowledgement',
+    'acknowledged' => 'Driver acknowledged',
+    'completed' => 'Driver marked completed',
+    'rejected' => 'Driver declined',
+    'cancelled' => 'Cancelled',
+    _ => 'Driver status unknown',
+  };
   final DateTime createdAt;
+  final String
+  purpose; // 'boarding' or 'alighting'; legacy requests mean boarding.
 
   /// Creates a [BoardingRequest] from a Firestore map.
   factory BoardingRequest.fromMap(Map<String, dynamic> map, {String? id}) {
-    final rawTypes = map[FirestoreConstants.fieldAssistanceTypes] as List<dynamic>? ??
+    final rawTypes =
+        map[FirestoreConstants.fieldAssistanceTypes] as List<dynamic>? ??
         map['assistanceTypes'] as List<dynamic>? ??
         [];
     final parsedTypes = rawTypes.map((e) => e.toString()).toList();
 
     return BoardingRequest(
+      purpose: map['purpose']?.toString() ?? 'boarding',
       id: id ?? map['id']?.toString() ?? '',
-      riderId: map[FirestoreConstants.fieldRiderId]?.toString() ??
+      riderId:
+          map[FirestoreConstants.fieldRiderId]?.toString() ??
           map['riderId']?.toString() ??
           '',
-      riderName: map[FirestoreConstants.fieldRiderName]?.toString() ??
+      riderName:
+          map[FirestoreConstants.fieldRiderName]?.toString() ??
           map['riderName']?.toString() ??
           'Rider',
-      busId: map[FirestoreConstants.fieldBusId]?.toString() ??
+      busId:
+          map[FirestoreConstants.fieldBusId]?.toString() ??
           map['busId']?.toString() ??
           '',
-      routeNo: map[FirestoreConstants.fieldRouteNo]?.toString() ??
+      routeNo:
+          map[FirestoreConstants.fieldRouteNo]?.toString() ??
           map['routeNo']?.toString() ??
           '',
-      stationId: map[FirestoreConstants.fieldStationId]?.toString() ??
+      stationId:
+          map[FirestoreConstants.fieldStationId]?.toString() ??
           map['stationId']?.toString() ??
           '',
-      stopName: map[FirestoreConstants.fieldStopName]?.toString() ??
+      stopName:
+          map[FirestoreConstants.fieldStopName]?.toString() ??
           map['stopName']?.toString() ??
           '',
       assistanceTypes: parsedTypes,
-      status: map[FirestoreConstants.fieldRequestStatus]?.toString() ??
+      status:
+          map[FirestoreConstants.fieldRequestStatus]?.toString() ??
           map['status']?.toString() ??
           'pending',
-      createdAt: _parseTimestamp(map[FirestoreConstants.fieldCreatedAt]) ??
+      createdAt:
+          _parseTimestamp(map[FirestoreConstants.fieldCreatedAt]) ??
           DateTime.now(),
     );
   }
@@ -76,6 +99,7 @@ class BoardingRequest {
   /// Converts this request into a Firestore map representation.
   Map<String, dynamic> toMap({bool isServerTimestamp = false}) {
     return {
+      'purpose': purpose,
       FirestoreConstants.fieldRiderId: riderId,
       FirestoreConstants.fieldRiderName: riderName,
       FirestoreConstants.fieldBusId: busId,
@@ -102,8 +126,10 @@ class BoardingRequest {
     List<String>? assistanceTypes,
     String? status,
     DateTime? createdAt,
+    String? purpose,
   }) {
     return BoardingRequest(
+      purpose: purpose ?? this.purpose,
       id: id ?? this.id,
       riderId: riderId ?? this.riderId,
       riderName: riderName ?? this.riderName,
@@ -118,6 +144,7 @@ class BoardingRequest {
   }
 
   static DateTime? _parseTimestamp(dynamic value) {
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
     if (value is Timestamp) {
       return value.toDate();
     }

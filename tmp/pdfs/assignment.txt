@@ -1,0 +1,881 @@
+=== PAGE 1 ===
+ 
+Department of Software Engineering 
+Faculty of Computing 
+Sri Lanka Institute of Information Technology 
+ 
+ 
+1 
+ 
+SE3050: User Experience Engineering 
+Academic: year 3  
+Module code: SE3050 
+2026 
+Assignment Title 
+Designing a Mobile Solution with Inclusive UX: From User Research to 
+Market Launch 
+Learning outcomes 
+covered 
+LO1: Define the user experience engineering process and identify how it 
+fits into the software development life cycle. 
+LO2: Apply design thinking for software interfaces. 
+LO3: Investigate users to elicit user characteristics. 
+LO4: Design solutions using requirement engineering techniques for real-
+world problems. 
+LO5: Demonstrate user experience testing and secure design skills. 
+LO6: Extend solution space with user experience  engineering trends. 
+Assignment Mode 
+Group assignment 
+Maximum Marks 
+100% 
+Contribution to the Final 
+Grade 
+30% 
+Date published 
+Week 02 
+Deadline for submissions End of the 10th week of the semester 
+Mode of Submission 
+Online submission 
+ 
+Assignment Overview 
+ 
+In this assignment, your team will design, prototype, test, and implement a mobile solution aligned 
+with your assigned topic. Your task is to follow the end-to-end UX design process, incorporating 
+Equity, Diversity, and Inclusion (EDI), while producing a high-fidelity prototype and a functional 
+mobile solution. You are also required to create promotional and branding materials to position the 
+product for investors and the public launch. 
+ 
+ 
+ 
+
+
+=== PAGE 2 ===
+ 
+Department of Software Engineering 
+Faculty of Computing 
+Sri Lanka Institute of Information Technology 
+ 
+ 
+2 
+ 
+Milestone Plan 
+Milestone 1: User Research & Analysis + Ideation & Wireframing (LO1, LO2, LO3) 
+Research & Analysis 
+• 
+Define the problem statement and target user group(s), including at least one 
+underserved/marginalized segment (ties into EDI later) 
+• 
+Primary research: user interviews, surveys, or contextual inquiry (Conduct interviews 
+with approximately five to eight participants) 
+• 
+Secondary research: competitor analysis / market scan (3–5 comparable apps) 
+• 
+Synthesis: affinity diagramming, empathy maps 
+• 
+Deliverables: 4 user personas, user stories, user journey maps, problem statement and 
+"how might we" statements 
+Ideation & Wireframing 
+• 
+Ideation techniques: brainstorming, crazy 8s, or SCAMPER 
+• 
+Information architecture: sitemap / user flow diagrams 
+• 
+Low-fidelity wireframes (paper or digital, e.g. Balsamiq/Figma) for key screens 
+• 
+Deliverable: wireframe set + rationale for chosen flow 
+ 
+Milestone 2: High-Fidelity Prototype + EDI (LO2, LO4) 
+• 
+Convert wireframes into a clickable hi-fi prototype (Figma etc,) 
+• 
+Apply visual design system: typography, color palette, spacing, component library 
+• 
+EDI integration — explicitly document how the design supports:  
+o Accessibility (WCAG 2.1/2.2 AA: contrast ratios, text scaling, screen-reader 
+labels, touch target sizes) 
+o Language/localization considerations 
+o Cognitive/motor/visual impairment accommodations 
+o Socioeconomic inclusivity (e.g., low-bandwidth mode, offline support) 
+• 
+Deliverable: interactive prototype + EDI compliance checklist 
+ 
+ 
+ 
+
+
+=== PAGE 3 ===
+ 
+Department of Software Engineering 
+Faculty of Computing 
+Sri Lanka Institute of Information Technology 
+ 
+ 
+3 
+ 
+ 
+Milestone 3: User Testing & Iteration (LO5) 
+• 
+Define test plan: tasks, success metrics, participant count (5+ recommended) 
+• 
+Testing methods: moderated usability testing, think-aloud protocol, System Usability 
+Scale (SUS) survey 
+• 
+Secure design checks: authentication flow review, data privacy handling, secure storage 
+of user data, input validation 
+• 
+Analyze results: task completion rate, time-on-task, SUS score, qualitative pain points 
+• 
+Iterate: revise prototype/app based on findings 
+• 
+Deliverable: test plan, raw results, SUS score, before/after iteration summary 
+ 
+ 
+Milestone 4: Tech Stack Justification + Mobile App Implementation (LO1, LO4) 
+Tech Stack Justification 
+• 
+Compare 2–3 options (e.g., Flutter, React Native, native Android/iOS, Kotlin 
+Multiplatform) 
+• 
+Justify against criteria: performance, team skillset, accessibility support, dev speed, cost, 
+scalability 
+• 
+Deliverable: short tech stack justification document/table 
+Implementation 
+• 
+Set up architecture (folder structure, state management, navigation) 
+• 
+Set up Git 
+• 
+Implement core user flows identified in M1/M2 
+• 
+Requirements traceability: map implemented features back to requirements (user 
+stories/use cases) 
+• 
+Deliverable: working app build + source code repo + requirements-to-feature traceability 
+matrix 
+ 
+ 
+ 
+
+
+=== PAGE 4 ===
+ 
+Department of Software Engineering 
+Faculty of Computing 
+Sri Lanka Institute of Information Technology 
+ 
+ 
+4 
+ 
+Milestone 5: Promotion and Business Pitching (LO6) 
+• 
+Value proposition canvas and positioning statement 
+• 
+Go-to-market strategy: target audience, channels, launch plan 
+• 
+Business model: monetization (freemium, subscription, ads, etc.) 
+• 
+Emerging UX trends tie-in: how the app leverages or anticipates trends (AI 
+personalization, voice UX, AR, etc.) 
+• 
+Deliverable: pitch deck + short promotional material (poster/video/landing page mockup) 
+Professional logo, tagline, and A3 promotional poster; two engaging AI-generated MP4 
+videos (one technical demonstration and one business pitch), each 1–2 minutes in 
+duration, with clear narration, high-quality visuals, and content tailored to technical 
+evaluators, the target audience, and potential investors, demonstrating a strong and 
+consistent visual identity 
+ 
+Milestone 6: Individual Contribution and VIVA (all LOs, individually assessed) 
+• 
+Individual contribution log: what each member did, per milestone, with evidence 
+(commits, design files, meeting notes) 
+• 
+One-page signed individual self-reflection: each student writes and signs a single-page 
+reflection covering:  
+o Their specific contributions across the milestones 
+o Challenges faced and how they were addressed 
+o Skills applied or newly learned during the project 
+o What they would do differently 
+o Handed over directly to the evaluation panel (not submitted as part of the group 
+report) 
+• 
+VIVA prep: be ready to explain any part of the project individually, not just your own 
+section. Since Vivas often test whether you understand the whole group's work 
+• 
+Deliverables:  
+o Individual contribution log 
+o One-page signed self-reflection (handed to evaluation panel) 
+o VIVA attendance/participation 
+o Presentation slide deck 
+ 
+ 
+ 
+
+
+=== PAGE 5 ===
+ 
+Department of Software Engineering 
+Faculty of Computing 
+Sri Lanka Institute of Information Technology 
+ 
+ 
+5 
+ 
+Deliverables 
+• Project report (PDF) - Milestones 1- 6 
+• Mobile app (.apk) include Git repository link into the report 
+• Pitch deck (please attached at the end of the report) 
+• Promotional material  
+o One A3-size promotional poster (attached at the end of the report) 
+o Two AI-generated MP4 videos (one technical demonstration and one business 
+pitch, each 1–2 minutes in duration, with clear narration, high-quality visuals, 
+appropriate branding, and content tailored to the intended audience, technical 
+evaluators and potential investors, respectively). 
+ 
+
+
+=== PAGE 6 ===
+ 
+Department of Software Engineering 
+Faculty of Computing 
+Sri Lanka Institute of Information Technology 
+ 
+ 
+6 
+ 
+ 
+Registration N0. 
+M1 
+ 
+M2 
+ 
+M3 
+ 
+M4 
+ 
+Marking Scheme 
+Criteria (Marks) 
+Excellent 
+Good 
+Satisfactory 
+Needs Improvement 
+Poor 
+Marks 
+ 
+ 
+ 
+ 
+ 
+ 
+M1 
+M2 
+M3 
+M4 
+User Research & 
+Analysis (Milestone 1) 
+(Group) 
+(7 marks) 
+Comprehensive, in-depth user 
+research 
+using 
+multiple 
+methods (interviews, surveys, 
+field studies); clear stakeholder 
+identification; 
+apply 
+Affinity 
+Mapping, develop Personas, 
+Empathy maps, User stories, 
+and User journey maps, highly 
+detailed and evidence-based 
+Research uses at least two 
+methods: 
+good 
+stakeholder 
+analysis, applies Affinity Mapping, 
+develops 
+Personas, 
+Empathy 
+maps, User stories, and User 
+journey maps, has good detail but 
+lacks minor insights 
+Research done with limited 
+methods; 
+stakeholder 
+analysis 
+applies 
+Affinity 
+Mapping, develops Personas, 
+Empathy maps, User stories, 
+and 
+User 
+journey 
+maps, 
+missing artifacts or shallow 
+detail 
+Minimal 
+research 
+conducted; 
+stakeholder 
+analysis 
+incomplete 
+or 
+unclear artifacts 
+No research or irrelevant 
+content 
+submitted 
+(0 
+marks); 
+a 
+fragmentary 
+attempt may receive up to 1 
+mark 
+ 
+ 
+ 
+ 
+(7 marks) 
+(6 marks) 
+(4 marks) 
+(3 marks) 
+(0–1 marks) 
+ 
+ 
+ 
+ 
+Ideation & Wireframing 
+(Milestone 1) (Group) 
+(7 marks) 
+Multiple 
+innovative 
+ideas 
+generated; clear sketches; well-
+structured wireframes showing 
+logical user flows 
+Good range of ideas; wireframes 
+are clear but may lack minor 
+refinements 
+Limited 
+range 
+of 
+ideas; 
+wireframes partially complete 
+or unclear 
+Few 
+ideas: 
+wireframes 
+minimal, or disconnected 
+from research 
+No ideation or wireframes 
+provided 
+(0 
+marks); 
+a 
+fragmentary attempt may 
+receive up to 1 mark 
+ 
+ 
+ 
+ 
+(7 marks) 
+(6 marks) 
+(4 marks) 
+(3 marks) 
+(0–1 marks) 
+ 
+ 
+ 
+ 
+High-Fidelity Prototype + 
+EDI Features (Milestone 
+2) (Group) 
+(11 marks) 
+Fully 
+interactive, 
+visually 
+polished 
+prototype; 
+clear 
+integration of Equity, Diversity, 
+and Inclusion (EDI) features; 
+accessibility 
+and 
+responsiveness addressed 
+High-quality prototype with most 
+EDI features present; minor issues 
+in 
+responsiveness 
+or 
+visual 
+consistency 
+Functional 
+prototype 
+with 
+some EDI features but limited 
+depth or polish 
+Prototype incomplete; EDI 
+features minimal or poorly 
+integrated 
+No functional prototype or 
+EDI features (0 marks); a 
+fragmentary attempt may 
+receive up to 2 marks 
+ 
+ 
+ 
+ 
+(11 marks) 
+(9 marks) 
+(7 marks) 
+(4 marks) 
+(0–2 marks) 
+ 
+ 
+ 
+ 
+Tech Stack Justification 
+and Use of Novel 
+Technologies (Milestone 
+3) (Group) 
+(3 marks) 
+Clear, 
+well-researched 
+justification of chosen tools and 
+frameworks; 
+considers 
+scalability, maintainability, and 
+user needs; novel technologies 
+effectively used 
+Good justification with some 
+consideration of scalability and 
+user needs; novel technology used 
+appropriately 
+Basic justification focusing 
+mainly on tool familiarity; 
+minimal 
+use 
+of 
+novel 
+technology 
+Minimal reasoning; ignores 
+scalability or user needs; 
+unclear use of novel tools 
+No justification provided; 
+no 
+evidence 
+of 
+novel 
+technology use (0 marks); a 
+fragmentary attempt may 
+receive 1 mark 
+ 
+ 
+ 
+ 
+(3 marks) 
+  
+(1 marks) 
+(0 mark) 
+(0 mark) 
+ 
+ 
+ 
+ 
+Mobile App 
+Implementation 
+(Milestone 3) (Group) 
+(9 marks) 
+Fully functional, completed app 
+meeting requirements; smooth 
+navigation; no major bugs 
+App is mostly functional and 
+complete; minor bugs 
+The app is partially functional 
+and 
+incomplete, 
+or 
+with 
+noticeable bugs 
+Limited functionality; major 
+features missing 
+No 
+functional 
+app 
+submitted (0 marks); a 
+fragmentary attempt may 
+receive up to 2 marks 
+ 
+ 
+ 
+ 
+(9 marks) 
+(7 marks) 
+(5 marks) 
+(3 marks) 
+(0–2 marks) 
+ 
+ 
+ 
+ 
+Secure Design  
+Implementation  
+(Milestone 3) (Group) 
+Authentication, 
+authorization, 
+secure 
+storage, 
+privacy 
+protection, 
+input 
+validation, 
+secure 
+communication 
+and 
+Most 
+security 
+measures 
+implemented 
+with 
+minor 
+omissions. 
+Basic 
+security 
+measures 
+implemented. 
+Minimal 
+security 
+consideration. 
+No evidence of secure 
+design 
+ 
+ 
+ 
+ 
+
+
+=== PAGE 7 ===
+ 
+Department of Software Engineering 
+Faculty of Computing 
+Sri Lanka Institute of Information Technology 
+ 
+ 
+7 
+ 
+(3 marks) 
+ 
+security 
+best 
+practices 
+implemented and documented. 
+ 
+(3 marks) 
+(2 marks) 
+(1 mark) 
+(0 marks) 
+(0 marks) 
+ 
+ 
+ 
+ 
+User Testing & Iteration 
+(Milestone 4) (Group) 
+(7 marks) 
+At least two testing rounds (with 
+hi-fi 
+prototype 
+and 
+implemented app) with ≥5 
+users 
+each; 
+clear 
+documentation of feedback; 
+improvements 
+clearly 
+implemented 
+Testing with ≥5 users; some 
+feedback addressed in revisions 
+Testing was done, but with 
+fewer 
+users 
+or 
+limited 
+documentation 
+Minimal testing; feedback 
+not clearly used 
+No testing conducted (0 
+marks); 
+a 
+fragmentary 
+attempt may receive up to 1 
+mark 
+ 
+ 
+ 
+ 
+(7 marks) 
+(6 marks) 
+(4 marks) 
+(3 marks) 
+(0–1 marks) 
+ 
+ 
+ 
+ 
+Branding & Promotion 
+Materials (Milestone 5) 
+(Group) 
+(6 marks) 
+Professional logo, tagline, and 
+A3 poster; two engaging 1-2 
+minute videos tailored to the 
+target audience and investors; 
+strong visual identity 
+Good quality branding and videos; 
+professional logo, tagline, and A3 
+poster; minor inconsistencies 
+Branding assets are present 
+but lacking polish or cohesion 
+Minimal 
+branding 
+assets; 
+videos unclear or incomplete 
+No 
+branding 
+materials 
+submitted (0 marks); a 
+fragmentary attempt may 
+receive up to 1 mark 
+ 
+ 
+ 
+ 
+(6 marks) 
+(5 marks) 
+(4 marks) 
+(3 marks) 
+(0–2 marks) 
+ 
+ 
+ 
+ 
+Report & Documentation  
+(Group) 
+(7 marks) 
+Clear, 
+professional, 
+and 
+complete documentation of all 
+project 
+phases; 
+includes 
+rationale, 
+methodology, 
+and 
+references 
+Good 
+documentation 
+covering 
+most phases; minor gaps in clarity 
+Adequate documentation but 
+missing key details 
+Minimal documentation with 
+significant gaps 
+No 
+documentation 
+submitted (0 marks); a 
+fragmentary attempt may 
+receive up to 1 mark 
+ 
+ 
+ 
+ 
+(7 marks) 
+(6 marks) 
+(4 marks) 
+(3 marks) 
+(0–1 marks) 
+ 
+ 
+ 
+ 
+Function Effectively as 
+an Individual and as a 
+Team Member 
+(Milestone 6) (Individual 
+— assessed per 
+member) 
+(10 marks) 
+Demonstrates 
+initiative 
+and 
+responsibility; 
+collaborates 
+seamlessly with team members 
+Works well in a team; takes 
+responsibility for assigned work 
+Participates in teamwork but 
+shows limited initiative 
+Inconsistent contributions to 
+team activities; relies heavily 
+on others 
+Fails 
+to 
+contribute 
+meaningfully; 
+does 
+not 
+function well in a team (0 
+marks); 
+minimal 
+but 
+genuine effort may receive 
+up to 2 marks 
+ 
+ 
+ 
+ 
+(10 marks) 
+(8 marks) 
+(6 marks) 
+(4 marks) 
+(0–2 marks) 
+ 
+ 
+ 
+ 
+Presentation and VIVA 
+(Milestone 6) (Individual 
+— assessed per 
+member) 
+(15 marks) 
+Confident, engaging pitch; clear 
+narrative; 
+effective 
+visuals; 
+responds to questions with 
+clarity and depth 
+Good 
+delivery 
+and 
+visuals; 
+answers 
+most 
+questions 
+effectively; minor timing or clarity 
+issues 
+Adequate presentation; some 
+unclear points; visuals are 
+basic; struggles to answer 
+some questions 
+Poorly 
+prepared; 
+unclear 
+delivery; visuals ineffective; 
+unable to answer questions 
+well 
+No presentation or VIVA 
+delivered (0 marks); an 
+attempted but very poor 
+delivery may receive up to 3 
+marks 
+ 
+ 
+ 
+ 
+(15 marks) 
+(12 marks) 
+(9 marks) 
+(6 marks) 
+(0–3 marks) 
+ 
+ 
+ 
+ 
+Individual Contribution, 
+Reflection & AI Use 
+Declaration (Milestone 
+Comprehensive, 
+evidence-
+backed individual contribution 
+log; 
+thoughtful, 
+well-written 
+signed self-reflection; full and 
+honest 
+AI-use 
+declaration; 
+Clear contribution log with good 
+supporting evidence; solid self-
+reflection and AI-use declaration; 
+answers most VIVA questions 
+Contribution log present but 
+with 
+limited 
+evidence; 
+adequate self-reflection and 
+AI-use declaration; answers 
+VIVA 
+questions 
+on 
+own 
+Contribution log vague or 
+missing evidence; superficial 
+self-reflection; incomplete or 
+unclear AI-use declaration; 
+limited understanding of the 
+No contribution log, self-
+reflection, 
+or 
+AI-use 
+declaration 
+submitted; 
+unable to answer VIVA 
+questions meaningfully (0 
+ 
+ 
+ 
+ 
+
+
+=== PAGE 8 ===
+ 
+Department of Software Engineering 
+Faculty of Computing 
+Sri Lanka Institute of Information Technology 
+ 
+ 
+8 
+ 
+(Individual — assessed 
+per member) 
+(15 marks) 
+demonstrates 
+complete 
+understanding of the entire 
+project during VIVA, including 
+sections led by other members 
+confidently, 
+including 
+some 
+outside own section 
+section well but struggles 
+outside it 
+project beyond own section 
+during VIVA 
+marks); 
+a 
+fragmentary 
+attempt may receive up to 3 
+marks 
+(15 marks) 
+(12 marks) 
+(9 marks) 
+(6 marks) 
+(0–3 marks) 
+ 
+ 
+ 
+ 
+ 
+ 

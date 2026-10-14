@@ -13,6 +13,8 @@ import 'firebase_options.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'services/accessibility_preferences_service.dart';
+import 'services/report_submission_service.dart';
+import 'services/assistance_submission_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,11 +23,17 @@ Future<void> main() async {
 
   // Initialize global accessibility preferences (WCAG 2.2 AA)
   await AccessibilityPreferencesService.instance.init();
+  await ReportSubmissionService.instance.init();
+  ReportSubmissionService.instance.startAutoRetry();
+  await AssistanceSubmissionService.instance.init();
+  AssistanceSubmissionService.instance.startAutoRetry();
 
   // Sync authentic Sri Lankan routes and buses into Firestore
   try {
     final routes = await FirebaseFirestore.instance.collection('routes').get();
-    final hasNewSlRoutes = routes.docs.any((d) => d.id == 'route_138_pettah_homagama');
+    final hasNewSlRoutes = routes.docs.any(
+      (d) => d.id == 'route_138_pettah_homagama',
+    );
     if (!hasNewSlRoutes) {
       await SeedData().seedAll();
     }

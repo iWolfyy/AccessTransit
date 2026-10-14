@@ -43,6 +43,16 @@ class JourneyModel {
     required this.destination,
     this.status = JourneyStatus.confirmed,
     this.createdAt,
+    this.fromStationId,
+    this.toStationId,
+    this.selectedDate,
+    this.selectedTimeMinutes,
+    this.departureAt,
+    this.durationMinutes,
+    this.estimatedFareLkr,
+    this.busNo,
+    this.wheelchairAccessRequired = false,
+    this.stepFreeOnly = false,
   });
 
   final String journeyId;
@@ -66,29 +76,46 @@ class JourneyModel {
   final String destination;
   final JourneyStatus status;
   final DateTime? createdAt;
+  final String? fromStationId;
+  final String? toStationId;
+  final DateTime? selectedDate;
+  final int? selectedTimeMinutes;
+  final DateTime? departureAt;
+  final int? durationMinutes;
+  final int? estimatedFareLkr;
+  final String? busNo;
+  final bool wheelchairAccessRequired;
+  final bool stepFreeOnly;
+  bool get isOpen =>
+      status == JourneyStatus.confirmed || status == JourneyStatus.active;
 
-  factory JourneyModel.fromMap(
-    Map<String, dynamic> map, {
-    String? documentId,
-  }) {
+  factory JourneyModel.fromMap(Map<String, dynamic> map, {String? documentId}) {
     return JourneyModel(
-      journeyId: map[FirestoreConstants.fieldJourneyId]?.toString() ??
+      journeyId:
+          map[FirestoreConstants.fieldJourneyId]?.toString() ??
           documentId ??
           '',
-      passengerId:
-          map[FirestoreConstants.fieldPassengerId]?.toString() ?? '',
+      passengerId: map[FirestoreConstants.fieldPassengerId]?.toString() ?? '',
       routeId: map[FirestoreConstants.fieldRouteId]?.toString() ?? '',
       routeNumber: map[FirestoreConstants.fieldRouteNumber]?.toString() ?? '',
-      routeTitle:
-          map[FirestoreConstants.fieldRouteTitle]?.toString() ?? '',
+      routeTitle: map[FirestoreConstants.fieldRouteTitle]?.toString() ?? '',
       busId: map[FirestoreConstants.fieldBusId]?.toString() ?? '',
       origin: map[FirestoreConstants.fieldOrigin]?.toString() ?? '',
-      destination:
-          map[FirestoreConstants.fieldDestination]?.toString() ?? '',
+      destination: map[FirestoreConstants.fieldDestination]?.toString() ?? '',
       status: JourneyStatus.fromString(
         map[FirestoreConstants.fieldJourneyStatus]?.toString(),
       ),
       createdAt: _parseTimestamp(map[FirestoreConstants.fieldJourneyCreatedAt]),
+      fromStationId: map['fromStationId'] as String?,
+      toStationId: map['toStationId'] as String?,
+      selectedDate: _parseTimestamp(map['selectedDate']),
+      selectedTimeMinutes: (map['selectedTimeMinutes'] as num?)?.toInt(),
+      departureAt: _parseTimestamp(map['departureAt']),
+      durationMinutes: (map['durationMinutes'] as num?)?.toInt(),
+      estimatedFareLkr: (map['estimatedFareLkr'] as num?)?.toInt(),
+      busNo: map['busNo'] as String?,
+      wheelchairAccessRequired: map['wheelchairAccessRequired'] == true,
+      stepFreeOnly: map['stepFreeOnly'] == true,
     );
   }
 
@@ -106,8 +133,20 @@ class JourneyModel {
       FirestoreConstants.fieldJourneyCreatedAt: isCreate
           ? FieldValue.serverTimestamp()
           : createdAt != null
-              ? Timestamp.fromDate(createdAt!)
-              : null,
+          ? Timestamp.fromDate(createdAt!)
+          : null,
+      if (fromStationId != null) 'fromStationId': fromStationId,
+      if (toStationId != null) 'toStationId': toStationId,
+      if (selectedDate != null)
+        'selectedDate': Timestamp.fromDate(selectedDate!),
+      if (selectedTimeMinutes != null)
+        'selectedTimeMinutes': selectedTimeMinutes,
+      if (departureAt != null) 'departureAt': Timestamp.fromDate(departureAt!),
+      if (durationMinutes != null) 'durationMinutes': durationMinutes,
+      if (estimatedFareLkr != null) 'estimatedFareLkr': estimatedFareLkr,
+      if (busNo != null) 'busNo': busNo,
+      'wheelchairAccessRequired': wheelchairAccessRequired,
+      'stepFreeOnly': stepFreeOnly,
     };
   }
 
@@ -134,10 +173,21 @@ class JourneyModel {
       destination: destination ?? this.destination,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      fromStationId: fromStationId,
+      toStationId: toStationId,
+      selectedDate: selectedDate,
+      selectedTimeMinutes: selectedTimeMinutes,
+      departureAt: departureAt,
+      durationMinutes: durationMinutes,
+      estimatedFareLkr: estimatedFareLkr,
+      busNo: busNo,
+      wheelchairAccessRequired: wheelchairAccessRequired,
+      stepFreeOnly: stepFreeOnly,
     );
   }
 
   static DateTime? _parseTimestamp(dynamic value) {
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
     if (value is Timestamp) return value.toDate();
     if (value is DateTime) return value;
     if (value is String) return DateTime.tryParse(value);

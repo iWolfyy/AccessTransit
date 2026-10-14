@@ -1,0 +1,309 @@
+{
+  "date": "2026-10-14",
+  "findings": [
+    [
+      "F01",
+      "P0",
+      "Security",
+      "Firestore rules grant unrestricted access",
+      "An unauthenticated client can read/write every document under the local catch-all rule. Specific collection rules cannot tighten an already allowed catch-all.",
+      "Replace with default-deny rules, owner-scoped passenger data, assigned/approved operator writes, immutable identity and server-controlled rewards; validate with Firebase Rules Emulator. Verify what is actually deployed separately.",
+      "firestore.rules",
+      7
+    ],
+    [
+      "F02",
+      "P0",
+      "Safety",
+      "Emergency button falsely reports contact",
+      "The live journey emergency callback only shows 'Emergency services contacted.' No call, message or service request is performed.",
+      "Implement a reviewed contact/dial flow with truthful initiated/failed states, or remove the action until implemented. Confirm the appropriate contact through authoritative local sources before configuring it.",
+      "lib/screens/journey/live_journey_screen.dart",
+      1641
+    ],
+    [
+      "F03",
+      "P1",
+      "Assistance",
+      "Live journey sends users to the wrong assistance target",
+      "Both assistance actions open const BoardingAssistanceScreen(), using its default bus_138_outbound, st_fort and three-minute arrival, even while viewing another bus or stop.",
+      "Pass the actual bus ID, boarding/alighting stop ID and name, route label and measured ETA; require target review. Test another route and a shared stop.",
+      "lib/screens/journey/live_journey_screen.dart",
+      1575
+    ],
+    [
+      "F04",
+      "P1",
+      "Assistance",
+      "Assistance can appear sent without reaching the driver",
+      "createBoardingRequest caches first and swallows Firestore errors; the form then says sent and closes. Request status updates do the same. Its local-stream listener does not forward local events to the yielded stream.",
+      "Use acknowledged delivery states and a durable owner outbox. Add a passenger request-status stream with acknowledged/completed/cancelled states, failed-write UI and meaningful offline handling.",
+      "lib/services/firestore_service.dart",
+      711
+    ],
+    [
+      "F05",
+      "P1",
+      "Accessibility",
+      "Missing telemetry is presented as working equipment",
+      "LiveJourneyScreen defaults missing ramp/elevator telemetry to true and renders 'Verified active on this vehicle'. It does not subscribe to condition reports/StatusLogic for the live accessibility panel.",
+      "Reuse scoped evidence and freshness logic in the live screen; represent equipment as Unknown until checked, and separate vehicle ramp evidence from stop elevator evidence.",
+      "lib/screens/journey/live_journey_screen.dart",
+      172
+    ],
+    [
+      "F06",
+      "P1",
+      "Navigation",
+      "Normal search bypasses route evidence and journey persistence",
+      "_onSelectRoute navigates directly to LiveJourneyScreen. No production callers of RouteDetailsScreen or JourneyConfirmationScreen were found. The improved evidence card is therefore disconnected from the normal search flow; JourneyService.createJourney is in the unused confirmation screen.",
+      "Connect results -> route evidence -> explicit journey confirmation -> persisted journey -> live tracking. Preserve bus/stop IDs, selected date and time. Test restart/resume.",
+      "lib/screens/journey/route_results_screen.dart",
+      187
+    ],
+    [
+      "F07",
+      "P1",
+      "Reports",
+      "Confirm/resolve/flag can falsely appear shared",
+      "Community mutations change local reports first, award/deduct local stats, then catch cloud errors. The details screen still reports confirmation or resolution success.",
+      "Return acknowledged results or queue explicit pending mutations; propagate rejection; update public evidence and rewards only after acknowledgement. Keep resolution audit records.",
+      "lib/services/firestore_service.dart",
+      374
+    ],
+    [
+      "F08",
+      "P1",
+      "Operations",
+      "Driver updates and trips can succeed only locally",
+      "updateBusAccessibility, TripService start/arrival/complete and LiveBusService updates swallow write failures. Driver UI announces updated/active/completed states without reliable shared acknowledgement.",
+      "Make operator writes report success/failure; keep local GPS visible as local only; reconcile retries and show broadcasting acknowledged/stale/offline states. Add cross-device failure tests.",
+      "lib/services/firestore_service.dart",
+      616
+    ],
+    [
+      "F09",
+      "P1",
+      "Security",
+      "Operator role and bus assignment lack trusted approval",
+      "Registration accepts an operator role from the user. _claimBusAssignment writes the current user's ID directly onto the bus, including already assigned buses; protection is a UI check and the permissive rules.",
+      "Decide approved-operator enrolment and assignment policy. Enforce it in backend rules/transactions; prevent reassignment without permission; eliminate operator_dev identities in real flows.",
+      "lib/screens/operator/operator_dashboard_screen.dart",
+      229
+    ],
+    [
+      "F10",
+      "P1",
+      "Evidence",
+      "Missing report timestamps become fresh now",
+      "Report.fromMap uses DateTime.now() if createdAt is absent/invalid. Malformed or legacy evidence can look newly checked and pass freshness tests.",
+      "Represent unknown observation time explicitly or reject invalid records; never refresh missing evidence during parsing. Add missing/invalid timestamp fixtures.",
+      "lib/models/report.dart",
+      92
+    ],
+    [
+      "F11",
+      "P1",
+      "Accessibility",
+      "Unknown ramp condition defaults to working",
+      "Bus.fromMap defaults missing rampOk to true; wheelchairAccessible is hasRamp && rampOk. A record listing a ramp but no operational check can enter accessible results.",
+      "Separate capability from observed operational condition with nullable condition/time/source; treat absent check as Unknown for requirement matching.",
+      "lib/models/bus.dart",
+      117
+    ],
+    [
+      "F12",
+      "P1",
+      "Data",
+      "Sample services are exposed as real fallback transit data",
+      "FirestoreService preloads sample buses/routes and returns SeedData stations when remote data is empty or unavailable. Reports are now separated from demos, but service availability, schedules and equipment flags are not.",
+      "Add explicit demo mode and provenance for transit catalogues; preserve acknowledged cache offline and show no data/stale states instead of substituting demo services.",
+      "lib/services/firestore_service.dart",
+      31
+    ],
+    [
+      "F13",
+      "P2",
+      "Reports",
+      "Concurrent votes and rewards can lose updates",
+      "confirmReport/flagReport read a document then overwrite complete arrays/counts using set, not a transaction. UserService.updateUserStats similarly computes totals from a prior read. Parallel clients can overwrite each other's changes.",
+      "Use transactions or authoritative server operations for votes and idempotent reward events. Test simultaneous votes, duplicate retry and reversal.",
+      "lib/services/firestore_service.dart",
+      410
+    ],
+    [
+      "F14",
+      "P2",
+      "Navigation",
+      "Stop alert promises a notification without detection",
+      "_toggleAlert only flips a bool and shows a snackbar. No use of that bool for stop proximity or notifications was found.",
+      "Implement stop-index/proximity detection, once-only foreground alerts and clearly scoped background delivery, or mark the control unavailable.",
+      "lib/screens/journey/live_journey_screen.dart",
+      65
+    ],
+    [
+      "F15",
+      "P2",
+      "Freshness",
+      "Conditions do not refresh when time alone passes",
+      "Freshness is calculated during build/stream events; results/feed/evidence do not have a clock-boundary or resume refresh. With no data event, a 30-minute crowding badge can remain on screen after expiry.",
+      "Rebuild at the next expiry/recheck boundary and on app resume, sharing a clock where possible. Test a visible report crossing expiry without Firestore events.",
+      "lib/screens/community/community_screen.dart",
+      243
+    ],
+    [
+      "F16",
+      "P2",
+      "Freshness",
+      "A previous confirmer cannot perform a later recheck",
+      "Both UI and service exit if confirmedBy already contains the user. The same commuter cannot refresh an unresolved fault on a later trip.",
+      "Separate unique vote totals from dated check observations; permit later recheck under a reasonable interval without awarding repeat voting rewards.",
+      "lib/services/firestore_service.dart",
+      420
+    ],
+    [
+      "F17",
+      "P2",
+      "Operations",
+      "Final-stop arrival needs an extra confirmation to complete",
+      "confirmNextStopArrival completes only when nextIndex >= stops.length. Confirming arrival at the last valid index still returns in_progress; a further press is needed.",
+      "Complete on arrival at the final stop, retaining its actualArrival; atomically stop broadcasting. Test two-stop and multi-stop trips.",
+      "lib/services/trip_service.dart",
+      136
+    ],
+    [
+      "F18",
+      "P2",
+      "Scheduling",
+      "Operator overnight estimates do not roll into the next day",
+      "TripService.startTrip parses every schedule time on actualDepTime's date. A 23:50 then 00:10 itinerary produces the latter estimate earlier than departure. PassengerJourneyPlan handles rollover separately.",
+      "Share ordered schedule parsing between operator and passenger journeys, and clarify actual-versus-planned departure adjustments.",
+      "lib/services/trip_service.dart",
+      49
+    ],
+    [
+      "F19",
+      "P2",
+      "Data",
+      "Deleted telemetry can remain in local cache",
+      "LiveBusService returns cached location after a remote document is missing, and its all-active snapshot handler does not remove cached buses absent from the snapshot. A later local event can reintroduce old broadcasting records.",
+      "Invalidate on authoritative remote deletion/empty active snapshots; retain stale cache only when explicitly offline and labelled accordingly.",
+      "lib/services/live_bus_service.dart",
+      370
+    ],
+    [
+      "F20",
+      "P2",
+      "Privacy",
+      "Local outbox lacks retention and account cleanup",
+      "Outbox JSON includes report text and pending image bytes in SharedPreferences and retains all entries. Published entries remain in the map, and no cleanup/user deletion policy was found.",
+      "Bound retention, remove acknowledged entries when safe, add pending-report cancel/delete and account-scoped cleanup; evaluate private file storage for images and protect sensitive notes.",
+      "lib/services/report_submission_service.dart",
+      71
+    ],
+    [
+      "F21",
+      "P2",
+      "Preferences",
+      "Preferences carry across signed-in accounts",
+      "Accessibility settings use global SharedPreferences keys; logout does not reset or load account-specific preferences. A second rider on a shared phone inherits the previous rider's requirements.",
+      "Choose explicit device settings versus account travel needs; scope personal needs by UID with guest defaults and reload on auth changes.",
+      "lib/services/accessibility_preferences_service.dart",
+      18
+    ],
+    [
+      "F22",
+      "P2",
+      "Planning",
+      "Scheduled minutes are labelled as live bus movement",
+      "Results label buses Ongoing/Approaching/isLive from departure-time differences without live GPS. A scheduled bus that never starts can look live.",
+      "Use schedule wording until fresh operator telemetry confirms movement. Keep timetable estimates separate from live tracking.",
+      "lib/screens/journey/route_results_screen.dart",
+      342
+    ],
+    [
+      "F23",
+      "P2",
+      "Planning",
+      "Accessible empty-state recovery button is unreachable",
+      "The empty state checks _selectedFilterTab == '♿ Accessible', while the actual tab value is 'Accessible'. The intended Show All Buses button cannot appear.",
+      "Use one typed tab value and provide a useful recovery action without silently dropping wheelchair/step-free requirements.",
+      "lib/screens/journey/route_results_screen.dart",
+      666
+    ],
+    [
+      "F24",
+      "P2",
+      "Planning",
+      "Ticket prices are model estimates with incomplete disclosure",
+      "PassengerJourneyPlan uses an invented duration/stops formula, while route cards render bare LKR amounts. The unused details page also has an independent fixed ticket-price card.",
+      "Clearly label estimates and their source/limitations; replace with an authoritative fare dataset if available, and share the selected segment fare across all screens.",
+      "lib/logic/passenger_journey_plan.dart",
+      21
+    ],
+    [
+      "F25",
+      "P3",
+      "Scope",
+      "Unused confirmation screen contains fabricated live/verified data",
+      "JourneyConfirmationScreen can create operator_system telemetry at hard-coded coordinates/speed and displays fixed verified-ramp statements. It has no current callers, so this is a dormant risk rather than a reproduced production flow.",
+      "Remove demo writes from production and replace static verification before reconnecting this screen for F06.",
+      "lib/screens/journey/journey_confirmation_screen.dart",
+      43
+    ],
+    [
+      "F26",
+      "P3",
+      "Documentation",
+      "Project documentation overstates implemented features",
+      "read.md lists TTS voice navigation and QA DOCX/XLSX deliverables, while voice guidance is disabled and those artifacts were not found in the workspace inventory.",
+      "Reconcile README/read.md, onboarding and pitch claims with a tested feature inventory. Mark planned capabilities and external evidence links explicitly.",
+      "read.md",
+      42
+    ]
+  ],
+  "milestones": [
+    [
+      "M1",
+      "Research, ideation and wireframes",
+      "PDF p2; rubric p6",
+      "Interview approximately 5–8 participants including an underserved group; scan 3–5 comparable apps; affinity diagram, empathy maps, 4 evidence-backed personas, user stories, journey maps, problem/HMW statements, ideation alternatives, sitemap/flows and low-fi wireframes with rationale.",
+      "Interview guide exists. Actual interviews, synthesis, personas, competitor scan and wireframes are pending per user; 01-research-plan.md was not found on disk."
+    ],
+    [
+      "M2",
+      "Hi-fi prototype and EDI",
+      "PDF p2; rubric p6",
+      "Clickable hi-fi prototype; typography, palette, spacing and component library; EDI checklist covering WCAG AA contrast/text scaling/screen-reader labels/touch targets, localization, cognitive/motor/visual needs and low-bandwidth/offline support.",
+      "Flutter screens and contrast/touch-target tests exist. Figma/hi-fi source, formal checklist, localization and user/device accessibility evaluation are pending or not supplied."
+    ],
+    [
+      "M3",
+      "User testing, iteration and secure design (plan numbering)",
+      "PDF p3; rubric p6–7",
+      "Task plan and metrics, think-aloud moderated sessions, SUS raw responses and scoring, completion rate/time-on-task, qualitative findings and before/after changes; authentication, authorization, storage, privacy and validation evidence. Excellent rubric calls for two rounds: prototype and implemented app, at least 5 users each.",
+      "Automated software tests exist; participant studies and SUS data are pending. Open rules and false safety/delivery claims block a defensible secure-design claim."
+    ],
+    [
+      "M4",
+      "Stack justification and implementation (plan numbering)",
+      "PDF p3; rubric p6",
+      "Compare 2–3 stacks on performance, team skills, accessibility, speed, cost and scalability; explain architecture/state/navigation; working APK, Git repository and requirements-to-feature/test/evidence traceability.",
+      "Flutter/Firebase/Cloudinary implementation and Git remote exist. Stack comparison and traceability matrix are pending. Current blockers remain in core flows."
+    ],
+    [
+      "M5",
+      "Branding, promotion and business pitch",
+      "PDF p4–5; rubric p7",
+      "Value proposition canvas, positioning, target audience/channels/launch plan, monetization and emerging UX trend discussion; professional logo/tagline; pitch deck appended to report; A3 poster appended; TWO AI-generated MP4s, 1–2 min each (technical demo and business pitch), narration and consistent branding.",
+      "App icon/splash assets exist. Dedicated A3 poster, pitch deck, videos, business model and value proposition evidence are pending/not supplied. Planned voice/AI features must be labelled as planned."
+    ],
+    [
+      "M6",
+      "Contribution, reflection, AI declaration and VIVA",
+      "PDF p4,7–8",
+      "Individual contribution log with commits/design files/meeting notes; one signed single-page self-reflection per student handed to panel separately from group report; presentation/VIVA understanding of whole project; honest AI-use declaration required by rubric.",
+      "Git history exists. Member registration IDs, ownership/evidence logs, signed reflections, AI-use declarations and VIVA deck are pending/not supplied."
+    ]
+  ]
+}

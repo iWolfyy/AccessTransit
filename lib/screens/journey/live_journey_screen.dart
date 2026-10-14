@@ -7,7 +7,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/seed_data.dart';
 import '../../logic/delay_eta_logic.dart';
+import '../../logic/live_accessibility_evidence.dart';
 import '../../models/bus.dart';
+import '../../models/assistance_target.dart';
 import '../../models/bus_location_model.dart';
 import '../../models/enums/bus_status.dart';
 import '../../models/journey_model.dart';
@@ -18,6 +20,7 @@ import '../../services/firestore_service.dart';
 import '../../services/journey_service.dart';
 import '../../services/live_bus_service.dart';
 import '../../services/trip_service.dart';
+import '../../widgets/live_accessibility_panel.dart';
 import 'boarding_assistance_screen.dart';
 
 import 'report_condition_screen.dart';
@@ -36,6 +39,9 @@ class LiveJourneyScreen extends StatefulWidget {
     this.busId = 'bus_01',
     this.passengerId = '',
     this.route,
+    this.journeyId,
+    this.savedJourney,
+    this.journeyService,
   });
 
   final String origin;
@@ -49,6 +55,9 @@ class LiveJourneyScreen extends StatefulWidget {
   final String passengerId;
 
   final RouteResultItem? route;
+  final String? journeyId;
+  final JourneyModel? savedJourney;
+  final JourneyService? journeyService;
 
   static const double _desktopBreakpoint = 768;
 
@@ -58,7 +67,13 @@ class LiveJourneyScreen extends StatefulWidget {
 
 class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
   final LiveBusService _liveBusService = LiveBusService();
-  final JourneyService _journeyService = JourneyService();
+  late final JourneyService _journeyService =
+      widget.journeyService ?? JourneyService();
+  late final Stream<JourneyModel?>? _journeyUpdates = widget.passengerId.isEmpty
+      ? null
+      : widget.journeyId == null
+      ? _journeyService.watchActiveJourney(widget.passengerId)
+      : _journeyService.watchJourney(widget.journeyId!);
 
   bool _isAlertActive = false;
 
@@ -102,60 +117,10 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
     return StreamBuilder<BusLocationModel?>(
       stream: _liveBusService.listenToLiveLocation(resolvedBusId),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Column(
-            children: [
-              _TopBar(
-                onClose: () {
-                  if (Navigator.of(context).canPop()) {
-                    Navigator.of(context).pop();
-                  } else {
-                    Navigator.of(context).popUntil((r) => r.isFirst);
-                  }
-                },
-              ),
-              Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.error_outline,
-                          size: 48,
-                          color: AppColors.error,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Telemetry Connection Error',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${snapshot.error}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        }
-
-        final liveBus = snapshot.data;
-        final isStale =
-            liveBus == null ? false : _liveBusService.isBusStale(liveBus);
+        final liveBus = snapshot.hasError ? null : snapshot.data;
+        final isStale = liveBus == null
+            ? false
+            : _liveBusService.isBusStale(liveBus);
 
         final busNumber = liveBus != null && liveBus.routeNumber.isNotEmpty
             ? liveBus.routeNumber
@@ -164,25 +129,25 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
         final routeName = journey?.routeTitle.isNotEmpty == true
             ? journey!.routeTitle
             : (liveBus?.routeName.isNotEmpty == true
-                ? liveBus!.routeName
-                : 'Route $busNumber');
+                  ? liveBus!.routeName
+                  : 'Route $busNumber');
         final passengerStop = journey?.destination ?? widget.destination;
         final isBroadcasting =
             liveBus != null && liveBus.isBroadcasting && !isStale;
-        final rampWorking = liveBus?.rampOperational ?? true;
-        final elevatorWorking = liveBus?.elevatorWorking ?? true;
 
-        final effectiveOrigin = widget.route?.origin ?? widget.origin;
+        final effectiveOrigin =
+            journey?.origin ?? widget.route?.origin ?? widget.origin;
         final effectiveDestination = passengerStop;
 
-        Bus matchedBus = widget.route?.rawBus ??
+        Bus matchedBus =
+            widget.route?.rawBus ??
             Bus(
               id: resolvedBusId,
               routeNo: busNumber,
               busNo: busNumber,
-              hasRamp: rampWorking,
-              lowFloor: true,
-              rampOk: rampWorking,
+              hasRamp: false,
+              lowFloor: false,
+              rampOk: false,
               occupancy: liveBus?.occupancyLevel ?? 'Moderate',
               stops: [effectiveOrigin, effectiveDestination],
               scheduleTimes: const ['08:00 AM', '08:45 AM'],
@@ -191,14 +156,43 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
         final stationsMap = {
           for (final st in SeedData.colomboStations) st.id: st,
           for (final st in SeedData.colomboStations) st.name: st,
+          ...(widget.route?.journeyStations ?? const <String, Station>{}),
         };
+
+        final boardingTarget = AssistanceTarget.resolve(
+          busId: resolvedBusId,
+          bus: widget.route?.rawBus,
+          stationId: effectiveOrigin == widget.route?.origin
+              ? widget.route?.fromStationId
+              : null,
+          stopName: effectiveOrigin,
+          stations: stationsMap,
+        );
+        final alightingTarget = AssistanceTarget.resolve(
+          busId: resolvedBusId,
+          bus: widget.route?.rawBus,
+          stationId: effectiveDestination == widget.route?.destination
+              ? widget.route?.toStationId
+              : null,
+          stopName: effectiveDestination,
+          stations: stationsMap,
+          purpose: AssistancePurpose.alighting,
+        );
 
         final etaResult = DelayEtaCalculator.calculateArrivalEta(
           bus: matchedBus,
-          targetStopIdOrName: effectiveOrigin,
+          targetStopIdOrName: boardingTarget?.stationId ?? effectiveOrigin,
           liveBusLocation: liveBus,
           stationsMap: stationsMap,
         );
+        final alightingEta = alightingTarget == null
+            ? null
+            : DelayEtaCalculator.calculateArrivalEta(
+                bus: matchedBus,
+                targetStopIdOrName: alightingTarget.stationId,
+                liveBusLocation: liveBus,
+                stationsMap: stationsMap,
+              );
 
         final routeNumber = (widget.route?.routeNo?.isNotEmpty == true)
             ? widget.route!.routeNo!
@@ -250,7 +244,9 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                   decoration: BoxDecoration(
                     color: context.surfaceColor,
                     border: context.isHighContrast
-                        ? const Border(left: BorderSide(color: Colors.black, width: 2.0))
+                        ? const Border(
+                            left: BorderSide(color: Colors.black, width: 2.0),
+                          )
                         : null,
                   ),
                   child: _DraggableJourneySheetContent(
@@ -263,10 +259,26 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                     effectiveOrigin: effectiveOrigin,
                     effectiveDestination: effectiveDestination,
                     etaResult: etaResult,
+                    evidenceOriginId: LiveAccessibilityEvidence.resolveStopId(
+                      effectiveOrigin,
+                      stationsMap,
+                      preferredId: boardingTarget?.stationId,
+                    ),
+                    evidenceDestinationId:
+                        LiveAccessibilityEvidence.resolveStopId(
+                          effectiveDestination,
+                          stationsMap,
+                          preferredId: alightingTarget?.stationId,
+                        ),
+                    telemetryUnavailable: snapshot.hasError,
+                    boardingTarget: boardingTarget,
+                    alightingTarget: alightingTarget,
+                    alightingEtaMinutes: alightingTarget?.minutesFrom(
+                      alightingEta,
+                      telemetry: liveBus,
+                    ),
                     isBroadcasting: isBroadcasting,
                     isStale: isStale,
-                    rampWorking: rampWorking,
-                    elevatorWorking: elevatorWorking,
                     occupancyLevel: liveBus?.occupancyLevel ?? 'Moderate',
                     isAlertActive: _isAlertActive,
                     onToggleAlert: () => _toggleAlert(effectiveDestination),
@@ -321,7 +333,9 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                 return Container(
                   decoration: BoxDecoration(
                     color: context.surfaceColor,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
                     border: isHighContrast
                         ? const Border(
                             top: BorderSide(color: Colors.black, width: 2.0),
@@ -349,10 +363,26 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                     effectiveOrigin: effectiveOrigin,
                     effectiveDestination: effectiveDestination,
                     etaResult: etaResult,
+                    evidenceOriginId: LiveAccessibilityEvidence.resolveStopId(
+                      effectiveOrigin,
+                      stationsMap,
+                      preferredId: boardingTarget?.stationId,
+                    ),
+                    evidenceDestinationId:
+                        LiveAccessibilityEvidence.resolveStopId(
+                          effectiveDestination,
+                          stationsMap,
+                          preferredId: alightingTarget?.stationId,
+                        ),
+                    telemetryUnavailable: snapshot.hasError,
+                    boardingTarget: boardingTarget,
+                    alightingTarget: alightingTarget,
+                    alightingEtaMinutes: alightingTarget?.minutesFrom(
+                      alightingEta,
+                      telemetry: liveBus,
+                    ),
                     isBroadcasting: isBroadcasting,
                     isStale: isStale,
-                    rampWorking: rampWorking,
-                    elevatorWorking: elevatorWorking,
                     occupancyLevel: liveBus?.occupancyLevel ?? 'Moderate',
                     isAlertActive: _isAlertActive,
                     onToggleAlert: () => _toggleAlert(effectiveDestination),
@@ -374,14 +404,16 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop =
-        MediaQuery.sizeOf(context).width >= LiveJourneyScreen._desktopBreakpoint;
+        MediaQuery.sizeOf(context).width >=
+        LiveJourneyScreen._desktopBreakpoint;
 
     // ── Path A: passenger has authenticated UID → read from journeys collection
     if (widget.passengerId.isNotEmpty) {
       return Scaffold(
         backgroundColor: context.surfaceColor,
         body: StreamBuilder<JourneyModel?>(
-          stream: _journeyService.watchActiveJourney(widget.passengerId),
+          stream: _journeyUpdates,
+          initialData: widget.savedJourney,
           builder: (context, journeySnapshot) {
             if (journeySnapshot.hasError) {
               return _ErrorBody(
@@ -398,12 +430,16 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
 
             final journey = journeySnapshot.data;
             final hasJourney =
-                journey != null && journey.busId.isNotEmpty;
+                journey != null &&
+                journey.busId.isNotEmpty &&
+                journey.isOpen &&
+                journey.passengerId == widget.passengerId &&
+                (widget.journeyId == null ||
+                    journey.journeyId == widget.journeyId);
 
             // ── State: no active journey / no busId assigned ───────────────
             if (!hasJourney) {
-              if (journeySnapshot.connectionState ==
-                  ConnectionState.waiting) {
+              if (journeySnapshot.connectionState == ConnectionState.waiting) {
                 return _LoadingBody(
                   onClose: () {
                     if (Navigator.of(context).canPop()) {
@@ -461,10 +497,7 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _ErrorBody extends StatelessWidget {
-  const _ErrorBody({
-    required this.error,
-    required this.onClose,
-  });
+  const _ErrorBody({required this.error, required this.onClose});
 
   final String error;
   final VoidCallback onClose;
@@ -531,9 +564,7 @@ class _ErrorBody extends StatelessWidget {
 }
 
 class _LoadingBody extends StatelessWidget {
-  const _LoadingBody({
-    required this.onClose,
-  });
+  const _LoadingBody({required this.onClose});
   final VoidCallback onClose;
 
   @override
@@ -570,9 +601,7 @@ class _LoadingBody extends StatelessWidget {
 }
 
 class _NoJourneyBody extends StatelessWidget {
-  const _NoJourneyBody({
-    required this.onClose,
-  });
+  const _NoJourneyBody({required this.onClose});
   final VoidCallback onClose;
 
   @override
@@ -585,8 +614,7 @@ class _NoJourneyBody extends StatelessWidget {
             padding: const EdgeInsets.all(32),
             child: Semantics(
               container: true,
-              label:
-                  'Bus has not been assigned yet. Your booking is confirmed and waiting for bus assignment.',
+              label: 'Bus has not been assigned yet. Your booking is confirmed and waiting for bus assignment.',
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -658,8 +686,6 @@ class _NoJourneyBody extends StatelessWidget {
   }
 }
 
-
-
 class _TopBar extends StatelessWidget {
   const _TopBar({required this.onClose});
 
@@ -675,7 +701,9 @@ class _TopBar extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           border: isHighContrast
-              ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
+              ? const Border(
+                  bottom: BorderSide(color: Colors.black, width: 2.0),
+                )
               : null,
         ),
         child: SafeArea(
@@ -692,7 +720,9 @@ class _TopBar extends StatelessWidget {
                     child: IconButton(
                       onPressed: onClose,
                       icon: const Icon(Icons.close_rounded, size: 28),
-                      color: isHighContrast ? Colors.black : AppColors.onSurface,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurface,
                       tooltip: 'Close Live Navigation',
                     ),
                   ),
@@ -706,8 +736,12 @@ class _TopBar extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 20,
                             height: 28 / 20,
-                            fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
-                            color: isHighContrast ? Colors.black : AppColors.primary,
+                            fontWeight: isHighContrast
+                                ? FontWeight.w800
+                                : FontWeight.w700,
+                            color: isHighContrast
+                                ? Colors.black
+                                : AppColors.primary,
                           ),
                         ),
                       ),
@@ -751,10 +785,14 @@ class _FloatingTopBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: isHighContrast ? Colors.white : AppColors.surface.withValues(alpha: 0.95),
+            color: isHighContrast
+                ? Colors.white
+                : AppColors.surface.withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isHighContrast ? Colors.black : AppColors.outlineVariant.withValues(alpha: 0.5),
+              color: isHighContrast
+                  ? Colors.black
+                  : AppColors.outlineVariant.withValues(alpha: 0.5),
               width: isHighContrast ? 2.0 : 1.0,
             ),
             boxShadow: isHighContrast
@@ -784,11 +822,16 @@ class _FloatingTopBar extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFC2185B), // LMT Go Crimson badge
                   borderRadius: BorderRadius.circular(8),
-                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: Text(
                   routeNumber,
@@ -810,8 +853,12 @@ class _FloatingTopBar extends StatelessWidget {
                       'Live Tracking to',
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
-                        color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: isHighContrast
+                            ? const Color(0xFF1A1A1A)
+                            : AppColors.onSurfaceVariant,
                       ),
                     ),
                     Text(
@@ -821,7 +868,9 @@ class _FloatingTopBar extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: isHighContrast ? Colors.black : AppColors.onSurface,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.onSurface,
                       ),
                     ),
                   ],
@@ -834,15 +883,15 @@ class _FloatingTopBar extends StatelessWidget {
                   color: isHighContrast
                       ? Colors.white
                       : (isLiveGps
-                          ? const Color(0xFFE8F5E9)
-                          : const Color(0xFFFFF3E0)),
+                            ? const Color(0xFFE8F5E9)
+                            : const Color(0xFFFFF3E0)),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isHighContrast
                         ? Colors.black
                         : (isLiveGps
-                            ? const Color(0xFF81C784)
-                            : const Color(0xFFFFB74D)),
+                              ? const Color(0xFF81C784)
+                              : const Color(0xFFFFB74D)),
                     width: isHighContrast ? 1.5 : 1.0,
                   ),
                 ),
@@ -854,10 +903,12 @@ class _FloatingTopBar extends StatelessWidget {
                       height: 7,
                       decoration: BoxDecoration(
                         color: isHighContrast
-                            ? (isLiveGps ? const Color(0xFF003833) : const Color(0xFF8B4500))
+                            ? (isLiveGps
+                                  ? const Color(0xFF003833)
+                                  : const Color(0xFF8B4500))
                             : (isLiveGps
-                                ? const Color(0xFF2E7D32)
-                                : Colors.orange.shade800),
+                                  ? const Color(0xFF2E7D32)
+                                  : Colors.orange.shade800),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -868,10 +919,12 @@ class _FloatingTopBar extends StatelessWidget {
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         color: isHighContrast
-                            ? (isLiveGps ? const Color(0xFF003833) : const Color(0xFF8B4500))
+                            ? (isLiveGps
+                                  ? const Color(0xFF003833)
+                                  : const Color(0xFF8B4500))
                             : (isLiveGps
-                                ? const Color(0xFF1B5E20)
-                                : Colors.orange.shade900),
+                                  ? const Color(0xFF1B5E20)
+                                  : Colors.orange.shade900),
                       ),
                     ),
                   ],
@@ -930,7 +983,9 @@ class _EnhancedStopsTimelineCard extends StatelessWidget {
                       ? const Color(0xFF001F3F)
                       : AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: Icon(
                   Icons.alt_route_rounded,
@@ -949,7 +1004,9 @@ class _EnhancedStopsTimelineCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w800,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w900
+                            : FontWeight.w800,
                         color: context.textColor,
                       ),
                     ),
@@ -959,7 +1016,9 @@ class _EnhancedStopsTimelineCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.normal,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w700
+                            : FontWeight.normal,
                         color: context.subtextColor,
                       ),
                     ),
@@ -970,10 +1029,14 @@ class _EnhancedStopsTimelineCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: isHighContrast ? Colors.white : const Color(0xFFE8F5E9),
+                  color: isHighContrast
+                      ? Colors.white
+                      : const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: isHighContrast ? Colors.black : const Color(0xFF81C784),
+                    color: isHighContrast
+                        ? Colors.black
+                        : const Color(0xFF81C784),
                     width: isHighContrast ? 1.5 : 1.0,
                   ),
                 ),
@@ -982,7 +1045,9 @@ class _EnhancedStopsTimelineCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
-                    color: isHighContrast ? const Color(0xFF003833) : const Color(0xFF1B5E20),
+                    color: isHighContrast
+                        ? const Color(0xFF003833)
+                        : const Color(0xFF1B5E20),
                   ),
                 ),
               ),
@@ -1037,15 +1102,27 @@ class _StopTimelineItem extends StatelessWidget {
       if (isCurrent) {
         nodeColor = const Color(0xFF001F3F);
         borderColor = Colors.black;
-        nodeIcon = const Icon(Icons.directions_bus_rounded, size: 14, color: Colors.white);
+        nodeIcon = const Icon(
+          Icons.directions_bus_rounded,
+          size: 14,
+          color: Colors.white,
+        );
       } else if (isPassed) {
         nodeColor = Colors.white;
         borderColor = Colors.black;
-        nodeIcon = const Icon(Icons.check_rounded, size: 12, color: Colors.black);
+        nodeIcon = const Icon(
+          Icons.check_rounded,
+          size: 12,
+          color: Colors.black,
+        );
       } else if (isTarget) {
         nodeColor = const Color(0xFF8B4500);
         borderColor = Colors.black;
-        nodeIcon = const Icon(Icons.star_rounded, size: 14, color: Colors.white);
+        nodeIcon = const Icon(
+          Icons.star_rounded,
+          size: 14,
+          color: Colors.white,
+        );
       } else {
         nodeColor = Colors.white;
         borderColor = Colors.black;
@@ -1062,15 +1139,27 @@ class _StopTimelineItem extends StatelessWidget {
       if (isPassed) {
         nodeColor = const Color(0xFFE8F5E9);
         borderColor = const Color(0xFF4CAF50);
-        nodeIcon = const Icon(Icons.check_rounded, size: 12, color: Color(0xFF2E7D32));
+        nodeIcon = const Icon(
+          Icons.check_rounded,
+          size: 12,
+          color: Color(0xFF2E7D32),
+        );
       } else if (isCurrent) {
         nodeColor = AppColors.primary;
         borderColor = AppColors.primary;
-        nodeIcon = const Icon(Icons.directions_bus_rounded, size: 14, color: Colors.white);
+        nodeIcon = const Icon(
+          Icons.directions_bus_rounded,
+          size: 14,
+          color: Colors.white,
+        );
       } else if (isTarget) {
         nodeColor = const Color(0xFFFF9800);
         borderColor = const Color(0xFFE65100);
-        nodeIcon = const Icon(Icons.star_rounded, size: 14, color: Colors.white);
+        nodeIcon = const Icon(
+          Icons.star_rounded,
+          size: 14,
+          color: Colors.white,
+        );
       } else {
         nodeColor = Colors.white;
         borderColor = AppColors.outlineVariant;
@@ -1088,8 +1177,8 @@ class _StopTimelineItem extends StatelessWidget {
     final Color lineColor = isHighContrast
         ? (isPassed ? Colors.black54 : Colors.black)
         : (isPassed
-            ? const Color(0xFF81C784)
-            : AppColors.outlineVariant.withValues(alpha: 0.5));
+              ? const Color(0xFF81C784)
+              : AppColors.outlineVariant.withValues(alpha: 0.5));
 
     return IntrinsicHeight(
       child: Row(
@@ -1115,8 +1204,11 @@ class _StopTimelineItem extends StatelessWidget {
                     boxShadow: (isCurrent || isTarget) && !isHighContrast
                         ? [
                             BoxShadow(
-                              color: (isCurrent ? AppColors.primary : Colors.orange)
-                                  .withValues(alpha: 0.4),
+                              color:
+                                  (isCurrent
+                                          ? AppColors.primary
+                                          : Colors.orange)
+                                      .withValues(alpha: 0.4),
                               blurRadius: 6,
                               spreadRadius: 1,
                             ),
@@ -1155,13 +1247,13 @@ class _StopTimelineItem extends StatelessWidget {
                                   fontWeight: isCurrent || isTarget
                                       ? FontWeight.w800
                                       : (isPassed
-                                          ? FontWeight.w500
-                                          : FontWeight.w600),
+                                            ? FontWeight.w500
+                                            : FontWeight.w600),
                                   color: isHighContrast
                                       ? Colors.black
                                       : (isPassed
-                                          ? AppColors.onSurfaceVariant
-                                          : AppColors.onSurface),
+                                            ? AppColors.onSurfaceVariant
+                                            : AppColors.onSurface),
                                 ),
                               ),
                             ),
@@ -1204,16 +1296,20 @@ class _StopTimelineItem extends StatelessWidget {
                           isCurrent
                               ? 'Bus is currently here'
                               : (isPassed
-                                  ? 'Passed'
-                                  : 'Scheduled: ${stop.scheduledTimeStr}'),
+                                    ? 'Passed'
+                                    : 'Scheduled: ${stop.scheduledTimeStr}'),
                           style: TextStyle(
                             fontSize: 11,
-                            fontWeight: isHighContrast ? FontWeight.w700 : (isCurrent ? FontWeight.w700 : FontWeight.normal),
+                            fontWeight: isHighContrast
+                                ? FontWeight.w700
+                                : (isCurrent
+                                      ? FontWeight.w700
+                                      : FontWeight.normal),
                             color: isHighContrast
                                 ? const Color(0xFF1A1A1A)
                                 : (isCurrent
-                                    ? AppColors.primary
-                                    : AppColors.onSurfaceVariant),
+                                      ? AppColors.primary
+                                      : AppColors.onSurfaceVariant),
                           ),
                         ),
                       ],
@@ -1233,8 +1329,8 @@ class _StopTimelineItem extends StatelessWidget {
                           color: isHighContrast
                               ? Colors.black
                               : (isPassed
-                                  ? AppColors.onSurfaceVariant
-                                  : AppColors.onSurface),
+                                    ? AppColors.onSurfaceVariant
+                                    : AppColors.onSurface),
                         ),
                       ),
                       if (stop.delayLabel.isNotEmpty &&
@@ -1248,11 +1344,11 @@ class _StopTimelineItem extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                             color: isHighContrast
                                 ? (stop.delayType == DelayType.delayed
-                                    ? const Color(0xFF8B0000)
-                                    : const Color(0xFF003833))
+                                      ? const Color(0xFF8B0000)
+                                      : const Color(0xFF003833))
                                 : (stop.delayType == DelayType.delayed
-                                    ? const Color(0xFFD84315)
-                                    : const Color(0xFF0277BD)),
+                                      ? const Color(0xFFD84315)
+                                      : const Color(0xFF0277BD)),
                           ),
                         ),
                       ],
@@ -1274,6 +1370,12 @@ class _StopTimelineItem extends StatelessWidget {
 
 class _DraggableJourneySheetContent extends StatelessWidget {
   const _DraggableJourneySheetContent({
+    this.boardingTarget,
+    this.alightingTarget,
+    this.alightingEtaMinutes,
+    this.evidenceOriginId,
+    this.evidenceDestinationId,
+    this.telemetryUnavailable = false,
     required this.busId,
     required this.busName,
     required this.routeName,
@@ -1285,8 +1387,6 @@ class _DraggableJourneySheetContent extends StatelessWidget {
     required this.etaResult,
     required this.isBroadcasting,
     required this.isStale,
-    required this.rampWorking,
-    required this.elevatorWorking,
     required this.occupancyLevel,
     required this.isAlertActive,
     required this.onToggleAlert,
@@ -1298,6 +1398,12 @@ class _DraggableJourneySheetContent extends StatelessWidget {
   });
 
   final String busId;
+  final AssistanceTarget? boardingTarget;
+  final String? evidenceOriginId;
+  final String? evidenceDestinationId;
+  final bool telemetryUnavailable;
+  final AssistanceTarget? alightingTarget;
+  final int? alightingEtaMinutes;
   final String busName;
   final String routeName;
   final String routeNumber;
@@ -1308,8 +1414,6 @@ class _DraggableJourneySheetContent extends StatelessWidget {
   final BusArrivalEtaResult etaResult;
   final bool isBroadcasting;
   final bool isStale;
-  final bool rampWorking;
-  final bool elevatorWorking;
   final String occupancyLevel;
   final bool isAlertActive;
   final VoidCallback onToggleAlert;
@@ -1326,6 +1430,10 @@ class _DraggableJourneySheetContent extends StatelessWidget {
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
+        if (telemetryUnavailable)
+          const Text(
+            'Live GPS updates are unavailable. Equipment observations are shown separately below.',
+          ),
         if (!isDesktop) ...[
           Center(
             child: Container(
@@ -1351,11 +1459,16 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFC2185B),
                       borderRadius: BorderRadius.circular(8),
-                      border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                      border: isHighContrast
+                          ? Border.all(color: Colors.black, width: 1.5)
+                          : null,
                     ),
                     child: Text(
                       routeNumber,
@@ -1376,20 +1489,23 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: isHighContrast
                           ? Colors.white
                           : (isBroadcasting
-                              ? const Color(0xFFE8F5E9)
-                              : const Color(0xFFFFF3E0)),
+                                ? const Color(0xFFE8F5E9)
+                                : const Color(0xFFFFF3E0)),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isHighContrast
                             ? Colors.black
                             : (isBroadcasting
-                                ? const Color(0xFF81C784)
-                                : const Color(0xFFFFB74D)),
+                                  ? const Color(0xFF81C784)
+                                  : const Color(0xFFFFB74D)),
                         width: isHighContrast ? 1.5 : 1.0,
                       ),
                     ),
@@ -1399,10 +1515,12 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         color: isHighContrast
-                            ? (isBroadcasting ? const Color(0xFF003833) : const Color(0xFF8B4500))
+                            ? (isBroadcasting
+                                  ? const Color(0xFF003833)
+                                  : const Color(0xFF8B4500))
                             : (isBroadcasting
-                                ? const Color(0xFF1B5E20)
-                                : Colors.orange.shade900),
+                                  ? const Color(0xFF1B5E20)
+                                  : Colors.orange.shade900),
                       ),
                     ),
                   ),
@@ -1411,7 +1529,9 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                       '${speed.toStringAsFixed(0)} km/h',
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w700
+                            : FontWeight.w600,
                         color: context.subtextColor,
                       ),
                     ),
@@ -1436,10 +1556,14 @@ class _DraggableJourneySheetContent extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isHighContrast ? Colors.white : AppColors.primary.withValues(alpha: 0.08),
+            color: isHighContrast
+                ? Colors.white
+                : AppColors.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isHighContrast ? Colors.black : AppColors.primary.withValues(alpha: 0.2),
+              color: isHighContrast
+                  ? Colors.black
+                  : AppColors.primary.withValues(alpha: 0.2),
               width: isHighContrast ? 2.0 : 1.0,
             ),
           ),
@@ -1449,9 +1573,13 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                  color: isHighContrast
+                      ? const Color(0xFF001F3F)
+                      : AppColors.primary,
                   shape: BoxShape.circle,
-                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: const Icon(
                   Icons.directions_bus_rounded,
@@ -1470,7 +1598,9 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                           : 'Arriving in ${etaResult.countdownMinutes} min',
                       style: TextStyle(
                         fontSize: 15,
-                        fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w800,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w900
+                            : FontWeight.w800,
                         color: context.textColor,
                       ),
                     ),
@@ -1481,7 +1611,9 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.normal,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w700
+                            : FontWeight.normal,
                         color: context.subtextColor,
                       ),
                     ),
@@ -1489,31 +1621,36 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isHighContrast
-                      ? Colors.white
-                      : (etaResult.delayType == DelayType.delayed
-                          ? const Color(0xFFFFECE0)
-                          : const Color(0xFFE8F5E9)),
-                  borderRadius: BorderRadius.circular(10),
-                  border: isHighContrast
-                      ? Border.all(color: Colors.black, width: 1.5)
-                      : null,
-                ),
-                child: Text(
-                  etaResult.delayLabel,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
                     color: isHighContrast
-                        ? (etaResult.delayType == DelayType.delayed
-                            ? const Color(0xFF8B0000)
-                            : const Color(0xFF003833))
+                        ? Colors.white
                         : (etaResult.delayType == DelayType.delayed
-                            ? const Color(0xFFD84315)
-                            : const Color(0xFF2E7D32)),
+                              ? const Color(0xFFFFECE0)
+                              : const Color(0xFFE8F5E9)),
+                    borderRadius: BorderRadius.circular(10),
+                    border: isHighContrast
+                        ? Border.all(color: Colors.black, width: 1.5)
+                        : null,
+                  ),
+                  child: Text(
+                    etaResult.delayLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: isHighContrast
+                          ? (etaResult.delayType == DelayType.delayed
+                                ? const Color(0xFF8B0000)
+                                : const Color(0xFF003833))
+                          : (etaResult.delayType == DelayType.delayed
+                                ? const Color(0xFFD84315)
+                                : const Color(0xFF2E7D32)),
+                    ),
                   ),
                 ),
               ),
@@ -1536,7 +1673,9 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                   size: context.tapIconSize - 2,
                   color: isHighContrast
                       ? (isAlertActive ? Colors.white : Colors.black)
-                      : (isAlertActive ? Colors.white : const Color(0xFFE65100)),
+                      : (isAlertActive
+                            ? Colors.white
+                            : const Color(0xFFE65100)),
                 ),
                 label: Text(
                   isAlertActive ? 'Alert Active' : 'Alert When Near',
@@ -1545,21 +1684,25 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     color: isHighContrast
                         ? (isAlertActive ? Colors.white : Colors.black)
-                        : (isAlertActive ? Colors.white : const Color(0xFFE65100)),
+                        : (isAlertActive
+                              ? Colors.white
+                              : const Color(0xFFE65100)),
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isHighContrast
                       ? (isAlertActive ? const Color(0xFF001F3F) : Colors.white)
                       : (isAlertActive
-                          ? const Color(0xFFE65100)
-                          : const Color(0xFFFFF3E0)),
+                            ? const Color(0xFFE65100)
+                            : const Color(0xFFFFF3E0)),
                   elevation: isHighContrast ? 0 : (isAlertActive ? 2 : 0),
                   minimumSize: Size(0, context.buttonHeight),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                     side: BorderSide(
-                      color: isHighContrast ? Colors.black : const Color(0xFFFFB74D),
+                      color: isHighContrast
+                          ? Colors.black
+                          : const Color(0xFFFFB74D),
                       width: isHighContrast ? 2.0 : 1.0,
                     ),
                   ),
@@ -1569,13 +1712,14 @@ class _DraggableJourneySheetContent extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const BoardingAssistanceScreen(),
-                    ),
-                  );
-                },
+                onPressed: () => openBoardingAssistance(
+                  context,
+                  target: boardingTarget,
+                  minutesAway: boardingTarget?.minutesFrom(
+                    etaResult,
+                    telemetry: liveBus,
+                  ),
+                ),
                 icon: Icon(
                   Icons.accessible_rounded,
                   size: context.tapIconSize - 2,
@@ -1590,12 +1734,16 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isHighContrast ? const Color(0xFF001F3F) : AppColors.primary,
+                  backgroundColor: isHighContrast
+                      ? const Color(0xFF001F3F)
+                      : AppColors.primary,
                   elevation: isHighContrast ? 0 : 1,
                   minimumSize: Size(0, context.buttonHeight),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: isHighContrast ? const BorderSide(color: Colors.black, width: 2.0) : BorderSide.none,
+                    side: isHighContrast
+                        ? const BorderSide(color: Colors.black, width: 2.0)
+                        : BorderSide.none,
                   ),
                 ),
               ),
@@ -1614,10 +1762,17 @@ class _DraggableJourneySheetContent extends StatelessWidget {
         const SizedBox(height: 16),
 
         // Accessibility section
-        _LiveAccessibilitySection(
-          rampOperational: rampWorking,
-          elevatorWorking: elevatorWorking,
-          occupancyLevel: occupancyLevel,
+        if (liveBus != null)
+          const Text(
+            'Tracking shows the current vehicle location; it does not confirm your scheduled run.',
+          ),
+        LiveAccessibilityPanel(
+          telemetry: liveBus,
+          busId: busId,
+          origin: effectiveOrigin,
+          destination: effectiveDestination,
+          originId: evidenceOriginId,
+          destinationId: evidenceDestinationId,
         ),
 
         const SizedBox(height: 16),
@@ -1626,10 +1781,10 @@ class _DraggableJourneySheetContent extends StatelessWidget {
         _AssistanceSection(
           destination: effectiveDestination,
           onRequest: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const BoardingAssistanceScreen(),
-              ),
+            openBoardingAssistance(
+              context,
+              target: alightingTarget,
+              minutesAway: alightingEtaMinutes,
             );
           },
         ),
@@ -1637,8 +1792,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
         const SizedBox(height: 16),
 
         // Emergency & reporting
-        _EmergencyActions(
-          onEmergency: () => onShowSnack('Emergency services contacted.'),
+        JourneySafetyActions(
           onReport: () {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -1673,7 +1827,9 @@ class _DraggableJourneySheetContent extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 color: context.subtextColor,
-                fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: isHighContrast
+                    ? FontWeight.w600
+                    : FontWeight.normal,
               ),
             ),
             children: [
@@ -1767,8 +1923,7 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
   /// Enriched stop record for full-route visualization.
   List<_RouteStopInfo> _buildRouteStops() {
     final List<String> stopNames = [];
-    if (widget.matchedBus != null &&
-        widget.matchedBus!.stops.isNotEmpty) {
+    if (widget.matchedBus != null && widget.matchedBus!.stops.isNotEmpty) {
       stopNames.addAll(widget.matchedBus!.stops);
     } else if (widget.route != null) {
       stopNames.add(widget.route!.origin);
@@ -1823,13 +1978,15 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
         status = _StopStatus.upcoming;
       }
 
-      result.add(_RouteStopInfo(
-        name: displayName,
-        fullName: name,
-        coord: coord,
-        index: i,
-        status: status,
-      ));
+      result.add(
+        _RouteStopInfo(
+          name: displayName,
+          fullName: name,
+          coord: coord,
+          index: i,
+          status: status,
+        ),
+      );
     }
     return result;
   }
@@ -1880,10 +2037,7 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
     try {
       final bounds = LatLngBounds.fromPoints(pts);
       _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.all(40),
-        ),
+        CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(40)),
       );
     } catch (_) {
       _mapController.move(passengerPos, 13.5);
@@ -1964,10 +2118,12 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
         widget.liveBus!.nextStop.isNotEmpty) {
       busPos = _resolveStopCoordinates(widget.liveBus!.nextStop);
     }
-    busPos ??= _resolveStopCoordinates(widget.origin) ??
+    busPos ??=
+        _resolveStopCoordinates(widget.origin) ??
         const LatLng(6.9360, 79.8527); // Pettah default
 
-    final passengerPos = _resolveStopCoordinates(widget.origin) ??
+    final passengerPos =
+        _resolveStopCoordinates(widget.origin) ??
         _resolveStopCoordinates('Colombo Fort') ??
         const LatLng(6.9333, 79.8500);
 
@@ -2054,8 +2210,7 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate:
-                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.accesstransit.app',
                 ),
                 // ── Route Polyline: Traveled (dim) + Remaining (bright) ──
@@ -2170,12 +2325,12 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                                         color: Colors.white,
                                       )
                                     : stop.status == _StopStatus.current
-                                        ? const Icon(
-                                            Icons.near_me_rounded,
-                                            size: 12,
-                                            color: Colors.white,
-                                          )
-                                        : null,
+                                    ? const Icon(
+                                        Icons.near_me_rounded,
+                                        size: 12,
+                                        color: Colors.white,
+                                      )
+                                    : null,
                               ),
                             ],
                           ),
@@ -2274,10 +2429,7 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                               color: const Color(0xFFE65100),
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 3,
-                                ),
+                                BoxShadow(color: Colors.black26, blurRadius: 3),
                               ],
                             ),
                             child: const Text(
@@ -2338,10 +2490,7 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                                   : AppColors.primary,
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 3,
-                                ),
+                                BoxShadow(color: Colors.black26, blurRadius: 3),
                               ],
                             ),
                             child: Text(
@@ -2365,16 +2514,14 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                                   ? const Color(0xFF00C853)
                                   : AppColors.primary,
                               shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 3,
-                              ),
+                              border: Border.all(color: Colors.white, width: 3),
                               boxShadow: [
                                 BoxShadow(
-                                  color: (isLiveGps
-                                          ? const Color(0xFF00C853)
-                                          : AppColors.primary)
-                                      .withValues(alpha: 0.5),
+                                  color:
+                                      (isLiveGps
+                                              ? const Color(0xFF00C853)
+                                              : AppColors.primary)
+                                          .withValues(alpha: 0.5),
                                   blurRadius: 10,
                                   spreadRadius: 3,
                                 ),
@@ -2401,138 +2548,145 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                 left: 12,
                 right: 64, // Leaves space for control column
                 child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: isLiveGps
-                            ? const Color(0xFF00C853)
-                            : Colors.orange,
-                        shape: BoxShape.circle,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                isLiveGps ? 'LIVE GPS' : 'TIMETABLE',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                  color: isLiveGps
-                                      ? const Color(0xFF1B5E20) // 6.7:1 on white
-                                      : const Color(0xFFB25000), // 4.8:1 on white
-                                ),
-                              ),
-                              const Text(' · ', style: TextStyle(color: Color(0xFF5D616B))),
-                              Text(
-                                distanceText,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.onSurface,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            widget.etaResult.countdownText,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: delayBadgeColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            delayText,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: delayBadgeTextColor,
-                            ),
-                          ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: isLiveGps
+                              ? const Color(0xFF00C853)
+                              : Colors.orange,
+                          shape: BoxShape.circle,
                         ),
-                        if (widget.etaResult.delayReason != null &&
-                            widget.etaResult.delayReason!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF3E0),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: const Color(0xFFFFB74D),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
                               children: [
-                                const Icon(
-                                  Icons.warning_amber_rounded,
-                                  size: 11,
-                                  color: Color(0xFFD84315),
-                                ),
-                                const SizedBox(width: 3),
                                 Text(
-                                  '${widget.etaResult.delayReason} (+${widget.etaResult.addedDelayMinutes}m)',
+                                  isLiveGps ? 'LIVE GPS' : 'TIMETABLE',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                    color: isLiveGps
+                                        ? const Color(
+                                            0xFF1B5E20,
+                                          ) // 6.7:1 on white
+                                        : const Color(
+                                            0xFFB25000,
+                                          ), // 4.8:1 on white
+                                  ),
+                                ),
+                                const Text(
+                                  ' · ',
+                                  style: TextStyle(color: Color(0xFF5D616B)),
+                                ),
+                                Text(
+                                  distanceText,
                                   style: const TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFFD84315),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.onSurface,
                                   ),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 1),
+                            Text(
+                              widget.etaResult.countdownText,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: delayBadgeColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              delayText,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: delayBadgeTextColor,
+                              ),
+                            ),
                           ),
+                          if (widget.etaResult.delayReason != null &&
+                              widget.etaResult.delayReason!.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF3E0),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xFFFFB74D),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.warning_amber_rounded,
+                                    size: 11,
+                                    color: Color(0xFFD84315),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${widget.etaResult.delayReason} (+${widget.etaResult.addedDelayMinutes}m)',
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFD84315),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
             // ── Floating Action Buttons (Right-side controls) ──
             Positioned(
@@ -2577,8 +2731,10 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                     tooltip: 'Zoom in',
                     onTap: () {
                       final current = _mapController.camera.center;
-                      final zoom = (_mapController.camera.zoom + 1.0)
-                          .clamp(8.0, 18.0);
+                      final zoom = (_mapController.camera.zoom + 1.0).clamp(
+                        8.0,
+                        18.0,
+                      );
                       _mapController.move(current, zoom);
                     },
                   ),
@@ -2588,8 +2744,10 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                     tooltip: 'Zoom out',
                     onTap: () {
                       final current = _mapController.camera.center;
-                      final zoom = (_mapController.camera.zoom - 1.0)
-                          .clamp(8.0, 18.0);
+                      final zoom = (_mapController.camera.zoom - 1.0).clamp(
+                        8.0,
+                        18.0,
+                      );
                       _mapController.move(current, zoom);
                     },
                   ),
@@ -2603,39 +2761,39 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                 bottom: 10,
                 left: 12,
                 child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.72),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isLiveGps
-                          ? Icons.speed_rounded
-                          : Icons.schedule_rounded,
-                      size: 14,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      isLiveGps
-                          ? '${widget.liveBus?.speed.toStringAsFixed(0) ?? 0} km/h · Next: ${widget.liveBus?.nextStop ?? 'Approaching'}'
-                          : 'Next Stop: ${widget.liveBus?.nextStop ?? widget.origin}',
-                      style: const TextStyle(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isLiveGps
+                            ? Icons.speed_rounded
+                            : Icons.schedule_rounded,
+                        size: 14,
                         color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 5),
+                      Text(
+                        isLiveGps
+                            ? '${widget.liveBus?.speed.toStringAsFixed(0) ?? 0} km/h · Next: ${widget.liveBus?.nextStop ?? 'Approaching'}'
+                            : 'Next Stop: ${widget.liveBus?.nextStop ?? widget.origin}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -2693,11 +2851,6 @@ class _MapActionButton extends StatelessWidget {
 // ──────────────────────────────────────────────────────────────────────────────
 // Status Card: Bus info, Live badge, Last updated, Next stop, Route name
 // ──────────────────────────────────────────────────────────────────────────────
-
-
-
-
-
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Status Card: Bus info, Live badge, Last updated, Next stop, Route name
@@ -2771,8 +2924,9 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
-    final updatedText =
-        _formatTimestamp(liveBus?.timestamp ?? liveBus?.lastUpdated);
+    final updatedText = _formatTimestamp(
+      liveBus?.timestamp ?? liveBus?.lastUpdated,
+    );
     final busStatusText = _getBusStatusText(liveBus?.status, isStale);
     final busStatusIcon = _getBusStatusIcon(liveBus?.status, isStale);
 
@@ -2812,11 +2966,15 @@ class _StatusCard extends StatelessWidget {
                       ? const Color(0xFF001F3F)
                       : AppColors.primaryContainer,
                   shape: BoxShape.circle,
-                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: Icon(
                   Icons.directions_bus_filled_rounded,
-                  color: isHighContrast ? Colors.white : AppColors.onPrimaryContainer,
+                  color: isHighContrast
+                      ? Colors.white
+                      : AppColors.onPrimaryContainer,
                   size: 26,
                 ),
               ),
@@ -2830,7 +2988,9 @@ class _StatusCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 22,
                         height: 28 / 22,
-                        fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w800,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w900
+                            : FontWeight.w800,
                         color: context.textColor,
                       ),
                     ),
@@ -2840,7 +3000,9 @@ class _StatusCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         height: 20 / 15,
-                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w700
+                            : FontWeight.w600,
                         color: context.subtextColor,
                       ),
                     ),
@@ -2855,16 +3017,20 @@ class _StatusCard extends StatelessWidget {
                     ? 'Status: Live GPS updates receiving'
                     : 'Status: Location unavailable',
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: isHighContrast
                         ? Colors.white
                         : (isBroadcasting
-                            ? AppColors.primaryContainer
-                            : AppColors.errorContainer),
+                              ? AppColors.primaryContainer
+                              : AppColors.errorContainer),
                     borderRadius: BorderRadius.circular(20),
-                    border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                    border: isHighContrast
+                        ? Border.all(color: Colors.black, width: 1.5)
+                        : null,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -2875,10 +3041,12 @@ class _StatusCard extends StatelessWidget {
                             : Icons.sensors_off_rounded,
                         size: 16,
                         color: isHighContrast
-                            ? (isBroadcasting ? const Color(0xFF003833) : const Color(0xFF8B0000))
+                            ? (isBroadcasting
+                                  ? const Color(0xFF003833)
+                                  : const Color(0xFF8B0000))
                             : (isBroadcasting
-                                ? AppColors.onPrimaryContainer
-                                : AppColors.onErrorContainer),
+                                  ? AppColors.onPrimaryContainer
+                                  : AppColors.onErrorContainer),
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -2888,10 +3056,12 @@ class _StatusCard extends StatelessWidget {
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.5,
                           color: isHighContrast
-                              ? (isBroadcasting ? const Color(0xFF003833) : const Color(0xFF8B0000))
+                              ? (isBroadcasting
+                                    ? const Color(0xFF003833)
+                                    : const Color(0xFF8B0000))
                               : (isBroadcasting
-                                  ? AppColors.onPrimaryContainer
-                                  : AppColors.onErrorContainer),
+                                    ? AppColors.onPrimaryContainer
+                                    : AppColors.onErrorContainer),
                         ),
                       ),
                     ],
@@ -2985,10 +3155,7 @@ class _StatusCard extends StatelessWidget {
           const SizedBox(height: 20),
 
           // ── Visual Journey Timeline ────────────────────────────────────────
-          _TimelineProgress(
-            nextStop: nextStop,
-            destination: passengerStop,
-          ),
+          _TimelineProgress(nextStop: nextStop, destination: passengerStop),
         ],
       ),
     );
@@ -3016,11 +3183,7 @@ class _InfoTile extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: isHighContrast ? Colors.black : iconColor,
-        ),
+        Icon(icon, size: 20, color: isHighContrast ? Colors.black : iconColor),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -3030,7 +3193,9 @@ class _InfoTile extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: isHighContrast
+                      ? FontWeight.w700
+                      : FontWeight.w500,
                   color: context.subtextColor,
                 ),
               ),
@@ -3041,7 +3206,9 @@ class _InfoTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                  fontWeight: isHighContrast
+                      ? FontWeight.w800
+                      : FontWeight.w700,
                   color: isHighContrast ? Colors.black : valueColor,
                 ),
               ),
@@ -3094,10 +3261,14 @@ class _EtaBannerCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: isHighContrast ? Colors.white : AppColors.primaryContainer.withValues(alpha: 0.15),
+            color: isHighContrast
+                ? Colors.white
+                : AppColors.primaryContainer.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isHighContrast ? Colors.black : AppColors.primaryContainer.withValues(alpha: 0.4),
+              color: isHighContrast
+                  ? Colors.black
+                  : AppColors.primaryContainer.withValues(alpha: 0.4),
               width: isHighContrast ? 2.0 : 1.5,
             ),
           ),
@@ -3110,13 +3281,19 @@ class _EtaBannerCard extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                      color: isHighContrast
+                          ? const Color(0xFF001F3F)
+                          : AppColors.primaryContainer,
                       shape: BoxShape.circle,
-                      border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                      border: isHighContrast
+                          ? Border.all(color: Colors.black, width: 1.5)
+                          : null,
                     ),
                     child: Icon(
                       Icons.schedule_rounded,
-                      color: isHighContrast ? Colors.white : AppColors.onPrimaryContainer,
+                      color: isHighContrast
+                          ? Colors.white
+                          : AppColors.onPrimaryContainer,
                       size: 22,
                     ),
                   ),
@@ -3129,8 +3306,12 @@ class _EtaBannerCard extends StatelessWidget {
                           arrival.countdownText,
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w800,
-                            color: isHighContrast ? Colors.black : AppColors.primary,
+                            fontWeight: isHighContrast
+                                ? FontWeight.w900
+                                : FontWeight.w800,
+                            color: isHighContrast
+                                ? Colors.black
+                                : AppColors.primary,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -3138,7 +3319,9 @@ class _EtaBannerCard extends StatelessWidget {
                           'at $targetStop',
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                            fontWeight: isHighContrast
+                                ? FontWeight.w700
+                                : FontWeight.w600,
                             color: context.subtextColor,
                           ),
                         ),
@@ -3153,7 +3336,9 @@ class _EtaBannerCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: badgeColor,
                       borderRadius: BorderRadius.circular(12),
-                      border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                      border: isHighContrast
+                          ? Border.all(color: Colors.black, width: 1.5)
+                          : null,
                     ),
                     child: Text(
                       arrival.delayLabel,
@@ -3175,7 +3360,9 @@ class _EtaBannerCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: context.cardColor,
                   borderRadius: BorderRadius.circular(10),
-                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3184,7 +3371,9 @@ class _EtaBannerCard extends StatelessWidget {
                       'Scheduled: ${arrival.scheduledArrivalStr}',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w700
+                            : FontWeight.w600,
                         color: context.subtextColor,
                       ),
                     ),
@@ -3192,12 +3381,14 @@ class _EtaBannerCard extends StatelessWidget {
                       'Expected: ${arrival.estimatedArrivalStr}',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w800
+                            : FontWeight.w700,
                         color: isHighContrast
                             ? Colors.black
                             : (arrival.delayType == DelayType.delayed
-                                ? const Color(0xFFD84315)
-                                : AppColors.primary),
+                                  ? const Color(0xFFD84315)
+                                  : AppColors.primary),
                       ),
                     ),
                   ],
@@ -3212,10 +3403,14 @@ class _EtaBannerCard extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: isHighContrast ? Colors.white : const Color(0xFFFFF3E0),
+                    color: isHighContrast
+                        ? Colors.white
+                        : const Color(0xFFFFF3E0),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: isHighContrast ? Colors.black : const Color(0xFFFFB74D),
+                      color: isHighContrast
+                          ? Colors.black
+                          : const Color(0xFFFFB74D),
                       width: isHighContrast ? 1.5 : 1.0,
                     ),
                   ),
@@ -3224,7 +3419,9 @@ class _EtaBannerCard extends StatelessWidget {
                       Icon(
                         Icons.info_outline,
                         size: 14,
-                        color: isHighContrast ? Colors.black : const Color(0xFFD84315),
+                        color: isHighContrast
+                            ? Colors.black
+                            : const Color(0xFFD84315),
                       ),
                       const SizedBox(width: 6),
                       Expanded(
@@ -3233,7 +3430,9 @@ class _EtaBannerCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: isHighContrast ? Colors.black : const Color(0xFFD84315),
+                            color: isHighContrast
+                                ? Colors.black
+                                : const Color(0xFFD84315),
                           ),
                         ),
                       ),
@@ -3256,10 +3455,14 @@ class _EtaBannerCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: isHighContrast ? Colors.white : AppColors.primaryContainer.withValues(alpha: 0.15),
+            color: isHighContrast
+                ? Colors.white
+                : AppColors.primaryContainer.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isHighContrast ? Colors.black : AppColors.primaryContainer.withValues(alpha: 0.4),
+              color: isHighContrast
+                  ? Colors.black
+                  : AppColors.primaryContainer.withValues(alpha: 0.4),
               width: isHighContrast ? 2.0 : 1.5,
             ),
           ),
@@ -3269,13 +3472,19 @@ class _EtaBannerCard extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: isHighContrast ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                  color: isHighContrast
+                      ? const Color(0xFF001F3F)
+                      : AppColors.primaryContainer,
                   shape: BoxShape.circle,
-                  border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
+                  border: isHighContrast
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: Icon(
                   Icons.schedule_rounded,
-                  color: isHighContrast ? Colors.white : AppColors.onPrimaryContainer,
+                  color: isHighContrast
+                      ? Colors.white
+                      : AppColors.onPrimaryContainer,
                   size: 24,
                 ),
               ),
@@ -3288,8 +3497,12 @@ class _EtaBannerCard extends StatelessWidget {
                       etaResult.displayText,
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w800,
-                        color: isHighContrast ? Colors.black : AppColors.primary,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w900
+                            : FontWeight.w800,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -3297,7 +3510,9 @@ class _EtaBannerCard extends StatelessWidget {
                       'Distance: $distanceKm km to $targetStop',
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w700
+                            : FontWeight.w600,
                         color: context.subtextColor,
                       ),
                     ),
@@ -3343,7 +3558,9 @@ class _EtaBannerCard extends StatelessWidget {
                     etaResult.displayText,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                      fontWeight: isHighContrast
+                          ? FontWeight.w800
+                          : FontWeight.w700,
                       color: context.textColor,
                     ),
                   ),
@@ -3351,7 +3568,9 @@ class _EtaBannerCard extends StatelessWidget {
                     etaResult.reason,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: isHighContrast ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: isHighContrast
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                       color: context.subtextColor,
                     ),
                   ),
@@ -3366,10 +3585,7 @@ class _EtaBannerCard extends StatelessWidget {
 }
 
 class _TimelineProgress extends StatelessWidget {
-  const _TimelineProgress({
-    required this.nextStop,
-    required this.destination,
-  });
+  const _TimelineProgress({required this.nextStop, required this.destination});
 
   final String nextStop;
   final String destination;
@@ -3379,7 +3595,8 @@ class _TimelineProgress extends StatelessWidget {
     final isHighContrast = context.isHighContrast;
     return Semantics(
       container: true,
-      label: 'Journey progress: Bus approaching next stop $nextStop towards destination $destination',
+      label:
+          'Journey progress: Bus approaching next stop $nextStop towards destination $destination',
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -3408,7 +3625,9 @@ class _TimelineProgress extends StatelessWidget {
                         'Next: ',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                          fontWeight: isHighContrast
+                              ? FontWeight.w700
+                              : FontWeight.w600,
                           color: context.subtextColor,
                         ),
                       ),
@@ -3419,7 +3638,9 @@ class _TimelineProgress extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 15,
-                            fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
+                            fontWeight: isHighContrast
+                                ? FontWeight.w800
+                                : FontWeight.w700,
                             color: context.textColor,
                           ),
                         ),
@@ -3433,7 +3654,9 @@ class _TimelineProgress extends StatelessWidget {
                         'Final: ',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w600,
+                          fontWeight: isHighContrast
+                              ? FontWeight.w700
+                              : FontWeight.w600,
                           color: context.subtextColor,
                         ),
                       ),
@@ -3444,8 +3667,12 @@ class _TimelineProgress extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 15,
-                            fontWeight: isHighContrast ? FontWeight.w900 : FontWeight.w700,
-                            color: isHighContrast ? Colors.black : AppColors.primary,
+                            fontWeight: isHighContrast
+                                ? FontWeight.w900
+                                : FontWeight.w700,
+                            color: isHighContrast
+                                ? Colors.black
+                                : AppColors.primary,
                           ),
                         ),
                       ),
@@ -3463,211 +3690,6 @@ class _TimelineProgress extends StatelessWidget {
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Live Accessibility Features Section
-// ──────────────────────────────────────────────────────────────────────────────
-
-class _LiveAccessibilitySection extends StatelessWidget {
-  const _LiveAccessibilitySection({
-    required this.rampOperational,
-    required this.elevatorWorking,
-    required this.occupancyLevel,
-  });
-
-  final bool rampOperational;
-  final bool elevatorWorking;
-  final String occupancyLevel;
-
-  @override
-  Widget build(BuildContext context) {
-    final isHighContrast = context.isHighContrast;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: context.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isHighContrast
-              ? Colors.black
-              : AppColors.outlineVariant.withValues(alpha: 0.3),
-          width: isHighContrast ? 2.0 : 1.0,
-        ),
-        boxShadow: isHighContrast
-            ? null
-            : [
-                BoxShadow(
-                  color: AppColors.onSurface.withValues(alpha: 0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Live Accessibility',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
-                    color: context.textColor,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Semantics(
-                label: 'Wheelchair seats occupancy level: $occupancyLevel',
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isHighContrast ? Colors.white : AppColors.surfaceContainer,
-                    borderRadius: BorderRadius.circular(8),
-                    border: isHighContrast
-                        ? Border.all(color: Colors.black, width: 1.5)
-                        : null,
-                  ),
-                  child: Text(
-                    'Seats: $occupancyLevel',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: isHighContrast ? Colors.black : AppColors.primaryContainer,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _A11yItem(
-            title: rampOperational
-                ? 'Wheelchair Ramp Operational'
-                : 'Ramp Out of Service',
-            subtitle: rampOperational
-                ? 'Verified active on this vehicle'
-                : 'Driver reported maintenance required',
-            icon: Icons.accessible_rounded,
-            isWorking: rampOperational,
-          ),
-          const SizedBox(height: 10),
-          _A11yItem(
-            title: elevatorWorking
-                ? 'Station Elevator Working'
-                : 'Elevator Under Maintenance',
-            subtitle: elevatorWorking
-                ? 'Operational at stop'
-                : 'Alternative ramp accessible at ground level',
-            icon: Icons.elevator_outlined,
-            isWorking: elevatorWorking,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _A11yItem extends StatelessWidget {
-  const _A11yItem({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    this.isWorking = true,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final bool isWorking;
-
-  @override
-  Widget build(BuildContext context) {
-    final isHighContrast = context.isHighContrast;
-    return Semantics(
-      container: true,
-      label: '$title: $subtitle',
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: context.cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isHighContrast
-                ? Colors.black
-                : AppColors.outlineVariant.withValues(alpha: 0.2),
-            width: isHighContrast ? 2.0 : 1.0,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: isHighContrast
-                    ? (isWorking ? const Color(0xFF003833) : const Color(0xFF8B0000))
-                    : (isWorking
-                        ? AppColors.secondary
-                        : AppColors.errorContainer),
-                shape: BoxShape.circle,
-                border: isHighContrast ? Border.all(color: Colors.black, width: 1.5) : null,
-              ),
-              child: Icon(
-                isWorking
-                    ? Icons.check_circle_rounded
-                    : Icons.warning_amber_rounded,
-                color: isHighContrast
-                    ? Colors.white
-                    : (isWorking
-                        ? AppColors.onPrimary
-                        : AppColors.onErrorContainer),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
-                      color: context.textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
-                      color: isHighContrast
-                          ? (isWorking ? const Color(0xFF003833) : const Color(0xFF8B0000))
-                          : (isWorking
-                              ? AppColors.secondary
-                              : AppColors.error),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              icon,
-              color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
-              size: 24,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Assistance Request & Emergency Actions
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _AssistanceSection extends StatelessWidget {
@@ -3693,10 +3715,14 @@ class _AssistanceSection extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: onRequest,
               style: OutlinedButton.styleFrom(
-                foregroundColor: isHighContrast ? Colors.black : AppColors.primaryContainer,
+                foregroundColor: isHighContrast
+                    ? Colors.black
+                    : AppColors.primaryContainer,
                 backgroundColor: isHighContrast ? Colors.white : null,
                 side: BorderSide(
-                  color: isHighContrast ? Colors.black : AppColors.primaryContainer,
+                  color: isHighContrast
+                      ? Colors.black
+                      : AppColors.primaryContainer,
                   width: 2,
                 ),
                 shape: RoundedRectangleBorder(
@@ -3728,83 +3754,101 @@ class _AssistanceSection extends StatelessWidget {
   }
 }
 
-class _EmergencyActions extends StatelessWidget {
-  const _EmergencyActions({
-    required this.onEmergency,
-    required this.onReport,
-  });
+class JourneySafetyActions extends StatelessWidget {
+  const JourneySafetyActions({super.key, required this.onReport});
 
-  final VoidCallback onEmergency;
   final VoidCallback onReport;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Semantics(
-            button: true,
-            label: 'Emergency help button',
-            child: SizedBox(
-              height: context.buttonHeight,
-              child: FilledButton.icon(
-                onPressed: onEmergency,
-                style: FilledButton.styleFrom(
-                  backgroundColor: isHighContrast ? const Color(0xFF8B0000) : AppColors.error,
-                  foregroundColor: AppColors.onError,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: isHighContrast
-                        ? const BorderSide(color: Colors.black, width: 2.0)
-                        : BorderSide.none,
-                  ),
-                  textStyle: TextStyle(
-                    fontSize: context.buttonFontSize,
-                    fontWeight: FontWeight.w700,
+        Row(
+          children: [
+            Expanded(
+              child: Semantics(
+                button: true,
+                enabled: false,
+                label: 'Emergency calling unavailable. Use your phone to call for help.',
+                child: SizedBox(
+                  height: context.buttonHeight,
+                  child: FilledButton.icon(
+                    onPressed: null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: isHighContrast
+                          ? const Color(0xFF8B0000)
+                          : AppColors.error,
+                      foregroundColor: AppColors.onError,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: isHighContrast
+                            ? const BorderSide(color: Colors.black, width: 2.0)
+                            : BorderSide.none,
+                      ),
+                      textStyle: TextStyle(
+                        fontSize: context.buttonFontSize,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    icon: Icon(
+                      Icons.emergency_rounded,
+                      size: context.tapIconSize,
+                    ),
+                    label: const Text('Emergency'),
                   ),
                 ),
-                icon: Icon(Icons.emergency_rounded, size: context.tapIconSize),
-                label: const Text('Emergency'),
               ),
             ),
-          ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Semantics(
+                button: true,
+                label: 'Report accessibility issue or vehicle condition',
+                child: SizedBox(
+                  height: context.buttonHeight,
+                  child: OutlinedButton.icon(
+                    onPressed: onReport,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurface,
+                      backgroundColor: isHighContrast ? Colors.white : null,
+                      side: BorderSide(
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.outline,
+                        width: isHighContrast ? 2.0 : 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      textStyle: TextStyle(
+                        fontSize: context.buttonFontSize,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    icon: Icon(
+                      Icons.report_problem_outlined,
+                      size: context.tapIconSize,
+                    ),
+                    label: const Text('Report Issue'),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Semantics(
-            button: true,
-            label: 'Report accessibility issue or vehicle condition',
-            child: SizedBox(
-              height: context.buttonHeight,
-              child: OutlinedButton.icon(
-                onPressed: onReport,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: isHighContrast ? Colors.black : AppColors.onSurface,
-                  backgroundColor: isHighContrast ? Colors.white : null,
-                  side: BorderSide(
-                    color: isHighContrast ? Colors.black : AppColors.outline,
-                    width: isHighContrast ? 2.0 : 1.5,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  textStyle: TextStyle(
-                    fontSize: context.buttonFontSize,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                icon: Icon(Icons.report_problem_outlined, size: context.tapIconSize),
-                label: const Text('Report Issue'),
-              ),
-            ),
-          ),
+        const SizedBox(height: 8),
+        Text(
+          'Emergency calling is unavailable in this app. Use your phone to call for help.',
+          style: TextStyle(color: context.subtextColor),
         ),
       ],
     );
   }
 }
-
 
 class _LiveStopTimelineCard extends StatelessWidget {
   const _LiveStopTimelineCard({required this.busId});
@@ -3834,7 +3878,9 @@ class _LiveStopTimelineCard extends StatelessWidget {
 
         return Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           color: AppColors.surfaceContainerLowest,
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -3843,7 +3889,10 @@ class _LiveStopTimelineCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.timeline_rounded, color: AppColors.primary),
+                    const Icon(
+                      Icons.timeline_rounded,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 8),
                     const Text(
                       'Live Per-Stop Timeline',
@@ -3855,7 +3904,10 @@ class _LiveStopTimelineCard extends StatelessWidget {
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.green.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(6),
@@ -3878,9 +3930,7 @@ class _LiveStopTimelineCard extends StatelessWidget {
                   builder: (context, stationsSnapshot) {
                     final stationsList =
                         stationsSnapshot.data ?? SeedData.colomboStations;
-                    final stationsMap = {
-                      for (final s in stationsList) s.id: s,
-                    };
+                    final stationsMap = {for (final s in stationsList) s.id: s};
 
                     return ListView.separated(
                       shrinkWrap: true,
@@ -3890,7 +3940,8 @@ class _LiveStopTimelineCard extends StatelessWidget {
                           const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final stopId = stops[index];
-                        final stationName = stationsMap[stopId]?.name ??
+                        final stationName =
+                            stationsMap[stopId]?.name ??
                             stopId
                                 .replaceAll('st_', '')
                                 .replaceAll('_', ' ')
@@ -3931,14 +3982,14 @@ class _LiveStopTimelineCard extends StatelessWidget {
                                 color: isConfirmedCurrent
                                     ? AppColors.primaryContainer
                                     : (isPassed
-                                        ? Colors.green
-                                        : AppColors.surfaceContainer),
+                                          ? Colors.green
+                                          : AppColors.surfaceContainer),
                                 border: Border.all(
                                   color: isConfirmedCurrent
                                       ? AppColors.primary
                                       : (isPassed
-                                          ? Colors.green
-                                          : AppColors.outlineVariant),
+                                            ? Colors.green
+                                            : AppColors.outlineVariant),
                                   width: 2,
                                 ),
                               ),

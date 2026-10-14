@@ -1,3 +1,4 @@
+import 'package:access_transit/logic/report_mutation.dart';
 import 'package:access_transit/models/report.dart';
 import 'package:access_transit/services/firestore_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,9 +8,19 @@ void main() {
 
   group('Community Report Real-World Data & Service Tests', () {
     late FirestoreService service;
+    String? actor;
 
     setUp(() {
-      service = FirestoreService();
+      actor = null;
+      service = FirestoreService(
+        reportWriter: (_) async {},
+        reportActorId: () => actor,
+        reportMutationWriter: (plan) async => ReportMutationResult(
+          action: plan.action,
+          changed: plan.changed,
+          report: plan.after,
+        ),
+      );
     });
 
     test('Report model serialization preserves targetName, severity, category, description', () {
@@ -41,68 +52,85 @@ void main() {
       expect(report.problemType, equals('Elevator out of service'));
       expect(report.severity, equals('major'));
       expect(report.category, equals('elevatorOut'));
-      expect(report.description, equals('Elevator 2 near platform 1 is stuck.'));
+      expect(
+        report.description,
+        equals('Elevator 2 near platform 1 is stuck.'),
+      );
       expect(report.status, equals('active'));
 
       final map = report.toMap();
       expect(map['targetName'], equals('Colombo Fort Main Terminal'));
       expect(map['severity'], equals('major'));
       expect(map['category'], equals('elevatorOut'));
-      expect(map['description'], equals('Elevator 2 near platform 1 is stuck.'));
+      expect(
+        map['description'],
+        equals('Elevator 2 near platform 1 is stuck.'),
+      );
     });
 
-    test('FirestoreService createReport stores and streams new report', () async {
-      final newReport = Report(
-        id: 'rep_test_create_99',
-        targetType: 'station',
-        targetId: 'st_maradana',
-        targetName: 'Maradana Station',
-        problemType: 'Ramp broken',
-        severity: 'moderate',
-        category: 'rampAccess',
-        description: 'Main ramp board cracked',
-        status: 'active',
-        createdAt: DateTime.now(),
-        userId: 'test_user_77',
-      );
+    test(
+      'FirestoreService createReport stores and streams new report',
+      () async {
+        final newReport = Report(
+          id: 'rep_test_create_99',
+          targetType: 'station',
+          targetId: 'st_maradana',
+          targetName: 'Maradana Station',
+          problemType: 'Ramp broken',
+          severity: 'moderate',
+          category: 'rampAccess',
+          description: 'Main ramp board cracked',
+          status: 'active',
+          createdAt: DateTime.now(),
+          userId: 'test_user_77',
+        );
 
-      await service.createReport(newReport);
+        await service.createReport(newReport);
 
-      final reports = await service.streamReports().first;
-      final match = reports.firstWhere((r) => r.id == 'rep_test_create_99');
-      expect(match.targetName, equals('Maradana Station'));
-      expect(match.description, equals('Main ramp board cracked'));
-    });
+        final reports = await service.streamReports().first;
+        final match = reports.firstWhere((r) => r.id == 'rep_test_create_99');
+        expect(match.targetName, equals('Maradana Station'));
+        expect(match.description, equals('Main ramp board cracked'));
+      },
+    );
 
-    test('FirestoreService checkRateLimit enforces 15-minute window for target', () async {
-      final userId = 'rate_limit_user_${DateTime.now().millisecondsSinceEpoch}';
-      final targetId = 'st_rate_limit_target';
+    test(
+      'FirestoreService checkRateLimit enforces 15-minute window for target',
+      () async {
+        final userId =
+            'rate_limit_user_${DateTime.now().millisecondsSinceEpoch}';
+        final targetId = 'st_rate_limit_target';
 
-      final freshReport = Report(
-        id: 'rep_rate_limit_1',
-        targetType: 'station',
-        targetId: targetId,
-        targetName: 'Test Target Station',
-        problemType: 'Crowding',
-        severity: 'minor',
-        category: 'crowding',
-        status: 'active',
-        createdAt: DateTime.now(),
-        userId: userId,
-      );
+        final freshReport = Report(
+          id: 'rep_rate_limit_1',
+          targetType: 'station',
+          targetId: targetId,
+          targetName: 'Test Target Station',
+          problemType: 'Crowding',
+          severity: 'minor',
+          category: 'crowding',
+          status: 'active',
+          createdAt: DateTime.now(),
+          userId: userId,
+        );
 
-      await service.createReport(freshReport);
+        await service.createReport(freshReport);
 
-      final isLimited = await service.checkRateLimit(userId, targetId, thresholdMinutes: 15);
-      expect(isLimited, isTrue);
+        final isLimited = await service.checkRateLimit(
+          userId,
+          targetId,
+          thresholdMinutes: 15,
+        );
+        expect(isLimited, isTrue);
 
-      final isDifferentTargetLimited = await service.checkRateLimit(
-        userId,
-        'different_target_id',
-        thresholdMinutes: 15,
-      );
-      expect(isDifferentTargetLimited, isFalse);
-    });
+        final isDifferentTargetLimited = await service.checkRateLimit(
+          userId,
+          'different_target_id',
+          thresholdMinutes: 15,
+        );
+        expect(isDifferentTargetLimited, isFalse);
+      },
+    );
 
     test('FirestoreService confirmReport, resolveReport, flagReport update report state', () async {
       final reportId = 'rep_action_test_100';
@@ -126,26 +154,34 @@ void main() {
       await service.createReport(testReport);
 
       // Confirm
+      actor = 'reviewer_user_1';
       await service.confirmReport(reportId, 'reviewer_user_1');
       var updated = await service.streamReportById(reportId).first;
       expect(updated?.confirmCount, equals(1));
       expect(updated?.confirmedBy, contains('reviewer_user_1'));
 
       // Resolve
+      actor = (await service.streamReportById(reportId).first)!.userId;
       await service.resolveReport(reportId);
       updated = await service.streamReportById(reportId).first;
       expect(updated?.status, equals('resolved'));
 
       // Flag to hidden threshold (3 flags)
       final flagReportId = 'rep_flag_test_200';
-      await service.createReport(testReport.copyWith(id: flagReportId, status: 'active'));
-      
+      await service.createReport(
+        testReport.copyWith(id: flagReportId, status: 'active'),
+      );
+
+      actor = 'flagger_1';
+
       await service.flagReport(flagReportId, 'flagger_1');
+      actor = 'flagger_2';
       await service.flagReport(flagReportId, 'flagger_2');
+      actor = 'flagger_3';
       await service.flagReport(flagReportId, 'flagger_3');
 
       final flaggedDoc = await service.streamReportById(flagReportId).first;
-      expect(flaggedDoc, isNull);
+      expect(flaggedDoc?.status, 'hidden');
     });
   });
 }

@@ -1,3 +1,5 @@
+import 'support/acknowledged_operator_backend.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:access_transit/models/bus_location_model.dart';
 import 'package:access_transit/models/enums/bus_status.dart';
@@ -13,8 +15,10 @@ void main() {
     final testStops = ['st_pettah', 'st_maradana', 'st_borella', 'st_kottawa'];
 
     setUp(() {
-      liveBusService = LiveBusService();
-      tripService = TripService();
+      liveBusService = AcknowledgedOperatorBackend().liveService();
+      tripService = TripService(
+        tripWriter: AcknowledgedOperatorBackend().writeTrip,
+      );
     });
 
     test('1. LiveBusService.updateNextStop updates nextStop, currentStopIndex, and etaMinutes', () async {
@@ -95,12 +99,15 @@ void main() {
       final finalArrival = await tripService.confirmNextStopArrival(busId);
       expect(finalArrival, isNotNull);
       expect(finalArrival!.currentStopIndex, equals(3));
-      expect(finalArrival.stops[finalArrival.currentStopIndex], equals('st_kottawa'));
+      expect(
+        finalArrival.stops[finalArrival.currentStopIndex],
+        equals('st_kottawa'),
+      );
 
-      // Confirm final stop departure -> completes trip
-      final completedTrip = await tripService.confirmNextStopArrival(busId);
+      // Final arrival itself completes the trip.
+      final completedTrip = finalArrival;
       expect(completedTrip, isNotNull);
-      expect(completedTrip!.status, equals('completed'));
+      expect(completedTrip.status, equals('completed'));
 
       final finalLocation = await liveBusService.getLiveLocation(busId);
       expect(finalLocation, isNotNull);

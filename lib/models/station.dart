@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../constants/firestore_constants.dart';
 
 /// Represents a transit station with accessibility facilities and geographic location.
@@ -12,6 +13,7 @@ class Station {
     required this.hasRamp,
     required this.lat,
     required this.lng,
+    this.stepFreeAccess,
   });
 
   final String id;
@@ -21,19 +23,26 @@ class Station {
   final double lat;
   final double lng;
 
+  /// Explicit path assessment; null means no assessment is available.
+  final bool? stepFreeAccess;
+
   /// Factory to instantiate a [Station] from a Firestore map and optional document [id].
   factory Station.fromMap(Map<String, dynamic> map, {String? id}) {
     return Station(
       id: id ?? map['id']?.toString() ?? '',
-      name: map[FirestoreConstants.fieldName]?.toString() ??
+      name:
+          map[FirestoreConstants.fieldName]?.toString() ??
           map['name']?.toString() ??
           '',
       hasElevator: map[FirestoreConstants.fieldHasElevator] as bool? ?? false,
       hasRamp: map[FirestoreConstants.fieldHasRamp] as bool? ?? false,
-      lat: (map[FirestoreConstants.fieldLat] as num?)?.toDouble() ??
+      stepFreeAccess: map['stepFreeAccess'] as bool?,
+      lat:
+          (map[FirestoreConstants.fieldLat] as num?)?.toDouble() ??
           (map['latitude'] as num?)?.toDouble() ??
           0.0,
-      lng: (map[FirestoreConstants.fieldLng] as num?)?.toDouble() ??
+      lng:
+          (map[FirestoreConstants.fieldLng] as num?)?.toDouble() ??
           (map['longitude'] as num?)?.toDouble() ??
           0.0,
     );
@@ -53,6 +62,7 @@ class Station {
       FirestoreConstants.fieldName: name,
       FirestoreConstants.fieldHasElevator: hasElevator,
       FirestoreConstants.fieldHasRamp: hasRamp,
+      if (stepFreeAccess != null) 'stepFreeAccess': stepFreeAccess,
       FirestoreConstants.fieldLat: lat,
       FirestoreConstants.fieldLng: lng,
     };
@@ -69,6 +79,7 @@ class Station {
     bool? hasRamp,
     double? lat,
     double? lng,
+    bool? stepFreeAccess,
   }) {
     return Station(
       id: id ?? this.id,
@@ -77,6 +88,7 @@ class Station {
       hasRamp: hasRamp ?? this.hasRamp,
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
+      stepFreeAccess: stepFreeAccess ?? this.stepFreeAccess,
     );
   }
 
@@ -90,7 +102,8 @@ class Station {
           hasElevator == other.hasElevator &&
           hasRamp == other.hasRamp &&
           lat == other.lat &&
-          lng == other.lng;
+          lng == other.lng &&
+          stepFreeAccess == other.stepFreeAccess;
 
   @override
   int get hashCode =>
@@ -99,5 +112,6 @@ class Station {
       hasElevator.hashCode ^
       hasRamp.hashCode ^
       lat.hashCode ^
-      lng.hashCode;
+      lng.hashCode ^
+      stepFreeAccess.hashCode;
 }

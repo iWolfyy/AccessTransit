@@ -87,7 +87,9 @@ class _AccessibilityPreferencesScreenState
           ),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
 
@@ -241,7 +243,8 @@ class _AccessibilityPreferencesScreenState
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _wheelchairAccess = v);
-                        AccessibilityPreferencesService.instance.setWheelchairOnly(v);
+                        AccessibilityPreferencesService.instance
+                            .setWheelchairOnly(v);
                       },
                     ),
                     const Divider(height: 1, indent: 64),
@@ -260,12 +263,14 @@ class _AccessibilityPreferencesScreenState
                     _PreferenceToggle(
                       icon: Icons.directions_walk,
                       label: 'Minimize walking distance',
-                      subtitle: 'Prioritize connections closest to entry points',
+                      subtitle: 'Not available yet — walking paths and distances have not been measured',
+                      enabled: false,
                       value: _minimizeWalking,
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _minimizeWalking = v);
-                        AccessibilityPreferencesService.instance.setMinimizeWalking(v);
+                        AccessibilityPreferencesService.instance
+                            .setMinimizeWalking(v);
                       },
                     ),
                   ],
@@ -286,7 +291,8 @@ class _AccessibilityPreferencesScreenState
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _highContrast = v);
-                        AccessibilityPreferencesService.instance.setHighContrast(v);
+                        AccessibilityPreferencesService.instance
+                            .setHighContrast(v);
                       },
                     ),
                     const Divider(height: 1, indent: 64),
@@ -298,7 +304,8 @@ class _AccessibilityPreferencesScreenState
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _hasLargeTargets = v);
-                        AccessibilityPreferencesService.instance.setLargeTargets(v);
+                        AccessibilityPreferencesService.instance
+                            .setLargeTargets(v);
                         ScaffoldMessenger.of(context)
                           ..hideCurrentSnackBar()
                           ..showSnackBar(
@@ -317,7 +324,9 @@ class _AccessibilityPreferencesScreenState
                                     v
                                         ? 'Large tap targets (48dp+) enabled'
                                         : 'Standard tap targets enabled',
-                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -337,24 +346,28 @@ class _AccessibilityPreferencesScreenState
                     _PreferenceToggle(
                       icon: Icons.volume_up,
                       label: 'Voice guidance for navigation',
-                      subtitle: 'Spoken stop announcements and transfer cues',
+                      subtitle: 'Not available yet — use your phone screen reader for spoken interface labels',
+                      enabled: false,
                       value: _voiceGuidance,
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _voiceGuidance = v);
-                        AccessibilityPreferencesService.instance.setVoiceGuidance(v);
+                        AccessibilityPreferencesService.instance
+                            .setVoiceGuidance(v);
                       },
                     ),
                     const Divider(height: 1, indent: 64),
                     _PreferenceToggle(
                       icon: Icons.vibration,
                       label: 'Haptic alerts for stops',
-                      subtitle: 'Vibrate device when approaching destination',
+                      subtitle: 'Not available yet — automatic vibration alerts are not supported',
+                      enabled: false,
                       value: _hapticAlerts,
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _hapticAlerts = v);
-                        AccessibilityPreferencesService.instance.setHapticAlerts(v);
+                        AccessibilityPreferencesService.instance
+                            .setHapticAlerts(v);
                       },
                     ),
                   ],
@@ -370,24 +383,29 @@ class _AccessibilityPreferencesScreenState
                     _PreferenceToggle(
                       icon: Icons.front_hand_rounded,
                       label: 'Boarding assistance required',
-                      subtitle: 'Notify driver in advance to assist with ramp deployment',
+                      subtitle: 'Automatic requests are not available yet — request assistance from the journey screen',
+                      enabled: false,
                       value: _boardingAssistance,
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _boardingAssistance = v);
-                        AccessibilityPreferencesService.instance.setBoardingAssistance(v);
+                        AccessibilityPreferencesService.instance
+                            .setBoardingAssistance(v);
                       },
                     ),
                     const Divider(height: 1, indent: 64),
                     _PreferenceToggle(
                       icon: Icons.hearing_disabled,
                       label: 'Show quiet routes',
-                      subtitle: 'Prioritize lower crowd levels and quieter transit options',
+                      subtitle: 'Not available yet — noise levels are unknown',
+                      enabled: false,
                       value: _quietRoutes,
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _quietRoutes = v);
-                        AccessibilityPreferencesService.instance.setQuietRoutes(v);
+                        AccessibilityPreferencesService.instance.setQuietRoutes(
+                          v,
+                        );
                       },
                     ),
                   ],
@@ -531,6 +549,7 @@ class _PreferenceToggle extends StatelessWidget {
     required this.value,
     required this.onChanged,
     this.hasLargeTargets = true,
+    this.enabled = true,
   });
 
   final IconData icon;
@@ -539,6 +558,7 @@ class _PreferenceToggle extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
   final bool hasLargeTargets;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -556,12 +576,15 @@ class _PreferenceToggle extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => onChanged(!value),
+        onTap: enabled ? () => onChanged(!value) : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 240),
           curve: Curves.easeOutCubic,
           constraints: BoxConstraints(minHeight: targetMinHeight),
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: verticalPadding),
+          padding: EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: verticalPadding,
+          ),
           child: Row(
             children: [
               AnimatedContainer(
@@ -571,10 +594,12 @@ class _PreferenceToggle extends StatelessWidget {
                 height: iconBoxSize,
                 decoration: BoxDecoration(
                   color: isHighContrast
-                      ? (value ? const Color(0xFF001F3F) : const Color(0xFFE5E5E5))
+                      ? (value
+                            ? const Color(0xFF001F3F)
+                            : const Color(0xFFE5E5E5))
                       : (value
-                          ? AppColors.primaryContainer.withValues(alpha: 0.25)
-                          : AppColors.surfaceContainer),
+                            ? AppColors.primaryContainer.withValues(alpha: 0.25)
+                            : AppColors.surfaceContainer),
                   borderRadius: BorderRadius.circular(10),
                   border: isHighContrast
                       ? Border.all(color: Colors.black, width: 1.5)
@@ -585,7 +610,9 @@ class _PreferenceToggle extends StatelessWidget {
                   size: iconSize,
                   color: isHighContrast
                       ? (value ? Colors.white : Colors.black)
-                      : (value ? AppColors.primary : AppColors.onSurfaceVariant),
+                      : (value
+                            ? AppColors.primary
+                            : AppColors.onSurfaceVariant),
                 ),
               ),
               const SizedBox(width: 14),
@@ -598,8 +625,12 @@ class _PreferenceToggle extends StatelessWidget {
                       label,
                       style: TextStyle(
                         fontSize: labelFontSize,
-                        fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
-                        color: isHighContrast ? Colors.black : AppColors.onSurface,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.onSurface,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -625,7 +656,7 @@ class _PreferenceToggle extends StatelessWidget {
                   curve: Curves.easeOutCubic,
                   child: Switch(
                     value: value,
-                    onChanged: onChanged,
+                    onChanged: enabled ? onChanged : null,
                     materialTapTargetSize: MaterialTapTargetSize.padded,
                     activeThumbColor: Colors.white,
                     activeTrackColor: isHighContrast

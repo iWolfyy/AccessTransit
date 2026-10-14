@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,8 +10,11 @@ import '../../data/seed_data.dart';
 import '../../models/bus.dart';
 import '../../models/bus_route.dart';
 import '../../models/report.dart';
+import '../../models/enums/report_condition.dart';
 import '../../models/station.dart';
 import '../../services/firestore_service.dart';
+import '../../services/report_submission_service.dart';
+import '../../services/report_photo_storage.dart';
 import 'report_submitted_screen.dart';
 
 /// Target category for the report: either on a bus or at a bus stop / station.
@@ -18,9 +22,24 @@ enum ReportTargetType { bus, station }
 
 /// Crowding level options tailored for accessible transit passengers.
 enum CrowdingLevel {
-  low('Low Crowd', 'Plenty of room & wheelchair bay free', Icons.sentiment_satisfied_alt_rounded, AppColors.success),
-  medium('Moderate', 'Seats full, standing room available', Icons.sentiment_neutral_rounded, Color(0xFFF57F17)),
-  high('Crowded / Packed', 'Wheelchair space or aisle blocked', Icons.sentiment_very_dissatisfied_rounded, AppColors.error);
+  low(
+    'Low Crowd',
+    'Plenty of room & wheelchair bay free',
+    Icons.sentiment_satisfied_alt_rounded,
+    AppColors.success,
+  ),
+  medium(
+    'Moderate',
+    'Seats full, standing room available',
+    Icons.sentiment_neutral_rounded,
+    Color(0xFFF57F17),
+  ),
+  high(
+    'Crowded / Packed',
+    'Wheelchair space or aisle blocked',
+    Icons.sentiment_very_dissatisfied_rounded,
+    AppColors.error,
+  );
 
   const CrowdingLevel(this.label, this.subtitle, this.icon, this.color);
   final String label;
@@ -92,7 +111,6 @@ class ReportConditionScreen extends StatefulWidget {
 
 class _ReportConditionScreenState extends State<ReportConditionScreen> {
   static const double _desktopBreakpoint = 768;
-  static String? _cachedGuestUserId;
 
   final FirestoreService _firestoreService = FirestoreService();
   final TextEditingController _noteController = TextEditingController();
@@ -125,6 +143,15 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
   // Submission state
   bool _isSubmitting = false;
+  bool _conditionChosen = false;
+  bool _crowdingChosen = false;
+
+  void _resetObservation() {
+    _conditionChosen = false;
+    _crowdingChosen = false;
+    _pickedImage = null;
+    _noteController.clear();
+  }
 
   // ── BUS CATEGORIES & SUB-CARDS ─────────────────────────────────────────────
   static final List<ReportCategoryDef> _busCategories = [
@@ -413,7 +440,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
       setState(() {
         _allRoutes = routes.isNotEmpty ? routes : SeedData.sampleRoutes;
-        _allStations = stations.isNotEmpty ? stations : SeedData.colomboStations;
+        _allStations = stations.isNotEmpty
+            ? stations
+            : SeedData.colomboStations;
         _allBuses = buses.isNotEmpty ? buses : SeedData.sampleBuses;
 
         _setupInitialSelection();
@@ -433,10 +462,6 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   }
 
   void _setupInitialSelection() {
-    if (_allRoutes.isNotEmpty) {
-      _selectedRoute = _allRoutes.first;
-    }
-
     if (widget.targetType.toLowerCase() == 'bus') {
       _targetType = ReportTargetType.bus;
       _selectedOption = _busCategories[0].options[0];
@@ -445,18 +470,33 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
           (b) => b?.id == widget.targetId,
           orElse: () => null,
         );
+        final bus = _selectedBus;
+        if (bus != null) {
+          final exact = _allRoutes.where((r) => r.id == bus.routeId).toList();
+          final candidates = bus.routeId?.isNotEmpty == true
+              ? exact
+              : _allRoutes.where((r) => r.routeNo == bus.routeNo).toList();
+          if (candidates.length == 1) _selectedRoute = candidates.single;
+        }
       }
     } else {
       _targetType = ReportTargetType.station;
       _selectedOption = _stationCategories[0].options[0];
       if (widget.targetId.isNotEmpty || widget.initialLocation.isNotEmpty) {
-        _selectedStation = _allStations.cast<Station?>().firstWhere(
-          (s) =>
-              s?.id == widget.targetId ||
-              (widget.initialLocation.isNotEmpty &&
-                  (s?.name.toLowerCase().contains(widget.initialLocation.toLowerCase()) ?? false)),
-          orElse: () => null,
-        );
+        final matches = _allStations
+            .where(
+              (s) => widget.targetId.isNotEmpty
+                  ? s.id == widget.targetId
+                  : s.name.trim().toLowerCase() ==
+                        widget.initialLocation.trim().toLowerCase(),
+            )
+            .toList();
+        if (matches.length == 1) _selectedStation = matches.single;
+        // A shared stop may belong to several routes; do not guess one.
+        final candidates = _allRoutes
+            .where((r) => r.stops.contains(_selectedStation?.id))
+            .toList();
+        if (candidates.length == 1) _selectedRoute = candidates.single;
       }
     }
 
@@ -468,29 +508,37 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
     final routeBuses = _getBusesForSelectedRoute();
     if (_selectedBus == null || !routeBuses.contains(_selectedBus)) {
-      _selectedBus = routeBuses.isNotEmpty ? routeBuses.first : null;
+      if (_targetType == ReportTargetType.bus && _selectedBus != null) {
+        _resetObservation();
+      }
+      _selectedBus = null;
     }
 
     final routeStations = _getStationsForSelectedRoute();
     if (_selectedStation == null || !routeStations.contains(_selectedStation)) {
-      _selectedStation = routeStations.isNotEmpty ? routeStations.first : null;
+      if (_targetType == ReportTargetType.station && _selectedStation != null) {
+        _resetObservation();
+      }
+      _selectedStation = null;
     }
   }
 
   List<Bus> _getBusesForSelectedRoute() {
     if (_selectedRoute == null) return _allBuses;
     final filtered = _allBuses.where((b) {
-      return b.routeId == _selectedRoute!.id || b.routeNo == _selectedRoute!.routeNo;
+      return b.routeId?.isNotEmpty == true
+          ? b.routeId == _selectedRoute!.id
+          : b.routeNo == _selectedRoute!.routeNo;
     }).toList();
-    return filtered.isNotEmpty ? filtered : _allBuses;
+    return filtered;
   }
 
   List<Station> _getStationsForSelectedRoute() {
     if (_selectedRoute == null) return _allStations;
-    if (_selectedRoute!.stops.isEmpty) return _allStations;
+    if (_selectedRoute!.stops.isEmpty) return const [];
     final stopSet = _selectedRoute!.stops.toSet();
     final matched = _allStations.where((s) => stopSet.contains(s.id)).toList();
-    return matched.isNotEmpty ? matched : _allStations;
+    return matched;
   }
 
   String _getOrCreateUserId() {
@@ -498,8 +546,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     if (user != null && user.uid.isNotEmpty) {
       return user.uid;
     }
-    _cachedGuestUserId ??= 'guest_user_${DateTime.now().millisecondsSinceEpoch}';
-    return _cachedGuestUserId!;
+    throw StateError('Please sign in before publishing a report.');
   }
 
   void _showSnack(String message) {
@@ -554,7 +601,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                 const SizedBox(height: 6),
                 const Text(
                   'Help verify condition for commuters with disabilities',
-                  style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 Row(
@@ -570,9 +620,15 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          side: const BorderSide(color: AppColors.primary, width: 1.5),
+                          side: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
                         ),
-                        icon: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
+                        icon: const Icon(
+                          Icons.camera_alt_rounded,
+                          color: AppColors.primary,
+                        ),
                         label: const Text(
                           'Take Photo',
                           style: TextStyle(fontWeight: FontWeight.w700),
@@ -591,9 +647,14 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          side: const BorderSide(color: AppColors.outlineVariant),
+                          side: const BorderSide(
+                            color: AppColors.outlineVariant,
+                          ),
                         ),
-                        icon: const Icon(Icons.photo_library_rounded, color: AppColors.onSurface),
+                        icon: const Icon(
+                          Icons.photo_library_rounded,
+                          color: AppColors.onSurface,
+                        ),
                         label: const Text(
                           'From Gallery',
                           style: TextStyle(fontWeight: FontWeight.w700),
@@ -613,15 +674,61 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
   Future<void> _submitReport() async {
     final isBus = _targetType == ReportTargetType.bus;
-    final targetId = isBus
-        ? (_selectedBus?.id ?? 'bus_generic')
-        : (_selectedStation?.id ?? 'station_generic');
+    if ((isBus && _selectedBus == null) ||
+        (!isBus && _selectedStation == null)) {
+      _showSnack('Select the exact bus or stop you observed.');
+      return;
+    }
+    if (!_conditionChosen || (isBus && !_crowdingChosen)) {
+      _showSnack(
+        isBus
+            ? 'Choose the condition and crowding level you observed.'
+            : 'Choose the condition you observed.',
+      );
+      return;
+    }
+    final targetId = isBus ? _selectedBus!.id : _selectedStation!.id;
     final targetName = isBus
         ? (_selectedBus != null
-            ? '${_selectedBus!.busNo} (Route ${_selectedRoute?.routeNo ?? _selectedBus!.routeNo})'
-            : 'Bus Route ${_selectedRoute?.routeNo ?? ""}')
-        : (_selectedStation?.name ?? 'Station on Route ${_selectedRoute?.routeNo ?? ""}');
+              ? '${_selectedBus!.displayBusNo} (Route ${_selectedBus!.routeNo})'
+              : 'Bus Route ${_selectedRoute?.routeNo ?? ""}')
+        : (_selectedStation?.name ??
+              'Station on Route ${_selectedRoute?.routeNo ?? ""}');
 
+    final option = _selectedOption;
+    final crowding = _selectedCrowding;
+    final note = _noteController.text.trim();
+    final photo = _pickedImage;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm your observation'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Location / Vehicle: $targetName'),
+              Text('Condition: ${option.title}'),
+              if (isBus) Text('Crowding: ${crowding.label}'),
+              if (note.isNotEmpty) Text('Note: $note'),
+              if (photo != null) const Text('Evidence: 1 photo attached'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Edit report'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm and submit'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
     setState(() => _isSubmitting = true);
 
     try {
@@ -644,9 +751,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
       String problemType;
       if (isBus) {
-        problemType = 'Crowding: ${_selectedCrowding.label} • ${_selectedOption.title}';
+        problemType = 'Crowding: ${crowding.label} • ${option.title}';
       } else {
-        problemType = _selectedOption.title;
+        problemType = option.title;
       }
 
       final report = Report(
@@ -655,14 +762,16 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         targetId: targetId,
         targetName: targetName,
         problemType: problemType,
-        subCategory: _selectedOption.title,
-        category: _selectedOption.category,
-        severity: _selectedOption.severity,
-        description: _noteController.text.trim(),
-        photoUrl: _pickedImage?.path ?? '',
+        subCategory: option.title,
+        condition: ReportCondition.fromOptionId(option.id),
+        crowdingLevel: isBus ? crowding.name : '',
+        category: option.category,
+        severity: option.severity,
+        description: note,
+        photoUrl: '',
         status: 'active',
         createdAt: DateTime.now(),
-        lastConfirmedAt: DateTime.now(),
+        lastConfirmedAt: null,
         confirmCount: 0,
         falseCount: 0,
         userId: userId,
@@ -670,13 +779,16 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         flaggedBy: const [],
       );
 
-      await _firestoreService.createReport(report);
+      final submission = await ReportSubmissionService.instance.submit(
+        report,
+        photoBytes: await photo?.readAsBytes(),
+      );
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => ReportSubmittedScreen(
-              report: report,
+              report: submission.report,
               targetName: targetName,
             ),
           ),
@@ -708,7 +820,11 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             : null,
         leading: IconButton(
           constraints: context.appBarActionConstraints,
-          icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize, color: context.textColor),
+          icon: Icon(
+            Icons.arrow_back_rounded,
+            size: context.tapIconSize,
+            color: context.textColor,
+          ),
           onPressed: () => Navigator.of(context).maybePop(),
           tooltip: 'Back',
         ),
@@ -750,7 +866,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       _buildSectionHeader(
                         step: '1',
                         title: 'Select Bus Route',
-                        subtitle: 'Which route are you traveling on or waiting for?',
+                        subtitle:
+                            'Which route are you traveling on or waiting for?',
                       ),
                       const SizedBox(height: 12),
                       _buildRouteSelector(),
@@ -817,7 +934,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                         decoration: InputDecoration(
                           hintText: 'e.g. Ramp was lowered but driver needed bystander help',
                           hintStyle: TextStyle(
-                            color: isHC ? Colors.black54 : AppColors.onSurfaceVariant,
+                            color: isHC
+                                ? Colors.black54
+                                : AppColors.onSurfaceVariant,
                             fontSize: 14,
                           ),
                           filled: true,
@@ -825,14 +944,18 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                              color: isHC ? Colors.black : AppColors.outlineVariant,
+                              color: isHC
+                                  ? Colors.black
+                                  : AppColors.outlineVariant,
                               width: isHC ? 2 : 1,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                              color: isHC ? Colors.black : AppColors.outlineVariant,
+                              color: isHC
+                                  ? Colors.black
+                                  : AppColors.outlineVariant,
                               width: isHC ? 2 : 1,
                             ),
                           ),
@@ -864,7 +987,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                 : AppColors.primary,
                             foregroundColor: AppColors.onPrimary,
                             side: isHC
-                                ? const BorderSide(color: Colors.black, width: 2)
+                                ? const BorderSide(
+                                    color: Colors.black,
+                                    width: 2,
+                                  )
                                 : null,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
@@ -880,11 +1006,14 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : Icon(Icons.send_rounded, size: context.tapIconSize),
+                              : Icon(
+                                  Icons.send_rounded,
+                                  size: context.tapIconSize,
+                                ),
                           label: Text(
                             _isSubmitting
                                 ? 'Submitting Report…'
-                                : 'Submit Accessibility Report (+10 Pts)',
+                                : 'Review and submit report',
                             style: TextStyle(
                               fontSize: context.hasLargeTargets ? 17.5 : 16,
                               fontWeight: FontWeight.w700,
@@ -946,10 +1075,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: context.subtextColor,
-                ),
+                style: TextStyle(fontSize: 13, color: context.subtextColor),
               ),
             ],
           ),
@@ -972,6 +1098,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<BusRoute>(
+          hint: const Text('Select a route (optional)'),
           isExpanded: true,
           value: _selectedRoute,
           icon: Icon(
@@ -985,7 +1112,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: isHC
                           ? Colors.white
@@ -999,7 +1129,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       'Bus ${r.routeNo}',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                        color: isHC
+                            ? const Color(0xFF001F3F)
+                            : AppColors.primary,
                         fontSize: 13,
                       ),
                     ),
@@ -1045,9 +1177,13 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             icon: Icons.directions_bus_rounded,
             isSelected: isBus,
             onTap: () {
+              if (_targetType == ReportTargetType.bus) return;
               setState(() {
                 _targetType = ReportTargetType.bus;
-                _selectedOption = _busCategories[_activeBusCategoryIndex].options[0];
+                _selectedBus = null;
+                _resetObservation();
+                _selectedOption =
+                    _busCategories[_activeBusCategoryIndex].options[0];
                 _refreshTargetsForRoute();
               });
             },
@@ -1061,9 +1197,13 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             icon: Icons.store_mall_directory_rounded,
             isSelected: !isBus,
             onTap: () {
+              if (_targetType == ReportTargetType.station) return;
               setState(() {
                 _targetType = ReportTargetType.station;
-                _selectedOption = _stationCategories[_activeStationCategoryIndex].options[0];
+                _selectedStation = null;
+                _resetObservation();
+                _selectedOption =
+                    _stationCategories[_activeStationCategoryIndex].options[0];
                 _refreshTargetsForRoute();
               });
             },
@@ -1121,7 +1261,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             }).toList(),
             onChanged: (bus) {
               if (bus != null) {
-                setState(() => _selectedBus = bus);
+                setState(() {
+                  if (_selectedBus?.id != bus.id) _resetObservation();
+                  _selectedBus = bus;
+                });
               }
             },
           ),
@@ -1145,7 +1288,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               'Select Stop along this route',
               style: TextStyle(color: context.subtextColor),
             ),
-            value: stations.contains(_selectedStation) ? _selectedStation : null,
+            value: stations.contains(_selectedStation)
+                ? _selectedStation
+                : null,
             items: stations.map((s) {
               return DropdownMenuItem<Station>(
                 value: s,
@@ -1174,7 +1319,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             }).toList(),
             onChanged: (st) {
               if (st != null) {
-                setState(() => _selectedStation = st);
+                setState(() {
+                  if (_selectedStation?.id != st.id) _resetObservation();
+                  _selectedStation = st;
+                });
               }
             },
           ),
@@ -1200,28 +1348,34 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         const SizedBox(height: 8),
         Row(
           children: CrowdingLevel.values.map((lvl) {
-            final isSelected = _selectedCrowding == lvl;
+            final isSelected = _crowdingChosen && _selectedCrowding == lvl;
             final hcColor = lvl == CrowdingLevel.low
                 ? const Color(0xFF003833)
                 : (lvl == CrowdingLevel.medium
-                    ? const Color(0xFF8B4500)
-                    : const Color(0xFF8B0000));
+                      ? const Color(0xFF8B4500)
+                      : const Color(0xFF8B0000));
 
             return Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: InkWell(
-                  onTap: () => setState(() => _selectedCrowding = lvl),
+                  onTap: () => setState(() {
+                    _selectedCrowding = lvl;
+                    _crowdingChosen = true;
+                  }),
                   borderRadius: BorderRadius.circular(14),
                   child: Container(
                     constraints: const BoxConstraints(minHeight: 74),
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: isHC
                           ? (isSelected ? hcColor : Colors.white)
                           : (isSelected
-                              ? lvl.color.withValues(alpha: 0.15)
-                              : AppColors.surfaceContainerLowest),
+                                ? lvl.color.withValues(alpha: 0.15)
+                                : AppColors.surfaceContainerLowest),
                       borderRadius: BorderRadius.circular(14),
                       border: isHC
                           ? Border.all(
@@ -1229,7 +1383,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                               width: isSelected ? 3 : 2,
                             )
                           : Border.all(
-                              color: isSelected ? lvl.color : AppColors.outlineVariant,
+                              color: isSelected
+                                  ? lvl.color
+                                  : AppColors.outlineVariant,
                               width: isSelected ? 2 : 1,
                             ),
                     ),
@@ -1254,7 +1410,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                             fontWeight: FontWeight.w700,
                             color: isHC
                                 ? (isSelected ? Colors.white : Colors.black)
-                                : (isSelected ? lvl.color : AppColors.onSurface),
+                                : (isSelected
+                                      ? lvl.color
+                                      : AppColors.onSurface),
                           ),
                         ),
                       ],
@@ -1268,16 +1426,18 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         Padding(
           padding: const EdgeInsets.only(top: 8, left: 4),
           child: Text(
-            _selectedCrowding.subtitle,
+            _crowdingChosen
+                ? _selectedCrowding.subtitle
+                : 'Choose the crowding level you observed.',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: isHC
                   ? (_selectedCrowding == CrowdingLevel.low
-                      ? const Color(0xFF003833)
-                      : (_selectedCrowding == CrowdingLevel.medium
-                          ? const Color(0xFF8B4500)
-                          : const Color(0xFF8B0000)))
+                        ? const Color(0xFF003833)
+                        : (_selectedCrowding == CrowdingLevel.medium
+                              ? const Color(0xFF8B4500)
+                              : const Color(0xFF8B0000)))
                   : _selectedCrowding.color,
             ),
           ),
@@ -1320,17 +1480,23 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                     setState(() {
                       _activeBusCategoryIndex = idx;
                       _selectedOption = cat.options[0];
+                      _conditionChosen = false;
                     });
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: isHC
-                          ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
+                          ? (isSelected
+                                ? const Color(0xFF001F3F)
+                                : Colors.white)
                           : (isSelected
-                              ? AppColors.primary
-                              : AppColors.surfaceContainerLowest),
+                                ? AppColors.primary
+                                : AppColors.surfaceContainerLowest),
                       borderRadius: BorderRadius.circular(12),
                       border: isHC
                           ? Border.all(
@@ -1352,8 +1518,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                           color: isHC
                               ? (isSelected ? Colors.white : Colors.black)
                               : (isSelected
-                                  ? AppColors.onPrimary
-                                  : AppColors.primary),
+                                    ? AppColors.onPrimary
+                                    : AppColors.primary),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -1367,8 +1533,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                             color: isHC
                                 ? (isSelected ? Colors.white : Colors.black)
                                 : (isSelected
-                                    ? AppColors.onPrimary
-                                    : AppColors.onSurface),
+                                      ? AppColors.onPrimary
+                                      : AppColors.onSurface),
                           ),
                         ),
                       ],
@@ -1420,17 +1586,21 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                 setState(() {
                   _activeStationCategoryIndex = idx;
                   _selectedOption = cat.options[0];
+                  _conditionChosen = false;
                 });
               },
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: isHC
                       ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
                       : (isSelected
-                          ? AppColors.primary
-                          : AppColors.surfaceContainerLowest),
+                            ? AppColors.primary
+                            : AppColors.surfaceContainerLowest),
                   borderRadius: BorderRadius.circular(12),
                   border: isHC
                       ? Border.all(
@@ -1451,8 +1621,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       color: isHC
                           ? (isSelected ? Colors.white : Colors.black)
                           : (isSelected
-                              ? AppColors.onPrimary
-                              : AppColors.primary),
+                                ? AppColors.onPrimary
+                                : AppColors.primary),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -1466,8 +1636,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                           color: isHC
                               ? (isSelected ? Colors.white : Colors.black)
                               : (isSelected
-                                  ? AppColors.onPrimary
-                                  : AppColors.onSurface),
+                                    ? AppColors.onPrimary
+                                    : AppColors.onSurface),
                         ),
                       ),
                     ),
@@ -1499,15 +1669,18 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       ),
       itemBuilder: (context, optIdx) {
         final opt = options[optIdx];
-        final isOptSelected = _selectedOption.id == opt.id;
+        final isOptSelected = _conditionChosen && _selectedOption.id == opt.id;
         final hcColor = opt.severity == 'major'
             ? const Color(0xFF8B0000)
             : (opt.severity == 'moderate'
-                ? const Color(0xFF8B4500)
-                : const Color(0xFF003833));
+                  ? const Color(0xFF8B4500)
+                  : const Color(0xFF003833));
 
         return InkWell(
-          onTap: () => setState(() => _selectedOption = opt),
+          onTap: () => setState(() {
+            _selectedOption = opt;
+            _conditionChosen = true;
+          }),
           borderRadius: BorderRadius.circular(14),
           child: Container(
             padding: const EdgeInsets.all(10),
@@ -1515,8 +1688,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               color: isHC
                   ? Colors.white
                   : (isOptSelected
-                      ? opt.color.withValues(alpha: 0.12)
-                      : AppColors.surfaceContainerLowest),
+                        ? opt.color.withValues(alpha: 0.12)
+                        : AppColors.surfaceContainerLowest),
               borderRadius: BorderRadius.circular(14),
               border: isHC
                   ? Border.all(
@@ -1524,20 +1697,22 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       width: isOptSelected ? 3 : 2,
                     )
                   : Border.all(
-                      color: isOptSelected ? opt.color : AppColors.outlineVariant,
+                      color: isOptSelected
+                          ? opt.color
+                          : AppColors.outlineVariant,
                       width: isOptSelected ? 2 : 1,
                     ),
               boxShadow: isHC
                   ? null
                   : (isOptSelected
-                      ? [
-                          BoxShadow(
-                            color: opt.color.withValues(alpha: 0.15),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null),
+                        ? [
+                            BoxShadow(
+                              color: opt.color.withValues(alpha: 0.15),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1568,7 +1743,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: isOptSelected ? FontWeight.w800 : FontWeight.w700,
+                    fontWeight: isOptSelected
+                        ? FontWeight.w800
+                        : FontWeight.w700,
                     color: isHC
                         ? (isOptSelected ? hcColor : Colors.black)
                         : (isOptSelected ? opt.color : AppColors.onSurface),
@@ -1594,6 +1771,14 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   }
 
   Widget _buildPhotoUploadSection() {
+    if (!ReportPhotoStorage.configured.isConfigured) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'Photo uploads are currently unavailable. You can submit your report without a photo.',
+        ),
+      );
+    }
     final isHC = context.isHighContrast;
 
     if (_pickedImage != null) {
@@ -1633,10 +1818,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                   const SizedBox(height: 2),
                   Text(
                     'Will be uploaded with report',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.subtextColor,
-                    ),
+                    style: TextStyle(fontSize: 12, color: context.subtextColor),
                   ),
                 ],
               ),
@@ -1665,7 +1847,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
           borderRadius: BorderRadius.circular(14),
           border: isHC
               ? Border.all(color: Colors.black, width: 2)
-              : Border.all(color: AppColors.outlineVariant, style: BorderStyle.solid),
+              : Border.all(
+                  color: AppColors.outlineVariant,
+                  style: BorderStyle.solid,
+                ),
         ),
         child: Row(
           children: [
@@ -1675,7 +1860,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isHC ? Colors.white : AppColors.primaryContainer,
-                border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+                border: isHC
+                    ? Border.all(color: Colors.black, width: 1.5)
+                    : null,
               ),
               child: Icon(
                 Icons.add_a_photo_rounded,
@@ -1700,10 +1887,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                   const SizedBox(height: 2),
                   Text(
                     'Tap to take photo or choose from device',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.subtextColor,
-                    ),
+                    style: TextStyle(fontSize: 12, color: context.subtextColor),
                   ),
                 ],
               ),
@@ -1723,9 +1907,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     final isBus = _targetType == ReportTargetType.bus;
     final targetTitle = isBus
         ? (_selectedBus != null
-            ? '${_selectedBus!.busNo} (Route ${_selectedRoute?.routeNo ?? ""})'
-            : 'Bus Route ${_selectedRoute?.routeNo ?? ""}')
-        : (_selectedStation?.name ?? 'Station on Route ${_selectedRoute?.routeNo ?? ""}');
+              ? '${_selectedBus!.displayBusNo} (Route ${_selectedBus!.routeNo})'
+              : 'Not selected')
+        : (_selectedStation?.name ?? 'Not selected');
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1766,10 +1950,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               ),
             ],
           ),
-          Divider(
-            height: 20,
-            color: isHC ? Colors.black : null,
-          ),
+          Divider(height: 20, color: isHC ? Colors.black : null),
           _buildSummaryRow(
             icon: isBus ? Icons.directions_bus_rounded : Icons.place_rounded,
             label: 'Location / Vehicle',
@@ -1781,13 +1962,15 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             _buildSummaryRow(
               icon: _selectedCrowding.icon,
               label: 'Crowding Level',
-              value: '${_selectedCrowding.label} — ${_selectedCrowding.subtitle}',
+              value: _crowdingChosen
+                  ? '${_selectedCrowding.label} — ${_selectedCrowding.subtitle}'
+                  : 'Not selected',
               color: isHC
                   ? (_selectedCrowding == CrowdingLevel.low
-                      ? const Color(0xFF003833)
-                      : (_selectedCrowding == CrowdingLevel.medium
-                          ? const Color(0xFF8B4500)
-                          : const Color(0xFF8B0000)))
+                        ? const Color(0xFF003833)
+                        : (_selectedCrowding == CrowdingLevel.medium
+                              ? const Color(0xFF8B4500)
+                              : const Color(0xFF8B0000)))
                   : _selectedCrowding.color,
             ),
           ],
@@ -1795,13 +1978,15 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
           _buildSummaryRow(
             icon: _selectedOption.icon,
             label: 'Accessibility Status',
-            value: '${_selectedOption.title} — ${_selectedOption.subtitle}',
+            value: _conditionChosen
+                ? '${_selectedOption.title} — ${_selectedOption.subtitle}'
+                : 'Not selected',
             color: isHC
                 ? (_selectedOption.severity == 'major'
-                    ? const Color(0xFF8B0000)
-                    : (_selectedOption.severity == 'moderate'
-                        ? const Color(0xFF8B4500)
-                        : const Color(0xFF003833)))
+                      ? const Color(0xFF8B0000)
+                      : (_selectedOption.severity == 'moderate'
+                            ? const Color(0xFF8B4500)
+                            : const Color(0xFF003833)))
                 : _selectedOption.color,
           ),
           if (_pickedImage != null) ...[
@@ -1891,29 +2076,28 @@ class _TargetChoiceCard extends StatelessWidget {
           color: isHC
               ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
               : (isSelected
-                  ? AppColors.primaryContainer
-                  : AppColors.surfaceContainerLowest),
+                    ? AppColors.primaryContainer
+                    : AppColors.surfaceContainerLowest),
           borderRadius: BorderRadius.circular(16),
           border: isHC
-              ? Border.all(
-                  color: Colors.black,
-                  width: isSelected ? 3 : 2,
-                )
+              ? Border.all(color: Colors.black, width: isSelected ? 3 : 2)
               : Border.all(
-                  color: isSelected ? AppColors.primary : AppColors.outlineVariant,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.outlineVariant,
                   width: isSelected ? 2 : 1,
                 ),
           boxShadow: isHC
               ? null
               : (isSelected
-                  ? [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ]
-                  : null),
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.15),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1957,12 +2141,14 @@ class _TargetChoiceCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: hasLargeTargets ? 12.5 : 11,
-                fontWeight: isHC && isSelected ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: isHC && isSelected
+                    ? FontWeight.w600
+                    : FontWeight.normal,
                 color: isHC
                     ? (isSelected ? Colors.white : Colors.black)
                     : (isSelected
-                        ? AppColors.primaryFixed
-                        : AppColors.onSurfaceVariant),
+                          ? AppColors.primaryFixed
+                          : AppColors.onSurfaceVariant),
               ),
             ),
           ],

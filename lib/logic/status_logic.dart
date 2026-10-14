@@ -1,5 +1,6 @@
 import '../models/bus.dart';
 import '../models/report.dart';
+import '../models/enums/report_condition.dart';
 import '../models/station.dart';
 import '../screens/journey/route_results_screen.dart' show AccessibilityStatus;
 
@@ -24,6 +25,8 @@ class BusStatusResult {
         return 'Warning';
       case AccessibilityStatus.notAccessible:
         return 'Not accessible';
+      case AccessibilityStatus.unknown:
+        return 'Unknown';
     }
   }
 }
@@ -32,11 +35,90 @@ class BusStatusResult {
 class StatusLogic {
   const StatusLogic._();
 
-  /// Checks if a [Report] is active and within the 12-hour expiry threshold (AC-74).
-  ///
-  /// Returns `true` if `report.status == 'active'` AND timestamp (either [lastConfirmedAt]
-  /// or [createdAt]) is within 12 hours of [currentTime] (defaults to `DateTime.now()`).
+  /// Confirmations may refresh evidence only with an account and valid timestamp.
+  static DateTime lastCheckedAt(Report report, {DateTime? currentTime}) {
+    final now = currentTime ?? DateTime.now();
+    final confirmed = report.lastConfirmedAt;
+    return confirmed != null &&
+            report.confirmedBy.any((id) => id.trim().isNotEmpty) &&
+            !confirmed.isBefore(report.createdAt) &&
+            !confirmed.isAfter(now)
+        ? confirmed
+        : report.createdAt;
+  }
+
+  /// These are product defaults, not guarantees about physical conditions.
+  static Duration freshnessWindow(Report report) {
+    final text = '${report.subCategory} ${report.problemType}'.toLowerCase();
+    if (report.category == 'crowding' ||
+        RegExp(r'seats (free|occupied)|bay blocked|wheelchair bay')
+            .hasMatch(text)) {
+      return const Duration(minutes: 30);
+    }
+    if (report.category == 'driverAssistanceDenied' ||
+        text.contains('reckless') ||
+        text.contains('blocked')) {
+      return const Duration(hours: 2);
+    }
+    if (report.category == 'cleanliness') return const Duration(hours: 6);
+    return const Duration(hours: 24);
+  }
+
+  static bool isPersistentBarrier(Report report) =>
+      report.observedCondition == ReportCondition.barrier &&
+      (report.category == 'elevatorOut' ||
+          RegExp(
+            r'broken|damaged|jammed|power failure|out of service|not working|missing|unsafe gap',
+            caseSensitive: false,
+          ).hasMatch('${report.subCategory} ${report.problemType}'));
+
+  static bool isReportFresh(Report report, {DateTime? currentTime}) {
+    final now = currentTime ?? DateTime.now();
+    final age = now.difference(lastCheckedAt(report, currentTime: now));
+    return !report.createdAt.isAfter(now) &&
+        age >= Duration.zero &&
+        age <= freshnessWindow(report);
+  }
+
+  static DateTime freshUntil(Report report, {DateTime? currentTime}) =>
+      lastCheckedAt(
+        report,
+        currentTime: currentTime,
+      ).add(freshnessWindow(report));
+
+  static bool needsRecheck(Report report, {DateTime? currentTime}) =>
+      isReportActive(report, currentTime: currentTime) &&
+      isPersistentBarrier(report) &&
+      !isReportFresh(report, currentTime: currentTime);
+
+  static bool hasFreshCrowding(Report report, {DateTime? currentTime}) {
+    final now = currentTime ?? DateTime.now();
+    final age = now.difference(lastCheckedAt(report, currentTime: now));
+    return age >= Duration.zero && age <= const Duration(minutes: 30);
+  }
+
+  static ReportCondition planningCondition(
+    Report report, {
+    DateTime? currentTime,
+  }) => hasFreshCrowding(report, currentTime: currentTime)
+      ? report.effectiveCondition
+      : report.observedCondition;
+
+  static String freshnessLabel(Report report, {DateTime? currentTime}) {
+    if (report.status.toLowerCase() == 'resolved') return 'Resolved';
+    if (!isReportActive(report, currentTime: currentTime)) {
+      return 'Expired or unavailable';
+    }
+    if (needsRecheck(report, currentTime: currentTime)) {
+      return 'Unresolved barrier — needs recheck';
+    }
+    return 'Recent observation';
+  }
+
+  /// Structural barriers remain unresolved until explicitly resolved/hidden.
+  /// Being relevant to planning does not mean an old observation is fresh.
   static bool isReportActive(Report report, {DateTime? currentTime}) {
+    if (!report.isPublic) return false;
     if (report.status.trim().toLowerCase() != 'active') {
       return false;
     }
@@ -45,31 +127,97 @@ class StatusLogic {
     }
 
     final now = currentTime ?? DateTime.now();
-    final timestamp = report.lastConfirmedAt ?? report.createdAt;
+    final timestamp = lastCheckedAt(report, currentTime: now);
     final difference = now.difference(timestamp);
 
-    // Active if created/confirmed within the last 24 hours
-    return difference >= Duration.zero && difference <= const Duration(hours: 24);
+    return difference >= Duration.zero &&
+        !report.createdAt.isAfter(now) &&
+        (isPersistentBarrier(report) || difference <= freshnessWindow(report));
   }
 
   /// Calculates the dynamic [BusStatusResult] for a [Bus] route (AC-74).
   ///
   /// Evaluates in exact order:
   /// 1. No ramp AND not low floor -> [AccessibilityStatus.notAccessible] (Not accessible)
-  /// 2. rampOk == false OR active report on bus OR active report on any stop station -> [AccessibilityStatus.partial] (Warning)
-  /// 3. Otherwise -> [AccessibilityStatus.accessible] (Safe)
+  /// 2. Broken ramp or active barrier -> Warning; positive reports do not clear barriers.
+  /// 3. Unclassified active observation -> Unknown.
+  /// 4. Otherwise -> accessible according to vehicle data and known observations.
+  /// With both station IDs, only boarding/alighting station reports apply.
+  /// Required access at either endpoint is Unknown when it cannot be established.
   static BusStatusResult getBusStatus(
     Bus bus,
     List<Report> allReports, {
     Map<String, Station>? stationsMap,
     DateTime? currentTime,
+    String? fromStationId,
+    String? toStationId,
+    bool wheelchairAccessRequired = false,
+    bool stepFreeOnly = false,
   }) {
     final activeReports = allReports
         .where((r) => isReportActive(r, currentTime: currentTime))
         .toList();
 
     final List<String> reasons = [];
+    final List<String> positiveReasons = [];
+    final List<String> unknownReasons = [];
     final List<Report> relevantReports = [];
+    final scoped = fromStationId != null && toStationId != null;
+    final accessStops = scoped
+        ? {fromStationId, toStationId}
+        : bus.stops.toSet();
+    bool unsuitable = false;
+
+    if (wheelchairAccessRequired && !bus.wheelchairAccessible) {
+      unsuitable = true;
+      reasons.add(
+        'An operational wheelchair ramp is required for this journey.',
+      );
+    }
+    if (stepFreeOnly && !bus.lowFloor && !bus.wheelchairAccessible) {
+      unsuitable = true;
+      reasons.add('Step-free boarding is not available on this vehicle.');
+    }
+
+    if (scoped && (wheelchairAccessRequired || stepFreeOnly)) {
+      for (final stopId in accessStops) {
+        final station = stationsMap?[stopId];
+        final observedAccess = activeReports.any(
+          (r) =>
+              r.targetType.toLowerCase() == 'station' &&
+              r.targetId == stopId &&
+              planningCondition(r, currentTime: currentTime) ==
+                  ReportCondition.positive &&
+              (r.category == 'rampAccess' || r.category == 'elevatorOut') &&
+              (r.condition != null ||
+                  const {
+                    'ramp clear',
+                    'ramp working',
+                    'elevator working',
+                  }.contains(
+                    (r.subCategory.trim().isNotEmpty
+                            ? r.subCategory
+                            : r.problemType.split('•').last)
+                        .trim()
+                        .toLowerCase(),
+                  )),
+        );
+        final knownAccess =
+            station?.stepFreeAccess ??
+            (station != null && (station.hasRamp || station.hasElevator)
+                ? true
+                : observedAccess
+                ? true
+                : null);
+        final name = station?.name ?? stopId;
+        if (knownAccess == false) {
+          unsuitable = true;
+          reasons.add('No step-free access at $name.');
+        } else if (knownAccess == null) {
+          unknownReasons.add('Step-free access at $name is unknown.');
+        }
+      }
+    }
 
     // ── 1. Check Not Accessible Rule ──────────────────────────────────────
     if (!bus.hasRamp && !bus.lowFloor) {
@@ -84,10 +232,43 @@ class StatusLogic {
     // ── 2. Check Warning Rule ─────────────────────────────────────────────
     bool isWarning = false;
 
+    void addObservation(Report report, String target) {
+      relevantReports.add(report);
+      if (needsRecheck(report, currentTime: currentTime)) {
+        isWarning = true;
+        reasons.add(
+          'Unresolved issue at $target: ${report.problemType}. Last checked ${lastCheckedAt(report, currentTime: currentTime).toLocal()}; needs recheck.',
+        );
+        return;
+      }
+      switch (planningCondition(report, currentTime: currentTime)) {
+        case ReportCondition.barrier:
+          isWarning = true;
+          final crowding =
+              report.crowdingLevel == 'high' &&
+                  hasFreshCrowding(report, currentTime: currentTime)
+              ? ' (crowding: high)'
+              : '';
+          reasons.add(
+            'Active issue at $target: ${report.problemType}$crowding',
+          );
+        case ReportCondition.positive:
+          positiveReasons.add(
+            'Positive condition at $target: ${report.problemType}',
+          );
+        case ReportCondition.unknown:
+          unknownReasons.add(
+            'Condition unknown at $target: ${report.problemType}',
+          );
+      }
+    }
+
     // 2a. Vehicle ramp marked broken
     if (!bus.rampOk) {
       isWarning = true;
-      reasons.add('Ramp reported broken: Vehicle wheelchair ramp is reported out of service.');
+      reasons.add(
+        'Ramp reported broken: Vehicle wheelchair ramp is reported out of service.',
+      );
     }
 
     // 2b. Active report on the bus itself
@@ -95,37 +276,37 @@ class StatusLogic {
       (r) => r.targetType.toLowerCase() == 'bus' && r.targetId == bus.id,
     );
     for (final r in busReports) {
-      isWarning = true;
-      relevantReports.add(r);
-      reasons.add('Vehicle report: ${r.problemType}');
+      addObservation(r, 'vehicle');
     }
 
     // 2c. Active report on any station along the bus's stops list
-    for (final stopId in bus.stops) {
+    for (final stopId in accessStops) {
       final stationReports = activeReports.where(
         (r) => r.targetType.toLowerCase() == 'station' && r.targetId == stopId,
       );
       for (final r in stationReports) {
-        isWarning = true;
-        relevantReports.add(r);
-        final stationName =
-            stationsMap?[stopId]?.name ?? 'Station $stopId';
-        reasons.add('Active issue at $stationName: ${r.problemType}');
+        final stationName = stationsMap?[stopId]?.name ?? 'Station $stopId';
+        addObservation(r, stationName);
       }
     }
 
-    if (isWarning) {
-      return BusStatusResult(
-        status: AccessibilityStatus.partial,
-        reasons: reasons,
-        relevantReports: relevantReports,
-      );
-    }
+    reasons.addAll(unknownReasons);
+    reasons.addAll(positiveReasons);
 
     // ── 3. Safe Rule ──────────────────────────────────────────────────────
-    reasons.add('Step-free boarding · Ramp operational & verified.');
+    if (reasons.isEmpty) {
+      reasons.add(
+        'Vehicle lists accessible boarding; no active barriers reported.',
+      );
+    }
     return BusStatusResult(
-      status: AccessibilityStatus.accessible,
+      status: unsuitable
+          ? AccessibilityStatus.notAccessible
+          : isWarning
+          ? AccessibilityStatus.partial
+          : unknownReasons.isNotEmpty
+          ? AccessibilityStatus.unknown
+          : AccessibilityStatus.accessible,
       reasons: reasons,
       relevantReports: relevantReports,
     );

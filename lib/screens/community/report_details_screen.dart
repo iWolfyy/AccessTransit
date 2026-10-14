@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 import '../../logic/status_logic.dart';
+import '../../logic/report_mutation.dart';
 import '../../models/report.dart';
 import '../../services/firestore_service.dart';
 
@@ -27,6 +28,8 @@ class ReportDetailsScreen extends StatefulWidget {
     this.mapLocationLabel = '',
     this.communityVerified = false,
     this.mapImageUrl = '',
+    this.service,
+    this.reportUpdates,
   });
 
   final Report? report;
@@ -42,6 +45,8 @@ class ReportDetailsScreen extends StatefulWidget {
   final String mapLocationLabel;
   final bool communityVerified;
   final String mapImageUrl;
+  final FirestoreService? service;
+  final Stream<Report?>? reportUpdates;
 
   @override
   State<ReportDetailsScreen> createState() => _ReportDetailsScreenState();
@@ -50,16 +55,25 @@ class ReportDetailsScreen extends StatefulWidget {
 class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   static const double _desktopBreakpoint = 768;
   bool _isLoadingAction = false;
-  static String? _cachedGuestUserId;
-
-  String _getOrCreateUserId() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null && user.uid.isNotEmpty) {
-      return user.uid;
+  late final FirestoreService _repository;
+  Stream<Report?>? _updates;
+  Report? _latestReport;
+  bool _readUnavailable = false;
+  @override
+  void initState() {
+    super.initState();
+    _repository = widget.service ?? FirestoreService();
+    _latestReport = widget.report;
+    final id = widget.report?.id ?? widget.reportId ?? '';
+    if (id.isNotEmpty) {
+      _updates =
+          widget.reportUpdates ??
+          _repository.streamReportById(id, surfaceErrors: true);
     }
-    _cachedGuestUserId ??=
-        'guest_user_${DateTime.now().millisecondsSinceEpoch}';
-    return _cachedGuestUserId!;
+  }
+
+  String _currentUserId() {
+    return _repository.currentReportActorId ?? '';
   }
 
   void _showSnack(String message) {
@@ -70,54 +84,41 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         SnackBar(
           content: Text(message),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
   }
 
-  Future<void> _handleConfirm(Report report) async {
-    final userId = _getOrCreateUserId();
-    if (report.confirmedBy.contains(userId)) {
-      _showSnack('You already confirmed this condition report.');
+  Future<void> _handleConfirm(Report report) =>
+      _perform(report, ReportMutationAction.confirm);
+  Future<void> _handleResolve(Report report) =>
+      _perform(report, ReportMutationAction.resolve);
+  Future<void> _handleFlag(Report report) =>
+      _perform(report, ReportMutationAction.flag);
+  Future<void> _perform(Report report, ReportMutationAction action) async {
+    if (_isLoadingAction) return;
+    final actor = _repository.currentReportActorId;
+    if (actor == null || actor.isEmpty) {
+      _showSnack('Sign in before changing a shared report.');
       return;
     }
-
     setState(() => _isLoadingAction = true);
     try {
-      await FirestoreService().confirmReport(report.id, userId);
-      _showSnack('Condition confirmed! Expiry timer refreshed.');
-    } catch (e) {
-      _showSnack('Action failed: ${e.toString().replaceAll('Exception: ', '')}');
-    } finally {
-      if (mounted) setState(() => _isLoadingAction = false);
-    }
-  }
-
-  Future<void> _handleResolve(Report report) async {
-    setState(() => _isLoadingAction = true);
-    try {
-      await FirestoreService().resolveReport(report.id);
-      _showSnack('Thank you! Report marked as resolved.');
-    } catch (e) {
-      _showSnack('Action failed: ${e.toString().replaceAll('Exception: ', '')}');
-    } finally {
-      if (mounted) setState(() => _isLoadingAction = false);
-    }
-  }
-
-  Future<void> _handleFlag(Report report) async {
-    final userId = _getOrCreateUserId();
-    if (report.flaggedBy.contains(userId)) {
-      _showSnack('You already flagged this report.');
-      return;
-    }
-
-    setState(() => _isLoadingAction = true);
-    try {
-      await FirestoreService().flagReport(report.id, userId);
-      _showSnack('Report flagged as false.');
-    } catch (e) {
-      _showSnack('Action failed: ${e.toString().replaceAll('Exception: ', '')}');
+      final result = await (switch (action) {
+        ReportMutationAction.confirm => _repository.confirmReport(
+          report.id,
+          actor,
+        ),
+        ReportMutationAction.flag => _repository.flagReport(report.id, actor),
+        ReportMutationAction.resolve => _repository.resolveReport(report.id),
+      }).timeout(const Duration(seconds: 15));
+      if (_repository.currentReportActorId == actor) _showSnack(result.message);
+    } catch (_) {
+      _showSnack(
+        'Change is not confirmed. Check your connection and sign-in, then retry or refresh the shared report.',
+      );
     } finally {
       if (mounted) setState(() => _isLoadingAction = false);
     }
@@ -125,7 +126,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
   void _shareReport(Report? report, String targetTitle) {
     final title = report?.problemType ?? widget.title;
-    final text = 'AccessTransit Alert: $title at $targetTitle. Check live status in AccessTransit.';
+    final text =
+        'AccessTransit Alert: $title at $targetTitle. Check live status in AccessTransit.';
     Clipboard.setData(ClipboardData(text: text));
     _showSnack('Alert link & text copied to clipboard!');
   }
@@ -167,7 +169,11 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             ),
             IconButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              icon: Icon(Icons.close_rounded, color: Colors.white, size: context.tapIconSize + 4),
+              icon: Icon(
+                Icons.close_rounded,
+                color: Colors.white,
+                size: context.tapIconSize + 4,
+              ),
               tooltip: 'Close',
               constraints: context.appBarActionConstraints,
             ),
@@ -184,22 +190,26 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
     if (targetReportId.isNotEmpty) {
       return StreamBuilder<Report?>(
-        stream: FirestoreService().streamReportById(targetReportId),
+        stream: _updates,
+        initialData: widget.report,
         builder: (context, snapshot) {
-          final currentReport = snapshot.data ??
-              widget.report ??
-              Report(
-                id: targetReportId,
-                targetType: 'station',
-                targetId: '',
-                targetName: widget.targetTitle,
-                problemType: widget.title,
-                status: 'active',
-                createdAt: DateTime.now(),
-                userId: '',
-              );
-
-          return _buildScaffold(context, isDesktop, currentReport);
+          _readUnavailable = snapshot.hasError;
+          if (!snapshot.hasError &&
+              snapshot.connectionState != ConnectionState.waiting) {
+            _latestReport = snapshot.data;
+          }
+          if (_latestReport == null) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Report Details')),
+              body: const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Shared report unavailable or removed. Reopen the feed to refresh.',
+                ),
+              ),
+            );
+          }
+          return _buildScaffold(context, isDesktop, _latestReport);
         },
       );
     }
@@ -208,13 +218,16 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   }
 
   Widget _buildScaffold(BuildContext context, bool isDesktop, Report? report) {
-    final userId = _getOrCreateUserId();
-    final isReportActive = report != null ? StatusLogic.isReportActive(report) : true;
+    final userId = _currentUserId();
+    final isReportActive = report != null
+        ? StatusLogic.isReportActive(report)
+        : true;
     final isResolved = report?.status.toLowerCase() == 'resolved';
     final isHidden = report?.status.toLowerCase() == 'hidden';
     final hasConfirmed = report?.confirmedBy.contains(userId) ?? false;
     final hasFlagged = report?.flaggedBy.contains(userId) ?? false;
-    final isAuthor = report != null && report.userId.isNotEmpty && report.userId == userId;
+    final isAuthor =
+        report != null && report.userId.isNotEmpty && report.userId == userId;
 
     final displayTitle = report?.problemType ?? widget.title;
     final targetTitle = (report?.targetName.trim().isNotEmpty == true)
@@ -230,7 +243,11 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         backgroundColor: context.surfaceColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: context.textColor, size: context.tapIconSize),
+          icon: Icon(
+            Icons.arrow_back_rounded,
+            color: context.textColor,
+            size: context.tapIconSize,
+          ),
           onPressed: () => Navigator.of(context).maybePop(),
           tooltip: 'Back',
           constraints: context.appBarActionConstraints,
@@ -264,10 +281,30 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             child: ListView(
               padding: EdgeInsets.fromLTRB(16, isDesktop ? 24 : 12, 16, 40),
               children: [
+                if (_readUnavailable)
+                  const Text(
+                    'Shared updates unavailable. Showing the last received observation; refresh before acting.',
+                  ),
+                if (_currentUserId().isEmpty)
+                  const Text(
+                    'Sign in to confirm, flag or resolve shared reports.',
+                  ),
+                if (report?.status == 'resolved') ...[
+                  const Text(
+                    'Resolution is the author\'s recorded observation; it does not independently verify a repair.',
+                  ),
+                  Text('Resolved by: ${report?.resolvedBy ?? 'Unknown'}'),
+                  Text(
+                    report?.resolvedAt == null
+                        ? 'Resolution time: Unknown'
+                        : 'Resolved at: ${TimeUtils.formatDateString(report!.resolvedAt!)}, ${TimeUtils.formatTimeString(report.resolvedAt!)}',
+                  ),
+                ],
                 // 1. Status Banner Header
                 _buildStatusBanner(
                   isResolved: isResolved,
                   isReportActive: isReportActive,
+                  report: report,
                   confirmCount: report?.confirmCount ?? 0,
                   isAuthor: isAuthor,
                 ),
@@ -316,10 +353,14 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: isHC ? Colors.white : AppColors.errorContainer.withValues(alpha: 0.3),
+                      color: isHC
+                          ? Colors.white
+                          : AppColors.errorContainer.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: isHC ? const Color(0xFF8B0000) : AppColors.error.withValues(alpha: 0.4),
+                        color: isHC
+                            ? const Color(0xFF8B0000)
+                            : AppColors.error.withValues(alpha: 0.4),
                         width: isHC ? 2 : 1,
                       ),
                     ),
@@ -327,14 +368,18 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       children: [
                         Icon(
                           Icons.visibility_off_rounded,
-                          color: isHC ? const Color(0xFF8B0000) : AppColors.error,
+                          color: isHC
+                              ? const Color(0xFF8B0000)
+                              : AppColors.error,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'This report has been hidden due to multiple false reports from commuters.',
+                            'This report is hidden after three independent inaccuracy flags. This does not prove the condition was false.',
                             style: TextStyle(
-                              color: isHC ? const Color(0xFF8B0000) : AppColors.error,
+                              color: isHC
+                                  ? const Color(0xFF8B0000)
+                                  : AppColors.error,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
@@ -354,6 +399,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
   /// Banner displaying the live status of the report (Resolved, Verified, Active, Past)
   Widget _buildStatusBanner({
+    Report? report,
     required bool isResolved,
     required bool isReportActive,
     required int confirmCount,
@@ -372,12 +418,29 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
       icon = Icons.check_circle_rounded;
       statusTitle = 'Condition Resolved';
       statusSubtitle = 'This accessibility issue has been marked fixed.';
-    } else if (confirmCount > 0 && isReportActive) {
-      bgColor = isHC ? Colors.white : AppColors.primaryContainer.withValues(alpha: 0.35);
+    } else if (report != null && StatusLogic.needsRecheck(report)) {
+      bgColor = isHC ? Colors.white : const Color(0xFFFFF3E0);
+      fgColor = isHC ? const Color(0xFF8B0000) : const Color(0xFFE65100);
+      icon = Icons.history_rounded;
+      statusTitle = 'Unresolved barrier — needs recheck';
+      statusSubtitle =
+          'Last checked ${TimeUtils.formatRelativeTime(StatusLogic.lastCheckedAt(report))}. Current condition unknown; no repair recorded.';
+    } else if (!_readUnavailable &&
+        report != null &&
+        confirmCount > 0 &&
+        isReportActive &&
+        report.confirmedBy.toSet().length == confirmCount &&
+        report.lastConfirmedAt != null &&
+        !report.lastConfirmedAt!.isBefore(report.createdAt) &&
+        !report.lastConfirmedAt!.isAfter(DateTime.now())) {
+      bgColor = isHC
+          ? Colors.white
+          : AppColors.primaryContainer.withValues(alpha: 0.35);
       fgColor = isHC ? const Color(0xFF001F3F) : AppColors.primary;
       icon = Icons.verified_rounded;
-      statusTitle = 'Community Verified Live';
-      statusSubtitle = 'Confirmed by $confirmCount fellow rider${confirmCount == 1 ? "" : "s"}.';
+      statusTitle = 'Community-confirmed observation';
+      statusSubtitle =
+          'Confirmed by $confirmCount fellow rider${confirmCount == 1 ? "" : "s"}.';
     } else if (isReportActive) {
       bgColor = isHC ? Colors.white : const Color(0xFFFFF3E0);
       fgColor = isHC ? const Color(0xFF8B0000) : const Color(0xFFE65100);
@@ -432,11 +495,18 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     if (isAuthor) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                          color: isHC
+                              ? const Color(0xFF001F3F)
+                              : AppColors.primary,
                           borderRadius: BorderRadius.circular(6),
-                          border: isHC ? Border.all(color: Colors.black, width: 1) : null,
+                          border: isHC
+                              ? Border.all(color: Colors.black, width: 1)
+                              : null,
                         ),
                         child: const Text(
                           'YOUR REPORT',
@@ -456,7 +526,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   statusSubtitle,
                   style: TextStyle(
                     fontSize: 13,
-                    color: isHC ? Colors.black : fgColor.withValues(alpha: 0.85),
+                    color: isHC
+                        ? Colors.black
+                        : fgColor.withValues(alpha: 0.85),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -507,10 +579,14 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       ? Colors.white
                       : AppColors.primaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
-                  border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+                  border: isHC
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: Icon(
-                  isBus ? Icons.directions_bus_rounded : Icons.store_mall_directory_rounded,
+                  isBus
+                      ? Icons.directions_bus_rounded
+                      : Icons.store_mall_directory_rounded,
                   size: 24,
                   color: isHC ? Colors.black : AppColors.primary,
                 ),
@@ -542,11 +618,16 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: isHC ? Colors.white : AppColors.surfaceContainer,
                   borderRadius: BorderRadius.circular(8),
-                  border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+                  border: isHC
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: Text(
                   isBus ? 'BUS' : 'STATION',
@@ -587,7 +668,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         break;
       case 'moderate':
       default:
-        severityColor = isHC ? const Color(0xFF8B4500) : const Color(0xFFF57F17);
+        severityColor = isHC
+            ? const Color(0xFF8B4500)
+            : const Color(0xFFF57F17);
         severityLabel = 'Moderate';
         break;
     }
@@ -643,19 +726,25 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             children: [
               // Severity Chip
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
-                  color: isHC ? Colors.white : severityColor.withValues(alpha: 0.12),
+                  color: isHC
+                      ? Colors.white
+                      : severityColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: severityColor,
-                    width: isHC ? 2 : 1,
-                  ),
+                  border: Border.all(color: severityColor, width: isHC ? 2 : 1),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.warning_amber_rounded, size: 14, color: severityColor),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 14,
+                      color: severityColor,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       severityLabel,
@@ -672,7 +761,10 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               // Category Chip
               if (report != null && report.category.isNotEmpty) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: isHC
                         ? Colors.white
@@ -688,7 +780,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       Icon(
                         Icons.category_rounded,
                         size: 14,
-                        color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                        color: isHC
+                            ? const Color(0xFF001F3F)
+                            : AppColors.primary,
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -696,7 +790,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                          color: isHC
+                              ? const Color(0xFF001F3F)
+                              : AppColors.primary,
                         ),
                       ),
                     ],
@@ -738,7 +834,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+                          color: isHC
+                              ? Colors.black
+                              : AppColors.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -831,16 +929,25 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     bottom: 8,
                     right: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.75),
                         borderRadius: BorderRadius.circular(6),
-                        border: isHC ? Border.all(color: Colors.white, width: 1) : null,
+                        border: isHC
+                            ? Border.all(color: Colors.white, width: 1)
+                            : null,
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.fullscreen_rounded, size: 14, color: Colors.white),
+                          Icon(
+                            Icons.fullscreen_rounded,
+                            size: 14,
+                            color: Colors.white,
+                          ),
                           SizedBox(width: 4),
                           Text(
                             'Tap to enlarge',
@@ -950,23 +1057,34 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               Icon(
                 Icons.flag_rounded,
                 size: 16,
-                color: isHC ? const Color(0xFF8B0000) : (report.falseCount > 0 ? AppColors.error : AppColors.outline),
+                color: isHC
+                    ? const Color(0xFF8B0000)
+                    : (report.falseCount > 0
+                          ? AppColors.error
+                          : AppColors.outline),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'False Flags: ${report.falseCount} / 3 (Report deletes/hides at 3 false flags)',
+                  'Inaccuracy flags: ${report.falseCount} / 3 (Report hidden at 3 independent flags)',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: isHC ? const Color(0xFF8B0000) : (report.falseCount > 0 ? AppColors.error : context.textColor),
+                    color: isHC
+                        ? const Color(0xFF8B0000)
+                        : (report.falseCount > 0
+                              ? AppColors.error
+                              : context.textColor),
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Divider(color: isHC ? Colors.black : AppColors.outlineVariant, height: 1),
+          Divider(
+            color: isHC ? Colors.black : AppColors.outlineVariant,
+            height: 1,
+          ),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -1053,11 +1171,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Click True if the issue exists, or False flag if it is inaccurate. 3 False flags will delete the report.',
-            style: TextStyle(
-              fontSize: 13,
-              color: context.subtextColor,
-            ),
+            'Confirm if this condition is still accurate, or flag inaccurate information. Three independent flags hide the report; they do not prove it was false.',
+            style: TextStyle(fontSize: 13, color: context.subtextColor),
           ),
           const SizedBox(height: 16),
 
@@ -1069,17 +1184,31 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                 child: SizedBox(
                   height: context.buttonHeight,
                   child: FilledButton.icon(
-                    onPressed: (hasConfirmed || _isLoadingAction)
+                    onPressed:
+                        (hasConfirmed ||
+                            _isLoadingAction ||
+                            isAuthor ||
+                            isResolved ||
+                            _readUnavailable ||
+                            _currentUserId().isEmpty)
                         ? null
                         : () => _handleConfirm(report),
                     style: FilledButton.styleFrom(
-                      backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                      backgroundColor: isHC
+                          ? const Color(0xFF001F3F)
+                          : AppColors.primary,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: isHC ? Colors.white : AppColors.surfaceContainer,
-                      disabledForegroundColor: isHC ? Colors.grey : AppColors.outline,
+                      disabledBackgroundColor: isHC
+                          ? Colors.white
+                          : AppColors.surfaceContainer,
+                      disabledForegroundColor: isHC
+                          ? Colors.grey
+                          : AppColors.outline,
                       side: isHC
                           ? BorderSide(
-                              color: (hasConfirmed || isResolved) ? Colors.grey : Colors.black,
+                              color: (hasConfirmed || isResolved)
+                                  ? Colors.grey
+                                  : Colors.black,
                               width: 2,
                             )
                           : BorderSide.none,
@@ -1088,11 +1217,15 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       ),
                     ),
                     icon: Icon(
-                      hasConfirmed ? Icons.check_rounded : Icons.thumb_up_rounded,
+                      hasConfirmed
+                          ? Icons.check_rounded
+                          : Icons.thumb_up_rounded,
                       size: 18,
                     ),
                     label: Text(
-                      hasConfirmed ? 'True (${report.confirmCount})' : 'True Flag (${report.confirmCount})',
+                      hasConfirmed
+                          ? 'True (${report.confirmCount})'
+                          : 'True Flag (${report.confirmCount})',
                       style: TextStyle(
                         fontSize: context.hasLargeTargets ? 14 : 13,
                         fontWeight: FontWeight.w700,
@@ -1108,25 +1241,40 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                 child: SizedBox(
                   height: context.buttonHeight,
                   child: OutlinedButton.icon(
-                    onPressed: (hasFlagged || _isLoadingAction || isResolved)
+                    onPressed:
+                        (hasFlagged ||
+                            _isLoadingAction ||
+                            isResolved ||
+                            isAuthor ||
+                            _readUnavailable ||
+                            _currentUserId().isEmpty)
                         ? null
                         : () => _handleFlag(report),
                     style: OutlinedButton.styleFrom(
                       backgroundColor: isHC ? Colors.white : null,
-                      foregroundColor: isHC ? const Color(0xFF8B0000) : AppColors.error,
+                      foregroundColor: isHC
+                          ? const Color(0xFF8B0000)
+                          : AppColors.error,
                       side: BorderSide(
                         color: hasFlagged
                             ? (isHC ? Colors.grey : AppColors.outlineVariant)
-                            : (isHC ? const Color(0xFF8B0000) : AppColors.error),
+                            : (isHC
+                                  ? const Color(0xFF8B0000)
+                                  : AppColors.error),
                         width: isHC ? 2 : 1.5,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: Icon(hasFlagged ? Icons.flag_rounded : Icons.flag_outlined, size: 18),
+                    icon: Icon(
+                      hasFlagged ? Icons.flag_rounded : Icons.flag_outlined,
+                      size: 18,
+                    ),
                     label: Text(
-                      hasFlagged ? 'False (${report.falseCount}/3)' : 'False Flag (${report.falseCount}/3)',
+                      hasFlagged
+                          ? 'False (${report.falseCount}/3)'
+                          : 'False Flag (${report.falseCount}/3)',
                       style: TextStyle(
                         fontSize: context.hasLargeTargets ? 14 : 13,
                         fontWeight: FontWeight.w700,
@@ -1144,12 +1292,19 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           SizedBox(
             height: context.buttonHeight - 4,
             child: OutlinedButton.icon(
-              onPressed: (isResolved || _isLoadingAction)
+              onPressed:
+                  (isResolved ||
+                      _isLoadingAction ||
+                      !isAuthor ||
+                      _readUnavailable ||
+                      _currentUserId().isEmpty)
                   ? null
                   : () => _handleResolve(report),
               style: OutlinedButton.styleFrom(
                 backgroundColor: isHC ? Colors.white : null,
-                foregroundColor: isHC ? const Color(0xFF003833) : AppColors.success,
+                foregroundColor: isHC
+                    ? const Color(0xFF003833)
+                    : AppColors.success,
                 side: BorderSide(
                   color: isResolved
                       ? (isHC ? Colors.grey : AppColors.outlineVariant)
@@ -1162,7 +1317,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               ),
               icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
               label: Text(
-                isResolved ? 'Condition Marked Fixed' : 'Mark Condition as Fixed / Resolved',
+                isResolved
+                    ? 'Condition Marked Fixed'
+                    : 'Mark Condition as Fixed / Resolved',
                 style: TextStyle(
                   fontSize: context.hasLargeTargets ? 14 : 13,
                   fontWeight: FontWeight.w700,
