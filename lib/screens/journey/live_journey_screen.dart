@@ -1,11 +1,14 @@
+import '../../logic/journey_fare.dart';
+import '../../widgets/fare_estimate_text.dart';
+import '../../widgets/published_timetable_notice.dart';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
-import '../../data/seed_data.dart';
+
 import '../../logic/delay_eta_logic.dart';
 import '../../logic/live_accessibility_evidence.dart';
 import '../../models/bus.dart';
@@ -20,7 +23,9 @@ import '../../services/firestore_service.dart';
 import '../../services/journey_service.dart';
 import '../../services/live_bus_service.dart';
 import '../../services/trip_service.dart';
+import '../../services/transit_catalogue.dart';
 import '../../widgets/live_accessibility_panel.dart';
+import '../../widgets/stop_alert_unavailable.dart';
 import 'boarding_assistance_screen.dart';
 
 import 'report_condition_screen.dart';
@@ -42,6 +47,7 @@ class LiveJourneyScreen extends StatefulWidget {
     this.journeyId,
     this.savedJourney,
     this.journeyService,
+    this.liveBusService,
   });
 
   final String origin;
@@ -58,6 +64,7 @@ class LiveJourneyScreen extends StatefulWidget {
   final String? journeyId;
   final JourneyModel? savedJourney;
   final JourneyService? journeyService;
+  final LiveBusService? liveBusService;
 
   static const double _desktopBreakpoint = 768;
 
@@ -66,7 +73,8 @@ class LiveJourneyScreen extends StatefulWidget {
 }
 
 class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
-  final LiveBusService _liveBusService = LiveBusService();
+  late final LiveBusService _liveBusService =
+      widget.liveBusService ?? LiveBusService();
   late final JourneyService _journeyService =
       widget.journeyService ?? JourneyService();
   late final Stream<JourneyModel?>? _journeyUpdates = widget.passengerId.isEmpty
@@ -74,21 +82,6 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
       : widget.journeyId == null
       ? _journeyService.watchActiveJourney(widget.passengerId)
       : _journeyService.watchJourney(widget.journeyId!);
-
-  bool _isAlertActive = false;
-
-  void _toggleAlert(String destination) {
-    setState(() {
-      _isAlertActive = !_isAlertActive;
-    });
-    HapticFeedback.mediumImpact();
-    _showSnack(
-      context,
-      _isAlertActive
-          ? '🔔 Alert set: We will notify you 1 stop before $destination!'
-          : '🔕 Stop alert cancelled.',
-    );
-  }
 
   void _handleClose(BuildContext context) {
     if (Navigator.of(context).canPop()) {
@@ -141,6 +134,12 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
 
         Bus matchedBus =
             widget.route?.rawBus ??
+            (TransitCatalogue.cached('buses')[resolvedBusId] == null
+                ? null
+                : Bus.fromMap(
+                    TransitCatalogue.cached('buses')[resolvedBusId]!,
+                    id: resolvedBusId,
+                  )) ??
             Bus(
               id: resolvedBusId,
               routeNo: busNumber,
@@ -150,12 +149,11 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
               rampOk: false,
               occupancy: liveBus?.occupancyLevel ?? 'Moderate',
               stops: [effectiveOrigin, effectiveDestination],
-              scheduleTimes: const ['08:00 AM', '08:45 AM'],
             );
 
         final stationsMap = {
-          for (final st in SeedData.colomboStations) st.id: st,
-          for (final st in SeedData.colomboStations) st.name: st,
+          for (final st in FirestoreService.cachedStations) st.id: st,
+          for (final st in FirestoreService.cachedStations) st.name: st,
           ...(widget.route?.journeyStations ?? const <String, Station>{}),
         };
 
@@ -196,11 +194,21 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
 
         final routeNumber = (widget.route?.routeNo?.isNotEmpty == true)
             ? widget.route!.routeNo!
-            : busNumber;
-        final busPlate = (widget.route?.busNo?.isNotEmpty == true)
+            : matchedBus.routeNo;
+        final busPlate = matchedBus.isPublishedTimetable
+            ? matchedBus.displayBusNo
+            : (widget.route?.busNo?.isNotEmpty == true)
             ? widget.route!.busNo!
             : 'WP $busNumber';
-        final fareLkr = widget.route?.estimatedPriceLkr ?? 80;
+        final selected = widget.route;
+        final sameSegment =
+            selected != null &&
+            selected.busId == resolvedBusId &&
+            selected.origin == effectiveOrigin &&
+            selected.destination == effectiveDestination;
+        final fareLkr =
+            journey?.estimatedFareLkr ??
+            (sameSegment ? selected.estimatedPriceLkr : null);
 
         if (isDesktop) {
           return Row(
@@ -270,7 +278,8 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                           stationsMap,
                           preferredId: alightingTarget?.stationId,
                         ),
-                    telemetryUnavailable: snapshot.hasError,
+                    telemetryUnavailable:
+                        snapshot.hasError || liveBus?.isCached == true,
                     boardingTarget: boardingTarget,
                     alightingTarget: alightingTarget,
                     alightingEtaMinutes: alightingTarget?.minutesFrom(
@@ -280,8 +289,6 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                     isBroadcasting: isBroadcasting,
                     isStale: isStale,
                     occupancyLevel: liveBus?.occupancyLevel ?? 'Moderate',
-                    isAlertActive: _isAlertActive,
-                    onToggleAlert: () => _toggleAlert(effectiveDestination),
                     scrollController: null,
                     isDesktop: true,
                     speed: liveBus?.speed ?? 0.0,
@@ -374,7 +381,8 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                           stationsMap,
                           preferredId: alightingTarget?.stationId,
                         ),
-                    telemetryUnavailable: snapshot.hasError,
+                    telemetryUnavailable:
+                        snapshot.hasError || liveBus?.isCached == true,
                     boardingTarget: boardingTarget,
                     alightingTarget: alightingTarget,
                     alightingEtaMinutes: alightingTarget?.minutesFrom(
@@ -384,8 +392,6 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
                     isBroadcasting: isBroadcasting,
                     isStale: isStale,
                     occupancyLevel: liveBus?.occupancyLevel ?? 'Moderate',
-                    isAlertActive: _isAlertActive,
-                    onToggleAlert: () => _toggleAlert(effectiveDestination),
                     scrollController: scrollController,
                     isDesktop: false,
                     speed: liveBus?.speed ?? 0.0,
@@ -1315,44 +1321,46 @@ class _StopTimelineItem extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        stop.estimatedTimeStr,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: isCurrent || isTarget
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                          color: isHighContrast
-                              ? Colors.black
-                              : (isPassed
-                                    ? AppColors.onSurfaceVariant
-                                    : AppColors.onSurface),
-                        ),
-                      ),
-                      if (stop.delayLabel.isNotEmpty &&
-                          stop.delayType != DelayType.onTime &&
-                          !isPassed) ...[
-                        const SizedBox(height: 2),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
                         Text(
-                          stop.delayLabel,
+                          stop.estimatedTimeStr,
                           style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            fontWeight: isCurrent || isTarget
+                                ? FontWeight.w800
+                                : FontWeight.w600,
                             color: isHighContrast
-                                ? (stop.delayType == DelayType.delayed
-                                      ? const Color(0xFF8B0000)
-                                      : const Color(0xFF003833))
-                                : (stop.delayType == DelayType.delayed
-                                      ? const Color(0xFFD84315)
-                                      : const Color(0xFF0277BD)),
+                                ? Colors.black
+                                : (isPassed
+                                      ? AppColors.onSurfaceVariant
+                                      : AppColors.onSurface),
                           ),
                         ),
+                        if (stop.delayLabel.isNotEmpty &&
+                            stop.delayType != DelayType.onTime &&
+                            !isPassed) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            stop.delayLabel,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isHighContrast
+                                  ? (stop.delayType == DelayType.delayed
+                                        ? const Color(0xFF8B0000)
+                                        : const Color(0xFF003833))
+                                  : (stop.delayType == DelayType.delayed
+                                        ? const Color(0xFFD84315)
+                                        : const Color(0xFF0277BD)),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -1388,8 +1396,6 @@ class _DraggableJourneySheetContent extends StatelessWidget {
     required this.isBroadcasting,
     required this.isStale,
     required this.occupancyLevel,
-    required this.isAlertActive,
-    required this.onToggleAlert,
     required this.scrollController,
     required this.isDesktop,
     required this.speed,
@@ -1408,15 +1414,13 @@ class _DraggableJourneySheetContent extends StatelessWidget {
   final String routeName;
   final String routeNumber;
   final String busPlate;
-  final int fareLkr;
+  final int? fareLkr;
   final String effectiveOrigin;
   final String effectiveDestination;
   final BusArrivalEtaResult etaResult;
   final bool isBroadcasting;
   final bool isStale;
   final String occupancyLevel;
-  final bool isAlertActive;
-  final VoidCallback onToggleAlert;
   final ScrollController? scrollController;
   final bool isDesktop;
   final double speed;
@@ -1539,8 +1543,8 @@ class _DraggableJourneySheetContent extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              'LKR $fareLkr',
+            FareEstimateText(
+              amount: fareLkr,
               style: TextStyle(
                 fontWeight: FontWeight.w900,
                 fontSize: 16,
@@ -1552,6 +1556,8 @@ class _DraggableJourneySheetContent extends StatelessWidget {
 
         const SizedBox(height: 12),
 
+        const Text(JourneyFare.disclosure, style: TextStyle(fontSize: 12)),
+        const SizedBox(height: 12),
         // Hero Arrival & Delay Banner
         Container(
           padding: const EdgeInsets.all(12),
@@ -1660,55 +1666,10 @@ class _DraggableJourneySheetContent extends StatelessWidget {
 
         const SizedBox(height: 12),
 
-        // Quick Action Row: [Alert When Near] and [Request Assistance]
+        // Stop alert availability and the independent assistance action.
         Row(
           children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: onToggleAlert,
-                icon: Icon(
-                  isAlertActive
-                      ? Icons.notifications_active_rounded
-                      : Icons.add_alert_rounded,
-                  size: context.tapIconSize - 2,
-                  color: isHighContrast
-                      ? (isAlertActive ? Colors.white : Colors.black)
-                      : (isAlertActive
-                            ? Colors.white
-                            : const Color(0xFFE65100)),
-                ),
-                label: Text(
-                  isAlertActive ? 'Alert Active' : 'Alert When Near',
-                  style: TextStyle(
-                    fontSize: context.hasLargeTargets ? 14 : 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: isHighContrast
-                        ? (isAlertActive ? Colors.white : Colors.black)
-                        : (isAlertActive
-                              ? Colors.white
-                              : const Color(0xFFE65100)),
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isHighContrast
-                      ? (isAlertActive ? const Color(0xFF001F3F) : Colors.white)
-                      : (isAlertActive
-                            ? const Color(0xFFE65100)
-                            : const Color(0xFFFFF3E0)),
-                  elevation: isHighContrast ? 0 : (isAlertActive ? 2 : 0),
-                  minimumSize: Size(0, context.buttonHeight),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(
-                      color: isHighContrast
-                          ? Colors.black
-                          : const Color(0xFFFFB74D),
-                      width: isHighContrast ? 2.0 : 1.0,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            const Expanded(child: StopAlertUnavailable()),
             const SizedBox(width: 10),
             Expanded(
               child: ElevatedButton.icon(
@@ -1752,6 +1713,9 @@ class _DraggableJourneySheetContent extends StatelessWidget {
         ),
 
         const SizedBox(height: 16),
+
+        const Text(StopAlertUnavailable.explanation),
+        const SizedBox(height: 12),
 
         // Stops Timeline (LMT Go style!)
         _EnhancedStopsTimelineCard(
@@ -1907,11 +1871,9 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
 
   LatLng? _resolveStopCoordinates(String stopName) {
     if (stopName.trim().isEmpty) return null;
-    final fromEta = EtaService.getStopCoordinates(stopName);
-    if (fromEta != null) return fromEta;
 
     final q = stopName.trim().toLowerCase();
-    for (final st in SeedData.colomboStations) {
+    for (final st in FirestoreService.cachedStations) {
       final sName = st.name.toLowerCase();
       if (sName == q || sName.contains(q) || q.contains(sName)) {
         return LatLng(st.lat, st.lng);
@@ -1943,7 +1905,7 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
 
       // Determine display name from SeedData
       String displayName = name;
-      for (final st in SeedData.colomboStations) {
+      for (final st in FirestoreService.cachedStations) {
         final sName = st.name.toLowerCase();
         final sId = st.id.toLowerCase();
         final q = name.trim().toLowerCase();
@@ -1995,7 +1957,7 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
     if (a == b) return true;
     if (a.contains(b) || b.contains(a)) return true;
     // Check SeedData station IDs/names
-    for (final st in SeedData.colomboStations) {
+    for (final st in FirestoreService.cachedStations) {
       final sName = st.name.toLowerCase();
       final sId = st.id.toLowerCase();
       if ((sId == a || sName.contains(a) || a.contains(sName)) &&
@@ -2109,6 +2071,16 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
   @override
   Widget build(BuildContext context) {
     // 1. Resolve positions
+    final timetableBus = widget.matchedBus;
+    if (timetableBus?.isPublishedTimetable == true) {
+      return ColoredBox(
+        color: Theme.of(context).colorScheme.surface,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 90, 24, 24),
+          child: PublishedTimetableNotice(bus: timetableBus!),
+        ),
+      );
+    }
     LatLng? busPos;
     if (widget.liveBus != null &&
         widget.liveBus!.latitude != 0.0 &&
@@ -2927,7 +2899,9 @@ class _StatusCard extends StatelessWidget {
     final updatedText = _formatTimestamp(
       liveBus?.timestamp ?? liveBus?.lastUpdated,
     );
-    final busStatusText = _getBusStatusText(liveBus?.status, isStale);
+    final busStatusText = liveBus?.isCached == true
+        ? 'Saved location - updates unavailable'
+        : _getBusStatusText(liveBus?.status, isStale);
     final busStatusIcon = _getBusStatusIcon(liveBus?.status, isStale);
 
     return Container(
@@ -3929,7 +3903,8 @@ class _LiveStopTimelineCard extends StatelessWidget {
                   future: FirestoreService().getStations(),
                   builder: (context, stationsSnapshot) {
                     final stationsList =
-                        stationsSnapshot.data ?? SeedData.colomboStations;
+                        stationsSnapshot.data ??
+                        FirestoreService.cachedStations;
                     final stationsMap = {for (final s in stationsList) s.id: s};
 
                     return ListView.separated(

@@ -127,15 +127,20 @@ class _CommunityReportingPageState extends State<CommunityReportingPage>
             curve: const Interval(0.35, 0.8, curve: Curves.easeOut),
           ),
           child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.12),
-              end: Offset.zero,
-            ).animate(
-              CurvedAnimation(
-                parent: _entranceController,
-                curve: const Interval(0.35, 0.8, curve: Curves.easeOutCubic),
-              ),
-            ),
+            position:
+                Tween<Offset>(
+                  begin: const Offset(0, 0.12),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: _entranceController,
+                    curve: const Interval(
+                      0.35,
+                      0.8,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+                ),
             child: Column(
               children: [
                 Text(
@@ -150,13 +155,17 @@ class _CommunityReportingPageState extends State<CommunityReportingPage>
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Report elevator outages and ramp issues to help fellow travelers. Earn badges for your contributions!',
+                  'Share ramp and elevator observations. Reports are public after upload acknowledgement; rewards need review.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
                     height: 24 / 16,
-                    fontWeight: context.isHighContrast ? FontWeight.w600 : FontWeight.normal,
-                    color: context.isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                    fontWeight: context.isHighContrast
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    color: context.isHighContrast
+                        ? Colors.black
+                        : AppColors.onSurfaceVariant,
                   ),
                 ),
               ],

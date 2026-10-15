@@ -10,11 +10,13 @@ class BusStatusResult {
     required this.status,
     required this.reasons,
     this.relevantReports = const [],
+    this.rampWorking = false,
   });
 
   final AccessibilityStatus status;
   final List<String> reasons;
   final List<Report> relevantReports;
+  final bool rampWorking;
 
   /// User-facing short label ('Safe', 'Warning', 'Not accessible').
   String get statusLabel {
@@ -36,15 +38,28 @@ class StatusLogic {
   const StatusLogic._();
 
   /// Confirmations may refresh evidence only with an account and valid timestamp.
-  static DateTime lastCheckedAt(Report report, {DateTime? currentTime}) {
+  static DateTime? lastCheckedAt(Report report, {DateTime? currentTime}) {
     final now = currentTime ?? DateTime.now();
+    final created = report.createdAt;
+    if (created == null) return null;
     final confirmed = report.lastConfirmedAt;
-    return confirmed != null &&
+    final confirmation =
+        confirmed != null &&
             report.confirmedBy.any((id) => id.trim().isNotEmpty) &&
-            !confirmed.isBefore(report.createdAt) &&
+            !confirmed.isBefore(created) &&
             !confirmed.isAfter(now)
         ? confirmed
-        : report.createdAt;
+        : created;
+    final rechecked = report.lastRecheckedAt;
+    return rechecked != null &&
+            report.lastRecheckId?.trim().isNotEmpty == true &&
+            report.lastRecheckedBy?.trim().isNotEmpty == true &&
+            report.confirmedBy.contains(report.lastRecheckedBy) &&
+            !report.flaggedBy.contains(report.lastRecheckedBy) &&
+            !rechecked.isBefore(confirmation) &&
+            !rechecked.isAfter(now)
+        ? rechecked
+        : confirmation;
   }
 
   /// These are product defaults, not guarantees about physical conditions.
@@ -74,17 +89,19 @@ class StatusLogic {
 
   static bool isReportFresh(Report report, {DateTime? currentTime}) {
     final now = currentTime ?? DateTime.now();
-    final age = now.difference(lastCheckedAt(report, currentTime: now));
-    return !report.createdAt.isAfter(now) &&
+    final checked = lastCheckedAt(report, currentTime: now);
+    if (checked == null || report.createdAt!.isAfter(now)) return false;
+    final age = now.difference(checked);
+    return !report.createdAt!.isAfter(now) &&
         age >= Duration.zero &&
         age <= freshnessWindow(report);
   }
 
-  static DateTime freshUntil(Report report, {DateTime? currentTime}) =>
+  static DateTime? freshUntil(Report report, {DateTime? currentTime}) =>
       lastCheckedAt(
         report,
         currentTime: currentTime,
-      ).add(freshnessWindow(report));
+      )?.add(freshnessWindow(report));
 
   static bool needsRecheck(Report report, {DateTime? currentTime}) =>
       isReportActive(report, currentTime: currentTime) &&
@@ -93,19 +110,28 @@ class StatusLogic {
 
   static bool hasFreshCrowding(Report report, {DateTime? currentTime}) {
     final now = currentTime ?? DateTime.now();
-    final age = now.difference(lastCheckedAt(report, currentTime: now));
+    final checked = lastCheckedAt(report, currentTime: now);
+    if (checked == null || report.createdAt!.isAfter(now)) return false;
+    final age = now.difference(checked);
     return age >= Duration.zero && age <= const Duration(minutes: 30);
   }
 
   static ReportCondition planningCondition(
     Report report, {
     DateTime? currentTime,
-  }) => hasFreshCrowding(report, currentTime: currentTime)
+  }) => report.createdAt == null && !isPersistentBarrier(report)
+      ? ReportCondition.unknown
+      : hasFreshCrowding(report, currentTime: currentTime)
       ? report.effectiveCondition
       : report.observedCondition;
 
   static String freshnessLabel(Report report, {DateTime? currentTime}) {
     if (report.status.toLowerCase() == 'resolved') return 'Resolved';
+    if (report.createdAt == null) {
+      return needsRecheck(report, currentTime: currentTime)
+          ? 'Unresolved barrier - observation time unknown; needs recheck'
+          : 'Observation time unknown';
+    }
     if (!isReportActive(report, currentTime: currentTime)) {
       return 'Expired or unavailable';
     }
@@ -128,10 +154,11 @@ class StatusLogic {
 
     final now = currentTime ?? DateTime.now();
     final timestamp = lastCheckedAt(report, currentTime: now);
+    if (timestamp == null) return isPersistentBarrier(report);
     final difference = now.difference(timestamp);
 
     return difference >= Duration.zero &&
-        !report.createdAt.isAfter(now) &&
+        !report.createdAt!.isAfter(now) &&
         (isPersistentBarrier(report) || difference <= freshnessWindow(report));
   }
 
@@ -168,13 +195,38 @@ class StatusLogic {
         : bus.stops.toSet();
     bool unsuitable = false;
 
-    if (wheelchairAccessRequired && !bus.wheelchairAccessible) {
+    final rampCondition = bus.rampCondition(currentTime: currentTime);
+    final rampReports = activeReports
+        .where(
+          (r) =>
+              r.targetType == 'bus' &&
+              r.targetId == bus.id &&
+              r.category == 'rampAccess',
+        )
+        .toList();
+    final hasBarrier =
+        rampCondition == false ||
+        rampReports.any((r) => r.observedCondition == ReportCondition.barrier);
+    final workingReport = rampReports.any(
+      (r) =>
+          isReportFresh(r, currentTime: currentTime) &&
+          r.observedCondition == ReportCondition.positive,
+    );
+    final rampWorking =
+        bus.hasRamp && !hasBarrier && (rampCondition == true || workingReport);
+    final unknownRamp = bus.hasRamp && !hasBarrier && !rampWorking;
+    if (unknownRamp) {
+      unknownReasons.add(
+        'Ramp equipped; operational condition Unknown. A dated check is required.',
+      );
+    }
+    if (wheelchairAccessRequired && !rampWorking && !unknownRamp) {
       unsuitable = true;
       reasons.add(
         'An operational wheelchair ramp is required for this journey.',
       );
     }
-    if (stepFreeOnly && !bus.lowFloor && !bus.wheelchairAccessible) {
+    if (stepFreeOnly && !bus.lowFloor && !rampWorking && !unknownRamp) {
       unsuitable = true;
       reasons.add('Step-free boarding is not available on this vehicle.');
     }
@@ -237,7 +289,7 @@ class StatusLogic {
       if (needsRecheck(report, currentTime: currentTime)) {
         isWarning = true;
         reasons.add(
-          'Unresolved issue at $target: ${report.problemType}. Last checked ${lastCheckedAt(report, currentTime: currentTime).toLocal()}; needs recheck.',
+          'Unresolved issue at $target: ${report.problemType}. Last checked ${lastCheckedAt(report, currentTime: currentTime)?.toLocal() ?? 'Unknown'}; needs recheck.',
         );
         return;
       }
@@ -264,7 +316,7 @@ class StatusLogic {
     }
 
     // 2a. Vehicle ramp marked broken
-    if (!bus.rampOk) {
+    if (rampCondition == false) {
       isWarning = true;
       reasons.add(
         'Ramp reported broken: Vehicle wheelchair ramp is reported out of service.',
@@ -309,6 +361,7 @@ class StatusLogic {
           : AccessibilityStatus.accessible,
       reasons: reasons,
       relevantReports: relevantReports,
+      rampWorking: rampWorking,
     );
   }
 }

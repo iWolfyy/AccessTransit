@@ -1,3 +1,7 @@
+import '../../logic/journey_fare.dart';
+import '../../widgets/fare_estimate_text.dart';
+import '../../services/transit_catalogue.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/utils/time_utils.dart';
@@ -127,13 +131,16 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                 ? 'Departure: Unknown'
                 : 'Timetable departure: ${TimeUtils.formatDateString(departure)}, ${TimeUtils.formatTimeString(departure)}',
           ),
+          if (route.usesEstimatedTimes)
+            const Text(
+              'Some timetable intervals are missing. Times include model estimates; confirm them with the operator.',
+            ),
           if (departure != null)
             Text(
               'Estimated arrival: ${TimeUtils.formatDateString(departure.add(Duration(minutes: route.durationMinutes)))}, ${TimeUtils.formatTimeString(departure.add(Duration(minutes: route.durationMinutes)))}',
             ),
-          Text(
-            'Estimated fare: LKR ${route.estimatedPriceLkr} - model estimate; confirm with the operator.',
-          ),
+          FareEstimateText(amount: route.estimatedPriceLkr),
+          const Text(JourneyFare.disclosure),
           if (route.wheelchairAccessRequired)
             const Text('Travel requirement: Wheelchair access'),
           if (route.stepFreeOnly) const Text('Travel requirement: Step-free'),
@@ -144,7 +151,7 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
           const SizedBox(height: 16),
           if (error != null) Text(error!),
           FilledButton(
-            onPressed: saving ? null : confirm,
+            onPressed: saving || TransitCatalogue.demo ? null : confirm,
             child: Text(
               saving ? 'Saving journey...' : 'Confirm and save journey',
             ),

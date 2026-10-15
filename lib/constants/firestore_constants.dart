@@ -1,3 +1,5 @@
+import '../services/sample_test_mode.dart';
+
 /// Firestore collection and field names for AccessTransit.
 ///
 /// AC-48: Defines the `users` collection structure used across the app.
@@ -7,31 +9,33 @@ class FirestoreConstants {
   // --- Collections ---
 
   /// User profile documents keyed by Firebase Auth [uid].
-  static const String usersCollection = 'users';
+  static const String usersCollection = '${SampleTestMode.prefix}users';
 
   /// Live bus tracking telemetry documents keyed by bus ID.
-  static const String busesCollection = 'active_buses';
+  static const String busesCollection = '${SampleTestMode.prefix}active_buses';
 
   /// Live bus locations documents keyed by bus ID.
-  static const String liveLocationsCollection = 'live_locations';
+  static const String liveLocationsCollection =
+      '${SampleTestMode.prefix}live_locations';
 
   /// Passenger journey/booking documents keyed by auto-generated ID.
-  static const String journeysCollection = 'journeys';
+  static const String journeysCollection = '${SampleTestMode.prefix}journeys';
 
   /// Station documents keyed by station ID (`stations/{id}`).
-  static const String stationsCollection = 'stations';
+  static const String stationsCollection = '${SampleTestMode.prefix}stations';
 
   /// Static bus route & accessibility documents keyed by bus ID (`buses/{id}`).
-  static const String staticBusesCollection = 'buses';
+  static const String staticBusesCollection = '${SampleTestMode.prefix}buses';
 
   /// Accessibility condition reports keyed by report ID (`reports/{id}`).
-  static const String reportsCollection = 'reports';
+  static const String reportsCollection = '${SampleTestMode.prefix}reports';
 
   /// Bus route definitions keyed by route ID (`routes/{id}`).
-  static const String routesCollection = 'routes';
+  static const String routesCollection = '${SampleTestMode.prefix}routes';
 
   /// Passenger boarding assistance requests keyed by request ID (`boarding_requests/{id}`).
-  static const String boardingRequestsCollection = 'boarding_requests';
+  static const String boardingRequestsCollection =
+      '${SampleTestMode.prefix}boarding_requests';
 
   // --- users/{userId} document fields ---
 

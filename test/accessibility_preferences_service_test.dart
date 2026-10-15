@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,7 +24,7 @@ void main() {
 
     test('Loads default values aligned with WCAG 2.2 AA accessibility requirements', () async {
       final service = AccessibilityPreferencesService.instance;
-      await service.init();
+      await service.init(userId: 'owner');
 
       expect(service.isInitialized, isTrue);
       expect(service.isHighContrast, isFalse);
@@ -40,8 +42,10 @@ void main() {
     test('Loads saved values from SharedPreferences correctly', () async {
       SharedPreferences.setMockInitialValues({
         AccessibilityPreferencesService.keyHighContrast: true,
-        AccessibilityPreferencesService.keyWheelchairOnly: false,
-        AccessibilityPreferencesService.keyStepFree: true,
+        AccessibilityPreferencesService.accountKey('owner'): jsonEncode({
+          'wheelchair': false,
+          'stepFree': true,
+        }),
         AccessibilityPreferencesService.keyHasLargeTargets: true,
         AccessibilityPreferencesService.keyMinimizeWalking: true,
         AccessibilityPreferencesService.keyVoiceGuidance: false,
@@ -51,7 +55,7 @@ void main() {
       });
 
       final service = AccessibilityPreferencesService.instance;
-      await service.init();
+      await service.init(userId: 'owner');
 
       expect(service.isHighContrast, isTrue);
       expect(service.isWheelchairOnly, isFalse);
@@ -69,7 +73,7 @@ void main() {
       () async {
         SharedPreferences.setMockInitialValues({});
         final service = AccessibilityPreferencesService.instance;
-        await service.init();
+        await service.init(userId: 'owner');
 
         int notifyCount = 0;
         service.addListener(() => notifyCount++);
@@ -97,11 +101,19 @@ void main() {
           isTrue,
         );
         expect(
-          prefs.getBool(AccessibilityPreferencesService.keyWheelchairOnly),
+          (jsonDecode(
+            prefs.getString(
+              AccessibilityPreferencesService.accountKey('owner'),
+            )!,
+          ) as Map)['wheelchair'],
           isFalse,
         );
         expect(
-          prefs.getBool(AccessibilityPreferencesService.keyStepFree),
+          (jsonDecode(
+            prefs.getString(
+              AccessibilityPreferencesService.accountKey('owner'),
+            )!,
+          ) as Map)['stepFree'],
           isTrue,
         );
         expect(
@@ -116,7 +128,7 @@ void main() {
       () async {
         SharedPreferences.setMockInitialValues({});
         final service = AccessibilityPreferencesService.instance;
-        await service.init();
+        await service.init(userId: 'owner');
 
         int notifyCount = 0;
         service.addListener(() => notifyCount++);
@@ -145,11 +157,19 @@ void main() {
           isTrue,
         );
         expect(
-          prefs.getBool(AccessibilityPreferencesService.keyWheelchairOnly),
+          (jsonDecode(
+            prefs.getString(
+              AccessibilityPreferencesService.accountKey('owner'),
+            )!,
+          ) as Map)['wheelchair'],
           isFalse,
         );
         expect(
-          prefs.getBool(AccessibilityPreferencesService.keyStepFree),
+          (jsonDecode(
+            prefs.getString(
+              AccessibilityPreferencesService.accountKey('owner'),
+            )!,
+          ) as Map)['stepFree'],
           isTrue,
         );
         expect(
@@ -348,8 +368,8 @@ void main() {
           equals(const Color(0xFF001F3F)),
         );
 
-        // Check Popular Accessible Routes section is rendered
-        expect(find.text('Popular Accessible Routes'), findsOneWidget);
+        // Static sample corridors cannot claim accessible service availability.
+        expect(find.text('Popular Accessible Routes'), findsNothing);
 
         // Reset
         await AccessibilityPreferencesService.instance.setHighContrast(false);

@@ -4,6 +4,9 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import 'local_validation_backend.dart';
+import 'sample_test_mode.dart';
+
 /// Cloudinary unsigned uploads: no API secret or billing account in the app.
 class ReportPhotoStorage {
   const ReportPhotoStorage({
@@ -21,9 +24,16 @@ class ReportPhotoStorage {
   final String cloudName;
   final String uploadPreset;
   bool get isConfigured =>
-      cloudName.trim().isNotEmpty && uploadPreset.trim().isNotEmpty;
+      !SampleTestMode.enabled &&
+      cloudName.trim().isNotEmpty &&
+      uploadPreset.trim().isNotEmpty;
 
   Future<String> upload(Uint8List bytes, {http.Client? client}) async {
+    if (LocalValidationBackend.enabled || SampleTestMode.enabled) {
+      throw StateError(
+        'External photo uploads are disabled in test mode. Use text-only sample reports.',
+      );
+    }
     if (!isConfigured) throw StateError('Photo uploads are not configured.');
     if (bytes.isEmpty || bytes.length > 2 * 1024 * 1024) {
       throw ArgumentError('Photo must be at most 2 MB.');

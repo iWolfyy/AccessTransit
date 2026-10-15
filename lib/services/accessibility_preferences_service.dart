@@ -1,230 +1,234 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'sample_test_mode.dart';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Global service managing user accessibility preferences.
-///
-/// Implements [ChangeNotifier] to allow real-time reactive updates across
-/// the entire app (e.g. dynamic high contrast theme switching and default
-/// journey route filter synchronization) in accordance with WCAG 2.2 AA.
+/// Device display controls persist globally; travel needs belong to an account.
 class AccessibilityPreferencesService extends ChangeNotifier {
-  AccessibilityPreferencesService._();
-
-  /// Global singleton instance.
-  static final AccessibilityPreferencesService instance =
-      AccessibilityPreferencesService._();
-
-  // SharedPreferences Keys
-  static const String keyHighContrast = 'isHighContrast';
-  static const String keyWheelchairOnly = 'isWheelchairOnly';
-  static const String keyStepFree = 'isStepFree';
-  static const String keyHasLargeTargets = 'hasLargeTargets';
-  static const String keyMinimizeWalking = 'minimizeWalking';
-  static const String keyVoiceGuidance = 'voiceGuidance';
-  static const String keyHapticAlerts = 'hapticAlerts';
-  static const String keyBoardingAssistance = 'boardingAssistance';
-  static const String keyQuietRoutes = 'quietRoutes';
+  AccessibilityPreferencesService();
+  static final instance = AccessibilityPreferencesService();
+  static const keyHighContrast = 'isHighContrast';
+  static const keyHasLargeTargets = 'hasLargeTargets';
+  // Legacy personal keys have no reliable owner and are discarded.
+  static const keyWheelchairOnly = 'isWheelchairOnly';
+  static const keyStepFree = 'isStepFree';
+  static const keyMinimizeWalking = 'minimizeWalking';
+  static const keyVoiceGuidance = 'voiceGuidance';
+  static const keyHapticAlerts = 'hapticAlerts';
+  static const keyBoardingAssistance = 'boardingAssistance';
+  static const keyQuietRoutes = 'quietRoutes';
+  static String accountKey(String uid) => SampleTestMode.storage(
+    'travel_preferences_v2_${base64Url.encode(utf8.encode(uid))}',
+  );
 
   SharedPreferences? _prefs;
   bool _isInitialized = false;
-
-  // Defaults aligned with WCAG AA accessibility needs
+  bool _disposed = false;
+  int _revision = 0;
+  String? _userId;
+  String? _storageError;
+  Future<void>? _writes;
+  StreamSubscription<String?>? _authSubscription;
   bool _isHighContrast = false;
+  bool _hasLargeTargets = true;
+  // Retain the product's conservative default for every new account/guest.
   bool _isWheelchairOnly = true;
   bool _isStepFree = false;
-  bool _hasLargeTargets = true;
-  bool _minimizeWalking = false;
-  bool _voiceGuidance = false;
-  bool _hapticAlerts = false;
-  bool _boardingAssistance = false;
-  bool _quietRoutes = false;
-
-  /// Whether the service has completed loading from storage.
   bool get isInitialized => _isInitialized;
-
-  // Getters
+  String? get userId => _userId;
+  String? get storageError => _storageError;
   bool get isHighContrast => _isHighContrast;
-  bool get isWheelchairOnly => _isWheelchairOnly;
-  bool get isStepFree => _isStepFree;
   bool get hasLargeTargets => _hasLargeTargets;
-  bool get minimizeWalking => _minimizeWalking;
-  bool get voiceGuidance => _voiceGuidance;
-  bool get hapticAlerts => _hapticAlerts;
-  bool get boardingAssistance => _boardingAssistance;
-  bool get quietRoutes => _quietRoutes;
-
-  /// Semantic alias for wheelchair access requirement.
+  bool get isWheelchairOnly => _isWheelchairOnly;
   bool get wheelchairAccessRequired => _isWheelchairOnly;
+  bool get isStepFree => _isStepFree;
+  bool get minimizeWalking => false;
+  bool get voiceGuidance => false;
+  bool get hapticAlerts => false;
+  bool get boardingAssistance => false;
+  bool get quietRoutes => false;
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
 
-  /// Initializes preferences by reading saved settings from [SharedPreferences].
-  ///
-  /// Can accept an optional [prefs] instance for testing.
-  Future<void> init({SharedPreferences? prefs}) async {
+  void _loadNeeds() {
+    _isWheelchairOnly = true;
+    _isStepFree = false;
+    final uid = _userId;
+    if (uid == null || _prefs == null) return;
     try {
-      _prefs = prefs ?? await SharedPreferences.getInstance();
-      _isHighContrast = _prefs?.getBool(keyHighContrast) ?? false;
-      _isWheelchairOnly = _prefs?.getBool(keyWheelchairOnly) ?? true;
-      _isStepFree = _prefs?.getBool(keyStepFree) ?? false;
-      _hasLargeTargets = _prefs?.getBool(keyHasLargeTargets) ?? true;
-      // Migrate old switches that never had a working implementation.
-      _minimizeWalking = false;
-      _voiceGuidance = false;
-      _hapticAlerts = false;
-      _boardingAssistance = false;
-      _quietRoutes = false;
-      await Future.wait([
-        for (final key in [
-          keyMinimizeWalking,
-          keyVoiceGuidance,
-          keyHapticAlerts,
-          keyBoardingAssistance,
-          keyQuietRoutes,
-        ])
-          _prefs!.setBool(key, false),
-      ]);
-    } catch (e) {
-      debugPrint('AccessibilityPreferencesService init warning: $e');
-    } finally {
-      _isInitialized = true;
-      notifyListeners();
+      final raw = _prefs!.getString(accountKey(uid));
+      if (raw == null || raw.length > 512) return;
+      final data = jsonDecode(raw) as Map;
+      if (data['wheelchair'] is! bool || data['stepFree'] is! bool) return;
+      _isWheelchairOnly = data['wheelchair'] as bool;
+      _isStepFree = data['stepFree'] as bool;
+    } catch (_) {
+      /* Invalid needs load explicit defaults, never another owner. */
     }
   }
 
-  /// Sets High Contrast mode and notifies listeners immediately.
-  Future<void> setHighContrast(bool value) async {
-    if (_isHighContrast == value) return;
-    _isHighContrast = value;
-    await _prefs?.setBool(keyHighContrast, value);
-    notifyListeners();
+  Future<void> init({SharedPreferences? prefs, String? userId}) async {
+    final revision = ++_revision;
+    _userId = userId;
+    _isWheelchairOnly = true;
+    _isStepFree = false;
+    _notify();
+    final loaded = prefs ?? await SharedPreferences.getInstance();
+    if (_disposed || revision != _revision) return;
+    _prefs = loaded;
+    _isHighContrast = loaded.getBool(keyHighContrast) ?? false;
+    _hasLargeTargets = loaded.getBool(keyHasLargeTargets) ?? true;
+    _loadNeeds();
+    _isInitialized = true;
+    _storageError = null;
+    _notify();
+    // No implicit migration of anonymous travel needs into a signed-in account.
+    for (final key in [
+      keyWheelchairOnly,
+      keyStepFree,
+      keyMinimizeWalking,
+      keyVoiceGuidance,
+      keyHapticAlerts,
+      keyBoardingAssistance,
+      keyQuietRoutes,
+    ]) {
+      if (!await loaded.remove(key)) {
+        throw StateError('Could not clear legacy preferences.');
+      }
+    }
   }
 
-  /// Sets Wheelchair-Only filter preference.
-  Future<void> setWheelchairOnly(bool value) async {
-    if (_isWheelchairOnly == value) return;
-    _isWheelchairOnly = value;
-    await _prefs?.setBool(keyWheelchairOnly, value);
-    notifyListeners();
+  Future<void> activateAccount(String? uid) async {
+    final revision = ++_revision;
+    _userId = uid;
+    _storageError = null;
+    _loadNeeds(); // Synchronous reset/load before any await or notification.
+    _notify();
+    if (_prefs == null) {
+      final loaded = await SharedPreferences.getInstance();
+      if (_disposed || revision != _revision) return;
+      _prefs = loaded;
+      _isHighContrast = loaded.getBool(keyHighContrast) ?? false;
+      _hasLargeTargets = loaded.getBool(keyHasLargeTargets) ?? true;
+      _isInitialized = true;
+    }
+    // Finish captured old-owner writes before reading this owner's latest save.
+    if (_writes != null) await _writes!.catchError((Object _) {});
+    if (_disposed || revision != _revision) return;
+    _loadNeeds();
+    _notify();
   }
 
-  /// Sets Step-Free routes preference.
-  Future<void> setStepFree(bool value) async {
-    if (_isStepFree == value) return;
-    _isStepFree = value;
-    await _prefs?.setBool(keyStepFree, value);
-    notifyListeners();
+  /// The initial identity is loaded by main before rendering the app.
+  void startAuthSync({FirebaseAuth? auth}) {
+    bindAccounts(
+      (auth ?? FirebaseAuth.instance).authStateChanges().map(
+        (user) => user?.uid,
+      ),
+    );
   }
 
-  /// Sets 48dp+ Large Tap Targets enforcement preference.
-  Future<void> setLargeTargets(bool value) async {
-    if (_hasLargeTargets == value) return;
-    _hasLargeTargets = value;
-    await _prefs?.setBool(keyHasLargeTargets, value);
-    notifyListeners();
+  void bindAccounts(Stream<String?> accounts) {
+    _authSubscription?.cancel();
+    _authSubscription = accounts.distinct().listen((uid) {
+      if (uid == _userId) return;
+      unawaited(
+        activateAccount(uid).catchError((Object _) {
+          _storageError = 'Could not load preferences for this account.';
+          _notify();
+        }),
+      );
+    });
   }
 
-  /// Sets Minimize Walking distance preference.
-  Future<void> setMinimizeWalking(bool value) async {
-    if (value) return; // Walking paths/distances are not available yet.
-    if (_minimizeWalking == value) return;
-    _minimizeWalking = value;
-    await _prefs?.setBool(keyMinimizeWalking, value);
-    notifyListeners();
-  }
+  Future<void> setHighContrast(bool value) =>
+      savePreferences(isHighContrast: value);
+  Future<void> setLargeTargets(bool value) =>
+      savePreferences(hasLargeTargets: value);
+  Future<void> setWheelchairOnly(bool value) =>
+      savePreferences(isWheelchairOnly: value);
+  Future<void> setStepFree(bool value) => savePreferences(isStepFree: value);
+  Future<void> setMinimizeWalking(bool value) async {}
+  Future<void> setVoiceGuidance(bool value) async {}
+  Future<void> setHapticAlerts(bool value) async {}
+  Future<void> setBoardingAssistance(bool value) async {}
+  Future<void> setQuietRoutes(bool value) async {}
 
-  /// Sets Voice Guidance preference.
-  Future<void> setVoiceGuidance(bool value) async {
-    if (value) return; // Spoken navigation is not implemented yet.
-    if (_voiceGuidance == value) return;
-    _voiceGuidance = value;
-    await _prefs?.setBool(keyVoiceGuidance, value);
-    notifyListeners();
-  }
-
-  /// Sets Haptic Alerts preference.
-  Future<void> setHapticAlerts(bool value) async {
-    if (value) return; // Automatic travel alerts are not implemented yet.
-    if (_hapticAlerts == value) return;
-    _hapticAlerts = value;
-    await _prefs?.setBool(keyHapticAlerts, value);
-    notifyListeners();
-  }
-
-  /// Sets Boarding Assistance preference.
-  Future<void> setBoardingAssistance(bool value) async {
-    // Assistance can be requested manually, not automatically.
-    if (value) return;
-    if (_boardingAssistance == value) return;
-    _boardingAssistance = value;
-    await _prefs?.setBool(keyBoardingAssistance, value);
-    notifyListeners();
-  }
-
-  /// Sets Quiet Routes preference.
-  Future<void> setQuietRoutes(bool value) async {
-    if (value) return; // No noise observations or quiet-route matching yet.
-    if (_quietRoutes == value) return;
-    _quietRoutes = value;
-    await _prefs?.setBool(keyQuietRoutes, value);
-    notifyListeners();
-  }
-
-  /// Batch updates multiple preferences in a single pass and notifies listeners.
   Future<void> savePreferences({
     bool? isHighContrast,
+    bool? hasLargeTargets,
     bool? isWheelchairOnly,
     bool? isStepFree,
-    bool? hasLargeTargets,
     bool? minimizeWalking,
     bool? voiceGuidance,
     bool? hapticAlerts,
     bool? boardingAssistance,
     bool? quietRoutes,
   }) async {
-    // Unsupported preferences cannot become active via batch save either.
-    _minimizeWalking = false;
-    _voiceGuidance = false;
-    _hapticAlerts = false;
-    _boardingAssistance = false;
-    _quietRoutes = false;
+    final revision = ++_revision;
+    final uid = _userId;
     if (isHighContrast != null) _isHighContrast = isHighContrast;
+    if (hasLargeTargets != null) _hasLargeTargets = hasLargeTargets;
     if (isWheelchairOnly != null) _isWheelchairOnly = isWheelchairOnly;
     if (isStepFree != null) _isStepFree = isStepFree;
-    if (hasLargeTargets != null) _hasLargeTargets = hasLargeTargets;
-
-    if (_prefs != null) {
-      await Future.wait([
-        if (isHighContrast != null)
-          _prefs!.setBool(keyHighContrast, isHighContrast),
-        if (isWheelchairOnly != null)
-          _prefs!.setBool(keyWheelchairOnly, isWheelchairOnly),
-        if (isStepFree != null) _prefs!.setBool(keyStepFree, isStepFree),
-        if (hasLargeTargets != null)
-          _prefs!.setBool(keyHasLargeTargets, hasLargeTargets),
-        for (final key in [
-          keyMinimizeWalking,
-          keyVoiceGuidance,
-          keyHapticAlerts,
-          keyBoardingAssistance,
-          keyQuietRoutes,
-        ])
-          _prefs!.setBool(key, false),
-      ]);
+    final needs = jsonEncode({
+      'wheelchair': _isWheelchairOnly,
+      'stepFree': _isStepFree,
+    });
+    _storageError = null;
+    _notify();
+    final previous = _writes;
+    Future<void> persist() async {
+      final prefs = _prefs ?? await SharedPreferences.getInstance();
+      if (isHighContrast != null &&
+          !await prefs.setBool(keyHighContrast, isHighContrast)) {
+        throw StateError('Display save failed.');
+      }
+      if (hasLargeTargets != null &&
+          !await prefs.setBool(keyHasLargeTargets, hasLargeTargets)) {
+        throw StateError('Display save failed.');
+      }
+      // Guests have session-only needs; never persist into an anonymous shared slot.
+      if (uid != null &&
+          (isWheelchairOnly != null || isStepFree != null) &&
+          !await prefs.setString(accountKey(uid), needs)) {
+        throw StateError('Travel preferences save failed.');
+      }
     }
 
-    notifyListeners();
+    final write = previous == null
+        ? persist()
+        : previous.catchError((Object _) {}).then((_) => persist());
+    _writes = write;
+    try {
+      await write;
+    } catch (_) {
+      if (!_disposed && revision == _revision) {
+        _storageError = 'Preferences changed for this session but could not be saved. Please retry.';
+        _notify();
+      }
+      rethrow;
+    } finally {
+      if (identical(_writes, write)) _writes = null;
+    }
   }
 
-  /// Resets all preferences to default values.
-  Future<void> resetToDefaults() async {
-    await savePreferences(
-      isHighContrast: false,
-      isWheelchairOnly: true,
-      isStepFree: false,
-      hasLargeTargets: true,
-      minimizeWalking: false,
-      voiceGuidance: false,
-      hapticAlerts: false,
-      boardingAssistance: false,
-      quietRoutes: false,
-    );
+  Future<void> resetToDefaults() => savePreferences(
+    isHighContrast: false,
+    hasLargeTargets: true,
+    isWheelchairOnly: true,
+    isStepFree: false,
+  );
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }

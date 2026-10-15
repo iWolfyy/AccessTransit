@@ -21,7 +21,7 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     await service.init(prefs: prefs);
     for (final key in unsupportedKeys) {
-      expect(prefs.getBool(key), isFalse);
+      expect(prefs.containsKey(key), isFalse);
     }
     await service.setVoiceGuidance(true);
     await service.setQuietRoutes(true);
@@ -43,7 +43,7 @@ void main() {
       service.boardingAssistance,
     ], everyElement(isFalse));
     for (final key in unsupportedKeys) {
-      expect(prefs.getBool(key), isFalse);
+      expect(prefs.containsKey(key), isFalse);
     }
   });
 

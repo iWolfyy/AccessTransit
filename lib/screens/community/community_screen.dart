@@ -1,3 +1,6 @@
+import '../../logic/report_mutation.dart';
+import '../../widgets/evidence_refresh.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -100,7 +103,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
     try {
       final result =
           await (confirm
-                  ? _firestoreService.confirmReport(report.id, actor)
+                  ? (report.confirmedBy.contains(actor)
+                        ? _firestoreService.recheckReport(report.id, actor)
+                        : _firestoreService.confirmReport(report.id, actor))
                   : _firestoreService.flagReport(report.id, actor))
               .timeout(const Duration(seconds: 15));
       if (mounted && _firestoreService.currentReportActorId == actor) {
@@ -228,137 +233,146 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   }
 
                   final reports = snapshot.data ?? [];
+                  return EvidenceRefresh(
+                    reports: reports,
+                    builder: (context, now) {
+                      // Separate active vs expired/resolved
+                      final activeReports = <Report>[];
+                      final inactiveReports = <Report>[];
 
-                  // Separate active vs expired/resolved
-                  final activeReports = <Report>[];
-                  final inactiveReports = <Report>[];
+                      for (final r in reports) {
+                        if (StatusLogic.isReportActive(r, currentTime: now)) {
+                          activeReports.add(r);
+                        } else {
+                          inactiveReports.add(r);
+                        }
+                      }
 
-                  for (final r in reports) {
-                    if (StatusLogic.isReportActive(r)) {
-                      activeReports.add(r);
-                    } else {
-                      inactiveReports.add(r);
-                    }
-                  }
-
-                  return ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                    children: [
-                      Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 720),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // If My Reports tab is active, show the points & contribution banner
-                              if (_tab == _CommunityTab.myReports) ...[
-                                ReportOutboxList(userId: currentUserId),
-                                _MyContributionsBanner(
-                                  reportCount: reports.length,
-                                  onNewReport: _openReportIssue,
-                                ),
-                                const SizedBox(height: 16),
-                              ],
-
-                              if (reports.isEmpty)
-                                _buildEmptyState(context)
-                              else ...[
-                                // Active reports section
-                                if (activeReports.isNotEmpty) ...[
-                                  for (
-                                    var i = 0;
-                                    i < activeReports.length;
-                                    i++
-                                  ) ...[
-                                    if (i > 0) const SizedBox(height: 12),
-                                    _ModernReportCard(
-                                      report: activeReports[i],
-                                      userId: currentUserId ?? '',
-                                      isSaving: _pendingActions.contains(
-                                        activeReports[i].id,
-                                      ),
-                                      targetTitle: _resolveTargetTitle(
-                                        activeReports[i],
-                                      ),
-                                      isActive: true,
-                                      onTap: () =>
-                                          _openReportDetails(activeReports[i]),
-                                      onConfirm: () =>
-                                          _handleCardConfirm(activeReports[i]),
-                                      onFlag: () =>
-                                          _handleCardFlag(activeReports[i]),
+                      return ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                        children: [
+                          Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 720),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // If My Reports tab is active, show the points & contribution banner
+                                  if (_tab == _CommunityTab.myReports) ...[
+                                    ReportOutboxList(userId: currentUserId),
+                                    _MyContributionsBanner(
+                                      reportCount: reports.length,
+                                      onNewReport: _openReportIssue,
                                     ),
+                                    const SizedBox(height: 16),
                                   ],
-                                ],
 
-                                // Inactive / Resolved section header
-                                if (inactiveReports.isNotEmpty) ...[
-                                  const SizedBox(height: 24),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Divider(
-                                          color: isHC
-                                              ? Colors.black
-                                              : AppColors.outlineVariant,
+                                  if (reports.isEmpty)
+                                    _buildEmptyState(context)
+                                  else ...[
+                                    // Active reports section
+                                    if (activeReports.isNotEmpty) ...[
+                                      for (
+                                        var i = 0;
+                                        i < activeReports.length;
+                                        i++
+                                      ) ...[
+                                        if (i > 0) const SizedBox(height: 12),
+                                        _ModernReportCard(
+                                          currentTime: now,
+                                          report: activeReports[i],
+                                          userId: currentUserId ?? '',
+                                          isSaving: _pendingActions.contains(
+                                            activeReports[i].id,
+                                          ),
+                                          targetTitle: _resolveTargetTitle(
+                                            activeReports[i],
+                                          ),
+                                          isActive: true,
+                                          onTap: () => _openReportDetails(
+                                            activeReports[i],
+                                          ),
+                                          onConfirm: () => _handleCardConfirm(
+                                            activeReports[i],
+                                          ),
+                                          onFlag: () =>
+                                              _handleCardFlag(activeReports[i]),
                                         ),
+                                      ],
+                                    ],
+
+                                    // Inactive / Resolved section header
+                                    if (inactiveReports.isNotEmpty) ...[
+                                      const SizedBox(height: 24),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Divider(
+                                              color: isHC
+                                                  ? Colors.black
+                                                  : AppColors.outlineVariant,
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                            ),
+                                            child: Text(
+                                              'Resolved & Past Reports',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: context.subtextColor,
+                                              ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Divider(
+                                              color: isHC
+                                                  ? Colors.black
+                                                  : AppColors.outlineVariant,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                        ),
-                                        child: Text(
-                                          'Resolved & Past Reports',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: context.subtextColor,
+                                      const SizedBox(height: 12),
+                                      for (
+                                        var i = 0;
+                                        i < inactiveReports.length;
+                                        i++
+                                      ) ...[
+                                        if (i > 0) const SizedBox(height: 12),
+                                        _ModernReportCard(
+                                          currentTime: now,
+                                          report: inactiveReports[i],
+                                          userId: currentUserId ?? '',
+                                          isSaving: _pendingActions.contains(
+                                            inactiveReports[i].id,
+                                          ),
+                                          targetTitle: _resolveTargetTitle(
+                                            inactiveReports[i],
+                                          ),
+                                          isActive: false,
+                                          onTap: () => _openReportDetails(
+                                            inactiveReports[i],
+                                          ),
+                                          onConfirm: () => _handleCardConfirm(
+                                            inactiveReports[i],
+                                          ),
+                                          onFlag: () => _handleCardFlag(
+                                            inactiveReports[i],
                                           ),
                                         ),
-                                      ),
-                                      Expanded(
-                                        child: Divider(
-                                          color: isHC
-                                              ? Colors.black
-                                              : AppColors.outlineVariant,
-                                        ),
-                                      ),
+                                      ],
                                     ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  for (
-                                    var i = 0;
-                                    i < inactiveReports.length;
-                                    i++
-                                  ) ...[
-                                    if (i > 0) const SizedBox(height: 12),
-                                    _ModernReportCard(
-                                      report: inactiveReports[i],
-                                      userId: currentUserId ?? '',
-                                      isSaving: _pendingActions.contains(
-                                        inactiveReports[i].id,
-                                      ),
-                                      targetTitle: _resolveTargetTitle(
-                                        inactiveReports[i],
-                                      ),
-                                      isActive: false,
-                                      onTap: () => _openReportDetails(
-                                        inactiveReports[i],
-                                      ),
-                                      onConfirm: () => _handleCardConfirm(
-                                        inactiveReports[i],
-                                      ),
-                                      onFlag: () =>
-                                          _handleCardFlag(inactiveReports[i]),
-                                    ),
                                   ],
                                 ],
-                              ],
-                            ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      );
+                    },
                   );
                 },
               ),
@@ -653,6 +667,7 @@ class _MyContributionsBanner extends StatelessWidget {
 class _ModernReportCard extends StatelessWidget {
   const _ModernReportCard({
     required this.report,
+    required this.currentTime,
     required this.targetTitle,
     required this.isActive,
     required this.onTap,
@@ -663,6 +678,7 @@ class _ModernReportCard extends StatelessWidget {
   });
 
   final Report report;
+  final DateTime currentTime;
   final String targetTitle;
   final bool isActive;
   final VoidCallback onTap;
@@ -686,14 +702,18 @@ class _ModernReportCard extends StatelessWidget {
       badgeType = _ReportBadge.resolved;
     } else if (isExpired) {
       badgeType = _ReportBadge.expired;
-    } else if (report.confirmCount > 0 && StatusLogic.isReportFresh(report)) {
+    } else if (report.confirmCount > 0 &&
+        StatusLogic.isReportFresh(report, currentTime: currentTime)) {
       badgeType = _ReportBadge.verified;
     } else {
       badgeType = _ReportBadge.active;
     }
 
     final isBus = report.targetType.toLowerCase() == 'bus';
-    final timeAgo = TimeUtils.formatRelativeTime(report.createdAt);
+    final timeAgo = TimeUtils.formatRelativeTime(
+      report.createdAt,
+      clock: currentTime,
+    );
 
     return Opacity(
       opacity: isActive ? 1.0 : (isHC ? 0.85 : 0.65),
@@ -780,7 +800,7 @@ class _ModernReportCard extends StatelessWidget {
 
               // Problem Condition Title
               Text(
-                '${StatusLogic.freshnessLabel(report)} · Last checked: ${TimeUtils.formatRelativeTime(StatusLogic.lastCheckedAt(report))}',
+                '${StatusLogic.freshnessLabel(report, currentTime: currentTime)} · Last checked: ${TimeUtils.formatRelativeTime(StatusLogic.lastCheckedAt(report, currentTime: currentTime), clock: currentTime)}',
                 style: TextStyle(color: context.subtextColor),
               ),
               Text(
@@ -970,6 +990,10 @@ class _ModernReportCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
 
+              if (hasConfirmed)
+                const Text(
+                  'Recheck the same observed condition after 30 minutes since the latest check. No extra votes or points. Report changed conditions separately.',
+                ),
               // Interactive True & False Quick Action Buttons
               Row(
                 children: [
@@ -980,7 +1004,12 @@ class _ModernReportCard extends StatelessWidget {
                       child: OutlinedButton.icon(
                         onPressed:
                             isSaving ||
-                                hasConfirmed ||
+                                (hasConfirmed &&
+                                    !ReportRecheck.canRecheck(
+                                      report,
+                                      userId,
+                                      currentTime,
+                                    )) ||
                                 isResolved ||
                                 userId.isEmpty ||
                                 report.userId == userId
@@ -1016,7 +1045,7 @@ class _ModernReportCard extends StatelessWidget {
                         ),
                         label: Text(
                           hasConfirmed
-                              ? 'True (${report.confirmCount})'
+                              ? 'Recheck condition'
                               : 'True Flag (${report.confirmCount})',
                           style: const TextStyle(
                             fontSize: 12,

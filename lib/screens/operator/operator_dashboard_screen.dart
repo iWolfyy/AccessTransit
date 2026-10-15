@@ -1,13 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
-import '../../data/seed_data.dart';
+
 import '../../logic/delay_eta_logic.dart';
 import '../../models/bus_route.dart';
 import '../../models/boarding_request.dart';
@@ -24,18 +23,30 @@ import '../../models/station.dart';
 import '../../widgets/add_station_dialog.dart';
 import '../../widgets/logout_confirmation_dialog.dart';
 import '../../widgets/assistance_operator_actions.dart';
+import '../../widgets/operator_access_gate.dart';
 import '../auth/login_screen.dart';
 
 /// Screen for Bus Operators to start/stop trips and broadcast real-time GPS telemetry to Firestore.
-class OperatorDashboardScreen extends StatefulWidget {
+class OperatorDashboardScreen extends StatelessWidget {
   const OperatorDashboardScreen({super.key});
 
   @override
-  State<OperatorDashboardScreen> createState() =>
+  Widget build(BuildContext context) => OperatorAccessGate(
+    builder: (_) => const _ApprovedOperatorDashboardScreen(),
+  );
+}
+
+class _ApprovedOperatorDashboardScreen extends StatefulWidget {
+  const _ApprovedOperatorDashboardScreen();
+
+  @override
+  State<_ApprovedOperatorDashboardScreen> createState() =>
       _OperatorDashboardScreenState();
 }
 
-class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
+class _OperatorDashboardScreenState
+    extends State<_ApprovedOperatorDashboardScreen>
+    with WidgetsBindingObserver {
   final LiveBusService _liveBusService = LiveBusService();
   final LocationService _locationService = LocationService();
   final AuthService _authService = AuthService();
@@ -49,6 +60,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   Duration _tripDuration = Duration.zero;
 
   bool _isTripActive = false;
+  int _operationEpoch = 0;
   bool _operatorWriteBusy = false;
   bool _gpsWriteBusy = false;
   String? _tripId;
@@ -57,7 +69,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   bool _isInitializing = false;
   bool _userManuallySelectedBus = false;
 
-  List<Bus> _availableBuses = SeedData.sampleBuses;
+  List<Bus> _availableBuses = [];
   Bus? _currentBus;
   Map<String, BusRoute> _routesMap = {};
 
@@ -67,7 +79,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   String _selectedRouteName = 'Route 138: Pettah → Kottawa';
   String _nextStop = 'Kottawa Highway Bus Station';
 
-  bool _rampOperational = true;
+  bool? _rampOperational;
   final bool _elevatorWorking = true;
   String _occupancyLevel = 'Medium';
 
@@ -82,6 +94,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadRoutes();
     _subscribeToBuses();
   }
@@ -89,7 +102,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   Future<void> _loadRoutes() async {
     try {
       final routes = await _firestoreService.getRoutes();
-      final list = routes.isNotEmpty ? routes : SeedData.sampleRoutes;
+      final list = routes;
       if (mounted) {
         setState(() {
           _routesMap = {for (final r in list) r.id: r};
@@ -98,7 +111,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _routesMap = {for (final r in SeedData.sampleRoutes) r.id: r};
+          _routesMap = {};
         });
       }
     }
@@ -192,7 +205,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
     _busesSubscription = _firestoreService.streamBuses().listen((buses) {
       if (!mounted) return;
       final currentUserId = _authService.currentUser?.uid;
-      final list = buses.isNotEmpty ? buses : SeedData.sampleBuses;
+      final list = buses;
 
       setState(() {
         _availableBuses = list;
@@ -211,10 +224,22 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   void _listenToSelectedBus(String busId) {
     _busDocSubscription?.cancel();
     _busDocSubscription = _firestoreService.streamBusById(busId).listen((bus) {
-      if (!mounted || bus == null || busId != _selectedBusId) return;
+      if (!mounted || busId != _selectedBusId) return;
+      if (bus == null ||
+          (_isTripActive && bus.driverId != _authService.currentUser?.uid)) {
+        _positionSubscription?.cancel();
+        _tripTimer?.cancel();
+        setState(() {
+          _currentBus = bus;
+          _isTripActive = false;
+          _publicationStatus =
+              'Bus assignment unavailable; broadcasting stopped locally';
+        });
+        return;
+      }
       setState(() {
         _currentBus = bus;
-        _rampOperational = bus.rampOk;
+        _rampOperational = bus.rampCondition();
         final occ = bus.occupancy.toLowerCase();
         if (occ == 'low') {
           _occupancyLevel = 'Low';
@@ -258,9 +283,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   Future<void> _onRampToggled(bool val) async {
     final currentUserId = _authService.currentUser?.uid ?? '';
     final isAssignedDriver =
-        _currentBus == null ||
-        _currentBus?.driverId == null ||
-        _currentBus?.driverId == currentUserId;
+        currentUserId.isNotEmpty && _currentBus?.driverId == currentUserId;
 
     if (!isAssignedDriver) {
       _showSnack(
@@ -276,7 +299,6 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       await _firestoreService.updateBusAccessibility(
         _selectedBusId,
         rampOk: val,
-        driverId: currentUserId,
       );
       if (mounted) setState(() => _rampOperational = val);
       await _pushAccessibilityUpdate();
@@ -299,9 +321,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
     if (val == null) return;
     final currentUserId = _authService.currentUser?.uid ?? '';
     final isAssignedDriver =
-        _currentBus == null ||
-        _currentBus?.driverId == null ||
-        _currentBus?.driverId == currentUserId;
+        currentUserId.isNotEmpty && _currentBus?.driverId == currentUserId;
 
     if (!isAssignedDriver) {
       _showSnack(
@@ -317,7 +337,6 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
       await _firestoreService.updateBusAccessibility(
         _selectedBusId,
         occupancy: val.toLowerCase(),
-        driverId: currentUserId,
       );
       if (mounted) setState(() => _occupancyLevel = val);
       await _pushAccessibilityUpdate();
@@ -333,7 +352,19 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      ++_operationEpoch;
+      _positionSubscription?.cancel();
+      _tripTimer?.cancel();
+      _isTripActive = false;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _busesSubscription?.cancel();
     _busDocSubscription?.cancel();
     _positionSubscription?.cancel();
@@ -346,7 +377,13 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   /// creating active document in Firestore (`live_locations/{busId}`), and streaming position updates.
   Future<void> _startTrip() async {
     if (_isTripActive || _isInitializing) return;
+    final uid = _authService.currentUser?.uid;
+    if (uid == null || _currentBus?.driverId != uid) {
+      _showSnack('Claim this bus before starting a trip.', isError: true);
+      return;
+    }
 
+    final operationEpoch = _operationEpoch;
     setState(() {
       _isInitializing = true;
     });
@@ -354,9 +391,15 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
     try {
       // 1. Verify location service and permissions
       await _locationService.verifyPermission();
+      if (!mounted || operationEpoch != _operationEpoch) return;
 
       // 2. Fetch initial GPS location fix
       final initialPosition = await _locationService.getCurrentPosition();
+      if (!mounted ||
+          operationEpoch != _operationEpoch ||
+          _authService.currentUser?.uid != uid) {
+        return;
+      }
 
       final currentUser = _authService.currentUser;
       final driverId = currentUser?.uid;
@@ -416,6 +459,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
 
       if (_tripId == null) {
         final prior = await TripService().getActiveTrip(_selectedBusId);
+        if (!mounted || operationEpoch != _operationEpoch) return;
         if (prior != null) {
           if (prior.driverId != driverId) {
             throw StateError('This bus has another operator\'s active trip');
@@ -431,10 +475,12 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         stops: stops,
         driverId: driverId,
         scheduleTimes: _currentBus?.scheduleTimes,
+        scheduledDeparture: _currentBus?.scheduledDeparture,
         departureTime: now,
         requestedTripId: _tripId,
         initialTelemetry: initialBusModel,
       );
+      if (!mounted || operationEpoch != _operationEpoch) return;
       if (!savedTrip.isInProgress) {
         throw StateError(
           'This trip already ended. Refresh before starting another.',
@@ -445,6 +491,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
 
       // 4. Listen to live GPS location stream with background tracking enabled
       await _positionSubscription?.cancel();
+      if (!mounted || operationEpoch != _operationEpoch) return;
       _positionSubscription = _locationService
           .getPositionStream(
             accuracy: LocationAccuracy.high,
@@ -488,7 +535,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
         'Trip Started! Broadcasting live GPS & per-stop timeline for Bus $_selectedRouteNumber',
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || operationEpoch != _operationEpoch) return;
       setState(() {
         _isInitializing = false;
       });
@@ -691,28 +738,6 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               );
             },
           ),
-          if (kDebugMode)
-            IconButton(
-              icon: Icon(
-                Icons.cloud_upload_outlined,
-                size: context.tapIconSize,
-              ),
-              tooltip: 'Seed Firestore Data (Debug)',
-              constraints: BoxConstraints(
-                minWidth: context.minTapHeight,
-                minHeight: context.minTapHeight,
-              ),
-              onPressed: () async {
-                try {
-                  await SeedData().seedAll();
-                  _showSnack(
-                    'Successfully seeded 15 stations, 10 buses, and 3 reports!',
-                  );
-                } catch (e) {
-                  _showSnack('Seeding failed: $e', isError: true);
-                }
-              },
-            ),
           IconButton(
             icon: Icon(Icons.logout, size: context.tapIconSize),
             constraints: BoxConstraints(
@@ -730,7 +755,18 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               if (_isTripActive) {
                 await _stopTrip();
               }
-              await _authService.logout();
+              try {
+                await _authService.logout();
+              } catch (_) {
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Could not clear private drafts or sign out. Please retry.',
+                    ),
+                  ),
+                );
+                return;
+              }
               nav.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
@@ -938,7 +974,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                     future: _firestoreService.getStations(),
                     builder: (context, stationsSnapshot) {
                       final stationsList =
-                          stationsSnapshot.data ?? SeedData.colomboStations;
+                          stationsSnapshot.data ??
+                          FirestoreService.cachedStations;
                       final stationsMap = {
                         for (final s in stationsList) s.id: s,
                       };
@@ -1221,6 +1258,16 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
           ),
           const SizedBox(height: 12),
 
+          Text(
+            'Planned departure: ${trip.scheduledDepartureTime == null ? 'Unknown' : '${TimeUtils.formatDateString(trip.scheduledDepartureTime!)} ${TimeUtils.formatTimeString(trip.scheduledDepartureTime!)}'}',
+          ),
+          Text(
+            'Actual departure: ${trip.actualDepartureTime == null ? 'Unknown' : '${TimeUtils.formatDateString(trip.actualDepartureTime!)} ${TimeUtils.formatTimeString(trip.actualDepartureTime!)}'}',
+          ),
+          const Text(
+            'ETAs follow actual departure and recorded arrivals. Missing timetable intervals use a 6-minute estimate; confirm timing with the operator.',
+          ),
+          const SizedBox(height: 12),
           // Schedule vs Current ETA Comparison Grid
           Row(
             children: [
@@ -1998,9 +2045,8 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
     final isAssignedToMe =
         _currentBus != null && _currentBus!.driverId == currentUserId;
     final isUnassigned =
-        _currentBus == null ||
-        _currentBus!.driverId == null ||
-        _currentBus!.driverId!.isEmpty;
+        _currentBus != null &&
+        (_currentBus!.driverId == null || _currentBus!.driverId!.isEmpty);
 
     // Sort buses: In Progress first, then Upcoming (nearest first), then Departed
     final sortedBuses = List<Bus>.from(_availableBuses);
@@ -2062,7 +2108,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   )
                 else if (isUnassigned)
                   TextButton.icon(
-                    onPressed: _claimBusAssignment,
+                    onPressed: _operatorWriteBusy ? null : _claimBusAssignment,
                     icon: const Icon(Icons.person_add, size: 16),
                     label: const Text(
                       'Assign to Me',
@@ -2074,10 +2120,10 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
                   )
                 else
                   TextButton.icon(
-                    onPressed: _claimBusAssignment,
-                    icon: const Icon(Icons.swap_horiz, size: 16),
+                    onPressed: null,
+                    icon: const Icon(Icons.lock_outline, size: 16),
                     label: Text(
-                      'Reassign to Me',
+                      'Assigned to another operator',
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.amber.shade900,
@@ -2332,7 +2378,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
 
   /// Resolves a stop ID to a human-readable station name from the seed data.
   String _resolveStopName(String stopId) {
-    final station = SeedData.colomboStations.cast<Station?>().firstWhere(
+    final station = FirestoreService.cachedStations.cast<Station?>().firstWhere(
       (s) => s?.id == stopId,
       orElse: () => null,
     );
@@ -2442,9 +2488,7 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
   Widget _buildAccessibilityControlsCard() {
     final currentUserId = _authService.currentUser?.uid ?? '';
     final isAssignedDriver =
-        _currentBus == null ||
-        _currentBus!.driverId == null ||
-        _currentBus!.driverId == currentUserId;
+        currentUserId.isNotEmpty && _currentBus?.driverId == currentUserId;
 
     return Card(
       elevation: 1,
@@ -2474,17 +2518,21 @@ class _OperatorDashboardScreenState extends State<OperatorDashboardScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            SwitchListTile(
-              title: const Text('Wheelchair Ramp Operational'),
-              subtitle: Text(
-                _rampOperational
-                    ? 'Last received driver observation: working'
-                    : 'Ramp reported broken (Rider status: Warning)',
+            DropdownButtonFormField<bool>(
+              key: ValueKey('ramp-$_selectedBusId-$_rampOperational'),
+              initialValue: _rampOperational,
+              decoration: const InputDecoration(
+                labelText: 'Wheelchair ramp observation',
               ),
-              value: _rampOperational,
-              activeThumbColor: AppColors.primaryContainer,
+              hint: const Text('Unknown - check before selecting'),
+              items: const [
+                DropdownMenuItem(value: true, child: Text('Working observed')),
+                DropdownMenuItem(value: false, child: Text('Broken observed')),
+              ],
               onChanged: isAssignedDriver && !_operatorWriteBusy
-                  ? _onRampToggled
+                  ? (value) {
+                      if (value != null) _onRampToggled(value);
+                    }
                   : null,
             ),
             const Divider(),

@@ -9,8 +9,14 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/operator_access/$(request.auth.uid))
         && get(/databases/$(database)/documents/operator_access/$(request.auth.uid)).data.approved == true;
     }
+    function realCatalogue(kind, id) {
+      return exists(/databases/$(database)/documents/$(kind)/$(id))
+        && get(/databases/$(database)/documents/$(kind)/$(id)).data.get('isDemo', false) != true
+        && get(/databases/$(database)/documents/$(kind)/$(id)).data.get('catalogueSource', '') != 'demo';
+    }
     function assignedOperator(busId) {
-      return approvedOperator() && exists(/databases/$(database)/documents/buses/$(busId))
+      return approvedOperator() && realCatalogue('buses', busId)
+        && get(/databases/$(database)/documents/buses/$(busId)).data.get('catalogueRecordType', 'vehicle') != 'published_timetable'
         && get(/databases/$(database)/documents/buses/$(busId)).data.get('driverId', '') == request.auth.uid;
     }
     function text(value, max) { return value is string && value.size() <= max; }
@@ -46,7 +52,7 @@ service cloud.firestore {
           'wheelchairAccessRequired', 'stepFreeOnly'])
         && request.resource.data.journeyId == id && request.resource.data.createdAt == request.time
         && request.resource.data.status in ['confirmed', 'active']
-        && exists(/databases/$(database)/documents/buses/$(request.resource.data.busId))
+        && realCatalogue('buses', request.resource.data.busId)
         && nonempty(request.resource.data.origin, 200) && nonempty(request.resource.data.destination, 200)
         && validJourneySelection(request.resource.data);
       allow update: if admin() || (owner(resource.data.passengerId) && changesOnly(['status'])
@@ -67,16 +73,27 @@ service cloud.firestore {
         && d.estimatedFareLkr is int && d.estimatedFareLkr >= 0
         && d.wheelchairAccessRequired is bool && d.stepFreeOnly is bool);
     }
+    match /reward_ledger/{id} {
+      allow read, write: if admin();
+      match /revisions/{revision} { allow read, write: if admin(); }
+    }
     match /stations/{id} { allow read: if true; allow write: if admin(); }
     match /routes/{id} { allow read: if true; allow write: if admin(); }
     match /buses/{busId} {
       allow read: if true;
       allow create, delete: if admin();
       allow update: if admin() || (approvedOperator()
-        && (resource.data.get('driverId', '') in ['', null] || resource.data.driverId == request.auth.uid)
-        && request.resource.data.driverId == request.auth.uid
-        && changesOnly(['driverId', 'rampOk', 'occupancy']) && request.resource.data.rampOk is bool
-        && request.resource.data.occupancy in ['low', 'medium', 'high']);
+        && resource.data.get('catalogueRecordType', 'vehicle') != 'published_timetable'
+        && resource.data.get('isDemo', false) != true && resource.data.get('catalogueSource', '') != 'demo'
+        && ((resource.data.get('driverId', '') in ['', null]
+          && request.resource.data.driverId == request.auth.uid && changesOnly(['driverId']))
+        || (resource.data.get('driverId', '') == request.auth.uid
+          && request.resource.data.driverId == resource.data.driverId
+          && changesOnly(['rampOk', 'occupancy', 'rampCheckedAt', 'rampCheckedBy'])
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['rampOk', 'rampCheckedAt', 'rampCheckedBy'])
+            || (request.resource.data.rampOk is bool && request.resource.data.rampCheckedBy == request.auth.uid
+              && request.resource.data.rampCheckedAt == request.time))
+          && request.resource.data.occupancy in ['low', 'medium', 'high'])));
     }
     function validTelemetry(busId) {
       let d = request.resource.data;
@@ -106,8 +123,9 @@ service cloud.firestore {
     }
     function validReport(d) {
       return d.targetType in ['bus', 'station'] && nonempty(d.targetId, 128)
-        && ((d.targetType == 'bus' && exists(/databases/$(database)/documents/buses/$(d.targetId)))
-          || (d.targetType == 'station' && exists(/databases/$(database)/documents/stations/$(d.targetId))))
+        && ((d.targetType == 'bus' && realCatalogue('buses', d.targetId)
+            && get(/databases/$(database)/documents/buses/$(d.targetId)).data.get('catalogueRecordType', 'vehicle') != 'published_timetable')
+          || (d.targetType == 'station' && realCatalogue('stations', d.targetId)))
         && text(d.targetName, 200) && nonempty(d.problemType, 300) && text(d.subCategory, 300)
         && text(d.description, 2000) && text(d.photoUrl, 2048)
         && (d.photoUrl == '' || d.photoUrl.matches('https://res[.]cloudinary[.]com/dyrynkuh3/.*'))
@@ -132,9 +150,30 @@ service cloud.firestore {
         && old.confirmedBy.toSet().difference(d.confirmedBy.toSet()).hasOnly([request.auth.uid])
         && d.flaggedBy.toSet().difference(old.flaggedBy.toSet()).hasOnly([request.auth.uid])
         && old.flaggedBy.toSet().difference(d.flaggedBy.toSet()).hasOnly([request.auth.uid])
-        && ((request.auth.uid in d.confirmedBy && d.lastConfirmedAt == request.time)
-          || (request.auth.uid in d.flaggedBy && (d.lastConfirmedAt == old.lastConfirmedAt
+        && ((request.auth.uid in d.confirmedBy && !(request.auth.uid in old.confirmedBy) && d.lastConfirmedAt == request.time)
+          || (request.auth.uid in d.flaggedBy && !(request.auth.uid in old.flaggedBy) && (d.lastConfirmedAt == old.lastConfirmedAt
             || (request.auth.uid in old.confirmedBy && d.lastConfirmedAt == null))));
+    }
+    function ownRecheck(id) {
+      let old = resource.data;
+      let d = request.resource.data;
+      let cutoff = request.time - duration.value(30, 'm');
+      let confirmed = old.get('lastConfirmedAt', null);
+      let rechecked = old.get('lastRecheckedAt', null);
+      let check = /databases/$(database)/documents/reports/$(id)/rechecks/$(d.lastRecheckId);
+      return signedIn() && old.userId != request.auth.uid && old.status == 'active'
+        && old.get('isDemo', false) == false && old.get('publicationState', 'published') == 'published'
+        && validVotes(old) && old.falseCount < 3
+        && request.auth.uid in old.confirmedBy && !(request.auth.uid in old.flaggedBy)
+        && old.createdAt is timestamp && old.createdAt <= cutoff
+        && (confirmed == null || (confirmed is timestamp && confirmed <= cutoff))
+        && (rechecked == null || (rechecked is timestamp && rechecked <= cutoff))
+        && changesOnly(['lastRecheckedAt', 'lastRecheckedBy', 'lastRecheckId'])
+        && d.lastRecheckedAt == request.time && d.lastRecheckedBy == request.auth.uid
+        && nonempty(d.lastRecheckId, 128) && !exists(check)
+        && getAfter(check).data.reportId == id
+        && getAfter(check).data.userId == request.auth.uid
+        && getAfter(check).data.checkedAt == request.time;
     }
     match /reports/{id} {
       // All client-created records in this collection are explicitly published.
@@ -147,7 +186,7 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time && request.resource.data.lastConfirmedAt == null
         && request.resource.data.publicationState == 'published' && request.resource.data.isDemo == false
         && request.resource.data.status == 'active' && request.resource.data.confirmCount == 0 && request.resource.data.falseCount == 0;
-      allow update: if admin() || ownVoteOnly() || (owner(resource.data.userId)
+      allow update: if admin() || ownVoteOnly() || ownRecheck(id) || (owner(resource.data.userId)
         && resource.data.status == 'active' && changesOnly(['status', 'resolvedBy', 'resolvedAt'])
         && request.resource.data.status == 'resolved' && request.resource.data.resolvedBy == request.auth.uid
         && request.resource.data.resolvedAt == request.time
@@ -155,6 +194,18 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/report_resolutions/$(id)).data.resolvedBy == request.auth.uid
         && getAfter(/databases/$(database)/documents/report_resolutions/$(id)).data.resolvedAt == request.time);
       allow delete: if admin() || owner(resource.data.userId);
+      match /rechecks/{checkId} {
+        allow read: if true;
+        allow create: if signedIn()
+          && request.resource.data.keys().hasOnly(['reportId', 'userId', 'checkedAt'])
+          && request.resource.data.reportId == id && request.resource.data.userId == request.auth.uid
+          && request.resource.data.checkedAt == request.time
+          && getAfter(/databases/$(database)/documents/reports/$(id)).data.lastRecheckId == checkId
+          && getAfter(/databases/$(database)/documents/reports/$(id)).data.lastRecheckedBy == request.auth.uid
+          && getAfter(/databases/$(database)/documents/reports/$(id)).data.lastRecheckedAt == request.time
+          && get(/databases/$(database)/documents/reports/$(id)).data.get('lastRecheckId', '') != checkId;
+        allow update, delete: if false;
+      }
     }
     match /report_resolutions/{id} {
       allow read: if true;
@@ -182,7 +233,9 @@ service cloud.firestore {
       allow create: if owner(request.resource.data.riderId)
         && request.resource.data.keys().hasOnly(['riderId', 'riderName', 'busId', 'routeNo', 'stationId', 'stopName',
           'assistanceTypes', 'status', 'createdAt', 'purpose'])
-        && exists(/databases/$(database)/documents/buses/$(request.resource.data.busId))
+        && realCatalogue('buses', request.resource.data.busId)
+        && get(/databases/$(database)/documents/buses/$(request.resource.data.busId)).data.get('catalogueRecordType', 'vehicle') != 'published_timetable'
+        && realCatalogue('stations', request.resource.data.stationId)
         && request.resource.data.stationId in get(/databases/$(database)/documents/buses/$(request.resource.data.busId)).data.stops
         && nonempty(request.resource.data.riderName, 100) && nonempty(request.resource.data.stopName, 200)
         && request.resource.data.assistanceTypes is list && request.resource.data.assistanceTypes.size() > 0
@@ -198,5 +251,260 @@ service cloud.firestore {
       allow delete: if admin();
     }
     match /{document=**} { allow read, write: if false; }
+    // BEGIN GENERATED SAMPLE TEST POLICY
+    // Source: root policy above; regenerate with test/security/generate-sample-rules.mjs.
+    match /sample_test/shared {
+      function signedIn() { return request.auth != null && exists(/databases/$(database)/documents/sample_test/shared/users/$(request.auth.uid)); }
+      function owner(uid) { return signedIn() && request.auth.uid == uid; }
+      function admin() { return signedIn() && request.auth.token.get('admin', false) == true; }
+      // Approval is provisioned by the project owner/Admin SDK, never by a profile role.
+      function approvedOperator() {
+        return signedIn() && exists(/databases/$(database)/documents/sample_test/shared/operator_access/$(request.auth.uid))
+          && get(/databases/$(database)/documents/sample_test/shared/operator_access/$(request.auth.uid)).data.approved == true;
+      }
+      function realCatalogue(kind, id) {
+        return exists(/databases/$(database)/documents/sample_test/shared/$(kind)/$(id))
+          && get(/databases/$(database)/documents/sample_test/shared/$(kind)/$(id)).data.get('isDemo', false) != true
+          && get(/databases/$(database)/documents/sample_test/shared/$(kind)/$(id)).data.get('catalogueSource', '') != 'demo';
+      }
+      function assignedOperator(busId) {
+        return approvedOperator() && realCatalogue('buses', busId)
+          && get(/databases/$(database)/documents/sample_test/shared/buses/$(busId)).data.get('catalogueRecordType', 'vehicle') != 'published_timetable'
+          && get(/databases/$(database)/documents/sample_test/shared/buses/$(busId)).data.get('driverId', '') == request.auth.uid;
+      }
+      function text(value, max) { return value is string && value.size() <= max; }
+      function nonempty(value, max) { return text(value, max) && value.size() > 0; }
+      function changesOnly(fields) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields); }
+      match /operator_access/{uid} {
+        allow get: if owner(uid) || admin();
+        allow list, write: if admin();
+      }
+      match /users/{uid} {
+        allow read: if owner(uid) || admin();
+        allow create: if owner(uid) && request.resource.data.keys().hasOnly(
+            ['uid', 'name', 'email', 'phone', 'role', 'createdAt', 'points', 'reportsSubmitted', 'verifiedCount'])
+          && request.resource.data.uid == uid && nonempty(request.resource.data.name, 100)
+          && request.resource.data.email == request.auth.token.email
+          && (request.resource.data.phone == null || text(request.resource.data.phone, 40))
+          && request.resource.data.role in ['passenger', 'operator']
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.points == 0 && request.resource.data.reportsSubmitted == 0
+          && request.resource.data.verifiedCount == 0;
+        allow update: if admin() || (owner(uid) && changesOnly(['name', 'phone', 'email'])
+          && nonempty(request.resource.data.name, 100) && request.resource.data.email == request.auth.token.email
+          && (request.resource.data.phone == null || text(request.resource.data.phone, 40)));
+        allow delete: if admin();
+      }
+      match /journeys/{id} {
+        allow get: if (signedIn() && resource == null) || owner(resource.data.passengerId) || admin();
+        allow list: if owner(resource.data.passengerId) || admin();
+        allow create: if owner(request.resource.data.passengerId)
+          && request.resource.data.keys().hasOnly(['journeyId', 'passengerId', 'routeId', 'routeNumber',
+            'routeTitle', 'busId', 'origin', 'destination', 'status', 'createdAt', 'fromStationId', 'toStationId',
+            'selectedDate', 'selectedTimeMinutes', 'departureAt', 'durationMinutes', 'estimatedFareLkr', 'busNo',
+            'wheelchairAccessRequired', 'stepFreeOnly'])
+          && request.resource.data.journeyId == id && request.resource.data.createdAt == request.time
+          && request.resource.data.status in ['confirmed', 'active']
+          && realCatalogue('buses', request.resource.data.busId)
+          && nonempty(request.resource.data.origin, 200) && nonempty(request.resource.data.destination, 200)
+          && validJourneySelection(request.resource.data);
+        allow update: if admin() || (owner(resource.data.passengerId) && changesOnly(['status'])
+          && resource.data.status in ['confirmed', 'active'] && request.resource.data.status in ['completed', 'cancelled']);
+        allow delete: if owner(resource.data.passengerId) || admin();
+      }
+      function validJourneySelection(d) {
+        // Older schemas remain readable/creatable; any new selection fields require a complete selection.
+        return !d.keys().hasAny(['fromStationId', 'toStationId', 'selectedDate', 'departureAt']) || (
+          d.fromStationId in get(/databases/$(database)/documents/sample_test/shared/buses/$(d.busId)).data.stops
+          && d.toStationId in get(/databases/$(database)/documents/sample_test/shared/buses/$(d.busId)).data.stops
+          && d.fromStationId != d.toStationId
+          && exists(/databases/$(database)/documents/sample_test/shared/stations/$(d.fromStationId))
+          && exists(/databases/$(database)/documents/sample_test/shared/stations/$(d.toStationId))
+          && d.selectedDate is timestamp && d.departureAt is timestamp
+          && (d.get('selectedTimeMinutes', null) == null || (d.selectedTimeMinutes is int && d.selectedTimeMinutes >= 0 && d.selectedTimeMinutes < 1440))
+          && d.durationMinutes is int && d.durationMinutes > 0
+          && d.estimatedFareLkr is int && d.estimatedFareLkr >= 0
+          && d.wheelchairAccessRequired is bool && d.stepFreeOnly is bool);
+      }
+      match /reward_ledger/{id} {
+        allow read, write: if admin();
+        match /revisions/{revision} { allow read, write: if admin(); }
+      }
+      match /stations/{id} { allow read: if true; allow write: if admin(); }
+      match /routes/{id} { allow read: if true; allow write: if admin(); }
+      match /buses/{busId} {
+        allow read: if true;
+        allow create, delete: if admin();
+        allow update: if admin() || (approvedOperator()
+          && resource.data.get('catalogueRecordType', 'vehicle') != 'published_timetable'
+          && resource.data.get('isDemo', false) != true && resource.data.get('catalogueSource', '') != 'demo'
+          && ((resource.data.get('driverId', '') in ['', null]
+            && request.resource.data.driverId == request.auth.uid && changesOnly(['driverId']))
+          || (resource.data.get('driverId', '') == request.auth.uid
+            && request.resource.data.driverId == resource.data.driverId
+            && changesOnly(['rampOk', 'occupancy', 'rampCheckedAt', 'rampCheckedBy'])
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['rampOk', 'rampCheckedAt', 'rampCheckedBy'])
+              || (request.resource.data.rampOk is bool && request.resource.data.rampCheckedBy == request.auth.uid
+                && request.resource.data.rampCheckedAt == request.time))
+            && request.resource.data.occupancy in ['low', 'medium', 'high'])));
+      }
+      function validTelemetry(busId) {
+        let d = request.resource.data;
+        return d.busId == busId && d.driverId == request.auth.uid && d.operatorId == request.auth.uid
+          && d.latitude is number && d.latitude >= -90 && d.latitude <= 90
+          && d.longitude is number && d.longitude >= -180 && d.longitude <= 180
+          && d.speed is number && d.speed >= 0 && d.speed <= 200
+          && d.timestamp is timestamp && d.timestamp <= request.time
+          && d.status in ['active', 'stopped', 'offline', 'completed'] && d.isBroadcasting is bool;
+      }
+      match /live_locations/{busId} {
+        allow read: if true;
+        allow create, update: if assignedOperator(busId) && validTelemetry(busId);
+        allow delete: if assignedOperator(busId) || admin();
+      }
+      match /active_buses/{busId} { allow read: if true; allow write: if admin(); }
+      match /trips/{id} {
+        allow read: if true;
+        allow create: if assignedOperator(request.resource.data.busId) && request.resource.data.driverId == request.auth.uid
+          && request.resource.data.tripId == id && request.resource.data.createdAt == request.time
+          && request.resource.data.status == 'in_progress';
+        allow update: if assignedOperator(resource.data.busId) && resource.data.driverId == request.auth.uid
+          && request.resource.data.busId == resource.data.busId && request.resource.data.driverId == resource.data.driverId
+          && changesOnly(['status', 'actualDepartureTime', 'stopTimes', 'currentStopIndex'])
+          && request.resource.data.status in ['in_progress', 'completed'];
+        allow delete: if admin();
+      }
+      function validReport(d) {
+        return d.targetType in ['bus', 'station'] && nonempty(d.targetId, 128)
+          && ((d.targetType == 'bus' && realCatalogue('buses', d.targetId)
+              && get(/databases/$(database)/documents/sample_test/shared/buses/$(d.targetId)).data.get('catalogueRecordType', 'vehicle') != 'published_timetable')
+            || (d.targetType == 'station' && realCatalogue('stations', d.targetId)))
+          && text(d.targetName, 200) && nonempty(d.problemType, 300) && text(d.subCategory, 300)
+          && text(d.description, 2000) && text(d.photoUrl, 2048)
+          && (d.photoUrl == '' || d.photoUrl.matches('https://res[.]cloudinary[.]com/dyrynkuh3/.*'))
+          && d.severity in ['minor', 'moderate', 'major']
+          && d.category in ['rampAccess', 'elevatorOut', 'crowding', 'cleanliness', 'safetyHazard', 'driverAssistanceDenied', 'tactilePavingBlocked']
+          && d.get('condition', 'unknown') in ['positive', 'barrier', 'unknown']
+          && d.get('crowdingLevel', '') in ['', 'low', 'medium', 'high'];
+      }
+      function validVotes(d) {
+        return d.confirmedBy is list && d.flaggedBy is list
+          && d.confirmedBy.size() == d.confirmedBy.toSet().size() && d.flaggedBy.size() == d.flaggedBy.toSet().size()
+          && d.confirmedBy.toSet().intersection(d.flaggedBy.toSet()).size() == 0
+          && d.confirmCount == d.confirmedBy.size() && d.falseCount == d.flaggedBy.size();
+      }
+      function ownVoteOnly() {
+        let old = resource.data;
+        let d = request.resource.data;
+        return signedIn() && old.userId != request.auth.uid && old.status == 'active'
+          && changesOnly(['confirmedBy', 'flaggedBy', 'confirmCount', 'falseCount', 'lastConfirmedAt', 'status']) && validVotes(d)
+          && ((d.falseCount < 3 && d.status == 'active') || (d.falseCount == 3 && d.status == 'hidden' && request.auth.uid in d.flaggedBy))
+          && d.confirmedBy.toSet().difference(old.confirmedBy.toSet()).hasOnly([request.auth.uid])
+          && old.confirmedBy.toSet().difference(d.confirmedBy.toSet()).hasOnly([request.auth.uid])
+          && d.flaggedBy.toSet().difference(old.flaggedBy.toSet()).hasOnly([request.auth.uid])
+          && old.flaggedBy.toSet().difference(d.flaggedBy.toSet()).hasOnly([request.auth.uid])
+          && ((request.auth.uid in d.confirmedBy && !(request.auth.uid in old.confirmedBy) && d.lastConfirmedAt == request.time)
+            || (request.auth.uid in d.flaggedBy && !(request.auth.uid in old.flaggedBy) && (d.lastConfirmedAt == old.lastConfirmedAt
+              || (request.auth.uid in old.confirmedBy && d.lastConfirmedAt == null))));
+      }
+      function ownRecheck(id) {
+        let old = resource.data;
+        let d = request.resource.data;
+        let cutoff = request.time - duration.value(30, 'm');
+        let confirmed = old.get('lastConfirmedAt', null);
+        let rechecked = old.get('lastRecheckedAt', null);
+        let check = /databases/$(database)/documents/sample_test/shared/reports/$(id)/rechecks/$(d.lastRecheckId);
+        return signedIn() && old.userId != request.auth.uid && old.status == 'active'
+          && old.get('isDemo', false) == false && old.get('publicationState', 'published') == 'published'
+          && validVotes(old) && old.falseCount < 3
+          && request.auth.uid in old.confirmedBy && !(request.auth.uid in old.flaggedBy)
+          && old.createdAt is timestamp && old.createdAt <= cutoff
+          && (confirmed == null || (confirmed is timestamp && confirmed <= cutoff))
+          && (rechecked == null || (rechecked is timestamp && rechecked <= cutoff))
+          && changesOnly(['lastRecheckedAt', 'lastRecheckedBy', 'lastRecheckId'])
+          && d.lastRecheckedAt == request.time && d.lastRecheckedBy == request.auth.uid
+          && nonempty(d.lastRecheckId, 128) && !exists(check)
+          && getAfter(check).data.reportId == id
+          && getAfter(check).data.userId == request.auth.uid
+          && getAfter(check).data.checkedAt == request.time;
+      }
+      match /reports/{id} {
+        // All client-created records in this collection are explicitly published.
+        allow read: if true;
+        allow create: if owner(request.resource.data.userId)
+          && request.resource.data.keys().hasOnly(['targetType', 'targetId', 'targetName', 'problemType', 'severity', 'category',
+            'subCategory', 'condition', 'crowdingLevel', 'publicationState', 'isDemo', 'description', 'photoUrl', 'status',
+            'createdAt', 'lastConfirmedAt', 'confirmCount', 'falseCount', 'userId', 'confirmedBy', 'flaggedBy'])
+          && validReport(request.resource.data) && validVotes(request.resource.data)
+          && request.resource.data.createdAt == request.time && request.resource.data.lastConfirmedAt == null
+          && request.resource.data.publicationState == 'published' && request.resource.data.isDemo == false
+          && request.resource.data.status == 'active' && request.resource.data.confirmCount == 0 && request.resource.data.falseCount == 0;
+        allow update: if admin() || ownVoteOnly() || ownRecheck(id) || (owner(resource.data.userId)
+          && resource.data.status == 'active' && changesOnly(['status', 'resolvedBy', 'resolvedAt'])
+          && request.resource.data.status == 'resolved' && request.resource.data.resolvedBy == request.auth.uid
+          && request.resource.data.resolvedAt == request.time
+          && existsAfter(/databases/$(database)/documents/sample_test/shared/report_resolutions/$(id))
+          && getAfter(/databases/$(database)/documents/sample_test/shared/report_resolutions/$(id)).data.resolvedBy == request.auth.uid
+          && getAfter(/databases/$(database)/documents/sample_test/shared/report_resolutions/$(id)).data.resolvedAt == request.time);
+        allow delete: if admin() || owner(resource.data.userId);
+        match /rechecks/{checkId} {
+          allow read: if true;
+          allow create: if signedIn()
+            && request.resource.data.keys().hasOnly(['reportId', 'userId', 'checkedAt'])
+            && request.resource.data.reportId == id && request.resource.data.userId == request.auth.uid
+            && request.resource.data.checkedAt == request.time
+            && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.lastRecheckId == checkId
+            && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.lastRecheckedBy == request.auth.uid
+            && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.lastRecheckedAt == request.time
+            && get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.get('lastRecheckId', '') != checkId;
+          allow update, delete: if false;
+        }
+      }
+      match /report_resolutions/{id} {
+        allow read: if true;
+        allow create: if request.resource.data.keys().hasOnly(['reportId', 'resolvedBy', 'resolvedAt',
+          'targetType', 'targetId', 'problemType', 'category', 'previousStatus', 'status'])
+          && owner(get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.userId)
+          && get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.status == 'active'
+          && request.resource.data.reportId == id && request.resource.data.resolvedBy == request.auth.uid
+          && request.resource.data.resolvedAt == request.time
+          && request.resource.data.previousStatus == 'active' && request.resource.data.status == 'resolved'
+          && request.resource.data.targetType == get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.targetType
+          && request.resource.data.targetId == get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.targetId
+          && request.resource.data.problemType == get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.problemType
+          && request.resource.data.category == get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.category
+          && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.status == 'resolved'
+          && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.resolvedBy == request.auth.uid
+          && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.resolvedAt == request.time;
+        allow update, delete: if admin();
+      }
+      match /boarding_requests/{id} {
+        // A signed-in creator must be able to check a missing ID in a transaction.
+        allow get: if (signedIn() && resource == null) || owner(resource.data.riderId)
+          || assignedOperator(resource.data.busId) || admin();
+        allow list: if owner(resource.data.riderId) || assignedOperator(resource.data.busId) || admin();
+        allow create: if owner(request.resource.data.riderId)
+          && request.resource.data.keys().hasOnly(['riderId', 'riderName', 'busId', 'routeNo', 'stationId', 'stopName',
+            'assistanceTypes', 'status', 'createdAt', 'purpose'])
+          && realCatalogue('buses', request.resource.data.busId)
+          && get(/databases/$(database)/documents/sample_test/shared/buses/$(request.resource.data.busId)).data.get('catalogueRecordType', 'vehicle') != 'published_timetable'
+          && realCatalogue('stations', request.resource.data.stationId)
+          && request.resource.data.stationId in get(/databases/$(database)/documents/sample_test/shared/buses/$(request.resource.data.busId)).data.stops
+          && nonempty(request.resource.data.riderName, 100) && nonempty(request.resource.data.stopName, 200)
+          && request.resource.data.assistanceTypes is list && request.resource.data.assistanceTypes.size() > 0
+          && request.resource.data.get('purpose', 'boarding') in ['boarding', 'alighting']
+          && request.resource.data.assistanceTypes.hasOnly(request.resource.data.get('purpose', 'boarding') == 'alighting'
+            ? ['Deploy Ramp', 'Extra Time', 'Alighting Help'] : ['Deploy Ramp', 'Extra Time', 'Boarding Help'])
+          && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
+        allow update: if admin() || (changesOnly(['status']) && (
+          (owner(resource.data.riderId) && resource.data.status in ['pending', 'acknowledged'] && request.resource.data.status == 'cancelled')
+          || (assignedOperator(resource.data.busId) && (
+            (resource.data.status == 'pending' && request.resource.data.status in ['acknowledged', 'rejected'])
+            || (resource.data.status == 'acknowledged' && request.resource.data.status == 'completed')))));
+        allow delete: if admin();
+      }
+      match /{document=**} { allow read, write: if false; }
+
+    }
   }
 }

@@ -1,3 +1,5 @@
+import 'ramp_test_observations.dart';
+
 import 'package:access_transit/core/utils/time_utils.dart';
 import 'package:access_transit/screens/journey/route_results_screen.dart';
 import 'package:access_transit/services/accessibility_preferences_service.dart';
@@ -7,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   setUp(() async {
+    await recordWorkingRamps();
     SharedPreferences.setMockInitialValues({});
     await AccessibilityPreferencesService.instance.init();
   });
@@ -60,7 +63,7 @@ void main() {
 
       // Seeded Route 138 reaches these stops at 07:38 and 07:55.
       expect(find.text('~17 min'), findsAtLeastNWidgets(1));
-      expect(find.text('LKR 70'), findsAtLeastNWidgets(1));
+      expect(find.text('Est. LKR 70'), findsAtLeastNWidgets(1));
       expect(find.text('Ongoing'), findsNothing);
       expect(find.text('Approaching'), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 
-/// Stylized live-map preview used on onboarding step 2.
+/// Illustration only: never represents a shared GPS fix or driver response.
 class TransitPreview extends StatelessWidget {
   const TransitPreview({
     super.key,
@@ -54,10 +54,7 @@ class TransitPreview extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0x00F7F2F8),
-                      Color(0xE6F7F2F8),
-                    ],
+                    colors: [Color(0x00F7F2F8), Color(0xE6F7F2F8)],
                     stops: [0.42, 1],
                   ),
                 ),
@@ -114,7 +111,7 @@ class OnboardingBusPill extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             const Text(
-              'Approaching: 3 mins',
+              'Example ETA: 3 min',
               style: TextStyle(
                 fontSize: 14,
                 height: 20 / 14,
@@ -200,7 +197,7 @@ class OnboardingAssistanceCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Driver notified',
+                    'Example: awaiting reply',
                     style: TextStyle(
                       fontSize: 14,
                       height: 20 / 14,
@@ -213,7 +210,7 @@ class OnboardingAssistanceCard extends StatelessWidget {
             Transform.scale(
               scale: checkScale,
               child: const Icon(
-                Icons.check_circle_rounded,
+                Icons.hourglass_empty_rounded,
                 color: AppColors.secondary,
                 size: 26,
               ),
@@ -337,11 +334,7 @@ class _CityMapPainter extends CustomPainter {
       if (progress < stop) continue;
       final tangent = metric.getTangentForOffset(metric.length * stop);
       if (tangent == null) continue;
-      canvas.drawCircle(
-        tangent.position,
-        4.5,
-        Paint()..color = Colors.white,
-      );
+      canvas.drawCircle(tangent.position, 4.5, Paint()..color = Colors.white);
       canvas.drawCircle(
         tangent.position,
         3,
@@ -364,7 +357,9 @@ class _CityMapPainter extends CustomPainter {
       Offset.zero,
       halo,
       Paint()
-        ..color = AppColors.primaryFixedDim.withValues(alpha: 0.28 + pulse * 0.15)
+        ..color = AppColors.primaryFixedDim.withValues(
+          alpha: 0.28 + pulse * 0.15,
+        )
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
     );
 

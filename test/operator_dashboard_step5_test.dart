@@ -117,7 +117,21 @@ void main() {
 
           await tester.pumpAndSettle();
 
-          // Should display LIVE GPS indicator and live speed
+          // Initial in-memory data is saved/unverified until a new receipt.
+          expect(find.text('LIVE GPS'), findsNothing);
+          expect(
+            find.textContaining('Saved location - live updates unavailable'),
+            findsOneWidget,
+          );
+          await liveService.updateLocationOnly(
+            busId: testBus.id,
+            latitude: 6.9344,
+            longitude: 79.8543,
+            speed: 42,
+          );
+          await tester.pumpAndSettle();
+          // A fresh acknowledgement can establish current GPS and speed.
+
           expect(find.text('LIVE GPS'), findsOneWidget);
           expect(find.text('42 km/h'), findsOneWidget);
         },

@@ -357,7 +357,7 @@ void main() {
       );
       expect(find.text('Working reported'), findsOneWidget);
       clock = now.add(const Duration(hours: 2));
-      await tester.pump(const Duration(seconds: 30));
+      await tester.pump(const Duration(minutes: 1));
       expect(find.text('Working reported'), findsNothing);
       expect(find.text('Unknown'), findsNWidgets(3));
       await tester.pumpWidget(const SizedBox());

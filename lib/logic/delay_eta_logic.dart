@@ -1,3 +1,4 @@
+import 'ordered_schedule.dart';
 import '../core/utils/time_utils.dart';
 import '../models/bus.dart';
 import '../models/bus_location_model.dart';
@@ -126,14 +127,17 @@ class DelayEtaCalculator {
 
     // 1. Resolve target stop index in the bus stops list
     final cleanTarget = targetStopIdOrName.trim();
-    int targetIndex = bus.stops.indexWhere((s) => s.toLowerCase() == cleanTarget.toLowerCase());
+    int targetIndex = bus.stops.indexWhere(
+      (s) => s.toLowerCase() == cleanTarget.toLowerCase(),
+    );
 
     // Fallback: match by station display name in stationsMap
     if (targetIndex == -1 && stationsMap != null) {
       for (int i = 0; i < bus.stops.length; i++) {
         final stopId = bus.stops[i];
         final station = stationsMap[stopId];
-        if (station != null && station.name.trim().toLowerCase() == cleanTarget.toLowerCase()) {
+        if (station != null &&
+            station.name.trim().toLowerCase() == cleanTarget.toLowerCase()) {
           targetIndex = i;
           break;
         }
@@ -145,26 +149,91 @@ class DelayEtaCalculator {
       targetIndex = 0;
     }
 
-    final targetStopId = bus.stops.isNotEmpty ? bus.stops[targetIndex] : cleanTarget;
+    final targetStopId = bus.stops.isNotEmpty
+        ? bus.stops[targetIndex]
+        : cleanTarget;
     final targetStopName = stationsMap?[targetStopId]?.name ?? targetStopId;
 
     // 2. Check live driver broadcasting status
-    final bool isLiveDriver = (liveBusLocation != null &&
-            liveBusLocation.isBroadcasting &&
-            liveBusLocation.status.name.toLowerCase() != 'offline') ||
-        (activeTrip != null && activeTrip.isInProgress);
+    final observedAt = liveBusLocation?.timestamp;
+    final hasCurrentGps =
+        !bus.isPublishedTimetable &&
+        liveBusLocation != null &&
+        liveBusLocation.busId == bus.id &&
+        !liveBusLocation.isCached &&
+        liveBusLocation.isBroadcasting &&
+        liveBusLocation.status.name == 'active' &&
+        observedAt != null &&
+        !observedAt.isAfter(now) &&
+        now.difference(observedAt) <= const Duration(minutes: 5);
+    // Recorded trip progress may still inform estimates, but cannot claim GPS.
+    final isLiveDriver =
+        !bus.isPublishedTimetable &&
+        (hasCurrentGps || (activeTrip?.isInProgress == true));
 
     // 3. Compute baseline scheduled arrival time for the target stop
-    final scheduledTimeStr = bus.getScheduledTimeForStop(targetIndex);
-    DateTime scheduledArrival = TimeUtils.parseTimeStringToDateTime(scheduledTimeStr, todayBase);
-
-    // If driver is offline and today's scheduled departure has already elapsed by > 15 mins,
-    // the next service instance is on the next day (tomorrow)
-    bool isTomorrow = false;
-    if (!isLiveDriver && activeTrip == null && scheduledArrival.isBefore(now.subtract(const Duration(minutes: 15)))) {
-      scheduledArrival = scheduledArrival.add(const Duration(days: 1));
-      isTomorrow = true;
+    final base =
+        activeTrip?.scheduledDepartureTime ??
+        activeTrip?.actualDepartureTime ??
+        todayBase;
+    final firstMinutes = OrderedSchedule.minutesOfDay(
+      bus.effectiveDepartureTime,
+    );
+    final timetable = OrderedSchedule.build(
+      stopCount: bus.stops.isEmpty ? 1 : bus.stops.length,
+      scheduleTimes: bus.scheduleTimes,
+      serviceDate: base,
+      fallbackDeparture: DateTime(
+        base.year,
+        base.month,
+        base.day,
+        (firstMinutes ?? 480) ~/ 60,
+        (firstMinutes ?? 480) % 60,
+      ),
+    );
+    bool hasScheduledTime(int index) =>
+        timetable != null &&
+        ((index < bus.scheduleTimes.length &&
+                bus.scheduleTimes[index].trim().isNotEmpty) ||
+            (index == 0 && bus.scheduledDeparture?.trim().isNotEmpty == true));
+    final hasTimetable = hasScheduledTime(targetIndex);
+    var ordered =
+        timetable ??
+        OrderedSchedule.build(
+          stopCount: bus.stops.isEmpty ? 1 : bus.stops.length,
+          scheduleTimes: const [],
+          serviceDate: now,
+          fallbackDeparture: now,
+        )!;
+    if (activeTrip != null) {
+      if (activeTrip.scheduledDepartureTime == null &&
+          activeTrip.actualDepartureTime != null) {
+        ordered = ordered.nearestDepartureTo(activeTrip.actualDepartureTime!);
+      }
+    } else if (isLiveDriver) {
+      ordered = ordered.nearestDepartureTo(now);
+    } else {
+      ordered = ordered.onDateAt(targetIndex, todayBase);
+      if (ordered.times[targetIndex].isBefore(
+        now.subtract(const Duration(minutes: 15)),
+      )) {
+        ordered = ordered.onDateAt(
+          targetIndex,
+          DateTime(now.year, now.month, now.day + 1),
+        );
+      }
     }
+    final scheduledArrival = ordered.times[targetIndex];
+    final scheduledTimeStr = hasTimetable
+        ? TimeUtils.formatTimeString(scheduledArrival)
+        : 'Unknown';
+    final isTomorrow =
+        !isLiveDriver &&
+        DateTime(
+          scheduledArrival.year,
+          scheduledArrival.month,
+          scheduledArrival.day,
+        ).isAfter(todayBase);
 
     // 4. Compute estimated arrival time based on live driver telemetry or active trip
     DateTime estimatedArrival;
@@ -173,14 +242,18 @@ class DelayEtaCalculator {
     if (activeTrip != null && activeTrip.stopTimes.containsKey(targetStopId)) {
       final stopTiming = activeTrip.stopTimes[targetStopId]!;
       // If actual arrival already logged, use it; otherwise use estimated
-      estimatedArrival = stopTiming.actualArrival ?? stopTiming.estimatedArrival;
-      tripDelayOffsetMinutes = estimatedArrival.difference(scheduledArrival).inMinutes;
-    } else if (liveBusLocation != null && isLiveDriver) {
+      estimatedArrival =
+          stopTiming.actualArrival ?? stopTiming.estimatedArrival;
+      tripDelayOffsetMinutes = estimatedArrival
+          .difference(scheduledArrival)
+          .inMinutes;
+    } else if (liveBusLocation != null && hasCurrentGps) {
       // Driver telemetry provides etaMinutes to current/next stop
       final nextStop = liveBusLocation.nextStop;
       final nextStopIndex = bus.stops.indexWhere(
-        (s) => s.toLowerCase() == nextStop.toLowerCase() ||
-               (stationsMap?[s]?.name.toLowerCase() == nextStop.toLowerCase()),
+        (s) =>
+            s.toLowerCase() == nextStop.toLowerCase() ||
+            (stationsMap?[s]?.name.toLowerCase() == nextStop.toLowerCase()),
       );
 
       final currentBusIndex = nextStopIndex != -1 ? nextStopIndex : 0;
@@ -192,11 +265,14 @@ class DelayEtaCalculator {
         estimatedArrival = now.add(Duration(minutes: liveMins));
       } else {
         // Average 5-6 minutes per intermediate transit stop in Colombo
-        final totalEstimatedMinutes = liveBusLocation.etaMinutes + ((stopsRemaining - 1) * 5);
+        final totalEstimatedMinutes =
+            liveBusLocation.etaMinutes + ((stopsRemaining - 1) * 5);
         estimatedArrival = now.add(Duration(minutes: totalEstimatedMinutes));
       }
 
-      tripDelayOffsetMinutes = estimatedArrival.difference(scheduledArrival).inMinutes;
+      tripDelayOffsetMinutes = estimatedArrival
+          .difference(scheduledArrival)
+          .inMinutes;
     } else {
       // Offline fallback: estimated time equals scheduled timetable
       estimatedArrival = scheduledArrival;
@@ -204,56 +280,84 @@ class DelayEtaCalculator {
     }
 
     // 4b. Factor in driver-reported quick delay reasons (e.g. Traffic Congestion, Heavy Rain)
-    final driverDelayReason = liveBusLocation?.delayReason;
-    final driverAddedDelay = liveBusLocation?.addedDelayMinutes ?? 0;
+    final driverDelayReason = hasCurrentGps
+        ? liveBusLocation.delayReason
+        : null;
+    final driverAddedDelay = hasCurrentGps
+        ? liveBusLocation.addedDelayMinutes
+        : 0;
     if (driverAddedDelay > 0) {
-      estimatedArrival = estimatedArrival.add(Duration(minutes: driverAddedDelay));
+      estimatedArrival = estimatedArrival.add(
+        Duration(minutes: driverAddedDelay),
+      );
       tripDelayOffsetMinutes += driverAddedDelay;
     }
 
     // 5. Calculate delay metrics
-    final delayMinutes = tripDelayOffsetMinutes;
-    final delayType = isTomorrow
+    final delayMinutes = hasTimetable ? tripDelayOffsetMinutes : 0;
+    final delayType = !hasTimetable
+        ? DelayType.scheduled
+        : isTomorrow
         ? DelayType.scheduled
         : getDelayType(delayMinutes, isLive: isLiveDriver);
-    final delayLabel = isTomorrow
+    final delayLabel = !hasTimetable
+        ? 'Timetable unavailable'
+        : isTomorrow
         ? 'Scheduled for tomorrow'
-        : formatDelayLabel(delayMinutes, isLive: isLiveDriver, reason: driverDelayReason);
+        : formatDelayLabel(
+            delayMinutes,
+            isLive: isLiveDriver,
+            reason: driverDelayReason,
+          );
 
     // 6. Calculate countdown ETA to target stop
     final countdownMinutes = estimatedArrival.difference(now).inMinutes;
-    final countdownText = formatCountdown(
-      countdownMinutes,
-      isTomorrow: isTomorrow,
-      scheduledTimeStr: scheduledTimeStr,
-    );
+    final scheduledArrivalStr = hasTimetable
+        ? _datedTime(scheduledArrival, now)
+        : 'Unknown';
+    final countdownText = !hasTimetable && !isLiveDriver
+        ? 'ETA unavailable'
+        : !isLiveDriver
+        ? (countdownMinutes < 0
+              ? 'Scheduled time passed'
+              : 'Scheduled for $scheduledArrivalStr')
+        : formatCountdown(
+            countdownMinutes,
+            isTomorrow: isTomorrow,
+            scheduledTimeStr: scheduledTimeStr,
+          );
 
-    final scheduledArrivalStr = isTomorrow
-        ? 'Tomorrow, $scheduledTimeStr'
-        : scheduledTimeStr;
-    final estimatedArrivalStr = isTomorrow
-        ? 'Tomorrow, ${TimeUtils.formatTimeString(estimatedArrival)}'
-        : TimeUtils.formatTimeString(estimatedArrival);
+    final estimatedArrivalStr = !hasTimetable && !isLiveDriver
+        ? 'Unknown'
+        : _datedTime(estimatedArrival, now);
 
-    final liveStatusDescription = isLiveDriver
+    final liveStatusDescription = hasCurrentGps
         ? 'Live GPS tracking active · Telemetry from driver'
-        : (isTomorrow
-            ? 'Timetable schedule · Next departure tomorrow'
-            : 'Timetable schedule · Driver offline');
+        : (activeTrip?.isInProgress == true
+              ? 'Recorded trip progress - current GPS unavailable'
+              : isTomorrow
+              ? 'Timetable schedule · Next departure tomorrow'
+              : 'Timetable schedule · Driver offline');
 
     // 7. Build stops timeline progression
     final List<StopEtaInfo> timeline = [];
-    final currentDriverStopIndex = activeTrip?.currentStopIndex ??
+    final currentDriverStopIndex =
+        activeTrip?.currentStopIndex ??
         (liveBusLocation != null
-            ? bus.stops.indexWhere((s) => s.toLowerCase() == liveBusLocation.nextStop.toLowerCase())
+            ? bus.stops.indexWhere(
+                (s) =>
+                    s.toLowerCase() == liveBusLocation.nextStop.toLowerCase(),
+              )
             : -1);
 
-    final effectiveBase = isTomorrow ? todayBase.add(const Duration(days: 1)) : todayBase;
     for (int i = 0; i < bus.stops.length; i++) {
       final stopId = bus.stops[i];
       final stopName = stationsMap?[stopId]?.name ?? stopId;
-      final stopScheduledStr = bus.getScheduledTimeForStop(i);
-      final stopScheduledTime = TimeUtils.parseTimeStringToDateTime(stopScheduledStr, effectiveBase);
+      final stopScheduledTime = ordered.times[i];
+      final hasStopTimetable = hasScheduledTime(i);
+      final stopScheduledStr = hasStopTimetable
+          ? _datedTime(stopScheduledTime, now)
+          : 'Unknown';
 
       DateTime stopEstTime;
       if (activeTrip != null && activeTrip.stopTimes.containsKey(stopId)) {
@@ -266,13 +370,21 @@ class DelayEtaCalculator {
         stopEstTime = stopScheduledTime;
       }
 
-      final stopDelay = stopEstTime.difference(stopScheduledTime).inMinutes;
-      final stopDelayType = getDelayType(stopDelay, isLive: isLiveDriver);
-      final stopDelayLabel = formatDelayLabel(stopDelay, isLive: isLiveDriver);
+      final stopDelay = hasStopTimetable
+          ? stopEstTime.difference(stopScheduledTime).inMinutes
+          : 0;
+      final stopDelayType = hasStopTimetable
+          ? getDelayType(stopDelay, isLive: isLiveDriver)
+          : DelayType.scheduled;
+      final stopDelayLabel = hasStopTimetable
+          ? formatDelayLabel(stopDelay, isLive: isLiveDriver)
+          : 'Timetable unavailable';
 
-      final bool isPassed = activeTrip?.stopTimes[stopId]?.actualArrival != null ||
+      final bool isPassed =
+          activeTrip?.stopTimes[stopId]?.actualArrival != null ||
           (currentDriverStopIndex != -1 && i < currentDriverStopIndex);
-      final bool isCurrent = currentDriverStopIndex != -1 && i == currentDriverStopIndex;
+      final bool isCurrent =
+          currentDriverStopIndex != -1 && i == currentDriverStopIndex;
       final bool isTarget = (i == targetIndex);
 
       timeline.add(
@@ -283,7 +395,9 @@ class DelayEtaCalculator {
           scheduledTimeStr: stopScheduledStr,
           scheduledTime: stopScheduledTime,
           estimatedTime: stopEstTime,
-          estimatedTimeStr: TimeUtils.formatTimeString(stopEstTime),
+          estimatedTimeStr: !hasStopTimetable && !isLiveDriver
+              ? 'Unknown'
+              : _datedTime(stopEstTime, now),
           delayMinutes: stopDelay,
           delayType: stopDelayType,
           delayLabel: stopDelayLabel,
@@ -310,10 +424,21 @@ class DelayEtaCalculator {
       addedDelayMinutes: driverAddedDelay,
       countdownMinutes: countdownMinutes,
       countdownText: countdownText,
-      isLive: isLiveDriver,
+      isLive: hasCurrentGps,
       liveStatusDescription: liveStatusDescription,
       stopsTimeline: timeline,
     );
+  }
+
+  static String _datedTime(DateTime value, DateTime now) {
+    final date = DateTime(value.year, value.month, value.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final time = TimeUtils.formatTimeString(value);
+    if (date == today) return time;
+    if (date == DateTime(now.year, now.month, now.day + 1)) {
+      return 'Tomorrow, $time';
+    }
+    return '${TimeUtils.formatDateString(value)}, $time';
   }
 
   /// Categorizes delay minutes into a [DelayType].
@@ -336,12 +461,18 @@ class DelayEtaCalculator {
   /// - `3` -> "Delayed by 3 mins"
   /// - `0` -> "On Time"
   /// - `-2` -> "Running 2 mins early"
-  static String formatDelayLabel(int delayMinutes, {bool isLive = true, String? reason}) {
+  static String formatDelayLabel(
+    int delayMinutes, {
+    bool isLive = true,
+    String? reason,
+  }) {
     if (!isLive) {
       return 'Scheduled';
     }
     if (delayMinutes > 1) {
-      final reasonSuffix = (reason != null && reason.isNotEmpty) ? ' • $reason' : '';
+      final reasonSuffix = (reason != null && reason.isNotEmpty)
+          ? ' • $reason'
+          : '';
       return 'Delayed by $delayMinutes min${delayMinutes == 1 ? '' : 's'}$reasonSuffix';
     }
     if (delayMinutes < -1) {

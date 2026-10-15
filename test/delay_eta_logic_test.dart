@@ -14,18 +14,8 @@ void main() {
       busNo: 'WP ND-4521',
       routeId: 'route_138',
       scheduledDeparture: '08:00 AM',
-      stops: [
-        'st_pettah',
-        'st_maradana',
-        'st_borella',
-        'st_kirulapone',
-      ],
-      scheduleTimes: [
-        '08:00 AM',
-        '08:12 AM',
-        '08:25 AM',
-        '08:38 AM',
-      ],
+      stops: ['st_pettah', 'st_maradana', 'st_borella', 'st_kirulapone'],
+      scheduleTimes: ['08:00 AM', '08:12 AM', '08:25 AM', '08:38 AM'],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
@@ -103,35 +93,38 @@ void main() {
       expect(result.countdownText, 'Arriving in 13 mins');
     });
 
-    test('Identifies On Time when arrival matches schedule within 1 minute', () {
-      final trip = TripModel(
-        tripId: 'trip_102',
-        busId: 'bus_138_nd4521',
-        routeNo: '138',
-        stops: sampleBus.stops,
-        status: 'in_progress',
-        driverId: 'driver_1',
-        createdAt: DateTime(2026, 9, 30, 7, 30),
-        stopTimes: {
-          'st_pettah': StopTimingInfo(
-            estimatedArrival: DateTime(2026, 9, 30, 8, 0), // 08:00 AM exactly
-          ),
-        },
-      );
+    test(
+      'Identifies On Time when arrival matches schedule within 1 minute',
+      () {
+        final trip = TripModel(
+          tripId: 'trip_102',
+          busId: 'bus_138_nd4521',
+          routeNo: '138',
+          stops: sampleBus.stops,
+          status: 'in_progress',
+          driverId: 'driver_1',
+          createdAt: DateTime(2026, 9, 30, 7, 30),
+          stopTimes: {
+            'st_pettah': StopTimingInfo(
+              estimatedArrival: DateTime(2026, 9, 30, 8, 0), // 08:00 AM exactly
+            ),
+          },
+        );
 
-      final result = DelayEtaCalculator.calculateArrivalEta(
-        bus: sampleBus,
-        targetStopIdOrName: 'st_pettah',
-        activeTrip: trip,
-        stationsMap: stationsMap,
-        currentTime: clockDate,
-      );
+        final result = DelayEtaCalculator.calculateArrivalEta(
+          bus: sampleBus,
+          targetStopIdOrName: 'st_pettah',
+          activeTrip: trip,
+          stationsMap: stationsMap,
+          currentTime: clockDate,
+        );
 
-      expect(result.delayMinutes, 0);
-      expect(result.delayType, DelayType.onTime);
-      expect(result.isOnTime, isTrue);
-      expect(result.delayLabel, 'On Time');
-    });
+        expect(result.delayMinutes, 0);
+        expect(result.delayType, DelayType.onTime);
+        expect(result.isOnTime, isTrue);
+        expect(result.delayLabel, 'On Time');
+      },
+    );
 
     test('Identifies Early when arrival is earlier than scheduled by more than 1 min', () {
       final trip = TripModel(
@@ -173,6 +166,7 @@ void main() {
         status: BusStatus.active,
         nextStop: 'st_pettah',
         etaMinutes: 4,
+        timestamp: DateTime(2026, 9, 30, 7, 59),
       );
 
       final result = DelayEtaCalculator.calculateArrivalEta(
@@ -203,46 +197,55 @@ void main() {
       expect(result.delayLabel, 'Scheduled');
       expect(result.scheduledArrivalStr, '08:00 AM');
       expect(result.countdownMinutes, 15);
-      expect(result.countdownText, 'Arriving in 15 mins');
+      expect(result.countdownText, 'Scheduled for 08:00 AM');
     });
 
-    test('Builds timeline progression accurately with passed and current stops', () {
-      final trip = TripModel(
-        tripId: 'trip_104',
-        busId: 'bus_138_nd4521',
-        routeNo: '138',
-        stops: sampleBus.stops,
-        status: 'in_progress',
-        currentStopIndex: 1, // Currently at Maradana
-        driverId: 'driver_1',
-        createdAt: DateTime(2026, 9, 30, 7, 30),
-        stopTimes: {
-          'st_pettah': StopTimingInfo(
-            estimatedArrival: DateTime(2026, 9, 30, 8, 0),
-            actualArrival: DateTime(2026, 9, 30, 8, 2), // Departed Pettah
-          ),
-          'st_maradana': StopTimingInfo(
-            estimatedArrival: DateTime(2026, 9, 30, 8, 15), // Arriving Maradana
-          ),
-        },
-      );
+    test(
+      'Builds timeline progression accurately with passed and current stops',
+      () {
+        final trip = TripModel(
+          tripId: 'trip_104',
+          busId: 'bus_138_nd4521',
+          routeNo: '138',
+          stops: sampleBus.stops,
+          status: 'in_progress',
+          currentStopIndex: 1, // Currently at Maradana
+          driverId: 'driver_1',
+          createdAt: DateTime(2026, 9, 30, 7, 30),
+          stopTimes: {
+            'st_pettah': StopTimingInfo(
+              estimatedArrival: DateTime(2026, 9, 30, 8, 0),
+              actualArrival: DateTime(2026, 9, 30, 8, 2), // Departed Pettah
+            ),
+            'st_maradana': StopTimingInfo(
+              estimatedArrival: DateTime(
+                2026,
+                9,
+                30,
+                8,
+                15,
+              ), // Arriving Maradana
+            ),
+          },
+        );
 
-      final result = DelayEtaCalculator.calculateArrivalEta(
-        bus: sampleBus,
-        targetStopIdOrName: 'st_borella',
-        activeTrip: trip,
-        stationsMap: stationsMap,
-        currentTime: clockDate,
-      );
+        final result = DelayEtaCalculator.calculateArrivalEta(
+          bus: sampleBus,
+          targetStopIdOrName: 'st_borella',
+          activeTrip: trip,
+          stationsMap: stationsMap,
+          currentTime: clockDate,
+        );
 
-      expect(result.stopsTimeline.length, 4);
-      // Pettah should be marked passed
-      expect(result.stopsTimeline[0].isPassed, isTrue);
-      // Maradana should be marked current
-      expect(result.stopsTimeline[1].isCurrent, isTrue);
-      // Borella is the passenger target stop
-      expect(result.stopsTimeline[2].isTargetStop, isTrue);
-    });
+        expect(result.stopsTimeline.length, 4);
+        // Pettah should be marked passed
+        expect(result.stopsTimeline[0].isPassed, isTrue);
+        // Maradana should be marked current
+        expect(result.stopsTimeline[1].isCurrent, isTrue);
+        // Borella is the passenger target stop
+        expect(result.stopsTimeline[2].isTargetStop, isTrue);
+      },
+    );
 
     test('Rolls over to tomorrow and displays hours remaining when offline bus timetable has passed for today', () {
       // Viewing 08:00 AM bus at 11:06 AM today
@@ -263,7 +266,46 @@ void main() {
       expect(result.delayType, DelayType.scheduled);
       // 11:06 AM today to 08:00 AM tomorrow = 20h 54m (1254 mins)
       expect(result.countdownMinutes, 1254);
-      expect(result.countdownText, 'Tomorrow at 08:00 AM (in 20h 54m)');
+      expect(result.countdownText, 'Scheduled for Tomorrow, 08:00 AM');
+    });
+
+    test('timetable countdown never claims arrival or departure without movement evidence', () {
+      for (final minute in [45, 59, 60, 65, 75, 76]) {
+        final now = DateTime(2026, 9, 30, 7).add(Duration(minutes: minute));
+        for (final telemetry in <BusLocationModel?>[
+          null,
+          BusLocationModel(
+            busId: sampleBus.id,
+            latitude: 7,
+            longitude: 80,
+            isBroadcasting: true,
+            status: BusStatus.active,
+            timestamp: now.subtract(const Duration(minutes: 6)),
+          ),
+          BusLocationModel(
+            busId: sampleBus.id,
+            latitude: 7,
+            longitude: 80,
+            isBroadcasting: true,
+            status: BusStatus.active,
+            timestamp: now,
+          ).copyWith(isCached: true),
+        ]) {
+          final result = DelayEtaCalculator.calculateArrivalEta(
+            bus: sampleBus,
+            targetStopIdOrName: 'st_pettah',
+            liveBusLocation: telemetry,
+            currentTime: now,
+          );
+          expect(result.isLive, isFalse);
+          expect(result.countdownText, startsWith('Scheduled'));
+          expect(result.countdownText, isNot(contains('Arriving')));
+          expect(result.countdownText, isNot(contains('Departed')));
+          if (minute > 60 && minute <= 75) {
+            expect(result.countdownText, 'Scheduled time passed');
+          }
+        }
+      }
     });
 
     test('formatCountdown outputs Departed for negative minutes and Arriving now only for 0-1 min', () {
@@ -276,4 +318,3 @@ void main() {
     });
   });
 }
-

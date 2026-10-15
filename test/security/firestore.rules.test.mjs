@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import { reconcileReport } from './reward-ledger.mjs';
 import { readFileSync } from 'node:fs';
 import { before, after, beforeEach, test } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, collection, getDoc, getDocs, query, where, setDoc, updateDoc, deleteDoc, runTransaction, Timestamp, serverTimestamp, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
+import { doc, collection, getDoc, getDocs, query, where, setDoc, updateDoc, deleteDoc, runTransaction, Timestamp, serverTimestamp, arrayUnion, arrayRemove, increment, writeBatch } from 'firebase/firestore';
 
 let env;
 const auth = (uid, claims = {}) => env.authenticatedContext(uid, { email: `${uid}@example.test`, ...claims }).firestore();
@@ -21,11 +22,62 @@ const request = (uid = 'alice') => ({ riderId: uid, riderName: 'Rider', busId: '
 const telemetry = () => ({ busId: 'bus1', driverId: 'op', operatorId: 'op', latitude: 6.9, longitude: 79.8,
   speed: 12, timestamp: serverTimestamp(), status: 'active', isBroadcasting: true });
 
+test('sample scope supports reports, assistance and operator writes without granting real approval', async () => {
+  const p='sample_test/shared/';
+  await env.withSecurityRulesDisabled(async c=>{
+    const db=c.firestore();
+    await Promise.all([
+      setDoc(ref(db,p+'users/alice'),{...profile(),createdAt:stamp()}),
+      setDoc(ref(db,p+'users/op'),{...profile('op'),role:'operator',createdAt:stamp()}),
+      setDoc(ref(db,p+'operator_access/op'),{approved:true,sampleScenario:true}),
+      setDoc(ref(db,'operator_access/op'),{approved:false}),
+      setDoc(ref(db,p+'buses/bus1'),{driverId:'op',stops:['s1','s2'],occupancy:'low'}),
+      setDoc(ref(db,p+'stations/s1'),{name:'SAMPLE Stop 1'}),
+      setDoc(ref(db,p+'stations/s2'),{name:'SAMPLE Stop 2'}),
+    ]);
+  });
+  await assertSucceeds(setDoc(ref(auth('alice'),p+'reports/check'),report()));
+  await assertSucceeds(setDoc(ref(auth('alice'),p+'boarding_requests/request'),request()));
+  await assertSucceeds(updateDoc(ref(auth('op'),p+'boarding_requests/request'),{status:'acknowledged'}));
+  await assertSucceeds(setDoc(ref(auth('op'),p+'live_locations/bus1'),telemetry()));
+  await assertFails(setDoc(ref(auth('op'),'live_locations/bus1'),telemetry()));
+  await assertFails(updateDoc(ref(auth('op'),'buses/bus1'),{occupancy:'high'}));
+  await assertFails(getDoc(ref(auth('op'),p+'users/alice')));
+  await assertFails(setDoc(ref(auth('alice'),p+'operator_access/alice'),{approved:true}));
+  await assertFails(setDoc(ref(auth('stranger'),p+'reports/stranger'),report('stranger')));
+  await assertFails(setDoc(ref(auth('alice'),'boarding_requests/cross_scope'),{...request(),busId:'sample_only_bus'}));
+});
+
 before(async () => {
-  env = await initializeTestEnvironment({ projectId: 'demo-accesstransit', firestore: {
-    host: '127.0.0.1', port: 8087, rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
+  const projectId = process.env.FIRESTORE_RULES_TEST_PROJECT ?? 'demo-accesstransit';
+  if (!projectId.startsWith('demo-')) throw new Error('Rules tests require an isolated demo project.');
+  env = await initializeTestEnvironment({ projectId, firestore: {
+    host: '127.0.0.1', port: Number(process.env.FIRESTORE_RULES_TEST_PORT ?? 8087), rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
 });
 after(async () => { await env?.cleanup(); });
+
+test('published timetables are readable and saveable but cannot be claimed or broadcast', async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    await updateDoc(ref(c.firestore(), 'buses/bus1'), {catalogueRecordType:'published_timetable'});
+    await updateDoc(ref(c.firestore(), 'buses/bus2'), {catalogueRecordType:'published_timetable'});
+  });
+  await assertSucceeds(getDoc(ref(guest(), 'buses/bus1')));
+  await assertSucceeds(setDoc(ref(auth('alice'), 'journeys/published'), {
+    journeyId:'published', passengerId:'alice', busId:'bus1', origin:'Stop 1', destination:'Stop 2',
+    status:'confirmed', createdAt:serverTimestamp(),
+  }));
+  await assertFails(updateDoc(ref(auth('op'), 'buses/bus2'), {driverId:'op'}));
+  await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), {occupancy:'high'}));
+  await assertFails(setDoc(ref(auth('op'), 'live_locations/bus1'), telemetry()));
+});
+
+test('published timetables cannot receive vehicle equipment reports or assistance', async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    await updateDoc(ref(c.firestore(), 'buses/bus1'), {catalogueRecordType:'published_timetable'});
+  });
+  await assertFails(setDoc(ref(auth('alice'), 'boarding_requests/published'), request()));
+  await assertFails(setDoc(ref(auth('alice'), 'reports/published'), report()));
+});
 beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async context => {
@@ -87,7 +139,7 @@ test('self-selected operator profile does not grant operations permission', asyn
   await assertFails(updateDoc(ref(auth('bob'), 'buses/bus2'), { driverId: 'bob' }));
 });
 test('only approved assigned operators can update bus conditions', async () => {
-  await assertSucceeds(updateDoc(ref(auth('op'), 'buses/bus1'), { rampOk: false, occupancy: 'high' }));
+  await assertSucceeds(updateDoc(ref(auth('op'), 'buses/bus1'), { rampOk: false, occupancy: 'high', rampCheckedAt: serverTimestamp(), rampCheckedBy: 'op' }));
   await assertFails(updateDoc(ref(auth('alice'), 'buses/bus1'), { rampOk: false }));
   await assertFails(updateDoc(ref(auth('otherop'), 'buses/bus1'), { rampOk: false }));
   await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), { occupancy: 'invented' }));
@@ -339,28 +391,42 @@ test('trips are created/updated only by their assigned approved operator', async
 
 
 // Operator transaction shape matches TripService's linked start/completion writes.
-test('linked trip start and final arrival commit together for assigned operator', async () => {
-  const db = auth('op');
-  const tripRef = ref(db, 'trips/f08-trip');
-  const liveRef = ref(db, 'live_locations/bus1');
-  await assertSucceeds(runTransaction(db, async tx => {
-    await tx.get(tripRef); await tx.get(liveRef);
-    tx.set(tripRef, { tripId: 'f08-trip', busId: 'bus1', driverId: 'op',
-      routeNo: '1', stops: ['s1', 's2'], status: 'in_progress',
-      currentStopIndex: 0, stopTimes: {}, createdAt: serverTimestamp() });
-    tx.set(liveRef, { ...telemetry(), tripId: 'f08-trip' });
-  }));
-  await assertSucceeds(runTransaction(db, async tx => {
-    await tx.get(tripRef); await tx.get(liveRef);
-    tx.update(tripRef, {status: 'completed', currentStopIndex: 1,
-      stopTimes: {s2: {estimatedArrival: stamp(), actualArrival: stamp()}}});
-    tx.update(liveRef, {status: 'completed', isBroadcasting: false,
-      currentStopIndex: 1, nextStop: 's2', addedDelayMinutes: 0});
-  }));
-  assert.equal((await getDoc(tripRef)).data().status, 'completed');
-  assert.equal((await getDoc(liveRef)).data().isBroadcasting, false);
-  assert.ok((await getDoc(tripRef)).data().stopTimes.s2.actualArrival);
-});
+for (const stops of [['s1', 's2'], ['s1', 'middle1', 'middle2', 's2']]) {
+  test(`linked ${stops.length}-stop trip completes on terminal arrival and closes broadcasting`, async () => {
+    const db = auth('op');
+    const tripRef = ref(db, 'trips/f17-trip');
+    const liveRef = ref(db, 'live_locations/bus1');
+    await assertSucceeds(runTransaction(db, async tx => {
+      await tx.get(tripRef); await tx.get(liveRef);
+      tx.set(tripRef, { tripId: 'f17-trip', busId: 'bus1', driverId: 'op',
+        routeNo: '1', stops, status: 'in_progress',
+        currentStopIndex: 0, stopTimes: {}, createdAt: serverTimestamp() });
+      tx.set(liveRef, { ...telemetry(), tripId: 'f17-trip' });
+    }));
+    const arrivals = {};
+    for (let index = 1; index < stops.length; index++) {
+      const final = index === stops.length - 1;
+      const arrival = Timestamp.fromMillis(Date.now() - (stops.length - index) * 1000);
+      arrivals[stops[index]] = { estimatedArrival: arrival, actualArrival: arrival };
+      await assertSucceeds(runTransaction(db, async tx => {
+        await tx.get(tripRef); await tx.get(liveRef);
+        tx.update(tripRef, { status: final ? 'completed' : 'in_progress',
+          currentStopIndex: index, stopTimes: { ...arrivals } });
+        tx.update(liveRef, { currentStopIndex: index, nextStop: stops[Math.min(index + 1, stops.length - 1)],
+          ...(final ? { status: 'completed', isBroadcasting: false, addedDelayMinutes: 0 } : {}) });
+      }));
+      const trip = (await getDoc(tripRef)).data();
+      const live = (await getDoc(liveRef)).data();
+      assert.equal(trip.status, final ? 'completed' : 'in_progress');
+      assert.equal(live.isBroadcasting, !final);
+      for (const [stop, time] of Object.entries(arrivals))
+        assert.equal(trip.stopTimes[stop].actualArrival.toMillis(), time.actualArrival.toMillis());
+    }
+    const persisted = (await getDoc(tripRef)).data();
+    assert.equal(persisted.currentStopIndex, stops.length - 1);
+    assert.equal((await getDoc(liveRef)).data().nextStop, stops.at(-1));
+  });
+}
 
 test('a denied timeline write rolls back telemetry in the same transaction', async () => {
   const db = auth('op');
@@ -373,4 +439,245 @@ test('a denied timeline write rolls back telemetry in the same transaction', asy
   }));
   assert.equal((await getDoc(ref(db, 'live_locations/bus1'))).data().isBroadcasting, true);
   assert.equal((await getDoc(ref(db, 'trips/f08-denied'))).exists(), false);
+});
+
+
+test('claim cannot combine equipment edits or release an assignment', async () => {
+  await assertFails(updateDoc(ref(auth('otherop'), 'buses/bus2'), { driverId: 'otherop', occupancy: 'high' }));
+  await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), { driverId: null }));
+  await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), { driverId: '' }));
+  await assertSucceeds(updateDoc(ref(auth('otherop'), 'buses/bus2'), { driverId: 'otherop' }));
+  await assertSucceeds(updateDoc(ref(auth('otherop'), 'buses/bus2'), { rampOk: false, rampCheckedAt: serverTimestamp(), rampCheckedBy: 'otherop' }));
+});
+
+test('concurrent claims have one winner and revoked operators lose write permission', async () => {
+  const claim = (uid) => {
+    const db = auth(uid);
+    return runTransaction(db, async tx => {
+      const bus = ref(db, 'buses/bus2');
+      const snap = await tx.get(bus);
+      if (snap.data().driverId) throw Error('already assigned');
+      tx.update(bus, { driverId: uid });
+    });
+  };
+  const results = await Promise.allSettled([claim('op'), claim('otherop')]);
+  assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+  const adminDb = auth('admin', { admin: true });
+  await updateDoc(ref(adminDb, 'operator_access/op'), { approved: false });
+  await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), { rampOk: false }));
+  await assertFails(setDoc(ref(auth('op'), 'live_locations/bus1'), telemetry()));
+});
+
+
+test('ramp checks bind actor and server time while occupancy cannot refresh evidence', async () => {
+  const db = auth('op');
+  const bus = ref(db, 'buses/bus1');
+  await assertFails(updateDoc(bus, { rampOk: false }));
+  await assertFails(updateDoc(bus, { rampOk: false, rampCheckedAt: serverTimestamp(), rampCheckedBy: 'otherop' }));
+  await assertFails(updateDoc(bus, { rampOk: false, rampCheckedAt: stamp(), rampCheckedBy: 'op' }));
+  await assertSucceeds(updateDoc(bus, { rampOk: false, rampCheckedAt: serverTimestamp(), rampCheckedBy: 'op' }));
+  const before = (await getDoc(bus)).data();
+  await assertSucceeds(updateDoc(bus, { occupancy: 'high' }));
+  const after = (await getDoc(bus)).data();
+  assert.equal(after.rampCheckedAt.toMillis(), before.rampCheckedAt.toMillis());
+  assert.equal(after.rampCheckedBy, 'op');
+  await assertFails(updateDoc(bus, { rampCheckedBy: 'forged' }));
+});
+
+
+test('marked demonstration targets cannot receive real reports, assistance or operator writes', async () => {
+  const adminDb = auth('admin', { admin: true });
+  await updateDoc(ref(adminDb, 'buses/bus1'), { isDemo: true, catalogueSource: 'demo' });
+  await assertFails(setDoc(ref(auth('alice'), 'reports/demo-bus'), report()));
+  await assertFails(setDoc(ref(auth('alice'), 'boarding_requests/demo-bus'), request()));
+  await assertFails(setDoc(ref(auth('op'), 'live_locations/bus1'), telemetry()));
+  await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), { occupancy: 'high' }));
+  await updateDoc(ref(adminDb, 'buses/bus1'), { isDemo: false, catalogueSource: 'operator_catalogue' });
+  await updateDoc(ref(adminDb, 'stations/s1'), { isDemo: true });
+  await assertFails(setDoc(ref(auth('alice'), 'reports/demo-stop'), { ...report(), targetType: 'station', targetId: 's1' }));
+  await assertFails(setDoc(ref(auth('alice'), 'boarding_requests/demo-stop'), request()));
+});
+
+
+async function rewardAdmin() {
+  const db = auth('admin', { admin: true });
+  await updateDoc(ref(db, 'buses/bus1'), { catalogueSource: 'operator_catalogue' });
+  return db;
+}
+
+test('reward ledger and audit revisions are accessible only by trusted administrators', async () => {
+  for (const db of [guest(), auth('alice'), auth('op')]) {
+    await assertFails(setDoc(ref(db, 'reward_ledger/r1'), { policyVersion: 1 }));
+    await assertFails(getDoc(ref(db, 'reward_ledger/r1')));
+    await assertFails(setDoc(ref(db, 'reward_ledger/r1/revisions/1'), { points: 100 }));
+  }
+  await assertSucceeds(reconcileReport(auth('admin', { admin: true }), 'r1', { apply: true }));
+});
+
+test('reward dry-run, duplicate retries and simultaneous reports/workers preserve totals', async () => {
+  const db = await rewardAdmin();
+  await setDoc(ref(auth('bob'), 'users/bob'), profile('bob'));
+  await updateDoc(ref(db, 'reports/r1'), { confirmedBy: ['bob', 'bob', 'alice'] });
+  await reconcileReport(db, 'r1');
+  assert.equal((await getDoc(ref(db, 'users/alice'))).data().points, 0);
+  await Promise.all(Array.from({ length: 4 }, () => reconcileReport(db, 'r1', { apply: true })));
+  assert.equal((await getDoc(ref(db, 'users/alice'))).data().points, 10);
+  assert.equal((await getDoc(ref(db, 'users/bob'))).data().points, 5);
+  assert.equal((await getDocs(collection(db, 'reward_ledger/r1/revisions'))).size, 1);
+  await setDoc(ref(auth('alice'), 'reports/r2'), report());
+  await Promise.all(['r1', 'r2'].map(id => reconcileReport(db, id, { apply: true })));
+  assert.equal((await getDoc(ref(db, 'users/alice'))).data().points, 20);
+  assert.equal((await getDoc(ref(db, 'users/alice'))).data().reportsSubmitted, 2);
+});
+
+test('vote reversal, restoration, hiding and deletion reconcile with revision history', async () => {
+  const db = await rewardAdmin();
+  await setDoc(ref(auth('bob'), 'users/bob'), profile('bob'));
+  await updateDoc(ref(db, 'reports/r1'), { confirmedBy: ['bob'] });
+  await reconcileReport(db, 'r1', { apply: true });
+  await updateDoc(ref(db, 'reports/r1'), { flaggedBy: ['bob'] });
+  await reconcileReport(db, 'r1', { apply: true });
+  assert.equal((await getDoc(ref(db, 'users/bob'))).data().points, 0);
+  await updateDoc(ref(db, 'reports/r1'), { flaggedBy: [] });
+  await reconcileReport(db, 'r1', { apply: true });
+  assert.equal((await getDoc(ref(db, 'users/bob'))).data().points, 5);
+  await updateDoc(ref(db, 'reports/r1'), { status: 'hidden' });
+  await reconcileReport(db, 'r1', { apply: true });
+  assert.equal((await getDoc(ref(db, 'users/alice'))).data().points, 0);
+  await updateDoc(ref(db, 'reports/r1'), { status: 'resolved' });
+  await reconcileReport(db, 'r1', { apply: true });
+  await deleteDoc(ref(db, 'reports/r1'));
+  await reconcileReport(db, 'r1', { apply: true });
+  assert.equal((await getDoc(ref(db, 'users/alice'))).data().points, 0);
+  assert.equal((await getDoc(ref(db, 'users/bob'))).data().verifiedCount, 0);
+  assert.equal((await getDocs(collection(db, 'reward_ledger/r1/revisions'))).size, 6);
+});
+
+test('ineligible reports/targets earn nothing; missing profiles and legacy balances fail atomically', async () => {
+  const db = await rewardAdmin();
+  for (const change of [{ isDemo: true }, { publicationState: 'queued' }, { createdAt: null }, { falseCount: 3 },
+    { createdAt: Timestamp.fromMillis(Date.now() + 86400000) }]) {
+    await setDoc(ref(db, 'reports/r1'), { ...report(), createdAt: stamp(), ...change });
+    assert.equal((await reconcileReport(db, 'r1', { apply: true })).changed, false);
+  }
+  await setDoc(ref(db, 'reports/r1'), { ...report(), createdAt: stamp() });
+  await updateDoc(ref(db, 'buses/bus1'), { isDemo: true });
+  assert.equal((await reconcileReport(db, 'r1', { apply: true })).changed, false);
+  await updateDoc(ref(db, 'buses/bus1'), { isDemo: false });
+  await updateDoc(ref(db, 'reports/r1'), { confirmedBy: ['missing'] });
+  await assert.rejects(reconcileReport(db, 'r1', { apply: true }), /Missing reward profile/);
+  assert.equal((await getDoc(ref(db, 'reward_ledger/r1'))).exists(), false);
+  await updateDoc(ref(db, 'reports/r1'), { confirmedBy: [] });
+  await updateDoc(ref(db, 'users/alice'), { points: 100 });
+  await assert.rejects(reconcileReport(db, 'r1', { apply: true }), /reviewed baseline/);
+  assert.equal((await getDoc(ref(db, 'users/alice'))).data().points, 100);
+  assert.equal((await getDoc(ref(db, 'reward_ledger/r1'))).exists(), false);
+});
+
+
+async function seedPreviousConfirmers(fields = {}) {
+  const db = auth('admin', { admin: true });
+  await updateDoc(ref(db, 'reports/r1'), {
+    confirmedBy: ['bob', 'carol'], confirmCount: 2, lastConfirmedAt: stamp(), ...fields,
+  });
+  return db;
+}
+function recheckBatch(db, uid, checkId, fields = {}, record = {}) {
+  const batch = writeBatch(db);
+  batch.update(ref(db, 'reports/r1'), { lastRecheckedAt: serverTimestamp(),
+    lastRecheckedBy: uid, lastRecheckId: checkId, ...fields });
+  batch.set(ref(db, `reports/r1/rechecks/${checkId}`), {
+    reportId: 'r1', userId: uid, checkedAt: serverTimestamp(), ...record,
+  });
+  return batch.commit();
+}
+async function transactionalRecheck(db, uid) {
+  const check = doc(collection(db, 'reports/r1/rechecks'));
+  return runTransaction(db, async tx => {
+    const reportRef = ref(db, 'reports/r1');
+    const r = (await tx.get(reportRef)).data();
+    const latest = Math.max(...[r.createdAt, r.lastConfirmedAt, r.lastRecheckedAt]
+      .filter(Boolean).map(t => t.toMillis()));
+    if (latest + 30 * 60000 > Date.now()) return false;
+    tx.update(reportRef, { lastRecheckedAt: serverTimestamp(), lastRecheckedBy: uid, lastRecheckId: check.id });
+    tx.set(check, { reportId: 'r1', userId: uid, checkedAt: serverTimestamp() });
+    return true;
+  });
+}
+
+test('dated rechecks preserve unique votes and require atomic immutable observation history', async () => {
+  await seedPreviousConfirmers();
+  const db = auth('bob');
+  await assertFails(updateDoc(ref(db, 'reports/r1'), { lastRecheckedAt: serverTimestamp(), lastRecheckedBy: 'bob', lastRecheckId: 'missing' }));
+  await assertFails(setDoc(ref(db, 'reports/r1/rechecks/orphan'), { reportId: 'r1', userId: 'bob', checkedAt: serverTimestamp() }));
+  await assertSucceeds(recheckBatch(db, 'bob', 'check1'));
+  const r = (await getDoc(ref(db, 'reports/r1'))).data();
+  assert.deepEqual(r.confirmedBy, ['bob', 'carol']);
+  assert.equal(r.confirmCount, 2);
+  assert.equal(r.falseCount, 0);
+  assert.equal(r.lastRecheckedBy, 'bob');
+  assert.equal(r.lastConfirmedAt.toMillis() < r.lastRecheckedAt.toMillis(), true);
+  const check = ref(db, 'reports/r1/rechecks/check1');
+  assert.equal((await getDoc(check)).data().checkedAt.toMillis(), r.lastRecheckedAt.toMillis());
+  await assertFails(updateDoc(check, { userId: 'carol' }));
+  await assertFails(deleteDoc(check));
+  await assertFails(recheckBatch(db, 'bob', 'check2'));
+  await assertFails(recheckBatch(auth('carol'), 'carol', 'check3'));
+  // Ordinary confirm updates cannot bypass the recheck cooldown/history rule.
+  await assertFails(updateDoc(ref(db, 'reports/r1'), { lastConfirmedAt: serverTimestamp() }));
+});
+
+test('rechecks deny spoofing, extra votes, unauthenticated and ineligible observations', async () => {
+  const admin = await seedPreviousConfirmers();
+  for (const [db, actor] of [[guest(), 'bob'], [auth('alice'), 'alice'], [auth('outsider'), 'outsider']])
+    await assertFails(recheckBatch(db, actor, `denied-${actor}`));
+  await assertFails(recheckBatch(auth('bob'), 'carol', 'spoof'));
+  await assertFails(recheckBatch(auth('bob'), 'bob', 'backdated', { lastRecheckedAt: stamp() }, { checkedAt: stamp() }));
+  await assertFails(recheckBatch(auth('bob'), 'bob', 'bonus', { confirmCount: 3 }));
+  await assertFails(recheckBatch(auth('bob'), 'bob', 'wrong-report', {}, { reportId: 'other' }));
+  for (const fields of [
+    { status: 'resolved' }, { status: 'hidden' }, { isDemo: true },
+    { publicationState: 'pendingUpload' }, { createdAt: null },
+    { createdAt: Timestamp.fromMillis(Date.now() + 60000) },
+    { lastConfirmedAt: Timestamp.now() }, { confirmedBy: ['carol'], confirmCount: 1 },
+    { falseCount: 3, flaggedBy: ['a', 'b', 'c'] },
+  ]) {
+    await updateDoc(ref(admin, 'reports/r1'), { ...report(), createdAt: stamp(), confirmedBy: ['bob', 'carol'],
+      confirmCount: 2, lastConfirmedAt: stamp(), ...fields });
+    await assertFails(recheckBatch(auth('bob'), 'bob', 'ineligible'));
+  }
+});
+
+test('competing rechecks serialize one observation and retry cannot multiply history', async () => {
+  await seedPreviousConfirmers();
+  const outcomes = await Promise.allSettled([
+    transactionalRecheck(auth('bob'), 'bob'), transactionalRecheck(auth('carol'), 'carol'),
+  ]);
+  assert.equal(outcomes.filter(o => o.status === 'fulfilled' && o.value === true).length, 1);
+  for (const outcome of outcomes) {
+    if (outcome.status === 'rejected') assert.equal(outcome.reason.code, 'permission-denied');
+    // The emulator may enforce cooldown against the newer resource before the
+    // losing transaction's version precondition is retried. This is a truthful
+    // rejected write, not a second saved observation.
+  }
+  assert.equal(await transactionalRecheck(auth('bob'), 'bob'), false);
+  const records = await getDocs(collection(guest(), 'reports/r1/rechecks'));
+  assert.equal(records.size, 1);
+  const r = (await getDoc(ref(guest(), 'reports/r1'))).data();
+  assert.equal(r.confirmCount, 2);
+  assert.equal(r.confirmedBy.length, 2);
+});
+
+test('rechecking does not earn another reward contribution or ledger revision', async () => {
+  const admin = await rewardAdmin();
+  await seedPreviousConfirmers();
+  for (const uid of ['bob', 'carol']) await setDoc(ref(auth(uid), `users/${uid}`), profile(uid));
+  await reconcileReport(admin, 'r1', { apply: true });
+  const before = (await getDoc(ref(admin, 'users/bob'))).data();
+  await assertSucceeds(recheckBatch(auth('bob'), 'bob', 'reward-check'));
+  assert.equal((await reconcileReport(admin, 'r1', { apply: true })).changed, false);
+  const after = (await getDoc(ref(admin, 'users/bob'))).data();
+  assert.equal(after.points, before.points);
+  assert.equal(after.verifiedCount, before.verifiedCount);
+  assert.equal((await getDocs(collection(admin, 'reward_ledger/r1/revisions'))).size, 1);
 });

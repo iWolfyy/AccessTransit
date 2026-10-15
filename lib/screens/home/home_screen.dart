@@ -1,3 +1,6 @@
+import '../../widgets/evidence_refresh.dart';
+import '../../constants/firestore_constants.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -82,7 +85,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final confirmed = await showLogoutConfirmationDialog(context);
     if (confirmed != true) return;
 
-    await _authService?.logout();
+    try {
+      await _authService?.logout();
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not clear private drafts or sign out. Please retry.',
+          ),
+        ),
+      );
+      return;
+    }
     nav.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
@@ -1362,43 +1376,50 @@ class _RecentReportsSection extends StatelessWidget {
             }
 
             final reports = snapshot.data ?? [];
-            final activeReports = reports
-                .where((r) => StatusLogic.isReportActive(r))
-                .take(3)
-                .toList();
+            return EvidenceRefresh(
+              reports: reports,
+              builder: (context, now) {
+                final activeReports = reports
+                    .where(
+                      (r) => StatusLogic.isReportActive(r, currentTime: now),
+                    )
+                    .take(3)
+                    .toList();
 
-            if (activeReports.isEmpty) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: context.isHighContrast
-                      ? Colors.white
-                      : AppColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(12),
-                  border: context.isHighContrast
-                      ? Border.all(color: Colors.black, width: 2.0)
-                      : null,
-                ),
-                child: Text(
-                  'No recent community reports.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-              );
-            }
+                if (activeReports.isEmpty) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: context.isHighContrast
+                          ? Colors.white
+                          : AppColors.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: context.isHighContrast
+                          ? Border.all(color: Colors.black, width: 2.0)
+                          : null,
+                    ),
+                    child: Text(
+                      'No recent community reports.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  );
+                }
 
-            return ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              itemCount: activeReports.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final report = activeReports[index];
-                return _RecentReportCard(report: report);
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  itemCount: activeReports.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final report = activeReports[index];
+                    return _RecentReportCard(report: report);
+                  },
+                );
               },
             );
           },
@@ -1571,8 +1592,8 @@ class _RecentJourneyCard extends StatelessWidget {
         if (pid.isEmpty)
           _buildCardContent(
             context,
-            title: 'Pettah Station to Kottawa',
-            subtitle: 'Yesterday, 2:45 PM',
+            title: 'No recorded journey',
+            subtitle: 'Plan a journey to get started',
             isHighContrast: isHighContrast,
             hasLargeTargets: hasLargeTargets,
           )
@@ -1580,8 +1601,8 @@ class _RecentJourneyCard extends StatelessWidget {
           StreamBuilder<List<JourneyModel>>(
             stream: _getJourneysStream(pid),
             builder: (context, snapshot) {
-              String title = 'Pettah Station to Kottawa';
-              String subtitle = 'Yesterday, 2:45 PM';
+              String title = 'No recorded journey';
+              String subtitle = 'Plan a journey to get started';
 
               final docs = snapshot.data ?? [];
               if (docs.isNotEmpty) {
@@ -1626,7 +1647,7 @@ class _RecentJourneyCard extends StatelessWidget {
     if (pid.isEmpty) return Stream.value([]);
     try {
       return FirebaseFirestore.instance
-          .collection('journeys')
+          .collection(FirestoreConstants.journeysCollection)
           .where('passengerId', isEqualTo: pid)
           .snapshots()
           .map((snapshot) {

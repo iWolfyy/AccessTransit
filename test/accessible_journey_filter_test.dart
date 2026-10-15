@@ -1,3 +1,5 @@
+import 'ramp_test_observations.dart';
+
 import 'package:access_transit/models/enums/report_condition.dart';
 import 'package:access_transit/models/report.dart';
 import 'package:access_transit/screens/journey/route_results_screen.dart';
@@ -9,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   setUp(() async {
+    await recordWorkingRamps();
     SharedPreferences.setMockInitialValues({});
     await AccessibilityPreferencesService.instance.init();
     await FirestoreService(busWriter: (_, _) async {})

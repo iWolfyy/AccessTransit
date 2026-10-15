@@ -185,7 +185,11 @@ void main() {
     test(
       'failed ${action.name} does not alter cache, votes, status or timestamp',
       () async {
-        final r = report('failed_${action.name}');
+        final r = report('failed_${action.name}').copyWith(
+          createdAt: DateTime.now().subtract(const Duration(hours: 1)),
+          confirmedBy: action == ReportMutationAction.recheck ? ['voter'] : [],
+          confirmCount: action == ReportMutationAction.recheck ? 1 : 0,
+        );
         final actor = action == ReportMutationAction.resolve
             ? 'author'
             : 'voter';
@@ -200,13 +204,14 @@ void main() {
         await service.createReport(r);
         final task = switch (action) {
           ReportMutationAction.confirm => service.confirmReport(r.id, actor),
+          ReportMutationAction.recheck => service.recheckReport(r.id, actor),
           ReportMutationAction.flag => service.flagReport(r.id, actor),
           ReportMutationAction.resolve => service.resolveReport(r.id),
         };
         await expectLater(task, throwsA(isA<FirebaseException>()));
         final cached = (await service.streamReportById(r.id).first)!;
         expect(cached.status, 'active');
-        expect(cached.confirmCount, 0);
+        expect(cached.confirmCount, r.confirmCount);
         expect(cached.falseCount, 0);
         expect(cached.lastConfirmedAt, isNull);
         expect(cached.resolvedAt, isNull);

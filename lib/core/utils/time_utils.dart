@@ -3,7 +3,8 @@ class TimeUtils {
   const TimeUtils._();
 
   /// Formats a [DateTime] into a friendly relative time string compared to [clock] (defaults to `DateTime.now()`).
-  static String formatRelativeTime(DateTime dateTime, {DateTime? clock}) {
+  static String formatRelativeTime(DateTime? dateTime, {DateTime? clock}) {
+    if (dateTime == null) return 'Unknown';
     final now = clock ?? DateTime.now();
     final difference = now.difference(dateTime);
 
@@ -38,12 +39,23 @@ class TimeUtils {
   /// Formats a [DateTime] into a user-facing date string (e.g. "Today, Sep 30, 2026").
   static String formatDateString(DateTime dateTime) {
     final now = DateTime.now();
-    final isToday = dateTime.year == now.year &&
+    final isToday =
+        dateTime.year == now.year &&
         dateTime.month == now.month &&
         dateTime.day == now.day;
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final monthName = months[dateTime.month - 1];
     final prefix = isToday ? 'Today, ' : '';

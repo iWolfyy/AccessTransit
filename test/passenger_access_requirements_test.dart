@@ -9,13 +9,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   final now = DateTime(2026, 10, 14, 10);
-  const bus = Bus(
+  final bus = Bus(
     id: 'bus',
     routeNo: '138',
     stops: ['before', 'boarding', 'passing', 'destination', 'after'],
     hasRamp: true,
     lowFloor: true,
     rampOk: true,
+    rampCheckedAt: now,
+    rampCheckedBy: 'test-operator',
     occupancy: 'low',
   );
   Station station(String id, {bool ramp = true, bool? access}) => Station(
@@ -42,13 +44,13 @@ void main() {
     userId: 'rider',
   );
   BusStatusResult assess({
-    Bus vehicle = bus,
+    Bus? vehicle,
     List<Report> reports = const [],
     Map<String, Station>? stops,
     bool wheelchair = true,
     bool stepFree = false,
   }) => StatusLogic.getBusStatus(
-    vehicle,
+    vehicle ?? bus,
     reports,
     currentTime: now,
     stationsMap: stops ?? stations,
@@ -171,12 +173,15 @@ void main() {
       );
     });
   }
-  test('vehicle reports still apply to the passenger segment', () {
-    expect(
-      assess(reports: [issue('bus', target: 'bus')]).status,
-      AccessibilityStatus.partial,
-    );
-  });
+  test(
+    'vehicle ramp barrier excludes a wheelchair-required passenger segment',
+    () {
+      expect(
+        assess(reports: [issue('bus', target: 'bus')]).status,
+        AccessibilityStatus.notAccessible,
+      );
+    },
+  );
   test('explicit stop assessment survives serialization and copies', () {
     final blocked = station('boarding', access: false);
     final restored = Station.fromMap(blocked.toMap(), id: blocked.id);

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+
 import '../constants/firestore_constants.dart';
 import '../models/bus.dart';
 import '../models/bus_route.dart';
@@ -10,8 +11,7 @@ import '../models/station.dart';
 ///
 /// Uses batched writes and fixed document IDs so executing it multiple times is idempotent.
 class SeedData {
-  SeedData({FirebaseFirestore? firestore})
-      : _customFirestore = firestore;
+  SeedData({FirebaseFirestore? firestore}) : _customFirestore = firestore;
 
   final FirebaseFirestore? _customFirestore;
   FirebaseFirestore get _db => _customFirestore ?? FirebaseFirestore.instance;
@@ -204,7 +204,7 @@ class SeedData {
         'st_nugegoda',
         'st_maharagama',
         'st_kottawa',
-        'st_homagama'
+        'st_homagama',
       ],
     ),
     // 2. Route 138 (Homagama - Pettah Inbound)
@@ -221,7 +221,7 @@ class SeedData {
         'st_kirulapone',
         'st_borella',
         'st_maradana',
-        'st_pettah'
+        'st_pettah',
       ],
     ),
     // 3. Route 100 (Pettah - Panadura Outbound)
@@ -239,7 +239,7 @@ class SeedData {
         'st_dehiwala',
         'st_mt_lavinia',
         'st_moratuwa',
-        'st_panadura'
+        'st_panadura',
       ],
     ),
     // 4. Route 100 (Panadura - Pettah Inbound)
@@ -257,7 +257,7 @@ class SeedData {
         'st_bambalapitiya',
         'st_kollupitiya',
         'st_fort',
-        'st_pettah'
+        'st_pettah',
       ],
     ),
     // 5. Route 120 (Pettah - Horana)
@@ -273,7 +273,7 @@ class SeedData {
         'st_kirulapone',
         'st_nugegoda',
         'st_maharagama',
-        'st_kottawa'
+        'st_kottawa',
       ],
     ),
     // 6. Route 177 (Kollupitiya - Kaduwela)
@@ -288,7 +288,7 @@ class SeedData {
         'st_borella',
         'st_battaramulla',
         'st_malabe',
-        'st_kaduwela'
+        'st_kaduwela',
       ],
     ),
     // 7. Route 171 (Pettah - Battaramulla)
@@ -302,7 +302,7 @@ class SeedData {
         'st_fort',
         'st_town_hall',
         'st_borella',
-        'st_battaramulla'
+        'st_battaramulla',
       ],
     ),
     // 8. Route 154 (Kirulapone - Borella)
@@ -316,7 +316,7 @@ class SeedData {
         'st_bambalapitiya',
         'st_kollupitiya',
         'st_town_hall',
-        'st_borella'
+        'st_borella',
       ],
     ),
     // 9. Route 176 (Dehiwala - Borella)
@@ -325,12 +325,7 @@ class SeedData {
       routeNo: '176',
       routeName: 'Dehiwala - Borella (Via Nugegoda)',
       description: 'Via Dehiwala, Kirulapone, Nugegoda, Borella',
-      stops: [
-        'st_dehiwala',
-        'st_kirulapone',
-        'st_nugegoda',
-        'st_borella'
-      ],
+      stops: ['st_dehiwala', 'st_kirulapone', 'st_nugegoda', 'st_borella'],
     ),
     // 10. Route 101 (Pettah - Moratuwa)
     const BusRoute(
@@ -345,7 +340,7 @@ class SeedData {
         'st_wellawatte',
         'st_dehiwala',
         'st_mt_lavinia',
-        'st_moratuwa'
+        'st_moratuwa',
       ],
     ),
   ];
@@ -368,7 +363,7 @@ class SeedData {
         'st_nugegoda',
         'st_maharagama',
         'st_kottawa',
-        'st_homagama'
+        'st_homagama',
       ],
       scheduleTimes: [
         '06:30 AM',
@@ -378,7 +373,7 @@ class SeedData {
         '07:22 AM',
         '07:38 AM',
         '07:55 AM',
-        '08:10 AM'
+        '08:10 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -400,7 +395,7 @@ class SeedData {
         'st_nugegoda',
         'st_maharagama',
         'st_kottawa',
-        'st_homagama'
+        'st_homagama',
       ],
       scheduleTimes: [
         '07:15 AM',
@@ -410,7 +405,7 @@ class SeedData {
         '08:08 AM',
         '08:25 AM',
         '08:42 AM',
-        '08:58 AM'
+        '08:58 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -432,7 +427,7 @@ class SeedData {
         'st_nugegoda',
         'st_maharagama',
         'st_kottawa',
-        'st_homagama'
+        'st_homagama',
       ],
       scheduleTimes: [
         '08:00 AM',
@@ -442,7 +437,7 @@ class SeedData {
         '08:52 AM',
         '09:08 AM',
         '09:25 AM',
-        '09:40 AM'
+        '09:40 AM',
       ],
       hasRamp: false,
       lowFloor: false,
@@ -464,7 +459,7 @@ class SeedData {
         'st_nugegoda',
         'st_maharagama',
         'st_kottawa',
-        'st_homagama'
+        'st_homagama',
       ],
       scheduleTimes: [
         '08:45 AM',
@@ -474,7 +469,7 @@ class SeedData {
         '09:38 AM',
         '09:55 AM',
         '10:12 AM',
-        '10:28 AM'
+        '10:28 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -496,7 +491,7 @@ class SeedData {
         'st_nugegoda',
         'st_maharagama',
         'st_kottawa',
-        'st_homagama'
+        'st_homagama',
       ],
       scheduleTimes: [
         '09:30 AM',
@@ -506,7 +501,7 @@ class SeedData {
         '10:22 AM',
         '10:38 AM',
         '10:55 AM',
-        '11:10 AM'
+        '11:10 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -529,7 +524,7 @@ class SeedData {
         'st_kirulapone',
         'st_borella',
         'st_maradana',
-        'st_pettah'
+        'st_pettah',
       ],
       scheduleTimes: [
         '07:00 AM',
@@ -539,7 +534,7 @@ class SeedData {
         '08:02 AM',
         '08:15 AM',
         '08:28 AM',
-        '08:40 AM'
+        '08:40 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -564,7 +559,7 @@ class SeedData {
         'st_dehiwala',
         'st_mt_lavinia',
         'st_moratuwa',
-        'st_panadura'
+        'st_panadura',
       ],
       scheduleTimes: [
         '06:45 AM',
@@ -575,7 +570,7 @@ class SeedData {
         '07:35 AM',
         '07:46 AM',
         '08:02 AM',
-        '08:20 AM'
+        '08:20 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -598,7 +593,7 @@ class SeedData {
         'st_dehiwala',
         'st_mt_lavinia',
         'st_moratuwa',
-        'st_panadura'
+        'st_panadura',
       ],
       scheduleTimes: [
         '07:30 AM',
@@ -609,7 +604,7 @@ class SeedData {
         '08:22 AM',
         '08:34 AM',
         '08:52 AM',
-        '09:10 AM'
+        '09:10 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -632,7 +627,7 @@ class SeedData {
         'st_dehiwala',
         'st_mt_lavinia',
         'st_moratuwa',
-        'st_panadura'
+        'st_panadura',
       ],
       scheduleTimes: [
         '08:15 AM',
@@ -643,7 +638,7 @@ class SeedData {
         '09:08 AM',
         '09:20 AM',
         '09:38 AM',
-        '09:55 AM'
+        '09:55 AM',
       ],
       hasRamp: false,
       lowFloor: false,
@@ -666,7 +661,7 @@ class SeedData {
         'st_dehiwala',
         'st_mt_lavinia',
         'st_moratuwa',
-        'st_panadura'
+        'st_panadura',
       ],
       scheduleTimes: [
         '09:00 AM',
@@ -677,7 +672,7 @@ class SeedData {
         '09:50 AM',
         '10:02 AM',
         '10:20 AM',
-        '10:38 AM'
+        '10:38 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -701,7 +696,7 @@ class SeedData {
         'st_bambalapitiya',
         'st_kollupitiya',
         'st_fort',
-        'st_pettah'
+        'st_pettah',
       ],
       scheduleTimes: [
         '07:15 AM',
@@ -712,7 +707,7 @@ class SeedData {
         '08:23 AM',
         '08:34 AM',
         '08:45 AM',
-        '08:52 AM'
+        '08:52 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -734,7 +729,7 @@ class SeedData {
         'st_kirulapone',
         'st_nugegoda',
         'st_maharagama',
-        'st_kottawa'
+        'st_kottawa',
       ],
       scheduleTimes: [
         '07:00 AM',
@@ -743,7 +738,7 @@ class SeedData {
         '07:38 AM',
         '07:52 AM',
         '08:08 AM',
-        '08:25 AM'
+        '08:25 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -763,7 +758,7 @@ class SeedData {
         'st_kirulapone',
         'st_nugegoda',
         'st_maharagama',
-        'st_kottawa'
+        'st_kottawa',
       ],
       scheduleTimes: [
         '08:00 AM',
@@ -772,7 +767,7 @@ class SeedData {
         '08:38 AM',
         '08:52 AM',
         '09:08 AM',
-        '09:25 AM'
+        '09:25 AM',
       ],
       hasRamp: false,
       lowFloor: false,
@@ -793,7 +788,7 @@ class SeedData {
         'st_borella',
         'st_battaramulla',
         'st_malabe',
-        'st_kaduwela'
+        'st_kaduwela',
       ],
       scheduleTimes: [
         '07:45 AM',
@@ -801,7 +796,7 @@ class SeedData {
         '08:08 AM',
         '08:25 AM',
         '08:42 AM',
-        '09:00 AM'
+        '09:00 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -820,7 +815,7 @@ class SeedData {
         'st_borella',
         'st_battaramulla',
         'st_malabe',
-        'st_kaduwela'
+        'st_kaduwela',
       ],
       scheduleTimes: [
         '08:30 AM',
@@ -828,7 +823,7 @@ class SeedData {
         '08:53 AM',
         '09:10 AM',
         '09:28 AM',
-        '09:45 AM'
+        '09:45 AM',
       ],
       hasRamp: true,
       lowFloor: false,
@@ -848,14 +843,14 @@ class SeedData {
         'st_fort',
         'st_town_hall',
         'st_borella',
-        'st_battaramulla'
+        'st_battaramulla',
       ],
       scheduleTimes: [
         '08:00 AM',
         '08:08 AM',
         '08:22 AM',
         '08:34 AM',
-        '08:52 AM'
+        '08:52 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -875,14 +870,14 @@ class SeedData {
         'st_bambalapitiya',
         'st_kollupitiya',
         'st_town_hall',
-        'st_borella'
+        'st_borella',
       ],
       scheduleTimes: [
         '09:15 AM',
         '09:27 AM',
         '09:38 AM',
         '09:48 AM',
-        '10:02 AM'
+        '10:02 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -897,18 +892,8 @@ class SeedData {
       routeId: 'route_176_dehiwala_borella',
       routeNo: '176',
       scheduledDeparture: '08:30 AM',
-      stops: [
-        'st_dehiwala',
-        'st_kirulapone',
-        'st_nugegoda',
-        'st_borella'
-      ],
-      scheduleTimes: [
-        '08:30 AM',
-        '08:44 AM',
-        '08:55 AM',
-        '09:12 AM'
-      ],
+      stops: ['st_dehiwala', 'st_kirulapone', 'st_nugegoda', 'st_borella'],
+      scheduleTimes: ['08:30 AM', '08:44 AM', '08:55 AM', '09:12 AM'],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
@@ -929,7 +914,7 @@ class SeedData {
         'st_wellawatte',
         'st_dehiwala',
         'st_mt_lavinia',
-        'st_moratuwa'
+        'st_moratuwa',
       ],
       scheduleTimes: [
         '08:15 AM',
@@ -938,7 +923,7 @@ class SeedData {
         '08:48 AM',
         '09:00 AM',
         '09:12 AM',
-        '09:30 AM'
+        '09:30 AM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -960,7 +945,7 @@ class SeedData {
         'st_wellawatte',
         'st_dehiwala',
         'st_mt_lavinia',
-        'st_moratuwa'
+        'st_moratuwa',
       ],
       scheduleTimes: [
         '11:45 AM',
@@ -969,7 +954,7 @@ class SeedData {
         '12:18 PM',
         '12:30 PM',
         '12:42 PM',
-        '01:00 PM'
+        '01:00 PM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -989,7 +974,7 @@ class SeedData {
         'st_wellawatte',
         'st_dehiwala',
         'st_mt_lavinia',
-        'st_moratuwa'
+        'st_moratuwa',
       ],
       scheduleTimes: [
         '03:15 PM',
@@ -998,7 +983,7 @@ class SeedData {
         '03:48 PM',
         '04:00 PM',
         '04:12 PM',
-        '04:30 PM'
+        '04:30 PM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -1018,7 +1003,7 @@ class SeedData {
         'st_wellawatte',
         'st_dehiwala',
         'st_mt_lavinia',
-        'st_moratuwa'
+        'st_moratuwa',
       ],
       scheduleTimes: [
         '06:30 PM',
@@ -1027,7 +1012,7 @@ class SeedData {
         '07:07 PM',
         '07:20 PM',
         '07:33 PM',
-        '07:52 PM'
+        '07:52 PM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -1047,7 +1032,7 @@ class SeedData {
         'st_wellawatte',
         'st_dehiwala',
         'st_mt_lavinia',
-        'st_moratuwa'
+        'st_moratuwa',
       ],
       scheduleTimes: [
         '09:15 PM',
@@ -1056,7 +1041,7 @@ class SeedData {
         '09:45 PM',
         '09:56 PM',
         '10:07 PM',
-        '10:24 PM'
+        '10:24 PM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -1080,7 +1065,7 @@ class SeedData {
         'st_dehiwala',
         'st_mt_lavinia',
         'st_moratuwa',
-        'st_panadura'
+        'st_panadura',
       ],
       scheduleTimes: [
         '11:30 AM',
@@ -1091,7 +1076,7 @@ class SeedData {
         '12:20 PM',
         '12:32 PM',
         '12:50 PM',
-        '01:08 PM'
+        '01:08 PM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -1113,7 +1098,7 @@ class SeedData {
         'st_dehiwala',
         'st_mt_lavinia',
         'st_moratuwa',
-        'st_panadura'
+        'st_panadura',
       ],
       scheduleTimes: [
         '02:30 PM',
@@ -1124,7 +1109,7 @@ class SeedData {
         '03:21 PM',
         '03:33 PM',
         '03:52 PM',
-        '04:10 PM'
+        '04:10 PM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -1146,7 +1131,7 @@ class SeedData {
         'st_dehiwala',
         'st_mt_lavinia',
         'st_moratuwa',
-        'st_panadura'
+        'st_panadura',
       ],
       scheduleTimes: [
         '05:45 PM',
@@ -1157,7 +1142,7 @@ class SeedData {
         '06:44 PM',
         '06:58 PM',
         '07:18 PM',
-        '07:38 PM'
+        '07:38 PM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -1179,7 +1164,7 @@ class SeedData {
         'st_dehiwala',
         'st_mt_lavinia',
         'st_moratuwa',
-        'st_panadura'
+        'st_panadura',
       ],
       scheduleTimes: [
         '08:30 PM',
@@ -1190,7 +1175,7 @@ class SeedData {
         '09:17 PM',
         '09:28 PM',
         '09:45 PM',
-        '10:02 PM'
+        '10:02 PM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -1213,7 +1198,7 @@ class SeedData {
         'st_nugegoda',
         'st_maharagama',
         'st_kottawa',
-        'st_homagama'
+        'st_homagama',
       ],
       scheduleTimes: [
         '12:15 PM',
@@ -1223,7 +1208,7 @@ class SeedData {
         '01:07 PM',
         '01:23 PM',
         '01:40 PM',
-        '01:55 PM'
+        '01:55 PM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -1244,7 +1229,7 @@ class SeedData {
         'st_nugegoda',
         'st_maharagama',
         'st_kottawa',
-        'st_homagama'
+        'st_homagama',
       ],
       scheduleTimes: [
         '06:45 PM',
@@ -1254,7 +1239,7 @@ class SeedData {
         '07:42 PM',
         '08:00 PM',
         '08:18 PM',
-        '08:35 PM'
+        '08:35 PM',
       ],
       hasRamp: true,
       lowFloor: true,
@@ -1318,29 +1303,6 @@ class SeedData {
   /// Cleans existing collections and executes batched writes to populate `stations`, `routes`, `buses`, and `reports`.
   Future<void> seedAll() async {
     debugPrint('Starting AccessTransit Clean Firestore Seeding...');
-    
-    // 0. Clean old existing routes, buses, active_buses, and stations documents first
-    try {
-      final oldRoutes = await _db.collection(FirestoreConstants.routesCollection).get();
-      for (final doc in oldRoutes.docs) {
-        await doc.reference.delete();
-      }
-      final oldBuses = await _db.collection(FirestoreConstants.staticBusesCollection).get();
-      for (final doc in oldBuses.docs) {
-        await doc.reference.delete();
-      }
-      final oldActiveBuses = await _db.collection(FirestoreConstants.busesCollection).get();
-      for (final doc in oldActiveBuses.docs) {
-        await doc.reference.delete();
-      }
-      final oldStations = await _db.collection(FirestoreConstants.stationsCollection).get();
-      for (final doc in oldStations.docs) {
-        await doc.reference.delete();
-      }
-      debugPrint('Cleared old Firestore routes, buses, and stations.');
-    } catch (e) {
-      debugPrint('Note: Error or no old docs while clearing: $e');
-    }
 
     final batch = _db.batch();
 
@@ -1349,7 +1311,11 @@ class SeedData {
       final docRef = _db
           .collection(FirestoreConstants.stationsCollection)
           .doc(station.id);
-      batch.set(docRef, station.toMap(), SetOptions(merge: true));
+      batch.set(docRef, {
+        ...station.toMap(),
+        'isDemo': true,
+        'catalogueSource': 'demo',
+      }, SetOptions(merge: true));
     }
 
     // 2. Seed Routes
@@ -1357,7 +1323,11 @@ class SeedData {
       final docRef = _db
           .collection(FirestoreConstants.routesCollection)
           .doc(route.id);
-      batch.set(docRef, route.toMap(), SetOptions(merge: true));
+      batch.set(docRef, {
+        ...route.toMap(),
+        'isDemo': true,
+        'catalogueSource': 'demo',
+      }, SetOptions(merge: true));
     }
 
     // 3. Seed Buses
@@ -1365,7 +1335,11 @@ class SeedData {
       final docRef = _db
           .collection(FirestoreConstants.staticBusesCollection)
           .doc(bus.id);
-      batch.set(docRef, bus.toMap(), SetOptions(merge: true));
+      batch.set(docRef, {
+        ...bus.toMap(),
+        'isDemo': true,
+        'catalogueSource': 'demo',
+      }, SetOptions(merge: true));
     }
 
     // 4. Seed Reports
@@ -1373,7 +1347,11 @@ class SeedData {
       final docRef = _db
           .collection(FirestoreConstants.reportsCollection)
           .doc(report.id);
-      batch.set(docRef, report.copyWith(isDemo: true).toMap(), SetOptions(merge: true));
+      batch.set(
+        docRef,
+        report.copyWith(isDemo: true).toMap(),
+        SetOptions(merge: true),
+      );
     }
 
     await batch.commit();

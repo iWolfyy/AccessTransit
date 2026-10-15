@@ -1,0 +1,24 @@
+{
+  "retrievedDate": "2026-10-15",
+  "publisher": "NCG Express",
+  "sourceUrl": "https://ncgexpress.lk/bus-timetables/",
+  "sourcePublicationDate": null,
+  "notes": "Publisher-listed daily timetables, not live service verification. Only listed timing points are included. No vehicle registrations, operator assignments, exact boarding coordinates or accessibility observations were available. Intermediate stopping points are incomplete.",
+  "stations": [
+    {"id":"ncg_makumbura","name":"Makumbura"},
+    {"id":"ncg_mattala","name":"Mattala"},
+    {"id":"ncg_wellawaya","name":"Wellawaya"},
+    {"id":"ncg_ella","name":"Ella"},
+    {"id":"ncg_badulla","name":"Badulla"}
+  ],
+  "routes": [
+    {"id":"ncg_makumbura_badulla","routeNo":"EX 01 74/31-2","routeName":"Makumbura → Badulla","stops":["ncg_makumbura","ncg_mattala","ncg_wellawaya","ncg_ella","ncg_badulla"]},
+    {"id":"ncg_badulla_makumbura","routeNo":"EX 01 74/31-2","routeName":"Badulla → Makumbura","stops":["ncg_badulla","ncg_ella","ncg_wellawaya","ncg_mattala","ncg_makumbura"]}
+  ],
+  "services": [
+    {"id":"ncg_makumbura_badulla_1030","routeId":"ncg_makumbura_badulla","scheduleTimes":["10:30","12:30","13:40","14:20","15:00"]},
+    {"id":"ncg_makumbura_badulla_1730","routeId":"ncg_makumbura_badulla","scheduleTimes":["17:30","19:30","20:25","20:55","21:30"]},
+    {"id":"ncg_badulla_makumbura_1030","routeId":"ncg_badulla_makumbura","scheduleTimes":["10:30","11:10","11:45","13:00","15:00"]},
+    {"id":"ncg_badulla_makumbura_1730","routeId":"ncg_badulla_makumbura","scheduleTimes":["17:30","18:00","18:40","19:30","21:30"]}
+  ]
+}

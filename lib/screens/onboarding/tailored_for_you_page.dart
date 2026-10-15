@@ -127,15 +127,20 @@ class _TailoredForYouPageState extends State<TailoredForYouPage>
             curve: const Interval(0.35, 0.8, curve: Curves.easeOut),
           ),
           child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.12),
-              end: Offset.zero,
-            ).animate(
-              CurvedAnimation(
-                parent: _entranceController,
-                curve: const Interval(0.35, 0.8, curve: Curves.easeOutCubic),
-              ),
-            ),
+            position:
+                Tween<Offset>(
+                  begin: const Offset(0, 0.12),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: _entranceController,
+                    curve: const Interval(
+                      0.35,
+                      0.8,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+                ),
             child: Column(
               children: [
                 Text(
@@ -153,13 +158,17 @@ class _TailoredForYouPageState extends State<TailoredForYouPage>
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 320),
                   child: Text(
-                    'Set your accessibility preferences to find the best routes for your specific needs, from wheelchair ramps to low-floor buses.',
+                    'Choose wheelchair and step-free needs, then review current evidence. Voice guidance is unavailable.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
                       height: 24 / 16,
-                      fontWeight: context.isHighContrast ? FontWeight.w600 : FontWeight.normal,
-                      color: context.isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                      fontWeight: context.isHighContrast
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      color: context.isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurfaceVariant,
                     ),
                   ),
                 ),

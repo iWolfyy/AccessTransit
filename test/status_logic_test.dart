@@ -21,13 +21,15 @@ void main() {
 
     final stationsMap = {'st_fort': stationFort};
 
-    const safeBus = Bus(
+    final safeBus = Bus(
       id: 'bus_safe',
       routeNo: '138',
       stops: ['st_fort', 'st_pettah'],
       hasRamp: true,
       lowFloor: true,
       rampOk: true,
+      rampCheckedAt: now,
+      rampCheckedBy: 'test-operator',
       occupancy: 'low',
     );
 

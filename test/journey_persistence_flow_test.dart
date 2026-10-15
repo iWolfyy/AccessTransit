@@ -1,3 +1,8 @@
+import 'package:access_transit/services/transit_catalogue.dart';
+import 'package:access_transit/widgets/live_accessibility_panel.dart';
+
+import 'ramp_test_observations.dart';
+
 import 'dart:async';
 
 import 'package:access_transit/logic/journey_selection.dart';
@@ -114,6 +119,7 @@ void main() {
     expect(history.accept([], authoritative: true), isNull);
   });
   setUp(() async {
+    await recordWorkingRamps();
     SharedPreferences.setMockInitialValues({});
     await AccessibilityPreferencesService.instance.init();
   });
@@ -137,7 +143,7 @@ void main() {
     expect(route.estimatedPriceLkr, 70);
     expect(route.wheelchairAccessRequired, isTrue);
     expect(route.stepFreeOnly, isTrue);
-    expect(route.isLive, isFalse);
+    expect(route.timetableStatusLabel, 'Scheduled');
     expect(route.accessibilityStatus, AccessibilityStatus.unknown);
   });
   test(
@@ -528,4 +534,50 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
+  testWidgets(
+    'confirmation never turns an undated ramp capability into verification on save',
+    (tester) async {
+      TransitCatalogue.installFixtures({
+        'buses': {
+          vehicle.id: {
+            ...vehicle.toMap(),
+            'catalogueSource': 'operator_catalogue',
+          },
+        },
+        'stations': {},
+        'routes': {},
+      });
+      var savedCount = 0;
+      final service = JourneyService(
+        currentPassengerId: () => 'rider',
+        writer: (j) async => j,
+      );
+      await confirmScreen(tester, service, (_) => savedCount++);
+      final panel = tester.widget<LiveAccessibilityPanel>(
+        find.byType(LiveAccessibilityPanel),
+      );
+      expect(panel.busId, vehicle.id);
+      expect(panel.originId, 'b');
+      expect(panel.destinationId, 'c');
+      expect(
+        find.text(
+          'Ramp operational condition: Unknown - a new check is required',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Working observed'), findsNothing);
+      expect(find.textContaining('Verified active'), findsNothing);
+      await tester.tap(find.text('Confirm and save journey'));
+      await tester.pumpAndSettle();
+      expect(savedCount, 1);
+      expect(
+        find.text(
+          'Ramp operational condition: Unknown - a new check is required',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Working observed'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }

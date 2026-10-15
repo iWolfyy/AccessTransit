@@ -50,3 +50,6 @@ firebase-debug.log
 
 # Widget Preview related
 .widget_preview/
+
+# Local database backups, reset plans and generated account credentials.
+/.private/

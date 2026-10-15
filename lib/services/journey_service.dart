@@ -1,3 +1,5 @@
+import 'transit_catalogue.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -61,6 +63,7 @@ class JourneyService {
   /// Generates a new Firestore document ID and writes the journey with
   /// server timestamp.  Returns the created [JourneyModel] with its ID.
   Future<JourneyModel> createJourney(JourneyModel journey) async {
+    TransitCatalogue.requireSharedWrites();
     if (journey.passengerId.isEmpty ||
         signedInPassenger != journey.passengerId) {
       throw StateError('Sign in with the account saving this journey.');
@@ -108,6 +111,7 @@ class JourneyService {
   ///
   /// Use this when an operator is later assigned to a journey.
   Future<void> assignBus(String journeyId, String busId) async {
+    TransitCatalogue.requireSharedWrites();
     await journeyDocument(journeyId).update({
       FirestoreConstants.fieldBusId: busId,
       FirestoreConstants.fieldJourneyStatus: JourneyStatus.active.value,
@@ -116,6 +120,7 @@ class JourneyService {
 
   /// Marks a journey as completed.
   Future<void> completeJourney(String journeyId) async {
+    TransitCatalogue.requireSharedWrites();
     if (statusWriter != null) {
       return statusWriter!(journeyId, JourneyStatus.completed);
     }
@@ -125,6 +130,7 @@ class JourneyService {
   }
 
   Future<void> cancelJourney(String journeyId) async {
+    TransitCatalogue.requireSharedWrites();
     if (statusWriter != null) {
       return statusWriter!(journeyId, JourneyStatus.cancelled);
     }
@@ -132,7 +138,9 @@ class JourneyService {
         .update({'status': JourneyStatus.cancelled.value});
   }
 
-  Stream<JourneyModel?> watchJourney(String journeyId) => journeyReader != null
+  Stream<JourneyModel?> watchJourney(String journeyId) => TransitCatalogue.demo
+      ? Stream.value(null)
+      : journeyReader != null
       ? journeyReader!(journeyId)
       : journeyDocument(journeyId)
             .snapshots(includeMetadataChanges: true)
@@ -151,6 +159,7 @@ class JourneyService {
   ///
   /// Returns `null` if no journey exists.
   Future<JourneyModel?> getActiveJourney(String passengerId) async {
+    if (TransitCatalogue.demo) return null;
     final snapshot = await _journeysCollection
         .where(FirestoreConstants.fieldPassengerId, isEqualTo: passengerId)
         .get();
@@ -187,6 +196,7 @@ class JourneyService {
   /// Emits `null` when no active journey exists for this passenger.
   /// The stream updates automatically whenever Firestore changes — no polling.
   Stream<JourneyModel?> watchActiveJourney(String passengerId) {
+    if (TransitCatalogue.demo) return Stream.value(null);
     if (activeReader != null) return activeReader!(passengerId);
     final history = AcknowledgedJourneyHistory(passengerId);
     try {

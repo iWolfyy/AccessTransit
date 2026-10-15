@@ -1,3 +1,4 @@
+import 'package:access_transit/models/bus.dart';
 import 'package:access_transit/models/enums/report_condition.dart';
 import 'package:access_transit/models/enums/user_role.dart';
 import 'package:access_transit/models/report.dart';
@@ -211,7 +212,17 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: RouteDetailsScreen(origin: 'st_fort', destination: 'st_pettah'),
+          home: RouteDetailsScreen(
+            origin: 'st_fort',
+            destination: 'st_pettah',
+            bus: Bus(
+              id: 'bus_138_nd4521',
+              routeNo: '138',
+              hasRamp: true,
+              lowFloor: true,
+              occupancy: 'low',
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();

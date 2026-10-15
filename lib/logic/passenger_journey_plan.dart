@@ -1,4 +1,5 @@
-import '../core/utils/time_utils.dart';
+import 'ordered_schedule.dart';
+import 'journey_fare.dart';
 import '../models/bus.dart';
 
 /// A scheduled journey covering only the passenger's selected route segment.
@@ -7,19 +8,23 @@ class PassengerJourneyPlan {
     required this.stops,
     required this.departure,
     required this.arrival,
+    this.usesEstimatedTimes = false,
   });
 
   final List<String> stops;
   final DateTime departure;
   final DateTime arrival;
+  final bool usesEstimatedTimes;
 
   int get durationMinutes => arrival.difference(departure).inMinutes;
 
   /// Estimate only; uses travel time and stops inside the passenger's segment.
   int get estimatedPriceLkr {
     final intermediateCount = (stops.length - 2).clamp(0, stops.length);
-    final price = 35 + durationMinutes * 2.2 + intermediateCount * 4;
-    return ((price / 5).round() * 5).clamp(40, 450);
+    return JourneyFare.estimate(
+      durationMinutes: durationMinutes,
+      intermediateStops: intermediateCount,
+    );
   }
 
   static PassengerJourneyPlan? forBus({
@@ -35,63 +40,41 @@ class PassengerJourneyPlan {
     if (fromIndex < 0 || toIndex <= fromIndex) return null;
 
     final base = DateTime(travelDate.year, travelDate.month, travelDate.day);
-    final firstTime = TimeUtils.parseTimeStringToDateTime(
+    final firstMinutes = OrderedSchedule.minutesOfDay(
       bus.effectiveDepartureTime,
-      base,
     );
-    var departure = fromIndex < bus.scheduleTimes.length
-        ? TimeUtils.parseTimeStringToDateTime(
-            bus.scheduleTimes[fromIndex],
-            base,
-          )
-        : firstTime.add(Duration(minutes: fromIndex * 6));
-    // The requested date refers to boarding, including overnight routes.
-    departure = DateTime(
-      base.year,
-      base.month,
-      base.day,
-      departure.hour,
-      departure.minute,
+    if (firstMinutes == null) return null;
+    var schedule = OrderedSchedule.build(
+      stopCount: bus.stops.length,
+      scheduleTimes: bus.scheduleTimes,
+      serviceDate: base,
+      fallbackDeparture: DateTime(
+        base.year,
+        base.month,
+        base.day,
+        firstMinutes ~/ 60,
+        firstMinutes % 60,
+      ),
     );
-    if (departure.isBefore(notBefore)) {
+    if (schedule == null) return null;
+    // The selected date refers to boarding, even when the run starts yesterday.
+    schedule = schedule.onDateAt(fromIndex, base);
+    if (schedule.times[fromIndex].isBefore(notBefore)) {
       if (!rollToNextDay) return null;
-      departure = DateTime(
-        departure.year,
-        departure.month,
-        departure.day + 1,
-        departure.hour,
-        departure.minute,
+      schedule = schedule.onDateAt(
+        fromIndex,
+        DateTime(base.year, base.month, base.day + 1),
       );
+      if (schedule.times[fromIndex].isBefore(notBefore)) return null;
     }
-
-    var arrival = departure;
-    for (var index = fromIndex + 1; index <= toIndex; index++) {
-      if (index < bus.scheduleTimes.length) {
-        var next = TimeUtils.parseTimeStringToDateTime(
-          bus.scheduleTimes[index],
-          arrival,
-        );
-        if (next.isBefore(arrival)) {
-          next = DateTime(
-            next.year,
-            next.month,
-            next.day + 1,
-            next.hour,
-            next.minute,
-          );
-        }
-        arrival = next.isAfter(arrival)
-            ? next
-            : arrival.add(const Duration(minutes: 6));
-      } else {
-        arrival = arrival.add(const Duration(minutes: 6));
-      }
-    }
+    final departure = schedule.times[fromIndex];
+    final arrival = schedule.times[toIndex];
 
     return PassengerJourneyPlan(
       stops: bus.stops.sublist(fromIndex, toIndex + 1),
       departure: departure,
       arrival: arrival,
+      usesEstimatedTimes: schedule.usesEstimates,
     );
   }
 }

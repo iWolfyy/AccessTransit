@@ -1,3 +1,9 @@
+import '../../logic/journey_fare.dart';
+import '../../widgets/fare_estimate_text.dart';
+import '../../widgets/published_timetable_notice.dart';
+import '../../widgets/evidence_refresh.dart';
+import '../../widgets/bus_ramp_observation.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -43,7 +49,14 @@ class RouteDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
-    final effectiveBusId = bus?.id ?? route?.busId ?? 'bus_138_outbound';
+    final effectiveBusId = bus?.id ?? route?.busId ?? '';
+    if (effectiveBusId.isEmpty) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Service unavailable. Select a shared service first.'),
+        ),
+      );
+    }
     final firestoreService = FirestoreService();
 
     return Scaffold(
@@ -55,144 +68,177 @@ class RouteDetailsScreen extends StatelessWidget {
             child: StreamBuilder<Bus?>(
               stream: firestoreService.streamBusById(effectiveBusId),
               builder: (context, busSnapshot) {
-                final liveBus = busSnapshot.data ?? bus;
+                final liveBus =
+                    busSnapshot.connectionState == ConnectionState.waiting
+                    ? bus
+                    : busSnapshot.data;
+                if (busSnapshot.connectionState != ConnectionState.waiting &&
+                    liveBus == null) {
+                  return const Center(
+                    child: Text(
+                      'This service is unavailable. Return to search.',
+                    ),
+                  );
+                }
 
                 return StreamBuilder<List<Report>>(
                   stream: firestoreService.streamReports(),
                   builder: (context, reportsSnapshot) {
                     final activeReports =
                         reportsSnapshot.data ?? const <Report>[];
-                    // Seeded demonstration records cannot verify real conditions.
-                    final demoKeys = SeedData.getSampleReports()
-                        .map((r) => '${r.id}:${r.userId}')
-                        .toSet();
-                    final evidenceReports = activeReports
-                        .where((r) => !demoKeys.contains('${r.id}:${r.userId}'))
-                        .toList();
+                    return EvidenceRefresh(
+                      reports: activeReports,
+                      buses: [?liveBus],
+                      builder: (context, now) {
+                        // Seeded demonstration records cannot verify real conditions.
+                        final demoKeys = SeedData.getSampleReports()
+                            .map((r) => '${r.id}:${r.userId}')
+                            .toSet();
+                        final evidenceReports = activeReports
+                            .where(
+                              (r) => !demoKeys.contains('${r.id}:${r.userId}'),
+                            )
+                            .toList();
 
-                    final liveStatusResult = liveBus != null
-                        ? StatusLogic.getBusStatus(
-                            liveBus,
-                            activeReports,
-                            fromStationId: route?.fromStationId ?? origin,
-                            toStationId: route?.toStationId ?? destination,
-                            stationsMap: route?.journeyStations,
-                            wheelchairAccessRequired:
-                                route?.wheelchairAccessRequired ?? false,
-                            stepFreeOnly: route?.stepFreeOnly ?? false,
-                          )
-                        : statusResult;
+                        final liveStatusResult = liveBus != null
+                            ? StatusLogic.getBusStatus(
+                                liveBus,
+                                activeReports,
+                                currentTime: now,
+                                fromStationId: route?.fromStationId ?? origin,
+                                toStationId: route?.toStationId ?? destination,
+                                stationsMap: route?.journeyStations,
+                                wheelchairAccessRequired:
+                                    route?.wheelchairAccessRequired ?? false,
+                                stepFreeOnly: route?.stepFreeOnly ?? false,
+                              )
+                            : statusResult;
 
-                    String liveCrowdLevel = route?.crowdLevel ?? 'Low';
-                    if (liveBus != null) {
-                      if (liveBus.occupancy.toLowerCase() == 'medium') {
-                        liveCrowdLevel = 'Medium';
-                      } else if (liveBus.occupancy.toLowerCase() == 'high') {
-                        liveCrowdLevel = 'High';
-                      } else if (liveBus.occupancy.toLowerCase() == 'low') {
-                        liveCrowdLevel = 'Low';
-                      }
-                    }
+                        String liveCrowdLevel = route?.crowdLevel ?? 'Low';
+                        if (liveBus != null) {
+                          if (liveBus.occupancy.toLowerCase() == 'medium') {
+                            liveCrowdLevel = 'Medium';
+                          } else if (liveBus.occupancy.toLowerCase() ==
+                              'high') {
+                            liveCrowdLevel = 'High';
+                          } else if (liveBus.occupancy.toLowerCase() == 'low') {
+                            liveCrowdLevel = 'Low';
+                          }
+                        }
 
-                    return ListView(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        16,
-                        16,
-                        isDesktop ? 24 : 112,
-                      ),
-                      children: [
-                        Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 768),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (route?.nextDepartureDateTime != null)
-                                  Text(
-                                    'Selected timetable departure: ${route!.nextDepartureDateTime} — current GPS does not confirm this scheduled run.',
-                                  ),
-                                // SECTION 1: Departure Details & Stop Schedule
-                                _DepartureAndStopsCard(
-                                  origin: origin,
-                                  destination: destination,
-                                  bus: liveBus,
-                                  busId: effectiveBusId,
-                                  route: route,
-                                ),
-                                const SizedBox(height: 20),
-
-                                // SECTION 2: Sources and timestamps for each condition.
-                                AccessibilityEvidenceCard(
-                                  reports: evidenceReports,
-                                  busId: effectiveBusId,
-                                  origin: route?.fromStationId ?? origin,
-                                  destination:
-                                      route?.toStationId ?? destination,
-                                  strictStopIds: route != null,
-                                ),
-                                const SizedBox(height: 20),
-
-                                // SECTION 3: Ticket Price
-                                _TicketPriceCard(
-                                  priceRs: route?.estimatedPriceLkr ?? 0,
-                                ),
-                                const Text(
-                                  'Estimated fare from the journey model; confirm the actual fare with the operator.',
-                                ),
-                                const SizedBox(height: 20),
-
-                                // SECTION 4: Safety & Crowd Status
-                                _SafetyAndAccessibilityCard(
-                                  statusResult: liveStatusResult,
-                                  route: route,
-                                  crowdLevel: liveCrowdLevel,
-                                ),
-                                const SizedBox(height: 24),
-
-                                // ACTION BUTTONS: Track Live, Confirm Schedule, Report
-                                _ActionButtons(
-                                  onTrackLive: () {
-                                    if (route == null) return;
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            JourneyConfirmationScreen(
-                                              origin: origin,
-                                              destination: destination,
-                                              route: route!,
-                                            ),
-                                      ),
-                                    );
-                                  },
-                                  onConfirmSchedule: () {
-                                    if (route == null) return;
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            JourneyConfirmationScreen(
-                                              origin: origin,
-                                              destination: destination,
-                                              route: route!,
-                                            ),
-                                      ),
-                                    );
-                                  },
-                                  onReport: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => ReportConditionScreen(
-                                          initialLocation: destination,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
+                        return ListView(
+                          padding: EdgeInsets.fromLTRB(
+                            16,
+                            16,
+                            16,
+                            isDesktop ? 24 : 112,
                           ),
-                        ),
-                      ],
+                          children: [
+                            Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 768,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (route?.nextDepartureDateTime != null)
+                                      Text(
+                                        'Selected timetable departure: ${route!.nextDepartureDateTime} — current GPS does not confirm this scheduled run.',
+                                      ),
+                                    if (route?.usesEstimatedTimes == true)
+                                      const Text(
+                                        'Some timetable intervals are missing. Times include model estimates; confirm them with the operator.',
+                                      ),
+                                    // SECTION 1: Departure Details & Stop Schedule
+                                    _DepartureAndStopsCard(
+                                      origin: origin,
+                                      destination: destination,
+                                      bus: liveBus,
+                                      busId: effectiveBusId,
+                                      route: route,
+                                    ),
+                                    const SizedBox(height: 20),
+
+                                    // SECTION 2: Sources and timestamps for each condition.
+                                    BusRampObservation(
+                                      bus: liveBus,
+                                      currentTime: now,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    AccessibilityEvidenceCard(
+                                      reports: evidenceReports,
+                                      currentTime: now,
+                                      busId: effectiveBusId,
+                                      origin: route?.fromStationId ?? origin,
+                                      destination:
+                                          route?.toStationId ?? destination,
+                                      strictStopIds: route != null,
+                                    ),
+                                    const SizedBox(height: 20),
+
+                                    // SECTION 3: Ticket Price
+                                    _TicketPriceCard(
+                                      priceRs: route?.estimatedPriceLkr ?? 0,
+                                    ),
+                                    const Text(JourneyFare.disclosure),
+                                    const SizedBox(height: 20),
+
+                                    // SECTION 4: Safety & Crowd Status
+                                    _SafetyAndAccessibilityCard(
+                                      statusResult: liveStatusResult,
+                                      route: route,
+                                      crowdLevel: liveCrowdLevel,
+                                    ),
+                                    const SizedBox(height: 24),
+
+                                    // ACTION BUTTONS: Track Live, Confirm Schedule, Report
+                                    _ActionButtons(
+                                      onTrackLive: () {
+                                        if (route == null) return;
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                JourneyConfirmationScreen(
+                                                  origin: origin,
+                                                  destination: destination,
+                                                  route: route!,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      onConfirmSchedule: () {
+                                        if (route == null) return;
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                JourneyConfirmationScreen(
+                                                  origin: origin,
+                                                  destination: destination,
+                                                  route: route!,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      onReport: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                ReportConditionScreen(
+                                                  initialLocation: destination,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     );
                   },
                 );
@@ -278,12 +324,11 @@ class _DepartureAndStopsCard extends StatelessWidget {
     final effectiveBus =
         bus ??
         const Bus(
-          id: 'bus_138_nd4521',
-          routeNo: '138',
-          busNo: 'WP ND-4521',
-          hasRamp: true,
-          lowFloor: true,
-          rampOk: true,
+          id: '',
+          routeNo: 'Unknown',
+          hasRamp: false,
+          lowFloor: false,
+          rampOk: null,
           occupancy: 'low',
         );
 
@@ -304,7 +349,7 @@ class _DepartureAndStopsCard extends StatelessWidget {
               future: FirestoreService().getStations(),
               builder: (context, stationsSnapshot) {
                 final stationsList =
-                    stationsSnapshot.data ?? SeedData.colomboStations;
+                    stationsSnapshot.data ?? FirestoreService.cachedStations;
                 final stationsMap = {for (final s in stationsList) s.id: s};
 
                 // Calculate Arrival ETA, Schedule Delays, and Timeline Progression
@@ -346,6 +391,11 @@ class _DepartureAndStopsCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      PublishedTimetableNotice(bus: effectiveBus),
+                      if (liveLocation?.isCached == true)
+                        const Text(
+                          'Saved location - live updates unavailable. This is not current bus movement.',
+                        ),
                       // 1. ROUTE PILL & LIVE TELEMETRY STATUS
                       Row(
                         children: [
@@ -780,23 +830,25 @@ class _DepartureAndStopsCard extends StatelessWidget {
 
                       // 3. BOARDING ASSISTANCE BUTTON
                       OutlinedButton.icon(
-                        onPressed: () {
-                          final target = AssistanceTarget.resolve(
-                            busId: busId,
-                            bus: effectiveBus,
-                            stationId: route?.fromStationId,
-                            stopName: origin,
-                            stations: stationsMap,
-                          );
-                          openBoardingAssistance(
-                            context,
-                            target: target,
-                            minutesAway: target?.minutesFrom(
-                              etaResult,
-                              telemetry: liveLocation,
-                            ),
-                          );
-                        },
+                        onPressed: effectiveBus.isPublishedTimetable
+                            ? null
+                            : () {
+                                final target = AssistanceTarget.resolve(
+                                  busId: busId,
+                                  bus: effectiveBus,
+                                  stationId: route?.fromStationId,
+                                  stopName: origin,
+                                  stations: stationsMap,
+                                );
+                                openBoardingAssistance(
+                                  context,
+                                  target: target,
+                                  minutesAway: target?.minutesFrom(
+                                    etaResult,
+                                    telemetry: liveLocation,
+                                  ),
+                                );
+                              },
                         style: OutlinedButton.styleFrom(
                           backgroundColor: isHC
                               ? const Color(0xFF001F3F)
@@ -820,7 +872,11 @@ class _DepartureAndStopsCard extends StatelessWidget {
                           ),
                         ),
                         icon: const Icon(Icons.assist_walker_rounded, size: 20),
-                        label: const Text('Request Boarding Assistance'),
+                        label: Text(
+                          effectiveBus.isPublishedTimetable
+                              ? 'Driver assistance unavailable'
+                              : 'Request Boarding Assistance',
+                        ),
                       ),
                       const SizedBox(height: 20),
 
@@ -1195,7 +1251,7 @@ class _DepartureAndStopsCard extends StatelessWidget {
 
 /// SECTION 3: Ticket Price Card
 class _TicketPriceCard extends StatelessWidget {
-  const _TicketPriceCard({this.priceRs = 250});
+  const _TicketPriceCard({required this.priceRs});
 
   final int priceRs;
 
@@ -1247,7 +1303,7 @@ class _TicketPriceCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Ticket Price',
+                  'Estimated fare',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -1255,8 +1311,8 @@ class _TicketPriceCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'Rs. $priceRs',
+                FareEstimateText(
+                  amount: priceRs,
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
@@ -1265,7 +1321,7 @@ class _TicketPriceCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Standard Single Journey Ticket • Cash or Digital Ticket',
+                  'Selected segment estimate; payment options unverified.',
                   style: TextStyle(fontSize: 13, color: context.subtextColor),
                 ),
               ],

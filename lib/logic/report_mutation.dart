@@ -1,6 +1,31 @@
 import '../models/report.dart';
 
-enum ReportMutationAction { confirm, flag, resolve }
+enum ReportMutationAction { confirm, flag, resolve, recheck }
+
+/// A later observation is distinct from a unique vote or reward event.
+class ReportRecheck {
+  static const interval = Duration(minutes: 30);
+  static DateTime? availableAt(Report report) {
+    var latest = report.createdAt;
+    if (latest == null) return null;
+    for (final date in [report.lastConfirmedAt, report.lastRecheckedAt]) {
+      if (date != null && date.isAfter(latest!)) latest = date;
+    }
+    return latest!.add(interval);
+  }
+
+  static bool canRecheck(Report report, String actor, DateTime now) =>
+      report.isPublic &&
+      report.status == 'active' &&
+      report.falseCount < 3 &&
+      report.flaggedBy.length < 3 &&
+      actor.isNotEmpty &&
+      actor != report.userId &&
+      report.confirmedBy.contains(actor) &&
+      !report.flaggedBy.contains(actor) &&
+      availableAt(report) != null &&
+      !now.isBefore(availableAt(report)!);
+}
 
 class ReportMutationPlan {
   const ReportMutationPlan({
@@ -20,8 +45,14 @@ class ReportMutationPlan {
     Report report,
     String actorId,
     ReportMutationAction action,
-    DateTime now,
-  ) {
+    DateTime now, {
+    String? recheckId,
+  }) {
+    if (report.createdAt == null) {
+      throw StateError(
+        'Observation time unknown. Submit a new dated observation.',
+      );
+    }
     if (actorId.trim().isEmpty || !report.isPublic || report.id.isEmpty) {
       throw StateError('Sign in and select a published report.');
     }
@@ -72,6 +103,31 @@ class ReportMutationPlan {
         'This report has inconsistent vote records. Refresh it before trying again.',
       );
     }
+    if (action == ReportMutationAction.recheck) {
+      if (!report.confirmedBy.contains(actorId) ||
+          report.flaggedBy.contains(actorId) ||
+          report.status != 'active' ||
+          report.falseCount >= 3 ||
+          report.flaggedBy.length >= 3) {
+        throw StateError(
+          'Only a previous confirmer can recheck an active report.',
+        );
+      }
+      if (!ReportRecheck.canRecheck(report, actorId, now)) {
+        return result(report, false);
+      }
+      if (recheckId == null || recheckId.trim().isEmpty) {
+        throw StateError('A dated recheck record is required.');
+      }
+      return result(
+        report.copyWith(
+          lastRecheckedAt: now,
+          lastRecheckedBy: actorId,
+          lastRecheckId: recheckId,
+        ),
+        true,
+      );
+    }
     if (action == ReportMutationAction.confirm) {
       flagged.remove(actorId);
       confirmed.add(actorId);
@@ -113,12 +169,16 @@ class ReportMutationResult {
   final bool changed;
   final Report? report;
   String get message => !changed
-      ? 'This action was already recorded.'
+      ? action == ReportMutationAction.recheck
+            ? 'Recheck not saved. Wait 30 minutes after the latest check, then retry.'
+            : 'This action was already recorded.'
       : report == null
       ? 'Change saved. Shared details will refresh when connected.'
       : switch (action) {
           ReportMutationAction.confirm =>
             'Confirmation saved to the shared report.',
+          ReportMutationAction.recheck =>
+            'Recheck saved. Unique confirmations and points are unchanged.',
           ReportMutationAction.flag =>
             report!.status == 'hidden'
                 ? 'Flag saved. Report hidden after three independent flags.'

@@ -73,7 +73,8 @@ class _RewardsContributionsScreenState
     final verified = widget.verifiedSpots ?? _user?.verifiedCount ?? 0;
     final badges = _user?.badges ?? (points ~/ 100);
 
-    final String level = widget.levelLabel ??
+    final String level =
+        widget.levelLabel ??
         (badges >= 3
             ? 'Gold Contributor'
             : (badges >= 1 ? 'Silver Contributor' : 'Bronze Contributor'));
@@ -107,10 +108,14 @@ class _RewardsContributionsScreenState
                         ),
                       ),
                       const SizedBox(height: 24),
-                      _PointsHeroCard(
-                        totalPoints: points,
-                        levelLabel: level,
+                      const Text(
+                        'Points update after administrator review and may take time. '
+                        'Published report: 10 points; unique confirmation: 5 points. '
+                        'Removed votes and hidden/deleted reports reverse credits. '
+                        'Points do not verify accessibility and have no cash value.',
                       ),
+                      const SizedBox(height: 16),
+                      _PointsHeroCard(totalPoints: points, levelLabel: level),
                       const SizedBox(height: 24),
                       Row(
                         children: [
@@ -130,7 +135,7 @@ class _RewardsContributionsScreenState
                               iconBg: AppColors.secondaryContainer,
                               iconColor: AppColors.onSecondaryContainer,
                               value: '$verified',
-                              label: 'Verified Spots',
+                              label: 'Recorded Confirmations',
                             ),
                           ),
                         ],
@@ -148,8 +153,8 @@ class _RewardsContributionsScreenState
                                   memberTier: level.contains('Gold')
                                       ? 'Gold Member'
                                       : (level.contains('Silver')
-                                          ? 'Silver Member'
-                                          : 'Bronze Member'),
+                                            ? 'Silver Member'
+                                            : 'Bronze Member'),
                                 ),
                               ),
                             );
@@ -160,7 +165,10 @@ class _RewardsContributionsScreenState
                                 : AppColors.primaryContainer,
                             foregroundColor: AppColors.onPrimary,
                             side: isHC
-                                ? const BorderSide(color: Colors.black, width: 2)
+                                ? const BorderSide(
+                                    color: Colors.black,
+                                    width: 2,
+                                  )
                                 : null,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -172,8 +180,10 @@ class _RewardsContributionsScreenState
                               letterSpacing: 0.1,
                             ),
                           ),
-                          icon: Icon(Icons.badge_outlined,
-                              size: context.tapIconSize),
+                          icon: Icon(
+                            Icons.badge_outlined,
+                            size: context.tapIconSize,
+                          ),
                           label: const Text('View Membership Card'),
                         ),
                       ),
@@ -188,10 +198,7 @@ class _RewardsContributionsScreenState
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.onBack,
-    required this.onSettings,
-  });
+  const _TopBar({required this.onBack, required this.onSettings});
 
   final VoidCallback onBack;
   final VoidCallback onSettings;
@@ -263,10 +270,7 @@ class _TopBar extends StatelessWidget {
 }
 
 class _PointsHeroCard extends StatelessWidget {
-  const _PointsHeroCard({
-    required this.totalPoints,
-    required this.levelLabel,
-  });
+  const _PointsHeroCard({required this.totalPoints, required this.levelLabel});
 
   final int totalPoints;
   final String levelLabel;
@@ -320,7 +324,9 @@ class _PointsHeroCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isHC ? Colors.white : AppColors.secondaryContainer,
                   borderRadius: BorderRadius.circular(999),
-                  border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+                  border: isHC
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -328,7 +334,9 @@ class _PointsHeroCard extends StatelessWidget {
                     Icon(
                       Icons.stars,
                       size: 20,
-                      color: isHC ? Colors.black : AppColors.onSecondaryContainer,
+                      color: isHC
+                          ? Colors.black
+                          : AppColors.onSecondaryContainer,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -338,7 +346,9 @@ class _PointsHeroCard extends StatelessWidget {
                         height: 20 / 14,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.1,
-                        color: isHC ? Colors.black : AppColors.onSecondaryContainer,
+                        color: isHC
+                            ? Colors.black
+                            : AppColors.onSecondaryContainer,
                       ),
                     ),
                   ],
@@ -422,11 +432,7 @@ class _StatTile extends StatelessWidget {
               shape: BoxShape.circle,
               border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
             ),
-            child: Icon(
-              icon,
-              color: isHC ? Colors.black : iconColor,
-              size: 22,
-            ),
+            child: Icon(icon, color: isHC ? Colors.black : iconColor, size: 22),
           ),
           const SizedBox(height: 8),
           Text(

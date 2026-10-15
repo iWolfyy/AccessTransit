@@ -1,9 +1,12 @@
+import 'transit_catalogue.dart';
+import 'sample_test_mode.dart';
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
-import '../core/utils/time_utils.dart';
+import '../logic/ordered_schedule.dart';
 import '../models/trip_model.dart';
 import '../models/bus_location_model.dart';
 import 'eta_service.dart';
@@ -38,9 +41,12 @@ class TripService {
       StreamController<Map<String, TripModel>>.broadcast();
 
   CollectionReference<Map<String, dynamic>>? get _tripsRef =>
-      _db?.collection('trips');
+      _db?.collection(SampleTestMode.collection('trips'));
 
-  /// 1. Starts a new trip for a bus route using seeded [scheduleTimes] or fallback geodesic ETA.
+  /// 1. Starts a new trip for a bus route using ordered timetable intervals or explicit model estimates.
+  /// [departureTime] is the actual departure. [serviceDate] optionally fixes the
+  /// first stop's timetable date; otherwise the nearest daily departure is used.
+  /// Estimates shift by actual minus planned departure, retaining planned time.
   Future<TripModel> startTrip({
     required String busId,
     required String routeNo,
@@ -48,9 +54,12 @@ class TripService {
     required String driverId,
     List<String>? scheduleTimes,
     DateTime? departureTime,
+    DateTime? serviceDate,
+    String? scheduledDeparture,
     String? requestedTripId,
     BusLocationModel? initialTelemetry,
   }) async {
+    TransitCatalogue.requireSharedWrites();
     final now = DateTime.now();
     final actualDepTime = departureTime ?? now;
     final tripId =
@@ -59,30 +68,56 @@ class TripService {
       throw StateError('Select a bus itinerary and sign in first');
     }
 
-    Map<String, StopTimingInfo> stopTimes = {};
-
-    if (scheduleTimes != null &&
-        scheduleTimes.isNotEmpty &&
-        scheduleTimes.length == stops.length) {
-      DateTime? previous;
-      for (int i = 0; i < stops.length; i++) {
-        final timeStr = scheduleTimes[i];
-        var scheduledDt = TimeUtils.parseTimeStringToDateTime(
-          timeStr,
-          actualDepTime,
-        );
-        while (previous != null && scheduledDt.isBefore(previous)) {
-          scheduledDt = scheduledDt.add(const Duration(days: 1));
-        }
-        previous = scheduledDt;
-        stopTimes[stops[i]] = StopTimingInfo(
-          estimatedArrival: scheduledDt,
-          actualArrival: i == 0 ? actualDepTime : null,
-        );
-      }
-    } else {
-      stopTimes = EtaService.computeTripStopEstimates(stops, actualDepTime);
+    final base = serviceDate ?? actualDepTime;
+    final primaryRaw = scheduledDeparture?.trim() ?? '';
+    final primary = primaryRaw.isEmpty
+        ? null
+        : OrderedSchedule.minutesOfDay(primaryRaw);
+    if (primaryRaw.isNotEmpty && primary == null) {
+      throw StateError('Invalid scheduled departure. Review the timetable.');
     }
+    final raw = scheduleTimes ?? const <String>[];
+    final hasTimetable =
+        (raw.isNotEmpty && raw.first.trim().isNotEmpty) || primary != null;
+    final fallback = primary == null
+        ? DateTime(
+            base.year,
+            base.month,
+            base.day,
+            actualDepTime.hour,
+            actualDepTime.minute,
+            actualDepTime.second,
+            actualDepTime.millisecond,
+            actualDepTime.microsecond,
+          )
+        : DateTime(
+            base.year,
+            base.month,
+            base.day,
+            primary ~/ 60,
+            primary % 60,
+          );
+    var schedule = OrderedSchedule.build(
+      stopCount: stops.length,
+      scheduleTimes: raw,
+      serviceDate: base,
+      fallbackDeparture: fallback,
+    );
+    if (schedule == null) {
+      throw StateError('Invalid stop timetable. Review it before starting.');
+    }
+    if (hasTimetable && serviceDate == null) {
+      schedule = schedule.nearestDepartureTo(actualDepTime);
+    }
+    final plannedDeparture = hasTimetable ? schedule.times.first : null;
+    final offset = actualDepTime.difference(schedule.times.first);
+    final stopTimes = <String, StopTimingInfo>{
+      for (var i = 0; i < stops.length; i++)
+        stops[i]: StopTimingInfo(
+          estimatedArrival: schedule.times[i].add(offset),
+          actualArrival: i == 0 ? actualDepTime : null,
+        ),
+    };
 
     final trip = TripModel(
       tripId: tripId,
@@ -90,6 +125,7 @@ class TripService {
       routeNo: routeNo,
       stops: stops,
       status: 'in_progress',
+      scheduledDepartureTime: plannedDeparture,
       actualDepartureTime: actualDepTime,
       stopTimes: stopTimes,
       currentStopIndex: 0,
@@ -106,8 +142,10 @@ class TripService {
           'A shared backend and initial GPS observation are required',
         );
       }
-      final ref = db.collection('trips').doc(tripId);
-      final live = db.collection('live_locations').doc(busId);
+      final ref = db.collection(SampleTestMode.collection('trips')).doc(tripId);
+      final live = db
+          .collection(SampleTestMode.collection('live_locations'))
+          .doc(busId);
       final saved = await db
           .runTransaction<TripModel>((tx) async {
             final existing = await tx.get(ref);
@@ -158,6 +196,7 @@ class TripService {
 
   /// 2. Streams the current active trip for a given [busId].
   Stream<TripModel?> watchActiveTripForBus(String busId) {
+    if (TransitCatalogue.demo) return Stream.value(null);
     TripModel? getLocal() {
       final t = _localTripsFallback[busId];
       return t?.isInProgress == true ? t : null;
@@ -213,6 +252,7 @@ class TripService {
     DateTime? arrivalTime,
     String? expectedTripId,
   }) async {
+    TransitCatalogue.requireSharedWrites();
     final active = _localTripsFallback[busId];
     if (active == null || !active.isInProgress) return null;
     if (expectedTripId != null && active.tripId != expectedTripId) {
@@ -221,13 +261,23 @@ class TripService {
       );
     }
 
-    final nextIndex = active.currentStopIndex + 1;
-    if (nextIndex >= active.stops.length) {
-      // Reached final stop -> auto complete trip
-      return await completeTrip(busId);
+    if (active.stops.isEmpty ||
+        active.currentStopIndex < 0 ||
+        active.currentStopIndex >= active.stops.length) {
+      throw StateError(
+        'Invalid stop progress. Refresh the trip before confirming arrival.',
+      );
     }
-
-    final actTime = arrivalTime ?? DateTime.now();
+    // Legacy active records can already point at the terminal stop. Complete
+    // that arrival without advancing beyond the itinerary or losing its time.
+    final nextIndex = (active.currentStopIndex + 1).clamp(
+      0,
+      active.stops.length - 1,
+    );
+    final actTime =
+        active.stopTimes[active.stops[nextIndex]]?.actualArrival ??
+        arrivalTime ??
+        DateTime.now();
 
     // Recalculate remaining stops' pace
     final updatedStopTimes = EtaService.recalculateRemainingStopsPace(
@@ -255,6 +305,7 @@ class TripService {
     String busId, {
     String? expectedTripId,
   }) async {
+    TransitCatalogue.requireSharedWrites();
     final active = _localTripsFallback[busId];
     if (active == null) return null;
     if (expectedTripId != null && active.tripId != expectedTripId) {
@@ -272,14 +323,19 @@ class TripService {
 
   /// Atomically acknowledge the timeline and its corresponding broadcast state.
   Future<TripModel> _commitProgress(TripModel before, TripModel after) async {
+    TransitCatalogue.requireSharedWrites();
     if (tripWriter != null) {
       await tripWriter!(after, before);
       return after;
     }
     final db = _db;
     if (db == null) throw StateError('Shared trips are unavailable');
-    final ref = db.collection('trips').doc(before.tripId);
-    final live = db.collection('live_locations').doc(before.busId);
+    final ref = db
+        .collection(SampleTestMode.collection('trips'))
+        .doc(before.tripId);
+    final live = db
+        .collection(SampleTestMode.collection('live_locations'))
+        .doc(before.busId);
     return db
         .runTransaction<TripModel>((tx) async {
           final snapshot = await tx.get(ref);
@@ -291,38 +347,49 @@ class TripService {
             );
           }
           final actual = TripModel.fromFirestore(snapshot);
-          if (actual.status == after.status &&
-              actual.currentStopIndex == after.currentStopIndex) {
-            return actual;
-          }
-          if (actual.status != before.status ||
-              actual.currentStopIndex != before.currentStopIndex) {
+          final alreadySaved =
+              actual.status == after.status &&
+              actual.currentStopIndex == after.currentStopIndex;
+          if (!alreadySaved &&
+              (actual.status != before.status ||
+                  actual.currentStopIndex != before.currentStopIndex)) {
             throw StateError('Trip progress changed. Refresh before retrying.');
           }
-          tx.update(ref, {
-            'status': after.status,
-            'currentStopIndex': after.currentStopIndex,
-            'stopTimes': after.toMap()['stopTimes'],
-          });
-          final next = (after.currentStopIndex + 1).clamp(
+          final saved = alreadySaved ? actual : after;
+          if (saved.stops.isEmpty ||
+              saved.currentStopIndex < 0 ||
+              saved.currentStopIndex >= saved.stops.length) {
+            throw StateError('Trip progress changed. Refresh before retrying.');
+          }
+          if (!alreadySaved) {
+            tx.update(ref, {
+              'status': saved.status,
+              'currentStopIndex': saved.currentStopIndex,
+              'stopTimes': saved.toMap()['stopTimes'],
+            });
+          }
+          // Retry must also reconcile telemetry, while retaining the original
+          // acknowledged actualArrival rather than writing a new retry time.
+          final next = (saved.currentStopIndex + 1).clamp(
             0,
-            after.stops.length - 1,
+            saved.stops.length - 1,
           );
           tx.update(live, {
-            'currentStopIndex': after.currentStopIndex,
-            'nextStop': after.stops[next],
-            if (!after.isInProgress) 'status': 'completed',
-            if (!after.isInProgress) 'isBroadcasting': false,
-            if (!after.isInProgress) 'addedDelayMinutes': 0,
-            if (!after.isInProgress) 'delayReason': FieldValue.delete(),
+            'currentStopIndex': saved.currentStopIndex,
+            'nextStop': saved.stops[next],
+            if (!saved.isInProgress) 'status': 'completed',
+            if (!saved.isInProgress) 'isBroadcasting': false,
+            if (!saved.isInProgress) 'addedDelayMinutes': 0,
+            if (!saved.isInProgress) 'delayReason': FieldValue.delete(),
           });
-          return after;
+          return saved;
         })
         .timeout(const Duration(seconds: 12));
   }
 
   /// Fetches a one-time snapshot of the active trip for a bus.
   Future<TripModel?> getActiveTrip(String busId) async {
+    if (TransitCatalogue.demo) return null;
     try {
       final col = _tripsRef;
       if (col != null) {

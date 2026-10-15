@@ -8,7 +8,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application
-        android:label="Access Transit"
+        android:label="${appLabel}"
+        android:usesCleartextTraffic="${localHttp}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <!-- Background location service for Geolocator plugin (Android 14+ compatible) -->

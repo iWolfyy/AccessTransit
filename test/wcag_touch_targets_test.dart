@@ -9,9 +9,14 @@ import 'package:access_transit/services/accessibility_preferences_service.dart';
 import 'package:access_transit/widgets/app_bottom_nav_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    await AccessibilityPreferencesService.instance.init();
+  });
 
   group('WCAG 2.2 Level AA - 48dp Minimum Touch Targets Tests', () {
     testWidgets(

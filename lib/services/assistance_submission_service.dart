@@ -1,3 +1,6 @@
+import 'transit_catalogue.dart';
+import 'sample_test_mode.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -45,7 +48,7 @@ class AssistanceSubmissionService extends ChangeNotifier {
        _currentRiderId = currentRiderId ?? _signedInUid,
        _now = now ?? DateTime.now;
   static final instance = AssistanceSubmissionService();
-  static const storageKey = 'assistance_outbox_v1';
+  static final storageKey = SampleTestMode.storage('assistance_outbox_v1');
   final Future<BoardingRequest> Function(BoardingRequest) _publisher;
   final String? Function() _currentRiderId;
   final DateTime Function() _now;
@@ -140,6 +143,7 @@ class AssistanceSubmissionService extends ChangeNotifier {
   }
 
   Future<AssistanceSubmission> enqueue(BoardingRequest request) async {
+    TransitCatalogue.requireSharedWrites();
     await init();
     _requireOwner(request);
     final id = request.id.isEmpty
@@ -197,6 +201,7 @@ class AssistanceSubmissionService extends ChangeNotifier {
   }
 
   Future<AssistanceSubmission> _attempt(String id) async {
+    TransitCatalogue.requireSharedWrites();
     await init();
     var entry = _entries[id];
     if (entry == null) throw StateError('This saved request was not found.');
@@ -273,6 +278,7 @@ class AssistanceSubmissionService extends ChangeNotifier {
   }
 
   Future<void> retryPendingForUser(String uid) async {
+    if (TransitCatalogue.demo) return;
     await init();
     if (uid != currentRiderId) return;
     for (final entry in entries) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
@@ -40,6 +42,11 @@ class _AccessibilityPreferencesScreenState
   @override
   void initState() {
     super.initState();
+    AccessibilityPreferencesService.instance.addListener(_preferencesChanged);
+    _readPreferences();
+  }
+
+  void _readPreferences() {
     final prefs = AccessibilityPreferencesService.instance;
     _wheelchairAccess = prefs.isWheelchairOnly;
     _stepFree = prefs.isStepFree;
@@ -52,38 +59,80 @@ class _AccessibilityPreferencesScreenState
     _hasLargeTargets = prefs.hasLargeTargets;
   }
 
+  void _preferencesChanged() {
+    if (mounted) setState(_readPreferences);
+  }
+
+  @override
+  void dispose() {
+    AccessibilityPreferencesService.instance.removeListener(
+      _preferencesChanged,
+    );
+    super.dispose();
+  }
+
+  void _persist(Future<void> save) {
+    final owner = AccessibilityPreferencesService.instance.userId;
+    unawaited(
+      save.catchError((Object _) {
+        if (mounted &&
+            owner == AccessibilityPreferencesService.instance.userId) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Preferences could not be saved. Please retry.'),
+            ),
+          );
+        }
+      }),
+    );
+  }
+
   void _openProfile() {
-    AppNavigation.openProfile(context, initialUser: widget.initialUser);
+    AppNavigation.openProfile(
+      context,
+      initialUser:
+          widget.initialUser?.uid ==
+              AccessibilityPreferencesService.instance.userId
+          ? widget.initialUser
+          : null,
+    );
   }
 
   Future<void> _save() async {
-    await AccessibilityPreferencesService.instance.savePreferences(
-      isWheelchairOnly: _wheelchairAccess,
-      isStepFree: _stepFree,
-      minimizeWalking: _minimizeWalking,
-      isHighContrast: _highContrast,
-      voiceGuidance: _voiceGuidance,
-      hapticAlerts: _hapticAlerts,
-      boardingAssistance: _boardingAssistance,
-      quietRoutes: _quietRoutes,
-      hasLargeTargets: _hasLargeTargets,
-    );
-
-    if (!mounted) return;
+    final service = AccessibilityPreferencesService.instance;
+    final owner = service.userId;
+    try {
+      await service.savePreferences(
+        isWheelchairOnly: _wheelchairAccess,
+        isStepFree: _stepFree,
+        minimizeWalking: _minimizeWalking,
+        isHighContrast: _highContrast,
+        voiceGuidance: _voiceGuidance,
+        hapticAlerts: _hapticAlerts,
+        boardingAssistance: _boardingAssistance,
+        quietRoutes: _quietRoutes,
+        hasLargeTargets: _hasLargeTargets,
+      );
+    } catch (_) {
+      if (mounted && owner == service.userId) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Preferences could not be saved. Please retry.'),
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted || owner != service.userId) return;
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 10),
-              Text(
-                'Accessibility preferences saved!',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ],
+          content: Text(
+            owner == null
+                ? 'Device settings saved. Guest travel needs last for this session.'
+                : 'Preferences saved for this account on this device.',
           ),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
@@ -96,7 +145,11 @@ class _AccessibilityPreferencesScreenState
     if (widget.continueToHome) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => MainShell(initialUser: widget.initialUser),
+          builder: (_) => MainShell(
+            initialUser: widget.initialUser?.uid == service.userId
+                ? widget.initialUser
+                : null,
+          ),
         ),
       );
       return;
@@ -212,7 +265,7 @@ class _AccessibilityPreferencesScreenState
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'These preferences prioritize ramps, step-free routes, and comfortable transit for your trips.',
+                              'High contrast and tap targets apply to this device. Travel needs are saved separately for each signed-in account on this device. Guest needs last for this session. New accounts start with wheelchair access required; review your needs.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isHighContrast
@@ -238,13 +291,16 @@ class _AccessibilityPreferencesScreenState
                     _PreferenceToggle(
                       icon: Icons.accessible,
                       label: 'Wheelchair access required',
-                      subtitle: 'Only show buses with deployed ramps & designated spaces',
+                      subtitle:
+                          'Require current ramp evidence for matching buses',
                       value: _wheelchairAccess,
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _wheelchairAccess = v);
-                        AccessibilityPreferencesService.instance
-                            .setWheelchairOnly(v);
+                        _persist(
+                          AccessibilityPreferencesService.instance
+                              .setWheelchairOnly(v),
+                        );
                       },
                     ),
                     const Divider(height: 1, indent: 64),
@@ -256,7 +312,11 @@ class _AccessibilityPreferencesScreenState
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _stepFree = v);
-                        AccessibilityPreferencesService.instance.setStepFree(v);
+                        _persist(
+                          AccessibilityPreferencesService.instance.setStepFree(
+                            v,
+                          ),
+                        );
                       },
                     ),
                     const Divider(height: 1, indent: 64),
@@ -269,8 +329,10 @@ class _AccessibilityPreferencesScreenState
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _minimizeWalking = v);
-                        AccessibilityPreferencesService.instance
-                            .setMinimizeWalking(v);
+                        _persist(
+                          AccessibilityPreferencesService.instance
+                              .setMinimizeWalking(v),
+                        );
                       },
                     ),
                   ],
@@ -291,8 +353,10 @@ class _AccessibilityPreferencesScreenState
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _highContrast = v);
-                        AccessibilityPreferencesService.instance
-                            .setHighContrast(v);
+                        _persist(
+                          AccessibilityPreferencesService.instance
+                              .setHighContrast(v),
+                        );
                       },
                     ),
                     const Divider(height: 1, indent: 64),
@@ -304,8 +368,10 @@ class _AccessibilityPreferencesScreenState
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _hasLargeTargets = v);
-                        AccessibilityPreferencesService.instance
-                            .setLargeTargets(v);
+                        _persist(
+                          AccessibilityPreferencesService.instance
+                              .setLargeTargets(v),
+                        );
                         ScaffoldMessenger.of(context)
                           ..hideCurrentSnackBar()
                           ..showSnackBar(
@@ -352,8 +418,10 @@ class _AccessibilityPreferencesScreenState
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _voiceGuidance = v);
-                        AccessibilityPreferencesService.instance
-                            .setVoiceGuidance(v);
+                        _persist(
+                          AccessibilityPreferencesService.instance
+                              .setVoiceGuidance(v),
+                        );
                       },
                     ),
                     const Divider(height: 1, indent: 64),
@@ -366,8 +434,10 @@ class _AccessibilityPreferencesScreenState
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _hapticAlerts = v);
-                        AccessibilityPreferencesService.instance
-                            .setHapticAlerts(v);
+                        _persist(
+                          AccessibilityPreferencesService.instance
+                              .setHapticAlerts(v),
+                        );
                       },
                     ),
                   ],
@@ -389,8 +459,10 @@ class _AccessibilityPreferencesScreenState
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _boardingAssistance = v);
-                        AccessibilityPreferencesService.instance
-                            .setBoardingAssistance(v);
+                        _persist(
+                          AccessibilityPreferencesService.instance
+                              .setBoardingAssistance(v),
+                        );
                       },
                     ),
                     const Divider(height: 1, indent: 64),
@@ -403,8 +475,9 @@ class _AccessibilityPreferencesScreenState
                       hasLargeTargets: _hasLargeTargets,
                       onChanged: (v) {
                         setState(() => _quietRoutes = v);
-                        AccessibilityPreferencesService.instance.setQuietRoutes(
-                          v,
+                        _persist(
+                          AccessibilityPreferencesService.instance
+                              .setQuietRoutes(v),
                         );
                       },
                     ),

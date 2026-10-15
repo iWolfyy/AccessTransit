@@ -4,7 +4,7 @@ import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
-import '../../data/seed_data.dart';
+
 import '../../models/station.dart';
 import '../../services/accessibility_preferences_service.dart';
 import '../../services/firestore_service.dart';
@@ -14,7 +14,8 @@ import 'route_results_screen.dart';
 /// streamlined travel time, accessibility-first filters, and popular corridors.
 /// Phase 1: High accessibility UX enhancement inspired by LMT Go.
 class JourneySearchScreen extends StatefulWidget {
-  const JourneySearchScreen({super.key});
+  const JourneySearchScreen({super.key, this.service});
+  final FirestoreService? service;
 
   @override
   State<JourneySearchScreen> createState() => _JourneySearchScreenState();
@@ -22,7 +23,8 @@ class JourneySearchScreen extends StatefulWidget {
 
 class _JourneySearchScreenState extends State<JourneySearchScreen> {
   static const double _desktopBreakpoint = 768;
-  final FirestoreService _firestoreService = FirestoreService();
+  late final FirestoreService _firestoreService =
+      widget.service ?? FirestoreService();
 
   List<Station> _stations = [];
   Station? _selectedFromStation;
@@ -69,22 +71,17 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
 
   Future<void> _loadStations() async {
     try {
-      final routes = await _firestoreService.getRoutes();
-      final hasNewSlRoutes = routes.any(
-        (r) => r.id == 'route_138_pettah_homagama',
-      );
-      if (!hasNewSlRoutes) {
-        await SeedData().seedAll();
-      }
-      var fetched = await _firestoreService.getStations();
-      if (fetched.isEmpty) {
-        await SeedData().seedAll();
-        fetched = await _firestoreService.getStations();
-      }
-      final list = fetched.isNotEmpty ? fetched : SeedData.colomboStations;
+      await _firestoreService.refreshCatalogue();
+      final list = FirestoreService.cachedStations;
       if (mounted) {
         setState(() {
           _stations = list;
+          if (list.isEmpty) {
+            _selectedFromStation = null;
+            _selectedToStation = null;
+            _isLoadingStations = false;
+            return;
+          }
           // Default: Pettah (st_pettah) to Mount Lavinia (st_mt_lavinia) for Route 100!
           _selectedFromStation = list.firstWhere(
             (s) => s.id == 'st_pettah',
@@ -106,9 +103,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _stations = SeedData.colomboStations;
-          _selectedFromStation = SeedData.colomboStations[1]; // st_pettah
-          _selectedToStation = SeedData.colomboStations[7]; // st_mt_lavinia
+          _stations = [];
+          _selectedFromStation = null;
+          _selectedToStation = null;
           _isLoadingStations = false;
         });
       }
@@ -117,44 +114,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
 
   Future<void> _resyncDatabase() async {
     setState(() => _isLoadingStations = true);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('Updating Sri Lankan transit database...'),
-        ),
-      );
-    try {
-      await SeedData().seedAll();
-      await _loadStations();
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Database updated with authentic Sri Lankan routes & buses!',
-              ),
-              backgroundColor: AppColors.primaryContainer,
-            ),
-          );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text('Error updating database: $e'),
-              backgroundColor: AppColors.error,
-            ),
-          );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingStations = false);
-      }
-    }
+    await _loadStations();
   }
 
   void _swapLocations() {
@@ -176,49 +136,13 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   }
 
   void _useMyLocation() {
-    if (_stations.isEmpty) return;
-    final myHub = _stations.firstWhere(
-      (s) => s.id == 'st_pettah',
-      orElse: () => _stations.firstWhere(
-        (s) => s.id == 'st_fort',
-        orElse: () => _stations.first,
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Automatic nearest-stop detection is unavailable. Choose your boarding stop.',
+        ),
       ),
     );
-    setState(() => _selectedFromStation = myHub);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('📍 Boarding stop set to nearest stop: ${myHub.name}'),
-          backgroundColor: AppColors.primary,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-  }
-
-  void _selectCorridor(String fromId, String toId) {
-    if (_stations.isEmpty) return;
-    final from = _stations.firstWhere(
-      (s) => s.id == fromId,
-      orElse: () => _stations.first,
-    );
-    final to = _stations.firstWhere(
-      (s) => s.id == toId,
-      orElse: () => _stations.last,
-    );
-    setState(() {
-      _selectedFromStation = from;
-      _selectedToStation = to;
-    });
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('Route selected: ${from.name} ➔ ${to.name}'),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
   }
 
   void _showStationPicker(BuildContext context, bool isFrom) {
@@ -990,7 +914,10 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                         const SizedBox(height: 28),
 
                         // Popular Corridors & Quick Trips (One-tap selection)
-                        _RecentSavedSection(onSelectCorridor: _selectCorridor),
+                        if (_stations.isEmpty)
+                          const Text(
+                            'No shared stops available. Connect and retry.',
+                          ),
                       ],
                     ),
                   ),
@@ -2357,170 +2284,6 @@ class _VoiceSearchModal extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Popular Sri Lankan Transit Corridors (Sets both From & To in 1 Tap)
-class _RecentSavedSection extends StatelessWidget {
-  const _RecentSavedSection({required this.onSelectCorridor});
-
-  final void Function(String fromId, String toId) onSelectCorridor;
-
-  static const _corridors = [
-    (
-      'Route 100 • Galle Road Corridor',
-      'st_pettah',
-      'st_mt_lavinia',
-      'Pettah ⇄ Mount Lavinia',
-      'Low-floor buses with hydraulic wheelchair ramp',
-      Icons.directions_bus_rounded,
-    ),
-    (
-      'Route 138 • High-Level Road Corridor',
-      'st_pettah',
-      'st_kottawa',
-      'Pettah ⇄ Kottawa Highway Hub',
-      'Frequent express line with step-free stations',
-      Icons.directions_bus_rounded,
-    ),
-    (
-      'Route 120 • Horana Corridor',
-      'st_pettah',
-      'st_maharagama',
-      'Pettah ⇄ Maharagama Bus Complex',
-      'High-capacity central trunk service',
-      Icons.directions_bus_rounded,
-    ),
-    (
-      'Route 154 • Cross-town Link',
-      'st_bambalapitiya',
-      'st_pettah',
-      'Bambalapitiya ⇄ Pettah Hub',
-      'Direct coastal transfer route',
-      Icons.directions_bus_rounded,
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final isHighContrast = context.isHighContrast;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              Icons.star_rounded,
-              size: 22,
-              color: isHighContrast ? Colors.black : AppColors.primary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Popular Accessible Routes',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: isHighContrast ? Colors.black : AppColors.onSurface,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Material(
-          color: isHighContrast
-              ? Colors.white
-              : AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(18),
-          elevation: isHighContrast ? 0 : 1,
-          shadowColor: AppColors.onSurface.withValues(alpha: 0.04),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              border: isHighContrast
-                  ? Border.all(color: Colors.black, width: 2.0)
-                  : Border.all(color: AppColors.surfaceVariant),
-            ),
-            child: Column(
-              children: [
-                for (var i = 0; i < _corridors.length; i++) ...[
-                  if (i > 0)
-                    Divider(
-                      height: 1,
-                      color: isHighContrast
-                          ? Colors.black
-                          : AppColors.surfaceVariant,
-                    ),
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    leading: CircleAvatar(
-                      backgroundColor: isHighContrast
-                          ? const Color(0xFF001F3F)
-                          : AppColors.surfaceContainer,
-                      child: Icon(
-                        _corridors[i].$6,
-                        color: isHighContrast
-                            ? Colors.white
-                            : AppColors.primaryContainer,
-                        size: 24,
-                      ),
-                    ),
-                    title: Text(
-                      _corridors[i].$4,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: isHighContrast
-                            ? Colors.black
-                            : AppColors.onSurface,
-                      ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 2),
-                        Text(
-                          _corridors[i].$1,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: isHighContrast
-                                ? Colors.black
-                                : AppColors.primary,
-                          ),
-                        ),
-                        Text(
-                          _corridors[i].$5,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isHighContrast
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                            color: isHighContrast
-                                ? const Color(0xFF1A1A1A)
-                                : AppColors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                    trailing: Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 18,
-                      color: isHighContrast ? Colors.black : AppColors.primary,
-                    ),
-                    onTap: () =>
-                        onSelectCorridor(_corridors[i].$2, _corridors[i].$3),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

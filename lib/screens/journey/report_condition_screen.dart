@@ -1,3 +1,5 @@
+import '../../services/transit_catalogue.dart';
+
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,7 +8,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
-import '../../data/seed_data.dart';
+
 import '../../models/bus.dart';
 import '../../models/bus_route.dart';
 import '../../models/report.dart';
@@ -439,11 +441,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       if (!mounted) return;
 
       setState(() {
-        _allRoutes = routes.isNotEmpty ? routes : SeedData.sampleRoutes;
-        _allStations = stations.isNotEmpty
-            ? stations
-            : SeedData.colomboStations;
-        _allBuses = buses.isNotEmpty ? buses : SeedData.sampleBuses;
+        _allRoutes = routes;
+        _allStations = stations;
+        _allBuses = buses;
 
         _setupInitialSelection();
         _isLoadingData = false;
@@ -451,9 +451,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _allRoutes = SeedData.sampleRoutes;
-          _allStations = SeedData.colomboStations;
-          _allBuses = SeedData.sampleBuses;
+          _allRoutes = [];
+          _allStations = <Station>[];
+          _allBuses = [];
           _setupInitialSelection();
           _isLoadingData = false;
         });
@@ -713,6 +713,16 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               if (isBus) Text('Crowding: ${crowding.label}'),
               if (note.isNotEmpty) Text('Note: $note'),
               if (photo != null) const Text('Evidence: 1 photo attached'),
+              const SizedBox(height: 12),
+              const Text(
+                'Your observation, note and attached photo will be public after publication. Avoid faces, identifying details and sensitive personal information. Submit only photos you have permission to share.',
+              ),
+              const Text(
+                'Pending drafts stay on this device for up to 7 days and are removed on sign-out/account change. You can remove them from Your uploads. Removing a draft cannot recall a request already sent or delete a public report/photo.',
+              ),
+              const Text(
+                'Android drafts use encrypted private storage. On other platforms drafts last only for this app session.',
+              ),
             ],
           ),
         ),
@@ -980,7 +990,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       SizedBox(
                         height: context.hasLargeTargets ? 64 : 56,
                         child: FilledButton.icon(
-                          onPressed: _isSubmitting ? null : _submitReport,
+                          onPressed: _isSubmitting || TransitCatalogue.demo
+                              ? null
+                              : _submitReport,
                           style: FilledButton.styleFrom(
                             backgroundColor: isHC
                                 ? const Color(0xFF001F3F)
@@ -1837,7 +1849,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     }
 
     return InkWell(
-      onTap: _showPhotoOptionsModal,
+      onTap: TransitCatalogue.demo ? null : _showPhotoOptionsModal,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         height: 72,

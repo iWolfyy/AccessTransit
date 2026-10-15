@@ -11,7 +11,6 @@ import '../auth/login_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import 'rewards_contributions_screen.dart';
 
-
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
@@ -127,8 +126,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Container(
             decoration: BoxDecoration(
               color: isHC ? Colors.white : context.surfaceColor,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
               border: isHC ? Border.all(color: Colors.black, width: 2.0) : null,
             ),
             padding: const EdgeInsets.all(24),
@@ -234,15 +234,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         phone: newPhone,
       );
 
-      setState(() {
-        _user = updatedUser;
-      });
-
       try {
-        await UserService().updateUser(updatedUser);
+        final saved = await UserService().updateUser(updatedUser);
+        if (!mounted) return;
+        setState(() => _user = saved);
         final fbUser = _authService.currentUser;
         if (fbUser != null) {
-          await fbUser.updateDisplayName(newName);
+          try {
+            await fbUser.updateDisplayName(newName);
+          } catch (_) {
+            debugPrint(
+              'Profile saved; authentication display-name sync pending.',
+            );
+          }
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -273,7 +277,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final confirmed = await showLogoutConfirmationDialog(context);
     if (confirmed != true) return;
 
-    await _authService.logout();
+    try {
+      await _authService.logout();
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not clear private drafts or sign out. Please retry.',
+          ),
+        ),
+      );
+      return;
+    }
     nav.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
@@ -288,7 +303,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text('$feature will be available in a future update.')),
+        SnackBar(
+          content: Text('$feature will be available in a future update.'),
+        ),
       );
   }
 
@@ -311,7 +328,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.person_off_outlined, size: 48, color: AppColors.outline),
+              const Icon(
+                Icons.person_off_outlined,
+                size: 48,
+                color: AppColors.outline,
+              ),
               const SizedBox(height: 12),
               Text(
                 _error ?? 'Profile unavailable.',
@@ -380,7 +401,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onSeeAll: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => RewardsContributionsScreen(user: user),
+                          builder: (_) =>
+                              RewardsContributionsScreen(user: user),
                         ),
                       );
                     },
@@ -506,15 +528,11 @@ class _GradientProfileHeader extends StatelessWidget {
             : const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  AppColors.primary,
-                  AppColors.primaryContainer,
-                ],
+                colors: [AppColors.primary, AppColors.primaryContainer],
               ),
         color: isHighContrast ? const Color(0xFF001F3F) : null,
         border: isHighContrast
-            ? const Border(
-                bottom: BorderSide(color: Colors.black, width: 2.0))
+            ? const Border(bottom: BorderSide(color: Colors.black, width: 2.0))
             : null,
       ),
       child: SafeArea(
@@ -539,15 +557,15 @@ class _GradientProfileHeader extends StatelessWidget {
                             ),
                           )
                         : (onMenu != null
-                            ? IconButton(
-                                onPressed: onMenu,
-                                icon: Icon(
-                                  Icons.menu_rounded,
-                                  color: Colors.white,
-                                  size: context.tapIconSize,
-                                ),
-                              )
-                            : const SizedBox.shrink()),
+                              ? IconButton(
+                                  onPressed: onMenu,
+                                  icon: Icon(
+                                    Icons.menu_rounded,
+                                    color: Colors.white,
+                                    size: context.tapIconSize,
+                                  ),
+                                )
+                              : const SizedBox.shrink()),
                   ),
                   const Spacer(),
                   if (onEdit != null)
@@ -591,7 +609,10 @@ class _GradientProfileHeader extends StatelessWidget {
             // ── Avatar + Name + Email + Role Badge ──
             Padding(
               padding: EdgeInsets.fromLTRB(
-                24, 8, 24, hasLargeTargets ? 28 : 24,
+                24,
+                8,
+                24,
+                hasLargeTargets ? 28 : 24,
               ),
               child: Column(
                 children: [
@@ -606,11 +627,10 @@ class _GradientProfileHeader extends StatelessWidget {
                           shape: BoxShape.circle,
                           color: isHighContrast
                               ? Colors.white
-                              : AppColors.primaryContainer.withValues(alpha: 0.6),
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 3,
-                          ),
+                              : AppColors.primaryContainer.withValues(
+                                  alpha: 0.6,
+                                ),
+                          border: Border.all(color: Colors.white, width: 3),
                           boxShadow: isHighContrast
                               ? null
                               : const [
@@ -773,7 +793,9 @@ class _PersonalInfoCard extends StatelessWidget {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+            color: isHighContrast
+                ? Colors.white
+                : AppColors.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(16),
             border: isHighContrast
                 ? Border.all(color: Colors.black, width: 2.0)
@@ -853,9 +875,7 @@ class _InfoRow extends StatelessWidget {
             child: Icon(
               data.icon,
               size: hasLargeTargets ? 20 : 18,
-              color: isHighContrast
-                  ? Colors.black
-                  : AppColors.primaryContainer,
+              color: isHighContrast ? Colors.black : AppColors.primaryContainer,
             ),
           ),
           const SizedBox(width: 14),
@@ -867,11 +887,10 @@ class _InfoRow extends StatelessWidget {
                   data.title,
                   style: TextStyle(
                     fontSize: hasLargeTargets ? 17 : 15,
-                    fontWeight:
-                        isHighContrast ? FontWeight.w700 : FontWeight.w600,
-                    color: isHighContrast
-                        ? Colors.black
-                        : AppColors.onSurface,
+                    fontWeight: isHighContrast
+                        ? FontWeight.w700
+                        : FontWeight.w600,
+                    color: isHighContrast ? Colors.black : AppColors.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -879,8 +898,9 @@ class _InfoRow extends StatelessWidget {
                   data.subtitle,
                   style: TextStyle(
                     fontSize: hasLargeTargets ? 13 : 12,
-                    fontWeight:
-                        isHighContrast ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight: isHighContrast
+                        ? FontWeight.w600
+                        : FontWeight.w400,
                     color: isHighContrast
                         ? const Color(0xFF1A1A1A)
                         : AppColors.onSurfaceVariant,
@@ -968,7 +988,9 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(16),
-        border: isHighContrast ? Border.all(color: Colors.black, width: 2.0) : null,
+        border: isHighContrast
+            ? Border.all(color: Colors.black, width: 2.0)
+            : null,
         boxShadow: isHighContrast
             ? null
             : const [
@@ -1003,7 +1025,9 @@ class _StatCard extends StatelessWidget {
               fontSize: hasLargeTargets ? 13.5 : 12,
               height: 16 / 12,
               fontWeight: isHighContrast ? FontWeight.w700 : FontWeight.w500,
-              color: isHighContrast ? const Color(0xFF1A1A1A) : AppColors.onSurfaceVariant,
+              color: isHighContrast
+                  ? const Color(0xFF1A1A1A)
+                  : AppColors.onSurfaceVariant,
             ),
           ),
         ],
@@ -1017,10 +1041,7 @@ class _StatCard extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _RewardsCard extends StatelessWidget {
-  const _RewardsCard({
-    this.user,
-    this.onSeeAll,
-  });
+  const _RewardsCard({this.user, this.onSeeAll});
 
   final UserModel? user;
   final VoidCallback? onSeeAll;
@@ -1060,14 +1081,16 @@ class _RewardsCard extends StatelessWidget {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: InkWell(
               onTap: onSeeAll,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
               child: Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(hasLargeTargets ? 22 : 18),
                 decoration: BoxDecoration(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
                   border: isHighContrast
                       ? Border.all(color: Colors.black, width: 2)
                       : null,
@@ -1157,13 +1180,15 @@ class _RewardsCard extends StatelessWidget {
                         shape: BoxShape.circle,
                         color: isHighContrast
                             ? const Color(0xFFE5E5E5)
-                            : AppColors.primaryContainer
-                                .withValues(alpha: 0.10),
+                            : AppColors.primaryContainer.withValues(
+                                alpha: 0.10,
+                              ),
                         border: isHighContrast
                             ? Border.all(color: Colors.black, width: 1.5)
                             : Border.all(
-                                color: AppColors.outlineVariant
-                                    .withValues(alpha: 0.5),
+                                color: AppColors.outlineVariant.withValues(
+                                  alpha: 0.5,
+                                ),
                               ),
                       ),
                       child: Icon(
@@ -1181,8 +1206,9 @@ class _RewardsCard extends StatelessWidget {
                   '+ 9 more badges',
                   style: TextStyle(
                     fontSize: hasLargeTargets ? 14 : 12,
-                    fontWeight:
-                        isHighContrast ? FontWeight.w700 : FontWeight.w500,
+                    fontWeight: isHighContrast
+                        ? FontWeight.w700
+                        : FontWeight.w500,
                     color: isHighContrast
                         ? Colors.black
                         : AppColors.onSurfaceVariant,
@@ -1215,9 +1241,7 @@ class _SectionTitle extends StatelessWidget {
         fontSize: 13,
         fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
         letterSpacing: 0.8,
-        color: isHighContrast
-            ? Colors.black
-            : AppColors.onSurfaceVariant,
+        color: isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
       ),
     );
   }
@@ -1317,8 +1341,7 @@ class _GroupedCardTile extends StatelessWidget {
                     shape: BoxShape.circle,
                     color: isHighContrast
                         ? const Color(0xFFE5E5E5)
-                        : AppColors.primaryContainer
-                            .withValues(alpha: 0.08),
+                        : AppColors.primaryContainer.withValues(alpha: 0.08),
                     border: isHighContrast
                         ? Border.all(color: Colors.black, width: 1.5)
                         : null,
@@ -1340,8 +1363,8 @@ class _GroupedCardTile extends StatelessWidget {
                       fontWeight: isHighContrast
                           ? FontWeight.w700
                           : (hasLargeTargets
-                              ? FontWeight.w600
-                              : FontWeight.w500),
+                                ? FontWeight.w600
+                                : FontWeight.w500),
                       color: isHighContrast
                           ? Colors.black
                           : AppColors.onSurface,
@@ -1399,14 +1422,18 @@ class _DangerZoneSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
     final hasLargeTargets = context.hasLargeTargets;
-    final dangerColor = isHighContrast ? const Color(0xFF8B0000) : AppColors.error;
+    final dangerColor = isHighContrast
+        ? const Color(0xFF8B0000)
+        : AppColors.error;
 
     return Column(
       children: [
         // Sign Out
         Container(
           decoration: BoxDecoration(
-            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+            color: isHighContrast
+                ? Colors.white
+                : AppColors.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(16),
             border: isHighContrast
                 ? Border.all(color: Colors.black, width: 2.0)
@@ -1462,7 +1489,9 @@ class _DangerZoneSection extends StatelessWidget {
         // Delete Account
         Container(
           decoration: BoxDecoration(
-            color: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+            color: isHighContrast
+                ? Colors.white
+                : AppColors.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(16),
             border: isHighContrast
                 ? Border.all(color: Colors.black, width: 2.0)

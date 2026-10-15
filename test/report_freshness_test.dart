@@ -135,7 +135,7 @@ void main() {
     expect(
       StatusLogic.lastCheckedAt(
         checked.copyWith(
-          lastConfirmedAt: old.createdAt.subtract(const Duration(seconds: 1)),
+          lastConfirmedAt: old.createdAt!.subtract(const Duration(seconds: 1)),
         ),
         currentTime: now,
       ),

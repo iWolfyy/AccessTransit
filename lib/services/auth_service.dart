@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import '../models/enums/user_role.dart';
 import '../models/user_model.dart';
 import 'user_service.dart';
+import 'sample_test_mode.dart';
+import 'report_submission_service.dart';
+import 'accessibility_preferences_service.dart';
 
 /// Handles Firebase Authentication for AccessTransit.
 class AuthService {
@@ -46,6 +49,11 @@ class AuthService {
     String? phone,
     UserRole role = UserRole.passenger,
   }) async {
+    if (SampleTestMode.enabled) {
+      throw StateError(
+        'Sample/Test mode uses the eight existing test accounts. Registration is available in normal mode.',
+      );
+    }
     User? firebaseUser;
 
     try {
@@ -77,6 +85,10 @@ class AuthService {
       throw Exception('Failed to obtain authenticated Firebase user.');
     }
 
+    await AccessibilityPreferencesService.instance.activateAccount(
+      firebaseUser.uid,
+    );
+
     final proposedUser = UserModel.fromAuth(
       uid: firebaseUser.uid,
       name: name,
@@ -101,12 +113,28 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    return _auth.signInWithEmailAndPassword(email: email, password: password);
+    final credential = await _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    await AccessibilityPreferencesService.instance.activateAccount(
+      credential.user?.uid,
+    );
+    return credential;
   }
 
   /// Logs out the currently authenticated user.
   Future<void> logout() async {
-    await _auth.signOut();
+    try {
+      await AccessibilityPreferencesService.instance.activateAccount(null);
+      await ReportSubmissionService.instance.activateAccount(null);
+      await _auth.signOut();
+    } catch (_) {
+      await AccessibilityPreferencesService.instance.activateAccount(
+        currentUser?.uid,
+      );
+      rethrow;
+    }
   }
 
   /// Gets the Firestore profile of the currently authenticated user.
@@ -126,18 +154,15 @@ class AuthService {
         final mergedName = profile.name.trim().isNotEmpty
             ? profile.name.trim()
             : (firebaseUser.displayName?.trim().isNotEmpty == true
-                ? firebaseUser.displayName!.trim()
-                : (firebaseUser.email?.split('@').first.isNotEmpty == true
-                    ? firebaseUser.email!.split('@').first
-                    : 'Passenger'));
+                  ? firebaseUser.displayName!.trim()
+                  : (firebaseUser.email?.split('@').first.isNotEmpty == true
+                        ? firebaseUser.email!.split('@').first
+                        : 'Passenger'));
         final mergedEmail = profile.email.trim().isNotEmpty
             ? profile.email.trim()
             : (firebaseUser.email ?? '');
 
-        return profile.copyWith(
-          name: mergedName,
-          email: mergedEmail,
-        );
+        return profile.copyWith(name: mergedName, email: mergedEmail);
       }
     } catch (_) {
       // Fall through to Auth-based profile below.
@@ -146,8 +171,8 @@ class AuthService {
     final authName = firebaseUser.displayName?.trim().isNotEmpty == true
         ? firebaseUser.displayName!.trim()
         : (firebaseUser.email?.split('@').first.isNotEmpty == true
-            ? firebaseUser.email!.split('@').first
-            : 'Passenger');
+              ? firebaseUser.email!.split('@').first
+              : 'Passenger');
 
     return UserModel(
       uid: firebaseUser.uid,

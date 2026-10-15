@@ -129,8 +129,9 @@ class _NavigateWithConfidencePageState extends State<NavigateWithConfidencePage>
                             curve: Curves.easeInOutCubic,
                           ),
                         ).value;
-                  final pulse =
-                      widget.reduceMotion ? 0.4 : _pulseController.value;
+                  final pulse = widget.reduceMotion
+                      ? 0.4
+                      : _pulseController.value;
 
                   return FittedBox(
                     fit: BoxFit.contain,
@@ -193,13 +194,17 @@ class _NavigateWithConfidencePageState extends State<NavigateWithConfidencePage>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Get real-time updates and request boarding assistance directly from the app for a stress-free journey.',
+                  'Preview only. Check shared GPS when available; assistance needs an operator response.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
                     height: 24 / 16,
-                    fontWeight: context.isHighContrast ? FontWeight.w600 : FontWeight.normal,
-                    color: context.isHighContrast ? Colors.black : AppColors.onSurfaceVariant,
+                    fontWeight: context.isHighContrast
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    color: context.isHighContrast
+                        ? Colors.black
+                        : AppColors.onSurfaceVariant,
                   ),
                 ),
               ],

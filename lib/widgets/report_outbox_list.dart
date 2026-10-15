@@ -5,11 +5,16 @@ import '../services/report_submission_service.dart';
 import '../screens/journey/report_submitted_screen.dart';
 
 class ReportOutboxList extends StatelessWidget {
-  const ReportOutboxList({super.key, required this.userId});
+  const ReportOutboxList({
+    super.key,
+    required this.userId,
+    this.submissionService,
+  });
   final String? userId;
+  final ReportSubmissionService? submissionService;
   @override
   Widget build(BuildContext context) {
-    final service = ReportSubmissionService.instance;
+    final service = submissionService ?? ReportSubmissionService.instance;
     return ListenableBuilder(
       listenable: service,
       builder: (context, _) {
@@ -30,6 +35,9 @@ class ReportOutboxList extends StatelessWidget {
               'Your uploads',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
+            const Text(
+              'Drafts expire after 7 days. Open an upload to retry or remove it. Sign-out removes local drafts.',
+            ),
             for (final entry in entries)
               ListTile(
                 title: Text(entry.report.problemType),
@@ -40,6 +48,7 @@ class ReportOutboxList extends StatelessWidget {
                     builder: (_) => ReportSubmittedScreen(
                       report: entry.report,
                       targetName: entry.report.targetName,
+                      submissionService: service,
                     ),
                   ),
                 ),

@@ -63,6 +63,7 @@ void main() {
       final now = DateTime(2026, 10, 1, 8, 10);
 
       final liveLocationWithDelay = BusLocationModel(
+        timestamp: now,
         busId: busId,
         routeId: 'route_138',
         latitude: 6.9344,

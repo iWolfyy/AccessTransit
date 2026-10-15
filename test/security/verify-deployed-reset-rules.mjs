@@ -1,0 +1,22 @@
+import {createRequire} from 'node:module';
+import {readFile,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {createHash} from 'node:crypto';
+const root=resolve(import.meta.dirname,'../..');
+const privateRoot=resolve(root,'.private/firebase-reset');
+const plan=JSON.parse(await readFile(resolve(privateRoot,'reset-plan.json'),'utf8'));
+if(plan.projectId!=='accesstransit-b615b')throw new Error('Unexpected project.');
+const require=createRequire(import.meta.url);
+const auth=require('firebase-tools/lib/auth.js');
+const account=auth.getGlobalDefaultAccount();
+const token=await auth.getAccessToken(account.tokens.refresh_token,['https://www.googleapis.com/auth/cloud-platform','https://www.googleapis.com/auth/firebase']);
+async function get(path){const response=await fetch(`https://firebaserules.googleapis.com/v1/${path}`,{headers:{Authorization:`Bearer ${token.access_token}`}});if(!response.ok)throw new Error(`Rules read failed: ${response.status}`);return response.json();}
+const release=await get(`projects/${plan.projectId}/releases/cloud.firestore`);
+const ruleset=await get(release.rulesetName);
+const file=ruleset.source?.files?.find(f=>f.name==='firestore.rules');
+if(!file)throw new Error('Deployed Firestore source missing.');
+const sha256=createHash('sha256').update(file.content).digest('hex');
+if(sha256!==plan.rulesSha256)throw new Error('Deployed rules differ from tested candidate.');
+const result={projectId:plan.projectId,ruleset:release.rulesetName,sha256,matchesReviewedPlan:true};
+await writeFile(resolve(privateRoot,'deployed-rules-verification.json'),JSON.stringify(result,null,2));
+console.log(JSON.stringify(result));process.exit(0);

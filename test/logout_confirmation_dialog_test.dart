@@ -16,7 +16,9 @@ void main() {
   });
 
   group('LogoutConfirmationDialog Tests', () {
-    testWidgets('Renders title, message, Cancel and Sign Out buttons', (tester) async {
+    testWidgets('Renders title, message, Cancel and Sign Out buttons', (
+      tester,
+    ) async {
       bool? result;
 
       await tester.pumpWidget(
@@ -40,9 +42,18 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify dialog elements
-      expect(find.text('Sign Out'), findsNWidgets(2)); // Title and confirm button
       expect(
-        find.textContaining('Are you sure you want to sign out?'),
+        find.text('Sign Out'),
+        findsNWidgets(2),
+      ); // Title and confirm button
+      expect(
+        find.textContaining(
+          'remove pending report drafts and photos from this device',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Requests already sent may still complete'),
         findsOneWidget,
       );
       expect(find.text('Cancel'), findsOneWidget);
@@ -107,14 +118,20 @@ void main() {
       await tester.tap(find.text('Open Dialog'));
       await tester.pumpAndSettle();
 
-      final cancelSize = tester.getSize(find.widgetWithText(OutlinedButton, 'Cancel'));
-      final signOutSize = tester.getSize(find.widgetWithText(ElevatedButton, 'Sign Out'));
+      final cancelSize = tester.getSize(
+        find.widgetWithText(OutlinedButton, 'Cancel'),
+      );
+      final signOutSize = tester.getSize(
+        find.widgetWithText(ElevatedButton, 'Sign Out'),
+      );
 
       expect(cancelSize.height, greaterThanOrEqualTo(48.0));
       expect(signOutSize.height, greaterThanOrEqualTo(48.0));
     });
 
-    testWidgets('showLogoutSuccessSnackBar displays confirmation message', (tester) async {
+    testWidgets('showLogoutSuccessSnackBar displays confirmation message', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.lightTheme,

@@ -8,13 +8,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   final now = DateTime(2026, 10, 14, 10);
-  const bus = Bus(
+  final bus = Bus(
     id: 'bus',
     routeNo: '138',
     stops: ['stop'],
     hasRamp: true,
     lowFloor: true,
     rampOk: true,
+    rampCheckedAt: now,
+    rampCheckedBy: 'test-operator',
     occupancy: 'low',
   );
 
@@ -39,8 +41,8 @@ void main() {
     userId: 'commuter',
   );
 
-  BusStatusResult status(List<Report> reports, {Bus vehicle = bus}) =>
-      StatusLogic.getBusStatus(vehicle, reports, currentTime: now);
+  BusStatusResult status(List<Report> reports, {Bus? vehicle}) =>
+      StatusLogic.getBusStatus(vehicle ?? bus, reports, currentTime: now);
 
   const positives = {
     'ramp_working': 'Ramp Working',

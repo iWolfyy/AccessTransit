@@ -1,13 +1,11 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
-import '../../services/user_service.dart';
 
-/// Digital Membership Card — points, Rs. 100 reward claim, member benefits.
+/// Digital Membership Card — recorded contribution points and reward availability.
 class MembershipCardScreen extends StatefulWidget {
   const MembershipCardScreen({
     super.key,
@@ -34,7 +32,6 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
   final AuthService _authService = AuthService();
   UserModel? _user;
   bool _isLoading = false;
-  int? _overridePoints;
 
   @override
   void initState() {
@@ -60,40 +57,6 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
     }
   }
 
-  Future<void> _claimReward(int currentPoints) async {
-    if (currentPoints < 100) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You need at least 100 points to claim Rs. 100 reward.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    final uid = _user?.uid ?? FirebaseAuth.instance.currentUser?.uid ?? '';
-    if (uid.isNotEmpty) {
-      await UserService().updateUserStats(uid, pointsDelta: -100);
-    }
-
-    if (!mounted) return;
-
-    final newPoints = (currentPoints - 100).clamp(0, 999999);
-    setState(() {
-      _overridePoints = newPoints;
-      if (_user != null) {
-        _user = _user!.copyWith(points: newPoints);
-      }
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('🎉 Rs. 100 Reward Claimed! 100 points redeemed successfully.'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
-
   static const double _desktopBreakpoint = 768;
   static const Color _tertiaryFixed = Color(0xFFFFDBCA);
   static const Color _onTertiaryFixed = Color(0xFF331200);
@@ -105,11 +68,13 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
     final isHC = context.isHighContrast;
 
-    final resolvedName = widget.memberName ??
+    final resolvedName =
+        widget.memberName ??
         (_user?.name.trim().isNotEmpty == true ? _user!.name : 'Commuter');
-    final resolvedPoints = _overridePoints ?? widget.points ?? _user?.points ?? 0;
+    final resolvedPoints = widget.points ?? _user?.points ?? 0;
     final badges = _user?.badges ?? (resolvedPoints ~/ 100);
-    final resolvedTier = widget.memberTier ??
+    final resolvedTier =
+        widget.memberTier ??
         (badges >= 3
             ? 'Gold Member'
             : (badges >= 1 ? 'Silver Member' : 'Bronze Member'));
@@ -117,7 +82,7 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
     final rawUid = _user?.uid ?? '';
     final shortUid = rawUid.length > 8
         ? rawUid.substring(0, 8).toUpperCase()
-        : (rawUid.isNotEmpty ? rawUid.toUpperCase() : '4821-7936');
+        : (rawUid.isNotEmpty ? rawUid.toUpperCase() : 'Unavailable');
     final resolvedMemberId = widget.memberId ?? 'AT-$shortUid';
 
     return Scaffold(
@@ -133,7 +98,12 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
                     ),
                   )
                 : ListView(
-                    padding: EdgeInsets.fromLTRB(16, isDesktop ? 24 : 16, 16, 32),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      isDesktop ? 24 : 16,
+                      16,
+                      32,
+                    ),
                     children: [
                       Center(
                         child: ConstrainedBox(
@@ -149,7 +119,6 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
                                 memberId: resolvedMemberId,
                                 tertiaryFixed: _tertiaryFixed,
                                 onTertiaryFixed: _onTertiaryFixed,
-                                onClaimReward: () => _claimReward(resolvedPoints),
                               ),
                               const SizedBox(height: 24),
                               _BenefitsSection(
@@ -160,14 +129,18 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
                               SizedBox(
                                 height: context.buttonHeight,
                                 child: FilledButton.icon(
-                                  onPressed: () => Navigator.of(context).maybePop(),
+                                  onPressed: () =>
+                                      Navigator.of(context).maybePop(),
                                   style: FilledButton.styleFrom(
                                     backgroundColor: isHC
                                         ? const Color(0xFF001F3F)
                                         : AppColors.primaryContainer,
                                     foregroundColor: AppColors.onPrimary,
                                     side: isHC
-                                        ? const BorderSide(color: Colors.black, width: 2)
+                                        ? const BorderSide(
+                                            color: Colors.black,
+                                            width: 2,
+                                          )
                                         : null,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -179,7 +152,10 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
                                       letterSpacing: 0.1,
                                     ),
                                   ),
-                                  icon: Icon(Icons.arrow_back, size: context.tapIconSize),
+                                  icon: Icon(
+                                    Icons.arrow_back,
+                                    size: context.tapIconSize,
+                                  ),
                                   label: const Text('Back to Rewards'),
                                 ),
                               ),
@@ -264,7 +240,6 @@ class _MembershipCard extends StatelessWidget {
     required this.memberId,
     required this.tertiaryFixed,
     required this.onTertiaryFixed,
-    required this.onClaimReward,
   });
 
   final String memberName;
@@ -274,13 +249,11 @@ class _MembershipCard extends StatelessWidget {
   final String memberId;
   final Color tertiaryFixed;
   final Color onTertiaryFixed;
-  final VoidCallback onClaimReward;
 
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.sizeOf(context).width >= 768;
     final isHC = context.isHighContrast;
-    final canClaim = points >= 100;
 
     return Container(
       decoration: BoxDecoration(
@@ -344,7 +317,9 @@ class _MembershipCard extends StatelessWidget {
                                   height: 16 / 12,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 1.2,
-                                  color: isHC ? Colors.black : AppColors.primary,
+                                  color: isHC
+                                      ? Colors.black
+                                      : AppColors.primary,
                                 ),
                               ),
                             ],
@@ -480,7 +455,7 @@ class _MembershipCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Rs. 100 Transit Reward',
+                            'Contribution points',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
@@ -491,11 +466,13 @@ class _MembershipCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '100 Points = Rs. 100 Voucher',
+                        'Points have no cash or voucher value',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                          color: isHC
+                              ? const Color(0xFF001F3F)
+                              : AppColors.primary,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -515,7 +492,7 @@ class _MembershipCard extends StatelessWidget {
                         width: double.infinity,
                         height: 48,
                         child: FilledButton.icon(
-                          onPressed: canClaim ? onClaimReward : null,
+                          onPressed: null,
                           style: FilledButton.styleFrom(
                             backgroundColor: isHC
                                 ? const Color(0xFF001F3F)
@@ -530,9 +507,7 @@ class _MembershipCard extends StatelessWidget {
                           ),
                           icon: const Icon(Icons.redeem_rounded, size: 20),
                           label: Text(
-                            canClaim
-                                ? 'Claim Rs. 100 Reward (Redeem 100 Points)'
-                                : 'Earn ${100 - points} more points to unlock Rs. 100',
+                            'Redemption unavailable',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -569,22 +544,22 @@ class _BenefitsSection extends StatelessWidget {
         Icons.loyalty,
         AppColors.primaryFixed,
         AppColors.primary,
-        'Partner Discounts',
-        'Exclusive rates at local businesses and transit services.',
+        'Reward availability',
+        'Partner discounts and vouchers are not available.',
       ),
       (
         Icons.card_membership,
         AppColors.primaryFixed,
         AppColors.primary,
         'Member Benefits',
-        'Priority support and early access to new transit features.',
+        'Membership does not include priority support or guaranteed access.',
       ),
       (
         Icons.verified,
         secondaryFixed,
         onSecondaryFixed,
         'Community Recognition',
-        'Earned for contributing accessibility reports and feedback.',
+        'Contribution points update after administrator review.',
       ),
     ];
 
@@ -670,7 +645,9 @@ class _BenefitRow extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isHC ? Colors.white : iconBg,
                 shape: BoxShape.circle,
-                border: isHC ? Border.all(color: Colors.black, width: 1.5) : null,
+                border: isHC
+                    ? Border.all(color: Colors.black, width: 1.5)
+                    : null,
               ),
               child: Icon(
                 icon,

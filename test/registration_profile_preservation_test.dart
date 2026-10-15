@@ -5,12 +5,18 @@
 import 'package:access_transit/models/enums/user_role.dart';
 import 'package:access_transit/models/user_model.dart';
 import 'package:access_transit/services/auth_service.dart';
+import 'package:access_transit/services/accessibility_preferences_service.dart';
 import 'package:access_transit/services/user_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    await AccessibilityPreferencesService.instance.init();
+  });
   final existing = UserModel(
     uid: 'existing-user',
     name: 'Original Name',
@@ -43,6 +49,7 @@ void main() {
       );
 
       expect(auth.signInCalls, 1);
+      expect(AccessibilityPreferencesService.instance.userId, existing.uid);
       expect(result.toMap(), existing.toMap());
       expect(db.data, storedData);
       expect(db.writeCount, 0);
@@ -166,7 +173,8 @@ void main() {
         reportsSubmitted: 12,
         verifiedCount: 7,
       );
-      await service.createUser(profile);
+      final cached = await service.createUser(profile);
+      expect(cached.points, 0);
       final result = await service.createUser(
         UserModel.fromAuth(
           uid: profile.uid,
@@ -174,8 +182,8 @@ void main() {
           email: profile.email,
         ),
       );
-      expect(result.toMap(), profile.toMap());
-      expect((await service.getUser(profile.uid))!.toMap(), profile.toMap());
+      expect(result.toMap(), cached.toMap());
+      expect((await service.getUser(profile.uid))!.toMap(), cached.toMap());
     },
   );
 }

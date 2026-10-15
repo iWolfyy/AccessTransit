@@ -1,3 +1,5 @@
+import 'evidence_refresh.dart';
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
@@ -36,9 +38,10 @@ class AccessibilityEvidenceCard extends StatelessWidget {
               report.targetName.trim().toLowerCase() ==
                   stop.trim().toLowerCase()));
 
-  String _time(DateTime time) =>
-      '${time.year}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} '
-      '${TimeUtils.formatTimeString(time)}';
+  String _time(DateTime? time) => time == null
+      ? 'Unknown'
+      : '${time.year}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} '
+            '${TimeUtils.formatTimeString(time)}';
 
   Widget _observation(BuildContext context, Report report, DateTime now) {
     final accounts = report.confirmedBy
@@ -50,11 +53,15 @@ class AccessibilityEvidenceCard extends StatelessWidget {
     final hasConfirmation =
         accounts.isNotEmpty &&
         confirmedAt != null &&
-        !confirmedAt.isBefore(report.createdAt) &&
+        report.createdAt != null &&
+        !confirmedAt.isBefore(report.createdAt!) &&
         !confirmedAt.isAfter(now);
     final isCurrent = StatusLogic.isReportActive(report, currentTime: now);
     final String state;
-    if (!isCurrent) {
+    if (report.createdAt == null &&
+        !StatusLogic.needsRecheck(report, currentTime: now)) {
+      state = 'Unknown - observation time unavailable';
+    } else if (!isCurrent) {
       state = 'Unknown — latest observation expired';
     } else if (StatusLogic.needsRecheck(report, currentTime: now)) {
       state = 'Unresolved barrier — needs recheck; current condition unknown';
@@ -93,6 +100,11 @@ class AccessibilityEvidenceCard extends StatelessWidget {
             style: TextStyle(color: context.subtextColor),
           ),
           _AccountAttribution(reporter: report.userId, confirmers: accounts),
+          if (report.lastRecheckedAt != null)
+            Text(
+              'Last recheck: ${_time(report.lastRecheckedAt!.isAfter(now) ? null : report.lastRecheckedAt)} by ${report.lastRecheckedBy ?? 'Unknown'}. Unique confirmations unchanged.',
+              style: TextStyle(color: context.subtextColor),
+            ),
           Text(
             '${StatusLogic.isPersistentBarrier(report) ? 'Recheck due' : 'Observation expires'}: ${_time(StatusLogic.freshUntil(report, currentTime: now))}',
             style: TextStyle(color: context.subtextColor),
@@ -117,8 +129,11 @@ class AccessibilityEvidenceCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final now = currentTime ?? DateTime.now();
+  Widget build(BuildContext context) => currentTime != null
+      ? _buildAtTime(context, currentTime!)
+      : EvidenceRefresh(reports: reports, builder: _buildAtTime);
+
+  Widget _buildAtTime(BuildContext context, DateTime now) {
     final eligible =
         reports
             .where(
@@ -127,14 +142,14 @@ class AccessibilityEvidenceCard extends StatelessWidget {
                   r.status.toLowerCase() == 'active' &&
                   r.falseCount < 3 &&
                   r.flaggedBy.length < 3 &&
-                  !r.createdAt.isAfter(now),
+                  (r.createdAt == null || !r.createdAt!.isAfter(now)),
             )
             .toList()
           ..sort(
-            (a, b) => StatusLogic.lastCheckedAt(
-              b,
-              currentTime: now,
-            ).compareTo(StatusLogic.lastCheckedAt(a, currentTime: now)),
+            (a, b) => Report.compareDatesDescending(
+              StatusLogic.lastCheckedAt(a, currentTime: now),
+              StatusLogic.lastCheckedAt(b, currentTime: now),
+            ),
           );
     final vehicleReports = eligible
         .where(

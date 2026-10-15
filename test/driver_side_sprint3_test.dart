@@ -42,7 +42,7 @@ void main() {
         expect(recreated, equals(bus));
       });
 
-      test('TASK 2 (AC-85): End-to-end driver ramp status toggle updates rider status (Safe -> Warning -> Safe)', () async {
+      test('TASK 2 (AC-85): End-to-end driver ramp status toggle updates rider status (Unknown -> Warning -> Unknown)', () async {
         const busId = 'bus_138_nd4521';
 
         // 1. Initial State: Bus ramp is OK
@@ -58,8 +58,8 @@ void main() {
         expect(bus!.rampOk, isTrue);
 
         var status = StatusLogic.getBusStatus(bus, []);
-        expect(status.status, equals(AccessibilityStatus.accessible));
-        expect(status.statusLabel, equals('Safe'));
+        expect(status.status, equals(AccessibilityStatus.unknown));
+        expect(status.statusLabel, equals('Unknown'));
 
         // 2. Operator flips rampOk to false on Dashboard -> status becomes Warning
         await firestoreService.updateBusAccessibility(busId, rampOk: false);
@@ -83,8 +83,8 @@ void main() {
         expect(bus!.rampOk, isTrue);
 
         status = StatusLogic.getBusStatus(bus, []);
-        expect(status.status, equals(AccessibilityStatus.accessible));
-        expect(status.statusLabel, equals('Safe'));
+        expect(status.status, equals(AccessibilityStatus.unknown));
+        expect(status.statusLabel, equals('Unknown'));
       });
 
       test('TASK 2 (AC-85): Occupancy update does not alter accessibility badge status', () async {
@@ -98,8 +98,8 @@ void main() {
         );
         var bus = await firestoreService.getBusById(busId);
         var status = StatusLogic.getBusStatus(bus!, []);
-        expect(status.status, equals(AccessibilityStatus.accessible));
-        expect(status.statusLabel, equals('Safe'));
+        expect(status.status, equals(AccessibilityStatus.unknown));
+        expect(status.statusLabel, equals('Unknown'));
 
         // Change occupancy to high
         await firestoreService.updateBusAccessibility(busId, occupancy: 'high');
@@ -108,8 +108,8 @@ void main() {
 
         // Badge status must remain Safe (informational only)
         status = StatusLogic.getBusStatus(bus, []);
-        expect(status.status, equals(AccessibilityStatus.accessible));
-        expect(status.statusLabel, equals('Safe'));
+        expect(status.status, equals(AccessibilityStatus.unknown));
+        expect(status.statusLabel, equals('Unknown'));
       });
 
       test('TASK 3 (AC-86): Boarding assistance requests lifecycle (submit -> stream -> acknowledge -> complete)', () async {

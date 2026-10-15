@@ -1,10 +1,28 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
-    id("com.google.gms.google-services")
+    id("com.google.gms.google-services") apply false
     // END: FlutterFire Configuration
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val localValidation = providers.gradleProperty("dart-defines").orNull
+    ?.split(",")?.any {
+        String(Base64.getDecoder().decode(it)) == "LOCAL_VALIDATION=true"
+    } ?: false
+
+if (!localValidation) apply(plugin = "com.google.gms.google-services")
+
+// A local walkthrough must not replace the installed production/test account app.
+if (localValidation) {
+    tasks.configureEach {
+        if (name.contains("Release")) doFirst {
+            error("Local validation is only supported in debug builds")
+        }
+    }
 }
 
 android {
@@ -20,6 +38,9 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.accesstransit.access_transit"
+        if (localValidation) applicationIdSuffix = ".validation"
+        manifestPlaceholders["appLabel"] = if (localValidation) "AccessTransit Local Test" else "Access Transit"
+        manifestPlaceholders["localHttp"] = if (localValidation) "true" else "false"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

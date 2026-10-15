@@ -54,7 +54,12 @@ class AssistanceTarget {
     required Map<String, Station> stations,
     AssistancePurpose purpose = AssistancePurpose.boarding,
   }) {
-    if (bus == null || bus.id != busId || busId.trim().isEmpty) return null;
+    if (bus == null ||
+        bus.isPublishedTimetable ||
+        bus.id != busId ||
+        busId.trim().isEmpty) {
+      return null;
+    }
     final explicitId = stationId?.trim() ?? '';
     final candidates = bus.stops
         .where(

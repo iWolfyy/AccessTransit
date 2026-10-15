@@ -2,7 +2,7 @@
 
 Wheelchair and step-free preferences feed journey accessibility checks. High contrast and large tap targets affect rendering. Manual boarding assistance remains available through its existing journey action.
 
-Spoken voice navigation, quiet-route matching, automatic haptic travel alerts and automatic boarding-assistance preferences have no connected implementation. Their switches are disabled and labelled unavailable. They cannot be activated by loading old preferences, individual setters or batch saving. Existing stored enabled values are migrated to false.
+Spoken voice navigation, quiet-route matching, automatic haptic travel alerts and automatic boarding-assistance preferences have no connected implementation. Their switches are disabled and labelled unavailable. They cannot be activated by loading old preferences, individual setters or batch saving. Legacy unsupported preference keys are removed; their getters remain false. Personal needs are scoped by UID while display controls are device settings; see [accessibility-preferences.md](accessibility-preferences.md).
 
 Walking optimisation is unavailable: the current search uses fixed boarding/alighting stops and has no measured walking paths, entrances or transfer distances. Intermediate bus-stop counts are not walking distance. The old stop-count sort has been removed. Legacy callers requesting minimise walking see a notice, and normal departure/accessibility ordering applies. Search presets do not enable this option. The age-based 'Elderly / Gentle' preset is renamed 'Step-free' to describe what it actually changes.
 

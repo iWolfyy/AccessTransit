@@ -1,3 +1,5 @@
+import '../../widgets/evidence_refresh.dart';
+
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -91,8 +93,12 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
       );
   }
 
-  Future<void> _handleConfirm(Report report) =>
-      _perform(report, ReportMutationAction.confirm);
+  Future<void> _handleConfirm(Report report) => _perform(
+    report,
+    report.confirmedBy.contains(_currentUserId())
+        ? ReportMutationAction.recheck
+        : ReportMutationAction.confirm,
+  );
   Future<void> _handleResolve(Report report) =>
       _perform(report, ReportMutationAction.resolve);
   Future<void> _handleFlag(Report report) =>
@@ -108,6 +114,10 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     try {
       final result = await (switch (action) {
         ReportMutationAction.confirm => _repository.confirmReport(
+          report.id,
+          actor,
+        ),
+        ReportMutationAction.recheck => _repository.recheckReport(
           report.id,
           actor,
         ),
@@ -217,10 +227,22 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     return _buildScaffold(context, isDesktop, widget.report);
   }
 
-  Widget _buildScaffold(BuildContext context, bool isDesktop, Report? report) {
+  Widget _buildScaffold(BuildContext context, bool isDesktop, Report? report) =>
+      EvidenceRefresh(
+        reports: [?report],
+        builder: (context, now) =>
+            _buildAtTime(context, isDesktop, report, now),
+      );
+
+  Widget _buildAtTime(
+    BuildContext context,
+    bool isDesktop,
+    Report? report,
+    DateTime now,
+  ) {
     final userId = _currentUserId();
     final isReportActive = report != null
-        ? StatusLogic.isReportActive(report)
+        ? StatusLogic.isReportActive(report, currentTime: now)
         : true;
     final isResolved = report?.status.toLowerCase() == 'resolved';
     final isHidden = report?.status.toLowerCase() == 'hidden';
@@ -302,6 +324,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                 ],
                 // 1. Status Banner Header
                 _buildStatusBanner(
+                  now: now,
                   isResolved: isResolved,
                   isReportActive: isReportActive,
                   report: report,
@@ -335,7 +358,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
                 // 5. Verification Timeline & Trust Meter
                 if (report != null) ...[
-                  _buildTrustTimelineCard(report),
+                  _buildTrustTimelineCard(report, now),
                   const SizedBox(height: 20),
                 ],
 
@@ -346,6 +369,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     isReportActive: isReportActive,
                     isResolved: isResolved,
                     hasConfirmed: hasConfirmed,
+                    now: now,
                     hasFlagged: hasFlagged,
                     isAuthor: isAuthor,
                   ),
@@ -399,6 +423,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
   /// Banner displaying the live status of the report (Resolved, Verified, Active, Past)
   Widget _buildStatusBanner({
+    required DateTime now,
     Report? report,
     required bool isResolved,
     required bool isReportActive,
@@ -418,21 +443,31 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
       icon = Icons.check_circle_rounded;
       statusTitle = 'Condition Resolved';
       statusSubtitle = 'This accessibility issue has been marked fixed.';
-    } else if (report != null && StatusLogic.needsRecheck(report)) {
+    } else if (report != null &&
+        report.createdAt == null &&
+        !StatusLogic.needsRecheck(report, currentTime: now)) {
+      bgColor = isHC ? Colors.white : AppColors.surfaceContainer;
+      fgColor = isHC ? Colors.black : AppColors.outline;
+      icon = Icons.help_outline;
+      statusTitle = 'Observation time unknown';
+      statusSubtitle = 'The observation date is unavailable. Current condition cannot be confirmed.';
+    } else if (report != null &&
+        StatusLogic.needsRecheck(report, currentTime: now)) {
       bgColor = isHC ? Colors.white : const Color(0xFFFFF3E0);
       fgColor = isHC ? const Color(0xFF8B0000) : const Color(0xFFE65100);
       icon = Icons.history_rounded;
       statusTitle = 'Unresolved barrier — needs recheck';
       statusSubtitle =
-          'Last checked ${TimeUtils.formatRelativeTime(StatusLogic.lastCheckedAt(report))}. Current condition unknown; no repair recorded.';
+          'Last checked ${TimeUtils.formatRelativeTime(StatusLogic.lastCheckedAt(report, currentTime: now), clock: now)}. Current condition unknown; no repair recorded.';
     } else if (!_readUnavailable &&
         report != null &&
         confirmCount > 0 &&
         isReportActive &&
         report.confirmedBy.toSet().length == confirmCount &&
         report.lastConfirmedAt != null &&
-        !report.lastConfirmedAt!.isBefore(report.createdAt) &&
-        !report.lastConfirmedAt!.isAfter(DateTime.now())) {
+        report.createdAt != null &&
+        !report.lastConfirmedAt!.isBefore(report.createdAt!) &&
+        !report.lastConfirmedAt!.isAfter(now)) {
       bgColor = isHC
           ? Colors.white
           : AppColors.primaryContainer.withValues(alpha: 0.35);
@@ -1001,11 +1036,14 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   }
 
   /// Trust & verification timeline card
-  Widget _buildTrustTimelineCard(Report report) {
+  Widget _buildTrustTimelineCard(Report report, DateTime now) {
     final isHC = context.isHighContrast;
-    final reportedAgo = TimeUtils.formatRelativeTime(report.createdAt);
+    final reportedAgo = TimeUtils.formatRelativeTime(
+      report.createdAt,
+      clock: now,
+    );
     final confirmedAgo = report.lastConfirmedAt != null
-        ? TimeUtils.formatRelativeTime(report.lastConfirmedAt!)
+        ? TimeUtils.formatRelativeTime(report.lastConfirmedAt!, clock: now)
         : null;
 
     return Container(
@@ -1040,7 +1078,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'True Flags (Confirmed): ${report.confirmCount} rider${report.confirmCount == 1 ? "" : "s"}',
+                  'Unique confirmations: ${report.confirmCount} rider${report.confirmCount == 1 ? "" : "s"}',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1102,6 +1140,14 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               ),
             ],
           ),
+          if (report.lastRecheckedAt != null) ...[
+            Text(
+              'Last recheck: ${TimeUtils.formatRelativeTime(report.lastRecheckedAt!.isAfter(now) ? null : report.lastRecheckedAt, clock: now)} by ${report.lastRecheckedBy ?? 'Unknown'}',
+            ),
+            const Text(
+              'Rechecks are dated observations; unique confirmations are unchanged.',
+            ),
+          ],
           if (confirmedAgo != null && report.confirmCount > 0) ...[
             const SizedBox(height: 6),
             Row(
@@ -1131,6 +1177,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
   /// Action buttons: Confirm condition (True Flag), Report as False (False Flag), Mark Resolved
   Widget _buildActionPanel({
+    required DateTime now,
     required Report report,
     required bool isReportActive,
     required bool isResolved,
@@ -1171,7 +1218,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Confirm if this condition is still accurate, or flag inaccurate information. Three independent flags hide the report; they do not prove it was false.',
+            'Confirm only what you observed. Previous confirmers can recheck the same condition 30 minutes after the latest check; unique votes and points do not increase. If the condition changed, submit a new report. Three independent flags hide a report.',
             style: TextStyle(fontSize: 13, color: context.subtextColor),
           ),
           const SizedBox(height: 16),
@@ -1185,7 +1232,12 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   height: context.buttonHeight,
                   child: FilledButton.icon(
                     onPressed:
-                        (hasConfirmed ||
+                        (hasConfirmed &&
+                                !ReportRecheck.canRecheck(
+                                  report,
+                                  _currentUserId(),
+                                  now,
+                                ) ||
                             _isLoadingAction ||
                             isAuthor ||
                             isResolved ||
@@ -1224,7 +1276,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     ),
                     label: Text(
                       hasConfirmed
-                          ? 'True (${report.confirmCount})'
+                          ? 'Recheck condition'
                           : 'True Flag (${report.confirmCount})',
                       style: TextStyle(
                         fontSize: context.hasLargeTargets ? 14 : 13,

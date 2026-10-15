@@ -28,6 +28,7 @@ class BusLocationModel {
     this.occupancyLevel = 'Moderate',
     this.delayReason,
     this.addedDelayMinutes = 0,
+    this.isCached = false,
     bool? isBroadcasting,
   }) : routeId = routeId ?? routeNumber ?? '',
        routeNumber = routeNumber ?? routeId ?? '',
@@ -63,6 +64,9 @@ class BusLocationModel {
   final String? delayReason;
   final int addedDelayMinutes;
   final bool isBroadcasting;
+
+  /// Local read provenance; never read from or written to a cloud field.
+  final bool isCached;
 
   /// Alias for [driverId] to maintain operator terminology compatibility.
   String get operatorId => driverId;
@@ -218,6 +222,7 @@ class BusLocationModel {
     String? delayReason,
     int? addedDelayMinutes,
     bool clearDelay = false,
+    bool? isCached,
     bool? isBroadcasting,
   }) {
     return BusLocationModel(
@@ -243,6 +248,7 @@ class BusLocationModel {
       addedDelayMinutes: clearDelay
           ? 0
           : (addedDelayMinutes ?? this.addedDelayMinutes),
+      isCached: isCached ?? this.isCached,
       isBroadcasting: isBroadcasting ?? this.isBroadcasting,
     );
   }

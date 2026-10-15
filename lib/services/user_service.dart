@@ -38,9 +38,14 @@ class UserService {
   /// The transaction makes registration retries safe across devices. Firestore
   /// failures propagate so a failed read cannot be mistaken for a missing user.
   Future<UserModel> createUser(UserModel user) async {
+    final initial = user.copyWith(
+      points: 0,
+      reportsSubmitted: 0,
+      verifiedCount: 0,
+    );
     final db = _db;
     if (db == null) {
-      return _localUserFallback.putIfAbsent(user.uid, () => user);
+      return _localUserFallback.putIfAbsent(user.uid, () => initial);
     }
 
     final doc = db.collection(FirestoreConstants.usersCollection).doc(user.uid);
@@ -52,8 +57,8 @@ class UserService {
         return UserModel.fromMap(data);
       }
 
-      transaction.set(doc, user.toMap(isCreate: true));
-      return user;
+      transaction.set(doc, initial.toMap(isCreate: true));
+      return initial;
     });
 
     _localUserFallback[user.uid] = profile;
@@ -61,16 +66,32 @@ class UserService {
   }
 
   /// Updates an existing user profile document in Firestore.
-  Future<void> updateUser(UserModel user) async {
-    _localUserFallback[user.uid] = user;
-    try {
-      final doc = userDocument(user.uid);
-      if (doc != null) {
-        await doc.set(user.toMap(), SetOptions(merge: true));
-      }
-    } catch (e) {
-      debugPrint('UserService.updateUser fallback: $e');
+  Future<UserModel> updateUser(UserModel user) async {
+    final db = _db;
+    if (db == null) {
+      throw StateError('Profile updates require a shared connection.');
     }
+    final doc = db.collection(FirestoreConstants.usersCollection).doc(user.uid);
+    final acknowledged = await db.runTransaction<UserModel>((tx) async {
+      final snapshot = await tx.get(doc);
+      if (!snapshot.exists) throw StateError('Profile no longer exists.');
+      final existing = UserModel.fromMap({
+        ...snapshot.data()!,
+        'uid': user.uid,
+      });
+      tx.update(doc, {
+        'name': user.name,
+        'phone': user.phone,
+        'email': user.email,
+      });
+      return existing.copyWith(
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+      );
+    });
+    _localUserFallback[user.uid] = acknowledged;
+    return acknowledged;
   }
 
   /// Reads a user profile from Firestore.
@@ -105,7 +126,9 @@ class UserService {
       final doc = userDocument(uid);
       if (doc != null) {
         final snapshot = await doc.get();
-        if (snapshot.exists && snapshot.data() != null) {
+        if (!snapshot.metadata.hasPendingWrites &&
+            snapshot.exists &&
+            snapshot.data() != null) {
           return snapshot.data();
         }
       }
@@ -119,7 +142,9 @@ class UserService {
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchUser(String uid) {
     final doc = userDocument(uid);
     if (doc != null) {
-      return doc.snapshots();
+      return doc
+          .snapshots(includeMetadataChanges: true)
+          .where((snapshot) => !snapshot.metadata.hasPendingWrites);
     }
     return const Stream.empty();
   }
@@ -138,65 +163,15 @@ class UserService {
     return _localUserFallback.containsKey(uid);
   }
 
-  /// Atomically updates user points, reportsSubmitted, and verifiedCount stats.
+  /// Clients cannot mutate trusted reward totals, including offline.
   Future<void> updateUserStats(
     String uid, {
     int pointsDelta = 0,
     int reportsDelta = 0,
     int verificationsDelta = 0,
   }) async {
-    if (uid.isEmpty) return;
-
-    final user = await getUser(uid);
-    if (user == null) {
-      final newUser = UserModel(
-        uid: uid,
-        name: 'User',
-        email: '',
-        points: (pointsDelta).clamp(0, 999999),
-        reportsSubmitted: (reportsDelta).clamp(0, 999999),
-        verifiedCount: (verificationsDelta).clamp(0, 999999),
-      );
-      try {
-        final doc = userDocument(uid);
-        if (doc != null) {
-          await doc.set(newUser.toMap(isCreate: true));
-        }
-      } catch (e) {
-        debugPrint('UserService.updateUserStats fallback set: $e');
-        return;
-      }
-      _localUserFallback[uid] = newUser;
-      return;
-    }
-
-    final newPoints = (user.points + pointsDelta).clamp(0, 999999);
-    final newReports = (user.reportsSubmitted + reportsDelta).clamp(0, 999999);
-    final newVerifications = (user.verifiedCount + verificationsDelta).clamp(
-      0,
-      999999,
+    throw UnsupportedError(
+      'Reward counters require trusted administrator reconciliation.',
     );
-
-    final updatedUser = user.copyWith(
-      points: newPoints,
-      reportsSubmitted: newReports,
-      verifiedCount: newVerifications,
-    );
-
-    try {
-      final doc = userDocument(uid);
-      if (doc != null) {
-        await doc.set({
-          FirestoreConstants.fieldPoints: newPoints,
-          FirestoreConstants.fieldReportsSubmitted: newReports,
-          FirestoreConstants.fieldVerifiedCount: newVerifications,
-        }, SetOptions(merge: true));
-      }
-    } catch (e) {
-      debugPrint('UserService.updateUserStats fallback update: $e');
-      return;
-    }
-    // Rejected client counter writes must not manufacture rewards in memory.
-    _localUserFallback[uid] = updatedUser;
   }
 }

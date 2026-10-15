@@ -73,10 +73,10 @@ class LiveAccessibilityEvidence {
     }
     // A newer uncertain observation cannot be erased by an older positive one.
     scoped.sort(
-      (a, b) => StatusLogic.lastCheckedAt(
-        b,
-        currentTime: now,
-      ).compareTo(StatusLogic.lastCheckedAt(a, currentTime: now)),
+      (a, b) => Report.compareDatesDescending(
+        StatusLogic.lastCheckedAt(a, currentTime: now),
+        StatusLogic.lastCheckedAt(b, currentTime: now),
+      ),
     );
     if (scoped.isEmpty) {
       return const LiveAccessibilityEvidence(EquipmentObservation.unknown, []);

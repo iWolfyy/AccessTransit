@@ -26,6 +26,9 @@ class Report {
     required this.status,
     required this.createdAt,
     this.lastConfirmedAt,
+    this.lastRecheckedAt,
+    this.lastRecheckedBy,
+    this.lastRecheckId,
     this.confirmCount = 0,
     this.falseCount = 0,
     required this.userId,
@@ -81,8 +84,11 @@ class Report {
   final String description;
   final String photoUrl; // URL or asset path or base64 photo
   final String status; // 'active' or 'resolved'
-  final DateTime createdAt;
+  final DateTime? createdAt;
   final DateTime? lastConfirmedAt;
+  final DateTime? lastRecheckedAt;
+  final String? lastRecheckedBy;
+  final String? lastRecheckId;
   final int confirmCount;
   final int falseCount;
   final String userId;
@@ -95,8 +101,7 @@ class Report {
   factory Report.fromMap(Map<String, dynamic> map, {String? id}) {
     final parsedCreatedAt =
         _parseTimestamp(map[FirestoreConstants.fieldCreatedAt]) ??
-        _parseTimestamp(map['createdAt']) ??
-        DateTime.now();
+        _parseTimestamp(map['createdAt']);
 
     final parsedLastConfirmedAt =
         _parseTimestamp(map[FirestoreConstants.fieldLastConfirmedAt]) ??
@@ -172,6 +177,13 @@ class Report {
           'active',
       createdAt: parsedCreatedAt,
       lastConfirmedAt: parsedLastConfirmedAt,
+      lastRecheckedAt: _parseTimestamp(map['lastRecheckedAt']),
+      lastRecheckedBy: map['lastRecheckedBy'] is String
+          ? map['lastRecheckedBy'] as String
+          : null,
+      lastRecheckId: map['lastRecheckId'] is String
+          ? map['lastRecheckId'] as String
+          : null,
       confirmCount:
           (map[FirestoreConstants.fieldConfirmCount] as num?)?.toInt() ??
           (map['confirmCount'] as num?)?.toInt() ??
@@ -200,6 +212,10 @@ class Report {
   /// Converts the [Report] instance into a Firestore map representation.
   Map<String, dynamic> toMap({bool isServerTimestamp = false}) {
     return {
+      if (lastRecheckedAt != null)
+        'lastRecheckedAt': Timestamp.fromDate(lastRecheckedAt!),
+      if (lastRecheckedBy != null) 'lastRecheckedBy': lastRecheckedBy,
+      if (lastRecheckId != null) 'lastRecheckId': lastRecheckId,
       if (resolvedBy != null) 'resolvedBy': resolvedBy,
       if (resolvedAt != null) 'resolvedAt': Timestamp.fromDate(resolvedAt!),
       FirestoreConstants.fieldTargetType: targetType,
@@ -216,9 +232,11 @@ class Report {
       FirestoreConstants.fieldDescription: description,
       FirestoreConstants.fieldPhotoUrl: photoUrl,
       FirestoreConstants.fieldStatus: status,
-      FirestoreConstants.fieldCreatedAt: isServerTimestamp
+      FirestoreConstants.fieldCreatedAt: isServerTimestamp && createdAt != null
           ? FieldValue.serverTimestamp()
-          : Timestamp.fromDate(createdAt),
+          : createdAt == null
+          ? null
+          : Timestamp.fromDate(createdAt!),
       FirestoreConstants.fieldLastConfirmedAt: lastConfirmedAt != null
           ? Timestamp.fromDate(lastConfirmedAt!)
           : null,
@@ -253,6 +271,9 @@ class Report {
     String? status,
     DateTime? createdAt,
     DateTime? lastConfirmedAt,
+    DateTime? lastRecheckedAt,
+    String? lastRecheckedBy,
+    String? lastRecheckId,
     int? confirmCount,
     int? falseCount,
     String? userId,
@@ -261,6 +282,7 @@ class Report {
     String? resolvedBy,
     DateTime? resolvedAt,
     bool clearLastConfirmedAt = false,
+    bool clearCreatedAt = false,
   }) {
     return Report(
       resolvedBy: resolvedBy ?? this.resolvedBy,
@@ -280,10 +302,13 @@ class Report {
       description: description ?? this.description,
       photoUrl: photoUrl ?? this.photoUrl,
       status: status ?? this.status,
-      createdAt: createdAt ?? this.createdAt,
+      createdAt: clearCreatedAt ? null : createdAt ?? this.createdAt,
       lastConfirmedAt: clearLastConfirmedAt
           ? null
           : lastConfirmedAt ?? this.lastConfirmedAt,
+      lastRecheckedAt: lastRecheckedAt ?? this.lastRecheckedAt,
+      lastRecheckedBy: lastRecheckedBy ?? this.lastRecheckedBy,
+      lastRecheckId: lastRecheckId ?? this.lastRecheckId,
       confirmCount: confirmCount ?? this.confirmCount,
       falseCount: falseCount ?? this.falseCount,
       userId: userId ?? this.userId,
@@ -292,11 +317,48 @@ class Report {
     );
   }
 
+  /// Unknown dates sort after known observations, without fabricating a time.
+  static int compareDatesDescending(DateTime? a, DateTime? b) {
+    if (a == null) return b == null ? 0 : 1;
+    if (b == null) return -1;
+    return b.compareTo(a);
+  }
+
   static DateTime? _parseTimestamp(dynamic value) {
-    if (value is Timestamp) return value.toDate();
-    if (value is DateTime) return value;
-    if (value is String) return DateTime.tryParse(value);
-    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
-    return null;
+    try {
+      DateTime? parsed;
+      if (value is Timestamp) parsed = value.toDate();
+      if (value is DateTime) parsed = value;
+      if (value is int) parsed = DateTime.fromMillisecondsSinceEpoch(value);
+      if (value is String) {
+        // Reject calendar overflow that DateTime.tryParse would normalize.
+        final date = RegExp(r'^(\d{4})-(\d{2})-(\d{2})(?:T| |$)')
+            .firstMatch(value);
+        if (date == null) return null;
+        final year = int.parse(date[1]!);
+        final month = int.parse(date[2]!);
+        final day = int.parse(date[3]!);
+        final calendar = DateTime.utc(year, month, day);
+        if (calendar.year != year ||
+            calendar.month != month ||
+            calendar.day != day) {
+          return null;
+        }
+        final time = RegExp(r'[T ](\d{2}):?(\d{2})(?::?(\d{2}))?')
+            .firstMatch(value);
+        if (time != null &&
+            (int.parse(time[1]!) > 23 ||
+                int.parse(time[2]!) > 59 ||
+                int.parse(time[3] ?? '0') > 59)) {
+          return null;
+        }
+        parsed = DateTime.tryParse(value);
+      }
+      return parsed != null && parsed.year >= 1 && parsed.year <= 9999
+          ? parsed
+          : null;
+    } on ArgumentError {
+      return null;
+    }
   }
 }

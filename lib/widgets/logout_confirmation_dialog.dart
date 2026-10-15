@@ -9,14 +9,18 @@ import '../core/theme/app_theme.dart';
 Future<bool?> showLogoutConfirmationDialog(BuildContext context) {
   final isHighContrast = context.isHighContrast;
   final hasLargeTargets = context.hasLargeTargets;
-  final dangerColor = isHighContrast ? const Color(0xFF8B0000) : AppColors.error;
+  final dangerColor = isHighContrast
+      ? const Color(0xFF8B0000)
+      : AppColors.error;
 
   return showDialog<bool>(
     context: context,
     barrierDismissible: true,
     builder: (dialogContext) {
       return AlertDialog(
-        backgroundColor: isHighContrast ? Colors.white : AppColors.surfaceContainerLowest,
+        backgroundColor: isHighContrast
+            ? Colors.white
+            : AppColors.surfaceContainerLowest,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: isHighContrast
@@ -56,11 +60,13 @@ Future<bool?> showLogoutConfirmationDialog(BuildContext context) {
           ],
         ),
         content: Text(
-          'Are you sure you want to sign out? You will need to sign back in to access your saved journeys, active passes, and community reports.',
+          'Sign out and remove pending report drafts and photos from this device? Requests already sent may still complete. Published reports remain available after signing back in.',
           style: TextStyle(
             fontSize: hasLargeTargets ? 16 : 14,
             height: 1.45,
-            color: isHighContrast ? const Color(0xFF1E1E1E) : AppColors.onSurfaceVariant,
+            color: isHighContrast
+                ? const Color(0xFF1E1E1E)
+                : AppColors.onSurfaceVariant,
           ),
         ),
         actions: [
@@ -70,9 +76,13 @@ Future<bool?> showLogoutConfirmationDialog(BuildContext context) {
                 child: OutlinedButton(
                   onPressed: () => Navigator.of(dialogContext).pop(false),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: isHighContrast ? Colors.black : AppColors.onSurface,
+                    foregroundColor: isHighContrast
+                        ? Colors.black
+                        : AppColors.onSurface,
                     side: BorderSide(
-                      color: isHighContrast ? Colors.black : AppColors.outlineVariant,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.outlineVariant,
                       width: isHighContrast ? 2.0 : 1.0,
                     ),
                     shape: RoundedRectangleBorder(

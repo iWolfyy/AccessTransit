@@ -1,3 +1,6 @@
+import 'transit_catalogue.dart';
+import 'sample_test_mode.dart';
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -25,6 +28,7 @@ class FirestoreService {
     this.boardingWriter,
     this.boardingStatusWriter,
     this.boardingViewerId,
+    this.operatorActorId,
   }) : _customFirestore = firestore;
   final Future<void> Function(String, Map<String, dynamic>)? busWriter;
   final Future<void> Function(Report)? reportWriter;
@@ -44,6 +48,7 @@ class FirestoreService {
   final Future<BoardingRequest> Function(BoardingRequest, String)?
   boardingStatusWriter;
   final String? Function()? boardingViewerId;
+  final String? Function()? operatorActorId;
 
   final FirebaseFirestore? _customFirestore;
 
@@ -53,9 +58,7 @@ class FirestoreService {
   static final StreamController<List<Report>> _localStreamController =
       StreamController<List<Report>>.broadcast();
 
-  static final List<BusRoute> _localRoutesFallback = [...SeedData.sampleRoutes];
-
-  static final List<Bus> _localBusesFallback = [...SeedData.sampleBuses];
+  static final List<Bus> _localBusesFallback = [];
   static final StreamController<List<Bus>> _localBusesStreamController =
       StreamController<List<Bus>>.broadcast();
 
@@ -64,6 +67,11 @@ class FirestoreService {
   static final StreamController<List<BoardingRequest>>
   _localRequestsStreamController =
       StreamController<List<BoardingRequest>>.broadcast();
+
+  /// Refresh every collection represented by the shared catalogue notice.
+  Future<void> refreshCatalogue() async {
+    await Future.wait([getStations(), getRoutes(), getBuses()]);
+  }
 
   /// Collection reference for `stations`.
   CollectionReference<Map<String, dynamic>> get _stationsRef =>
@@ -85,64 +93,78 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>> get _boardingRequestsRef =>
       _db.collection(FirestoreConstants.boardingRequestsCollection);
 
-  /// 1. Fetches a snapshot list of all transit stations (`stations`).
+  static List<Station> get cachedStations => [
+    for (final entry in TransitCatalogue.cached('stations').entries)
+      Station.fromMap(entry.value, id: entry.key),
+  ];
+
+  @visibleForTesting
+  static void installCatalogueFixtures() {
+    // ignore: invalid_use_of_visible_for_testing_member
+    TransitCatalogue.installFixtures({
+      'buses': {
+        for (final bus in SeedData.sampleBuses)
+          bus.id: {...bus.toMap(), 'catalogueSource': 'operator_catalogue'},
+      },
+      'routes': {
+        for (final route in SeedData.sampleRoutes)
+          route.id: {...route.toMap(), 'catalogueSource': 'operator_catalogue'},
+      },
+      'stations': {
+        for (final station in SeedData.colomboStations)
+          station.id: {
+            ...station.toMap(),
+            'catalogueSource': 'operator_catalogue',
+          },
+      },
+    });
+    _syncBusCache();
+  }
+
+  static void _syncBusCache() {
+    _localBusesFallback
+      ..clear()
+      ..addAll([
+        for (final entry in TransitCatalogue.cached('buses').entries)
+          Bus.fromMap(entry.value, id: entry.key),
+      ]);
+  }
+
   Future<List<Station>> getStations() async {
-    try {
-      final snapshot = await _stationsRef.get();
-      if (snapshot.docs.isNotEmpty) {
-        return snapshot.docs.map((doc) => Station.fromFirestore(doc)).toList();
-      }
-    } catch (e) {
-      debugPrint('Firestore getStations fallback: $e');
-    }
-    return SeedData.colomboStations;
+    await TransitCatalogue.read(
+      'stations',
+      () => _stationsRef.get(const GetOptions(source: Source.server)),
+    );
+    return cachedStations;
   }
 
-  /// Fetches a single station by its ID (`stations/{id}`).
-  Future<Station?> getStationById(String stationId) async {
-    try {
-      final doc = await _stationsRef.doc(stationId).get();
-      if (doc.exists) return Station.fromFirestore(doc);
-    } catch (e) {
-      debugPrint('Firestore getStationById fallback: $e');
-    }
-    try {
-      return SeedData.colomboStations.firstWhere((s) => s.id == stationId);
-    } catch (_) {
-      return null;
-    }
+  Future<Station?> getStationById(String id) async {
+    final data = await TransitCatalogue.readDocument(
+      'stations',
+      id,
+      () => _stationsRef.doc(id).get(const GetOptions(source: Source.server)),
+    );
+    return data == null ? null : Station.fromMap(data, id: id);
   }
 
-  // ==========================================
-  // Routes APIs (`routes` collection)
-  // ==========================================
-
-  /// Fetches a snapshot list of all bus routes (`routes`).
   Future<List<BusRoute>> getRoutes() async {
-    try {
-      final snapshot = await _routesRef.get();
-      if (snapshot.docs.isNotEmpty) {
-        return snapshot.docs.map((doc) => BusRoute.fromFirestore(doc)).toList();
-      }
-    } catch (e) {
-      debugPrint('Firestore getRoutes fallback: $e');
-    }
-    return _localRoutesFallback;
+    final records = await TransitCatalogue.read(
+      'routes',
+      () => _routesRef.get(const GetOptions(source: Source.server)),
+    );
+    return [
+      for (final entry in records.entries)
+        BusRoute.fromMap(entry.value, id: entry.key),
+    ];
   }
 
-  /// Fetches a single bus route by its ID (`routes/{id}`).
-  Future<BusRoute?> getRouteById(String routeId) async {
-    try {
-      final doc = await _routesRef.doc(routeId).get();
-      if (doc.exists) return BusRoute.fromFirestore(doc);
-    } catch (e) {
-      debugPrint('Firestore getRouteById fallback: $e');
-    }
-    try {
-      return _localRoutesFallback.firstWhere((r) => r.id == routeId);
-    } catch (_) {
-      return null;
-    }
+  Future<BusRoute?> getRouteById(String id) async {
+    final data = await TransitCatalogue.readDocument(
+      'routes',
+      id,
+      () => _routesRef.doc(id).get(const GetOptions(source: Source.server)),
+    );
+    return data == null ? null : BusRoute.fromMap(data, id: id);
   }
 
   /// Finds all bus routes that connect [fromStopId] to [toStopId] in valid directional order.
@@ -167,69 +189,43 @@ class FirestoreService {
     } else {
       _localBusesFallback[index] = bus;
     }
+    unawaited(
+      TransitCatalogue.accept('buses', {
+        bus.id: {
+          ...?TransitCatalogue.cached('buses')[bus.id],
+          'rampCheckedAt': null,
+          'rampCheckedBy': null,
+          ...bus.toMap(),
+        },
+      }, replace: false),
+    );
     _localBusesStreamController.add(List.unmodifiable(_localBusesFallback));
   }
 
-  /// 2. Fetches a snapshot list of all static bus vehicles (`buses`).
   Future<List<Bus>> getBuses() async {
-    try {
-      final snapshot = await _busesRef.get();
-      if (!snapshot.metadata.hasPendingWrites && snapshot.docs.isNotEmpty) {
-        final buses = snapshot.docs
-            .map((doc) => Bus.fromFirestore(doc))
-            .toList();
-        for (final bus in buses) {
-          _cacheAcknowledgedBus(bus);
-        }
-        return buses;
-      }
-    } catch (e) {
-      debugPrint('Firestore getBuses fallback: $e');
-    }
-    return _localBusesFallback;
+    await TransitCatalogue.read(
+      'buses',
+      () => _busesRef.get(const GetOptions(source: Source.server)),
+    );
+    _syncBusCache();
+    return List.unmodifiable(_localBusesFallback);
   }
 
-  /// Fetches all buses assigned to a specific [routeId] or [routeNo].
-  Future<List<Bus>> getBusesForRoute(String routeIdOrNo) async {
-    try {
-      final snapshot = await _busesRef
-          .where('routeId', isEqualTo: routeIdOrNo)
-          .get();
-      if (!snapshot.metadata.hasPendingWrites && snapshot.docs.isNotEmpty) {
-        return snapshot.docs.map((doc) => Bus.fromFirestore(doc)).toList();
-      }
-      final snapshotByNo = await _busesRef
-          .where(FirestoreConstants.fieldRouteNo, isEqualTo: routeIdOrNo)
-          .get();
-      if (!snapshotByNo.metadata.hasPendingWrites &&
-          snapshotByNo.docs.isNotEmpty) {
-        return snapshotByNo.docs.map((doc) => Bus.fromFirestore(doc)).toList();
-      }
-    } catch (e) {
-      debugPrint('Firestore getBusesForRoute fallback: $e');
-    }
-    return _localBusesFallback
-        .where((b) => b.routeId == routeIdOrNo || b.routeNo == routeIdOrNo)
-        .toList();
-  }
+  Future<List<Bus>> getBusesForRoute(String routeIdOrNo) async =>
+      (await getBuses())
+          .where(
+            (bus) => bus.routeId == routeIdOrNo || bus.routeNo == routeIdOrNo,
+          )
+          .toList();
 
-  /// Fetches a single static bus vehicle by its ID (`buses/{id}`).
-  Future<Bus?> getBusById(String busId) async {
-    try {
-      final doc = await _busesRef.doc(busId).get();
-      if (!doc.metadata.hasPendingWrites && doc.exists) {
-        final bus = Bus.fromFirestore(doc);
-        _cacheAcknowledgedBus(bus);
-        return bus;
-      }
-    } catch (e) {
-      debugPrint('Firestore getBusById fallback: $e');
-    }
-    try {
-      return _localBusesFallback.firstWhere((b) => b.id == busId);
-    } catch (_) {
-      return null;
-    }
+  Future<Bus?> getBusById(String id) async {
+    final data = await TransitCatalogue.readDocument(
+      'buses',
+      id,
+      () => _busesRef.doc(id).get(const GetOptions(source: Source.server)),
+    );
+    _syncBusCache();
+    return data == null ? null : Bus.fromMap(data, id: id);
   }
 
   /// 3. Returns a real-time stream of accessibility reports (`reports`).
@@ -241,6 +237,7 @@ class FirestoreService {
     String? userId,
     bool surfaceErrors = false,
   }) {
+    if (TransitCatalogue.demo) return Stream.value([]);
     bool matches(Report r) =>
         (status == null || status.isEmpty || r.status == status) &&
         (userId == null || userId.isEmpty || r.userId == userId);
@@ -255,7 +252,9 @@ class FirestoreService {
                   r.flaggedBy.length < 3,
             )
             .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          ..sort(
+            (a, b) => Report.compareDatesDescending(a.createdAt, b.createdAt),
+          );
     late StreamController<List<Report>> controller;
     StreamSubscription? local;
     StreamSubscription? remote;
@@ -382,6 +381,12 @@ class FirestoreService {
 
   /// Submits a new condition report to Firestore (`reports/{id}`).
   Future<void> createReport(Report report) async {
+    TransitCatalogue.requireSharedWrites();
+    if (report.createdAt == null) {
+      throw StateError(
+        'Observation time unknown. Create a new observation before publishing.',
+      );
+    }
     final reportId = report.id.isNotEmpty
         ? report.id
         : 'rep_${DateTime.now().millisecondsSinceEpoch}';
@@ -429,7 +434,7 @@ class FirestoreService {
 
     for (final r in _localReportsFallback) {
       if (r.userId == userId && r.targetId == targetId) {
-        if (r.createdAt.isAfter(cutoff)) {
+        if ((r.createdAt?.isAfter(cutoff) ?? false)) {
           return true;
         }
       }
@@ -443,7 +448,7 @@ class FirestoreService {
 
       for (final doc in snapshot.docs) {
         final report = Report.fromFirestore(doc);
-        if (report.createdAt.isAfter(cutoff)) {
+        if ((report.createdAt?.isAfter(cutoff) ?? false)) {
           return true;
         }
       }
@@ -463,6 +468,8 @@ class FirestoreService {
       _mutateReport(reportId, userId, ReportMutationAction.confirm);
   Future<ReportMutationResult> flagReport(String reportId, String userId) =>
       _mutateReport(reportId, userId, ReportMutationAction.flag);
+  Future<ReportMutationResult> recheckReport(String reportId, String userId) =>
+      _mutateReport(reportId, userId, ReportMutationAction.recheck);
   Future<ReportMutationResult> resolveReport(String reportId) => _mutateReport(
     reportId,
     currentReportActorId ?? '',
@@ -474,9 +481,15 @@ class FirestoreService {
     String actorId,
     ReportMutationAction action,
   ) async {
+    TransitCatalogue.requireSharedWrites();
     if (actorId.isEmpty || actorId != currentReportActorId) {
       throw StateError('Sign in before changing a shared report.');
     }
+    final recheckId = action != ReportMutationAction.recheck
+        ? null
+        : reportMutationWriter != null
+        ? 'injected-${DateTime.now().microsecondsSinceEpoch}'
+        : _reportsRef.doc(reportId).collection('rechecks').doc().id;
     final ReportMutationResult result;
     if (reportMutationWriter != null) {
       final existing = _localReportsFallback.firstWhere(
@@ -490,6 +503,7 @@ class FirestoreService {
         actorId,
         action,
         DateTime.now(),
+        recheckId: recheckId,
       );
       result = plan.changed
           ? await reportMutationWriter!(plan)
@@ -517,16 +531,30 @@ class FirestoreService {
             actorId,
             action,
             DateTime.now(),
+            recheckId: recheckId,
           );
           if (!plan.changed) return plan;
-          if (action == ReportMutationAction.resolve) {
+          if (action == ReportMutationAction.recheck) {
+            transaction.update(ref, {
+              'lastRecheckedAt': FieldValue.serverTimestamp(),
+              'lastRecheckedBy': actorId,
+              'lastRecheckId': recheckId,
+            });
+            transaction.set(ref.collection('rechecks').doc(recheckId), {
+              'reportId': reportId,
+              'userId': actorId,
+              'checkedAt': FieldValue.serverTimestamp(),
+            });
+          } else if (action == ReportMutationAction.resolve) {
             transaction.update(ref, {
               'status': 'resolved',
               'resolvedBy': actorId,
               'resolvedAt': FieldValue.serverTimestamp(),
             });
             transaction.set(
-              _db.collection('report_resolutions').doc(reportId),
+              _db
+                  .collection(SampleTestMode.collection('report_resolutions'))
+                  .doc(reportId),
               {
                 'reportId': reportId,
                 'resolvedBy': actorId,
@@ -615,69 +643,93 @@ class FirestoreService {
   });
 
   Stream<List<Bus>> _watchBuses(String? busId) {
+    if (TransitCatalogue.demo) {
+      _syncBusCache();
+      return Stream.value(
+        busId == null
+            ? List.unmodifiable(_localBusesFallback)
+            : _localBusesFallback.where((bus) => bus.id == busId).toList(),
+      );
+    }
     late StreamController<List<Bus>> controller;
     StreamSubscription? remote;
     StreamSubscription? local;
-    List<Bus> current() => List.unmodifiable(
-      busId == null
-          ? _localBusesFallback
-          : _localBusesFallback.where((b) => b.id == busId),
-    );
-    void cache(Bus bus) {
-      final index = _localBusesFallback.indexWhere((b) => b.id == bus.id);
-      if (index == -1) {
-        _localBusesFallback.add(bus);
-      } else {
-        _localBusesFallback[index] = bus;
+    bool cancelled = false;
+    void emit() {
+      if (cancelled) return;
+      _syncBusCache();
+      controller.add(
+        busId == null
+            ? List.unmodifiable(_localBusesFallback)
+            : _localBusesFallback.where((bus) => bus.id == busId).toList(),
+      );
+    }
+
+    Future<void> start() async {
+      await TransitCatalogue.ensureLoaded();
+      if (cancelled) return;
+      emit();
+      local = _localBusesStreamController.stream.listen((_) => emit());
+      try {
+        if (busId == null) {
+          remote = _busesRef.snapshots(includeMetadataChanges: true).listen((
+            snapshot,
+          ) async {
+            if (snapshot.metadata.hasPendingWrites ||
+                snapshot.metadata.isFromCache) {
+              TransitCatalogue.markUnavailable('buses');
+              return;
+            }
+            await TransitCatalogue.accept('buses', {
+              for (final doc in snapshot.docs) doc.id: doc.data(),
+            });
+            emit();
+          }, onError: (Object _) => TransitCatalogue.markUnavailable('buses'));
+        } else {
+          var receivedServerSnapshot = false;
+          remote = _busesRef
+              .doc(busId)
+              .snapshots(includeMetadataChanges: true)
+              .listen(
+                (snapshot) async {
+                  if (snapshot.metadata.hasPendingWrites) return;
+                  if (snapshot.metadata.isFromCache) {
+                    // A new document listener starts with SDK cache even when
+                    // the full catalogue was just acknowledged by the server.
+                    // Only a later cache transition indicates lost freshness.
+                    if (receivedServerSnapshot) {
+                      TransitCatalogue.markUnavailable('buses');
+                    }
+                    return;
+                  }
+                  receivedServerSnapshot = true;
+                  if (snapshot.exists &&
+                      !TransitCatalogue.isDemonstration(
+                        'buses',
+                        busId,
+                        snapshot.data()!,
+                      )) {
+                    await TransitCatalogue.accept('buses', {
+                      busId: snapshot.data()!,
+                    }, replace: false);
+                  } else {
+                    await TransitCatalogue.remove('buses', busId);
+                  }
+                  emit();
+                },
+                onError: (Object _) =>
+                    TransitCatalogue.markUnavailable('buses'),
+              );
+        }
+      } catch (_) {
+        TransitCatalogue.markUnavailable('buses');
       }
     }
 
     controller = StreamController<List<Bus>>(
-      onListen: () {
-        controller.add(current());
-        local = _localBusesStreamController.stream.listen(
-          (_) => controller.add(current()),
-        );
-        try {
-          if (busId == null) {
-            remote = _busesRef
-                .snapshots(includeMetadataChanges: true)
-                .listen(
-                  (snapshot) {
-                    if (snapshot.metadata.hasPendingWrites) return;
-                    for (final doc in snapshot.docs) {
-                      cache(Bus.fromFirestore(doc));
-                    }
-                    controller.add(current());
-                  },
-                  onError: (Object e) {
-                    debugPrint('Bus catalogue read failed: $e');
-                  },
-                );
-          } else {
-            remote = _busesRef
-                .doc(busId)
-                .snapshots(includeMetadataChanges: true)
-                .listen(
-                  (snapshot) {
-                    if (snapshot.metadata.hasPendingWrites) return;
-                    if (snapshot.exists) {
-                      cache(Bus.fromFirestore(snapshot));
-                    } else if (!snapshot.metadata.isFromCache) {
-                      _localBusesFallback.removeWhere((b) => b.id == busId);
-                    }
-                    controller.add(current());
-                  },
-                  onError: (Object e) {
-                    debugPrint('Bus read failed: $e');
-                  },
-                );
-          }
-        } catch (e) {
-          debugPrint('Bus catalogue unavailable: $e');
-        }
-      },
+      onListen: start,
       onCancel: () async {
+        cancelled = true;
         await local?.cancel();
         await remote?.cancel();
       },
@@ -692,35 +744,103 @@ class FirestoreService {
     String? occupancy,
     String? driverId,
   }) async {
+    TransitCatalogue.requireSharedWrites();
     final updates = <String, dynamic>{
       'rampOk': ?rampOk,
       if (occupancy != null) 'occupancy': occupancy.toLowerCase(),
       'driverId': ?driverId,
     };
     if (updates.isEmpty) return;
+    Bus? acknowledged;
     if (busWriter != null) {
       await busWriter!(busId, updates);
     } else {
+      final target = await _busesRef
+          .doc(busId)
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 8));
+      if (!target.exists ||
+          target.metadata.hasPendingWrites ||
+          target.metadata.isFromCache) {
+        throw StateError('A shared bus record is required');
+      }
+      TransitCatalogue.requireVehicleRecord(busId, target.data()!);
+      if (rampOk != null) {
+        final uid = operatorActorId?.call() ?? currentReportActorId;
+        if (uid == null || uid.isEmpty) {
+          throw StateError('Sign in to record a ramp observation');
+        }
+        updates['rampCheckedAt'] = FieldValue.serverTimestamp();
+        updates['rampCheckedBy'] = uid;
+      }
       await _busesRef
           .doc(busId)
           .update(updates)
           .timeout(const Duration(seconds: 12));
+      try {
+        final snapshot = await _busesRef
+            .doc(busId)
+            .get(const GetOptions(source: Source.server))
+            .timeout(const Duration(seconds: 8));
+        if (snapshot.exists &&
+            !snapshot.metadata.hasPendingWrites &&
+            !snapshot.metadata.isFromCache) {
+          acknowledged = Bus.fromFirestore(snapshot);
+        }
+      } catch (_) {
+        // Write is acknowledged; a failed metadata read cannot invent a check time.
+      }
     }
     final idx = _localBusesFallback.indexWhere((b) => b.id == busId);
     if (idx != -1) {
       final current = _localBusesFallback[idx];
-      _localBusesFallback[idx] = current.copyWith(
-        rampOk: rampOk,
-        occupancy: occupancy?.toLowerCase(),
-        driverId: driverId,
-      );
-      _localBusesStreamController.add(List.unmodifiable(_localBusesFallback));
+      _localBusesFallback[idx] =
+          acknowledged ??
+          current.copyWith(
+            rampOk: rampOk,
+            occupancy: occupancy?.toLowerCase(),
+            driverId: driverId,
+            clearRampCheck: rampOk != null,
+          );
+      _cacheAcknowledgedBus(_localBusesFallback[idx]);
     }
   }
 
   /// Assigns a driver to a bus document (`buses/{busId}`) (AC-84).
   Future<void> assignBusDriver(String busId, String driverId) async {
-    await updateBusAccessibility(busId, driverId: driverId);
+    TransitCatalogue.requireSharedWrites();
+    final uid = operatorActorId?.call() ?? currentReportActorId;
+    if (uid == null || uid.isEmpty || driverId != uid) {
+      throw StateError('Only the signed-in approved operator can claim a bus');
+    }
+    final bus = await _db
+        .runTransaction<Bus>((tx) async {
+          final approval = await tx.get(
+            _db
+                .collection(SampleTestMode.collection('operator_access'))
+                .doc(uid),
+          );
+          final ref = _busesRef.doc(busId);
+          final snapshot = await tx.get(ref);
+          if (approval.data()?['approved'] != true) {
+            throw StateError('Operator approval required');
+          }
+          if (!snapshot.exists) throw StateError('Bus unavailable');
+          TransitCatalogue.requireVehicleRecord(busId, snapshot.data()!);
+          final existing = Bus.fromFirestore(snapshot);
+          if (existing.driverId != null &&
+              existing.driverId!.isNotEmpty &&
+              existing.driverId != uid) {
+            throw StateError('This bus is assigned to another operator');
+          }
+          if (existing.driverId != uid) tx.update(ref, {'driverId': uid});
+          return existing.copyWith(driverId: uid);
+        })
+        .timeout(const Duration(seconds: 12));
+    final index = _localBusesFallback.indexWhere((item) => item.id == busId);
+    if (index >= 0) {
+      _cacheAcknowledgedBus(bus);
+    }
   }
 
   /// Adds a new [Station] to Firestore (`stations/{id}`) and inserts its ID
@@ -730,6 +850,7 @@ class FirestoreService {
     required String busId,
     required int insertIndex,
   }) async {
+    TransitCatalogue.requireSharedWrites();
     final updated = await _db
         .runTransaction<Bus>((tx) async {
           final ref = _busesRef.doc(busId);
@@ -794,6 +915,7 @@ class FirestoreService {
   Future<BoardingRequest> publishBoardingRequest(
     BoardingRequest request,
   ) async {
+    TransitCatalogue.requireSharedWrites();
     final viewer = _boardingViewer;
     if (request.id.isEmpty || request.riderId.isEmpty) {
       throw ArgumentError('An assistance request needs a stable ID and rider.');
@@ -860,8 +982,9 @@ class FirestoreService {
     List<BoardingRequest> cached() {
       _scopeBoardingCache();
       if (viewer != _boardingViewer) return [];
-      return _localRequestsFallback.where(matches).toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return _localRequestsFallback.where(matches).toList()..sort(
+        (a, b) => Report.compareDatesDescending(a.createdAt, b.createdAt),
+      );
     }
 
     late StreamController<List<BoardingRequest>> controller;
@@ -987,6 +1110,7 @@ class FirestoreService {
     String requestId,
     String status,
   ) async {
+    TransitCatalogue.requireSharedWrites();
     final viewer = _boardingViewer;
     _scopeBoardingCache();
     final BoardingRequest updated;

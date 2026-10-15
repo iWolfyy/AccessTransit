@@ -1,3 +1,9 @@
+import 'package:access_transit/models/trip_model.dart';
+import 'package:access_transit/models/report.dart';
+import 'package:access_transit/services/user_service.dart';
+import 'package:access_transit/services/journey_service.dart';
+import 'package:access_transit/models/journey_model.dart';
+
 // Firestore interfaces are faked to exercise the production transaction callbacks.
 // ignore_for_file: subtype_of_sealed_class
 import 'dart:async';
@@ -34,11 +40,16 @@ void main() {
       expect((await FirestoreService().getBusById(id))!.rampOk, isFalse);
     },
   );
-  Future<void> start(_Firestore db, String bus, {String? id}) async {
+  Future<void> start(
+    _Firestore db,
+    String bus, {
+    String? id,
+    List<String> stops = const ['a', 'b', 'c'],
+  }) async {
     await TripService(firestore: db).startTrip(
       busId: bus,
       routeNo: '1',
-      stops: ['a', 'b', 'c'],
+      stops: stops,
       driverId: 'driver',
       requestedTripId: id ?? 'trip-$bus',
       initialTelemetry: BusLocationModel(
@@ -161,6 +172,319 @@ void main() {
     expect(await LiveBusService().getLiveLocation(bus), isNull);
     await iterator.cancel();
   });
+  test('bus claim requires authenticated approval and preserves existing assignment', () async {
+    final db = _Firestore();
+    db.documents['buses/claim-test'] = {
+      'routeNo': '1',
+      'stops': ['a', 'b'],
+      'driverId': null,
+    };
+    final service = FirestoreService(
+      firestore: db,
+      operatorActorId: () => 'driver',
+    );
+    await expectLater(
+      service.assignBusDriver('claim-test', 'driver'),
+      throwsStateError,
+    );
+    expect(db.documents['buses/claim-test']!['driverId'], isNull);
+    db.documents['operator_access/driver'] = {'approved': true};
+    await expectLater(
+      service.assignBusDriver('claim-test', 'other'),
+      throwsStateError,
+    );
+    await service.assignBusDriver('claim-test', 'driver');
+    await service.assignBusDriver('claim-test', 'driver');
+    expect(db.documents['buses/claim-test']!['driverId'], 'driver');
+    db.documents['buses/claim-test']!['driverId'] = 'other';
+    await expectLater(
+      service.assignBusDriver('claim-test', 'driver'),
+      throwsStateError,
+    );
+    expect(db.documents['buses/claim-test']!['driverId'], 'other');
+    db.documents['operator_access/driver'] = {'approved': false};
+    await expectLater(
+      service.assignBusDriver('claim-test', 'driver'),
+      throwsStateError,
+    );
+  });
+  test('condition writes preserve acknowledged server check attribution while occupancy does not refresh it', () async {
+    final db = _Firestore();
+    const id = 'checked-bus';
+    db.documents['buses/$id'] = {
+      'routeNo': '1',
+      'stops': ['a', 'b'],
+      'hasRamp': true,
+      'rampOk': null,
+      'occupancy': 'low',
+      'driverId': 'driver',
+    };
+    final service = FirestoreService(
+      firestore: db,
+      operatorActorId: () => 'driver',
+    );
+    await service.getBusById(id);
+    await service.updateBusAccessibility(id, rampOk: true);
+    final check = db.documents['buses/$id']!['rampCheckedAt'];
+    expect(check, isA<Timestamp>());
+    expect(db.documents['buses/$id']!['rampCheckedBy'], 'driver');
+    expect((await service.getBusById(id))!.wheelchairAccessible, isTrue);
+    await service.updateBusAccessibility(id, occupancy: 'high');
+    expect(db.documents['buses/$id']!['rampCheckedAt'], check);
+    expect(db.documents['buses/$id']!['rampCheckedBy'], 'driver');
+  });
+  test('acknowledged profile edits preserve trusted counters and rejected edits preserve cache', () async {
+    final db = _Firestore();
+    const uid = 'reward-profile';
+    db.documents['users/$uid'] = {
+      'uid': uid,
+      'name': 'Before',
+      'email': 'rider@example.test',
+      'points': 100,
+      'reportsSubmitted': 2,
+      'verifiedCount': 3,
+    };
+    final service = UserService(firestore: db);
+    final original = (await service.getUser(uid))!;
+    final saved = await service.updateUser(
+      original.copyWith(name: 'After', points: 9999),
+    );
+    expect(saved.name, 'After');
+    expect(saved.points, 100);
+    expect(db.documents['users/$uid']!['points'], 100);
+    db.reject = true;
+    await expectLater(
+      service.updateUser(saved.copyWith(name: 'Rejected', points: 500)),
+      throwsStateError,
+    );
+    expect((await UserService().getUser(uid))!.name, 'After');
+    expect((await UserService().getUser(uid))!.points, 100);
+  });
+  test('production recheck transaction commits dated history, preserves votes and rolls back rejection', () async {
+    final db = _Firestore();
+    const id = 'production-recheck';
+    final original = Report(
+      id: id,
+      targetType: 'bus',
+      targetId: 'bus1',
+      problemType: 'Ramp Broken',
+      status: 'active',
+      userId: 'author',
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      lastConfirmedAt: DateTime.now().subtract(const Duration(days: 2)),
+      confirmedBy: ['rider'],
+      confirmCount: 1,
+    );
+    db.documents['reports/$id'] = original.toMap();
+    final service = FirestoreService(
+      firestore: db,
+      reportActorId: () => 'rider',
+    );
+    final saved = await service.recheckReport(id, 'rider');
+    expect(saved.changed, isTrue);
+    expect(saved.report!.lastRecheckedAt, isNotNull);
+    expect(saved.report!.confirmCount, 1);
+    expect(saved.report!.lastConfirmedAt, original.lastConfirmedAt);
+    final history = db.documents.entries
+        .where((e) => e.key.startsWith('reports/$id/rechecks/'))
+        .toList();
+    expect(history, hasLength(1));
+    expect(history.single.value['userId'], 'rider');
+    expect(history.single.value['checkedAt'], isA<Timestamp>());
+    final count = db.documents.length;
+    expect((await service.recheckReport(id, 'rider')).changed, isFalse);
+    expect(db.documents.length, count);
+    // A second eligible attempt denied at commit must not update the acknowledged cache or history.
+    db.documents['reports/$id'] = original.toMap();
+    db.reject = true;
+    await expectLater(service.recheckReport(id, 'rider'), throwsStateError);
+    expect(db.documents.length, count);
+    expect(db.documents['reports/$id']!['lastRecheckedAt'], isNull);
+    final cached = await FirestoreService().streamReportById(id).first;
+    expect(cached!.lastRecheckedAt, saved.report!.lastRecheckedAt);
+  });
+  for (final stops in [
+    ['a', 'b'],
+    ['a', 'b', 'c', 'd'],
+  ]) {
+    test(
+      '${stops.length}-stop trip completes on terminal arrival with no extra confirmation',
+      () async {
+        final db = _Firestore();
+        final bus = 'f17-${stops.length}';
+        final service = TripService(firestore: db);
+        await start(db, bus, stops: stops);
+        final tripPath = 'trips/trip-$bus';
+        final livePath = 'live_locations/$bus';
+        final arrivals = <String, DateTime>{};
+        for (var index = 1; index < stops.length; index++) {
+          final at = DateTime(2026, 10, 15, 12, index * 5);
+          arrivals[stops[index]] = at;
+          final result = await service.confirmNextStopArrival(
+            bus,
+            arrivalTime: at,
+            expectedTripId: 'trip-$bus',
+          );
+          expect(result!.currentStopIndex, index);
+          expect(result.isCompleted, index == stops.length - 1);
+          expect(
+            db.documents[livePath]!['isBroadcasting'],
+            index != stops.length - 1,
+          );
+          for (final prior in arrivals.entries) {
+            expect(result.stopTimes[prior.key]!.actualArrival, prior.value);
+          }
+        }
+        expect(db.documents[tripPath]!['status'], 'completed');
+        expect(db.documents[livePath]!['currentStopIndex'], stops.length - 1);
+        expect(db.documents[livePath]!['nextStop'], stops.last);
+        expect(db.documents[livePath]!['addedDelayMinutes'], 0);
+        expect(await TripService().getActiveTrip(bus), isNull);
+        expect(await service.confirmNextStopArrival(bus), isNull);
+        final retry = await service.completeTrip(
+          bus,
+          expectedTripId: 'trip-$bus',
+        );
+        expect(
+          retry!.stopTimes[stops.last]!.actualArrival,
+          arrivals[stops.last],
+        );
+      },
+    );
+  }
+
+  for (final priorArrival in [false, true]) {
+    test(
+      'legacy terminal index completes and ${priorArrival ? 'retains' : 'records'} its actual arrival',
+      () async {
+        final db = _Firestore();
+        final bus = 'f17-legacy-$priorArrival';
+        final service = TripService(firestore: db);
+        await start(db, bus);
+        final path = 'trips/trip-$bus';
+        final at = DateTime(2026, 10, 15, 12);
+        final legacy = TripModel.fromMap(db.documents[path]!)
+            .copyWith(currentStopIndex: 2);
+        final times = Map.of(legacy.stopTimes);
+        if (priorArrival) times['c'] = times['c']!.copyWith(actualArrival: at);
+        db.documents[path] = legacy.copyWith(stopTimes: times).toMap();
+        // Retry/resume imports acknowledged legacy progress instead of resetting it.
+        await start(db, bus);
+        final confirmedAt = at.add(const Duration(minutes: 5));
+        final result = await service.confirmNextStopArrival(
+          bus,
+          arrivalTime: confirmedAt,
+          expectedTripId: 'trip-$bus',
+        );
+        expect(result!.isCompleted, isTrue);
+        expect(result.currentStopIndex, 2);
+        expect(
+          result.stopTimes['c']!.actualArrival,
+          priorArrival ? at : confirmedAt,
+        );
+        expect(db.documents['live_locations/$bus']!['isBroadcasting'], isFalse);
+      },
+    );
+  }
+
+  test('completion retry reconciles stale broadcasting while retaining saved terminal arrival', () async {
+    final db = _Firestore();
+    const bus = 'f17-reconcile';
+    final service = TripService(firestore: db);
+    await start(db, bus, stops: ['a', 'b']);
+    final path = 'trips/trip-$bus';
+    final actual = DateTime(2026, 10, 15, 12);
+    final prior = TripModel.fromMap(db.documents[path]!);
+    db.documents[path] = prior
+        .copyWith(
+          status: 'completed',
+          currentStopIndex: 1,
+          stopTimes: {
+            ...prior.stopTimes,
+            'b': prior.stopTimes['b']!.copyWith(actualArrival: actual),
+          },
+        )
+        .toMap();
+    // Simulate an acknowledged completion elsewhere with stale local progress
+    // and a legacy broadcast that was not closed.
+    db.reject = true;
+    await expectLater(service.confirmNextStopArrival(bus), throwsStateError);
+    expect(db.documents['live_locations/$bus']!['isBroadcasting'], isTrue);
+    db.reject = false;
+    final saved = await service.confirmNextStopArrival(
+      bus,
+      arrivalTime: actual.add(const Duration(minutes: 10)),
+    );
+    expect(saved!.stopTimes['b']!.actualArrival, actual);
+    expect(db.documents['live_locations/$bus']!['isBroadcasting'], isFalse);
+    expect(db.documents[path]!['status'], 'completed');
+  });
+  test('passenger journey save, rejection and retry never create or modify operator evidence', () async {
+    final db = _Firestore();
+    db.documents.addAll({
+      'buses/confirmation25': {'hasRamp': true, 'rampOk': false},
+      'trips/real-operator-trip': {
+        'busId': 'confirmation25',
+        'status': 'in_progress',
+      },
+      'live_locations/confirmation25': {
+        'busId': 'confirmation25',
+        'latitude': 7.1,
+        'speed': 0,
+        'operatorId': 'approved-operator',
+      },
+      'reports/existing-warning': {
+        'targetId': 'confirmation25',
+        'condition': 'barrier',
+      },
+    });
+    final before = Map<String, Map<String, dynamic>>.from(db.documents);
+    final service = JourneyService(
+      firestore: db,
+      currentPassengerId: () => 'rider',
+    );
+    final journey = JourneyModel(
+      journeyId: 'passenger25',
+      passengerId: 'rider',
+      routeId: 'route25',
+      routeNumber: '25',
+      routeTitle: 'Selected route',
+      busId: 'confirmation25',
+      origin: 'Boarding',
+      destination: 'Destination',
+      fromStationId: 'a',
+      toStationId: 'b',
+      departureAt: DateTime(2026, 10, 25, 10),
+      durationMinutes: 15,
+      estimatedFareLkr: 70,
+    );
+    db.reject = true;
+    await expectLater(service.createJourney(journey), throwsStateError);
+    expect(db.documents, before);
+    db.reject = false;
+    final saved = await service.createJourney(journey);
+    await service.createJourney(
+      journey,
+    ); // Same passenger selection is idempotent.
+    expect(saved.status, JourneyStatus.confirmed);
+    expect(db.documents.length, before.length + 1);
+    expect(db.documents.containsKey('journeys/passenger25'), isTrue);
+    for (final entry in before.entries) {
+      expect(db.documents[entry.key], entry.value);
+    }
+    expect(db.refs.keys, everyElement(startsWith('journeys/')));
+    final payload = db.documents['journeys/passenger25']!;
+    for (final field in [
+      'latitude',
+      'longitude',
+      'speed',
+      'operatorId',
+      'rampOk',
+      'isBroadcasting',
+    ]) {
+      expect(payload.containsKey(field), isFalse);
+    }
+  });
 }
 
 class _Firestore extends Fake implements FirebaseFirestore {
@@ -194,7 +518,10 @@ class _Collection extends Fake
   final String path;
   @override
   DocumentReference<Map<String, dynamic>> doc([String? id]) =>
-      db.refs.putIfAbsent('$path/$id', () => _Document(db, '$path/$id'));
+      db.refs.putIfAbsent(
+        '$path/${id ?? 'generated-${db.refs.length}'}',
+        () => _Document(db, '$path/${id ?? 'generated-${db.refs.length}'}'),
+      );
 }
 
 class _Document extends Fake
@@ -206,6 +533,23 @@ class _Document extends Fake
   final String path;
   @override
   String get id => path.split('/').last;
+  @override
+  CollectionReference<Map<String, dynamic>> collection(String collectionPath) =>
+      _Collection(db, '$path/$collectionPath');
+  @override
+  Future<void> update(Map<Object, Object?> data) async {
+    if (db.reject) throw StateError('denied');
+    db.documents[path] = {
+      ...?db.documents[path],
+      ...data.map(
+        (key, value) => MapEntry(
+          key.toString(),
+          value is FieldValue ? Timestamp.fromDate(DateTime.now()) : value,
+        ),
+      ),
+    };
+  }
+
   @override
   Future<DocumentSnapshot<Map<String, dynamic>>> get([
     GetOptions? options,
