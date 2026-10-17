@@ -380,6 +380,7 @@ void main() {
         await tester.pump();
       }
       await tester.ensureVisible(find.byType(OutlinedButton));
+      await tester.pumpAndSettle();
       await tester.tap(find.byType(OutlinedButton));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(

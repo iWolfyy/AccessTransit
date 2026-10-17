@@ -1,3 +1,6 @@
+import '../admin/admin_scaffold.dart';
+import '../../l10n/moderation_presentation.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../l10n/localization_context.dart';
@@ -143,6 +146,10 @@ class _ReportReviewsScreenState extends State<ReportReviewsScreen> {
         evidence.addAll(values);
         evidenceNext = data['next'];
       });
+    } on ModerationException catch (e) {
+      if (mounted && version == revision) {
+        message(context.reviewFailure(e.code) ?? context.l10n.reviewsError);
+      }
     } catch (_) {
       if (mounted && version == revision) message(context.l10n.reviewsError);
     } finally {
@@ -171,6 +178,10 @@ class _ReportReviewsScreenState extends State<ReportReviewsScreen> {
       // Reload acknowledged state; never label a failed write as submitted.
       await open(id);
       if (mounted) setState(() => sent = true);
+    } on ModerationException catch (e) {
+      if (mounted && version == revision) {
+        message(context.reviewFailure(e.code) ?? context.l10n.reviewsError);
+      }
     } catch (_) {
       if (mounted && version == revision) message(context.l10n.reviewsError);
     } finally {
@@ -186,19 +197,18 @@ class _ReportReviewsScreenState extends State<ReportReviewsScreen> {
     super.dispose();
   }
 
-  String status(String? value) => switch (value) {
-    'pending' => context.l10n.reviewsPending,
-    'upheld' || 'rejected' => context.l10n.reviewsUpheld,
-    'overturned' || 'accepted' => context.l10n.reviewsOverturned,
-    _ => context.l10n.reviewsUnreviewed,
-  };
+  String status(String? value) => context.reportReviewStatus(value);
 
   @override
   Widget build(BuildContext context) {
     final d = detail;
     final appeal = d?['appeal'] as Map?;
-    final closed = const ['upheld', 'overturned'].contains(d?['reviewStatus']);
-    return Scaffold(
+    final closed = !const [
+      'unreviewed',
+      'pending',
+    ].contains(d?['reviewStatus']);
+    return AdminScaffold(
+      enabled: widget.admin,
       appBar: AppBar(
         toolbarHeight: MediaQuery.textScalerOf(context).scale(20) > 30
             ? 104
@@ -310,7 +320,12 @@ class _ReportReviewsScreenState extends State<ReportReviewsScreen> {
                         ...evidence.map(
                           (v) => ListTile(
                             contentPadding: EdgeInsets.zero,
-                            title: Text('${v['uid']} • ${v['value']}'),
+                            title: Text(
+                              context.l10n.reviewVoteEvidence(
+                                v['uid'],
+                                context.reviewVote(v['value']),
+                              ),
+                            ),
                             subtitle: Text(v['reason']?.toString() ?? ''),
                           ),
                         ),

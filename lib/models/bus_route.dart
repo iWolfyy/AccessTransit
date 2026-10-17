@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../constants/firestore_constants.dart';
 
 /// Represents a public transit bus route with route number, name, description,
@@ -12,6 +13,7 @@ class BusRoute {
     required this.routeName,
     this.description = '',
     this.stops = const [],
+    this.stopStationIds = const {},
   });
 
   /// Unique identifier of the route (e.g. `'route_138'`).
@@ -29,37 +31,54 @@ class BusRoute {
   /// Ordered list of station/stop IDs serving this route.
   final List<String> stops;
 
+  /// Unique visit IDs in `stops`; this map resolves each visit to its physical stop.
+  /// Legacy catalogues use the station ID itself as their single visit ID.
+  final Map<String, String> stopStationIds;
+  String stationIdFor(String occurrence) =>
+      stopStationIds[occurrence] ?? occurrence;
+  List<String> occurrencesAt(String stationId) =>
+      stops.where((s) => stationIdFor(s) == stationId).toList();
+
   /// Returns true if this route serves the specified [stopId].
-  bool containsStop(String stopId) => stops.contains(stopId);
+  bool containsStop(String stopId) => occurrencesAt(stopId).isNotEmpty;
 
   /// Checks whether [fromStopId] appears strictly before [toStopId] along this route.
   bool isValidDirection(String fromStopId, String toStopId) {
-    final fromIdx = stops.indexOf(fromStopId);
-    final toIdx = stops.indexOf(toStopId);
-    return fromIdx != -1 && toIdx != -1 && fromIdx < toIdx;
+    return occurrencesAt(fromStopId).any(
+      (a) =>
+          occurrencesAt(toStopId)
+              .any((b) => stops.indexOf(a) < stops.indexOf(b)),
+    );
   }
 
   /// Factory to instantiate a [BusRoute] from a map and optional document [id].
   factory BusRoute.fromMap(Map<String, dynamic> map, {String? id}) {
-    final rawStops = map[FirestoreConstants.fieldStops] as List<dynamic>? ??
+    final rawStops =
+        map[FirestoreConstants.fieldStops] as List<dynamic>? ??
         map['stops'] as List<dynamic>? ??
         [];
     final parsedStops = rawStops.map((e) => e.toString()).toList();
 
     return BusRoute(
       id: id ?? map['id']?.toString() ?? '',
-      routeNo: map[FirestoreConstants.fieldRouteNo]?.toString() ??
+      routeNo:
+          map[FirestoreConstants.fieldRouteNo]?.toString() ??
           map['routeNumber']?.toString() ??
           map['routeNo']?.toString() ??
           '',
-      routeName: map[FirestoreConstants.fieldRouteName]?.toString() ??
+      routeName:
+          map[FirestoreConstants.fieldRouteName]?.toString() ??
           map['routeName']?.toString() ??
           map['name']?.toString() ??
           '',
-      description: map[FirestoreConstants.fieldRouteDescription]?.toString() ??
+      description:
+          map[FirestoreConstants.fieldRouteDescription]?.toString() ??
           map['description']?.toString() ??
           '',
       stops: parsedStops,
+      stopStationIds: Map<String, String>.from(
+        map['stopStationIds'] as Map? ?? {},
+      ),
     );
   }
 
@@ -78,6 +97,7 @@ class BusRoute {
       FirestoreConstants.fieldRouteName: routeName,
       FirestoreConstants.fieldRouteDescription: description,
       FirestoreConstants.fieldStops: stops,
+      if (stopStationIds.isNotEmpty) 'stopStationIds': stopStationIds,
     };
   }
 
@@ -91,6 +111,7 @@ class BusRoute {
     String? routeName,
     String? description,
     List<String>? stops,
+    Map<String, String>? stopStationIds,
   }) {
     return BusRoute(
       id: id ?? this.id,
@@ -98,6 +119,7 @@ class BusRoute {
       routeName: routeName ?? this.routeName,
       description: description ?? this.description,
       stops: stops ?? List.from(this.stops),
+      stopStationIds: stopStationIds ?? Map.of(this.stopStationIds),
     );
   }
 
@@ -110,7 +132,11 @@ class BusRoute {
           routeNo == other.routeNo &&
           routeName == other.routeName &&
           description == other.description &&
-          _listEquals(stops, other.stops);
+          _listEquals(stops, other.stops) &&
+          stopStationIds.length == other.stopStationIds.length &&
+          stopStationIds.entries.every(
+            (e) => other.stopStationIds[e.key] == e.value,
+          );
 
   static bool _listEquals(List<String> a, List<String> b) {
     if (a.length != b.length) return false;
@@ -126,5 +152,8 @@ class BusRoute {
       routeNo.hashCode ^
       routeName.hashCode ^
       description.hashCode ^
+      Object.hashAllUnordered(
+        stopStationIds.entries.map((e) => Object.hash(e.key, e.value)),
+      ) ^
       Object.hashAll(stops);
 }

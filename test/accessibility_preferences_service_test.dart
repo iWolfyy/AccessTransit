@@ -1,4 +1,5 @@
 import 'support/fixture_search_backend.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -237,9 +238,9 @@ void main() {
 
         // Find and scroll until visible
         final highContrastFinder = find.text('High contrast mode');
-        expect(highContrastFinder, findsOneWidget);
         await tester.scrollUntilVisible(highContrastFinder, 200);
         await tester.pumpAndSettle();
+        expect(highContrastFinder, findsOneWidget);
 
         // Toggle ON
         await tester.tap(highContrastFinder);
@@ -392,7 +393,8 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             theme: AppTheme.highContrastTheme,
-            home: RouteResultsScreen(searchBackend: FixtureSearchBackend(), 
+            home: RouteResultsScreen(
+              searchBackend: FixtureSearchBackend(),
               fromStationId: 'st_fort',
               toStationId: 'st_kottawa',
               origin: 'Colombo Fort Station',

@@ -106,6 +106,14 @@ class _NotificationRequestScreenState extends State<NotificationRequestScreen> {
                     style: Theme.of(c).textTheme.titleMedium,
                   ),
                   Text('${request!.routeNo} · ${request!.stopName}'),
+                  if (request!.boardingIndex != null &&
+                      request!.alightingIndex != null)
+                    Text(
+                      c.l10n.journeyVisitPositions(
+                        request!.boardingIndex! + 1,
+                        request!.alightingIndex! + 1,
+                      ),
+                    ),
                   for (final type in request!.assistanceTypes)
                     Text(assistanceType(c, type)),
                   const SizedBox(height: 16),

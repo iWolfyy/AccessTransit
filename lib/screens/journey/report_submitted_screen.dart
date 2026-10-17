@@ -1,3 +1,6 @@
+import '../../l10n/report_view_presentation.dart';
+import '../../l10n/localization_context.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -62,7 +65,7 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                 ? 96
                 : 56,
             leading: IconButton(
-              tooltip: 'Back',
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
               onPressed: () => Navigator.of(context).maybePop(),
               icon: Icon(
                 Icons.arrow_back_rounded,
@@ -71,7 +74,7 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
               ),
             ),
             title: Text(
-              'Report delivery',
+              context.l10n.deliveryTitle,
               maxLines: 2,
               softWrap: true,
               style: TextStyle(
@@ -96,7 +99,7 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _heading('Publication status'),
+                              _heading(context.l10n.deliveryStatus),
                               const SizedBox(height: 16),
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,8 +123,10 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                                   Expanded(
                                     child: Text(
                                       removed
-                                          ? 'Draft unavailable'
-                                          : state.label,
+                                          ? context
+                                                .l10n
+                                                .deliveryDraftUnavailable
+                                          : context.reportViewText(state.label),
                                       style: TextStyle(
                                         fontSize: 22,
                                         height: 1.3,
@@ -141,10 +146,10 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                               const SizedBox(height: 16),
                               Text(
                                 published
-                                    ? 'Your report is available to other commuters.'
+                                    ? context.l10n.deliveryPublicHelp
                                     : removed
-                                    ? 'This draft was removed, expired or belongs to another account. Publication has not been confirmed.'
-                                    : entry?.error ?? 'Saved on this device. Publication has not been confirmed.',
+                                    ? context.l10n.deliveryRemovedHelp
+                                    : context.deliveryError(entry?.error),
                                 style: TextStyle(
                                   fontSize: 14,
                                   height: 1.4,
@@ -162,16 +167,19 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                           children: [
                             _heading(
                               removed
-                                  ? 'Local draft unavailable'
-                                  : 'Your observation',
+                                  ? context.l10n.deliveryLocalUnavailable
+                                  : context.l10n.deliveryObservation,
                             ),
                             if (!removed) ...[
                               const SizedBox(height: 16),
-                              _detail('Location / Vehicle', widget.targetName),
+                              _detail(
+                                context.l10n.deliveryTarget,
+                                widget.targetName,
+                              ),
                               if (current != null) ...[
                                 const SizedBox(height: 16),
                                 _detail(
-                                  'Condition reported',
+                                  context.l10n.deliveryCondition,
                                   current.problemType,
                                 ),
                               ],
@@ -187,7 +195,7 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _heading('Attached photo'),
+                              _heading(context.l10n.deliveryPhoto),
                               const SizedBox(height: 12),
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
@@ -195,9 +203,11 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                                   current.photoUrl,
                                   height: 160,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => const Padding(
+                                  errorBuilder: (_, _, _) => Padding(
                                     padding: EdgeInsets.all(16),
-                                    child: Text('Photo preview unavailable'),
+                                    child: Text(
+                                      context.l10n.deliveryPhotoUnavailable,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -213,14 +223,16 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                               : () => _retry(service, entry.report.id),
                           style: _filledStyle(),
                           child: Text(
-                            busy ? 'Uploading…' : 'Retry upload',
+                            busy
+                                ? context.l10n.deliveryUploading
+                                : context.l10n.deliveryRetry,
                             textAlign: TextAlign.center,
                           ),
                         ),
                         const SizedBox(height: 8),
                         TextButton.icon(
                           icon: const Icon(Icons.delete_outline),
-                          label: const Text('Remove draft from this device'),
+                          label: Text(context.l10n.deliveryRemoveDevice),
                           onPressed: () => _remove(service, entry.report),
                         ),
                         const SizedBox(height: 12),
@@ -228,10 +240,10 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _heading('About local drafts'),
+                              _heading(context.l10n.deliveryAboutDrafts),
                               const SizedBox(height: 8),
                               Text(
-                                'Drafts expire after 7 days and are removed on sign-out/account change.',
+                                context.l10n.deliveryDraftExpiry,
                                 style: TextStyle(
                                   fontSize: 14,
                                   height: 1.4,
@@ -254,8 +266,8 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                               )
                             : null,
                         style: _filledStyle(),
-                        child: const Text(
-                          'View in Community Feed',
+                        child: Text(
+                          context.l10n.deliveryViewFeed,
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -266,7 +278,10 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                                 .popUntil((route) => route.isFirst),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: context.primaryColor,
-                          minimumSize: Size(48, context.buttonHeight),
+                          minimumSize: Size(
+                            context.buttonHeight,
+                            context.buttonHeight,
+                          ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 20,
                             vertical: 14,
@@ -275,8 +290,8 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: const Text(
-                          'Back to Home',
+                        child: Text(
+                          context.l10n.deliveryHome,
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -297,7 +312,7 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
       final receipt = await service.retry(id);
       if (mounted) setState(() => _receipt = receipt.report);
     } catch (_) {
-      if (mounted) _snack('Could not save the upload status. Please retry.');
+      if (mounted) _snack(context.l10n.deliverySaveFailed);
     }
   }
 
@@ -305,20 +320,18 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
     final remove = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remove local draft?'),
-        content: const SingleChildScrollView(
-          child: Text(
-            'Stops future retries and removes the local note/photo. A request already sent may still complete. This does not delete a public report or an uploaded photo.',
-          ),
+        title: Text(context.l10n.deliveryRemoveQuestion),
+        content: SingleChildScrollView(
+          child: Text(context.l10n.deliveryRemoveHelp),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep draft'),
+            child: Text(context.l10n.deliveryKeep),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Remove draft'),
+            child: Text(context.l10n.deliveryRemove),
           ),
         ],
       ),
@@ -327,7 +340,7 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
     try {
       await service.remove(report.id, userId: report.userId);
     } catch (_) {
-      if (mounted) _snack('Local removal could not be saved. Please retry.');
+      if (mounted) _snack(context.l10n.deliveryRemoveFailed);
     }
   }
 
@@ -346,7 +359,7 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
   ButtonStyle _filledStyle() => FilledButton.styleFrom(
     backgroundColor: context.primaryColor,
     foregroundColor: Colors.white,
-    minimumSize: Size(48, context.buttonHeight),
+    minimumSize: Size(context.buttonHeight, context.buttonHeight),
     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
     textStyle: Theme.of(context).textTheme.labelLarge
         ?.copyWith(fontSize: 16, fontWeight: FontWeight.w700, height: 1.25),

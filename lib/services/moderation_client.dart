@@ -73,26 +73,24 @@ class ModerationClient {
     String? Function()? currentUid,
     bool? sample,
     this.timeout = const Duration(seconds: 15),
-  }) : _origin =
-           origin ??
-           Uri.tryParse(
-             ModerationMode.enabled
-                 ? 'http://10.0.2.2:8787'
-                 : const String.fromEnvironment('MODERATION_API_ORIGIN'),
-           ),
+  }) : _explicitOrigin = origin,
        _client = client ?? http.Client(),
        _ownsClient = client == null,
        _identity = identity ?? _firebaseIdentity,
        _currentUid = currentUid ?? _firebaseUid,
        _scope = (sample ?? SampleTestMode.enabled) ? 'sample' : 'normal';
 
-  final Uri? _origin;
+  final Uri? _explicitOrigin;
+  // Long-lived clients must follow main-app initialization rather than keeping
+  // an empty origin captured before startup (or during a debug hot reload).
+  Uri? get _origin => _explicitOrigin ?? ModerationMode.apiOrigin;
   final http.Client _client;
   final bool _ownsClient;
   final Future<ModerationIdentity?> Function() _identity;
   final String? Function() _currentUid;
   final String _scope;
   final Duration timeout;
+  String? get currentAccountId => _currentUid();
   bool _disposed = false;
 
   static String? _firebaseUid() => FirebaseAuth.instance.currentUser?.uid;
@@ -106,15 +104,7 @@ class ModerationClient {
     return ModerationIdentity(user.uid, token);
   }
 
-  bool get isConfigured =>
-      (_origin?.scheme == 'https' ||
-          (ModerationMode.enabled &&
-              _origin?.toString() == 'http://10.0.2.2:8787')) &&
-      _origin!.host.isNotEmpty &&
-      _origin.userInfo.isEmpty &&
-      !_origin.hasQuery &&
-      !_origin.hasFragment &&
-      (_origin.path.isEmpty || _origin.path == '/');
+  bool get isConfigured => ModerationMode.configuration.acceptsOrigin(_origin);
 
   Future<Map<String, dynamic>> _request(
     String path,
@@ -202,6 +192,13 @@ class ModerationClient {
           'gps-unavailable',
           'notification-unavailable',
           'device-limit',
+          'auth-scope-denied',
+          'auth-operation-pending',
+          'account-deleted',
+          'auth-account-missing',
+          'disable-before-delete',
+          'active-operation-blocks-delete',
+          'deletion-confirmation-required',
         };
         throw ModerationException(
           allowed.contains(code) ? code as String : 'service-unavailable',
@@ -291,6 +288,46 @@ class ModerationClient {
       points: data['points'],
       banReason: data['banReason'] is String ? data['banReason'] : null,
     );
+  }
+
+  Future<Map<String, dynamic>> manualAppeals({
+    bool admin = false,
+    String? after,
+  }) => _request('/v2/manual-appeals/list', {'queue': admin, 'after': ?after});
+
+  Future<Map<String, dynamic>> currentManualAppeal() =>
+      _request('/v2/manual-appeals/current', {});
+
+  Future<void> submitManualAppeal(int revision, String reason) async {
+    final data = await _request('/v2/manual-appeals/submit', {
+      'expectedRevision': revision,
+      'reason': reason,
+    });
+    _manualReceipt(data);
+  }
+
+  Future<void> reviewManualAppeal(
+    String appealId,
+    String outcome,
+    String reason,
+  ) async {
+    final data = await _request('/v2/manual-appeals/review', {
+      'appealId': appealId,
+      'outcome': outcome,
+      'reason': reason,
+    });
+    if (data['appealId'] != appealId) {
+      throw const ModerationException('invalid-response');
+    }
+    _manualReceipt(data);
+  }
+
+  void _manualReceipt(Map<String, dynamic> data) {
+    if (data['duplicate'] is! bool ||
+        data['appealId'] is! String ||
+        !const ['pending', 'accepted', 'rejected'].contains(data['status'])) {
+      throw const ModerationException('invalid-response');
+    }
   }
 
   Future<ModerationVoteStatus> voteStatus(String reportId) async {
@@ -540,8 +577,136 @@ class ModerationClient {
   Future<Map<String, dynamic>> banDetail(String accountId) =>
       _request('/v2/bans/detail', {'accountId': accountId});
 
+  Future<Map<String, dynamic>> managedAccount(String accountId) async {
+    final data = await _request('/v2/accounts/detail', {
+      'accountId': accountId,
+    });
+    if (data['accountId'] != accountId ||
+        data['revision'] is! int ||
+        data['revision'] < 0 ||
+        data['manualActive'] is! bool ||
+        data['restricted'] is! bool ||
+        data['communityRestricted'] is! bool ||
+        (data['manualReason'] != null && data['manualReason'] is! String) ||
+        (data['manualUntil'] != null &&
+            (data['manualUntil'] is! String ||
+                DateTime.tryParse(data['manualUntil']) == null))) {
+      throw const ModerationException('invalid-response');
+    }
+    return data;
+  }
+
+  Future<void> changeManagedAccount({
+    required String accountId,
+    required String operationId,
+    required int revision,
+    required String action,
+    required String reason,
+    int? durationHours,
+  }) async {
+    final data = await _request('/v2/accounts/change', {
+      'accountId': accountId,
+      'operationId': operationId,
+      'expectedRevision': revision,
+      'action': action,
+      'reason': reason,
+      'durationHours': ?durationHours,
+    });
+    if (data['accountId'] != accountId ||
+        data['operationId'] != operationId ||
+        data['duplicate'] is! bool ||
+        data['revision'] != revision + 1) {
+      throw const ModerationException('invalid-response');
+    }
+  }
+
   Future<Map<String, dynamic>> operations({String? after}) =>
       _request('/v2/operations/list', {'after': ?after});
+
+  Map<String, dynamic> _authDetail(Map<String, dynamic> d, String accountId) {
+    if (d['accountId'] != accountId ||
+        d['revision'] is! int ||
+        d['revision'] < 0 ||
+        [
+          'authExists',
+          'authDisabled',
+          'authBlocked',
+          'deleted',
+          'protected',
+          'activeOperation',
+        ].any((key) => d[key] is! bool) ||
+        ![
+          'none',
+          'pending',
+          'approved',
+          'rejected',
+        ].contains(d['reviewStatus'])) {
+      throw const ModerationException('invalid-response');
+    }
+    final job = d['lastOperation'];
+    if (job != null &&
+        (job is! Map ||
+            job['operationId'] is! String ||
+            job['action'] is! String ||
+            ![
+              'pending',
+              'processing',
+              'completed',
+              'review-required',
+            ].contains(job['status']))) {
+      throw const ModerationException('invalid-response');
+    }
+    return d;
+  }
+
+  Future<Map<String, dynamic>> authAccount(String accountId) async =>
+      _authDetail(
+        await _request('/v2/auth/detail', {'accountId': accountId}),
+        accountId,
+      );
+
+  Future<Map<String, dynamic>> changeAuthAccount({
+    required String accountId,
+    required String operationId,
+    required int revision,
+    required String action,
+    required String reason,
+    String? confirmAccountId,
+  }) async {
+    final d = await _request('/v2/auth/change', {
+      'accountId': accountId,
+      'operationId': operationId,
+      'expectedRevision': revision,
+      'action': action,
+      'reason': reason,
+      'confirmAccountId': ?confirmAccountId,
+    });
+    if (d['accountId'] != accountId ||
+        d['operationId'] != operationId ||
+        d['revision'] != revision + 1 ||
+        d['action'] != action ||
+        d['duplicate'] is! bool ||
+        ![
+          'pending',
+          'processing',
+          'completed',
+          'review-required',
+        ].contains(d['status'])) {
+      throw const ModerationException('invalid-response');
+    }
+    return d;
+  }
+
+  Future<Map<String, dynamic>> retryAuthAccount(
+    String accountId,
+    String operationId,
+  ) async => _authDetail(
+    await _request('/v2/auth/retry', {
+      'accountId': accountId,
+      'operationId': operationId,
+    }),
+    accountId,
+  );
   Future<Map<String, dynamic>> operationDetail(String runId) =>
       _request('/v2/operations/detail', {'runId': runId});
   Future<Map<String, dynamic>> operationCandidates(

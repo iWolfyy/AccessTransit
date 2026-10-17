@@ -2,6 +2,8 @@
 
 The Flutter app includes an administrator-only console. Login and splash routing use the Firebase `admin: true` custom claim, not the editable profile role. An administrator can return to the passenger app from Overview; Profile has an Admin console entry for administrators.
 
+Latest catalogue paging/localization slice: [catalogue pages and language controls](admin-catalogue-pages.md). Lists use 20-record pages; editor reference selectors collect all pages before saving.
+
 ## Included
 
 - Overview counts, searchable buses/timetables, routes, stops, users and driver reviews.
@@ -54,3 +56,22 @@ weekday/departure calendars and explicit bounded run generation. Existing runs
 are preserved; retiring a calendar does not cancel them. See
 [service calendars](service-calendars.md) and implementation checkpoint 38 for
 current local validation and remaining rollout limits.
+
+Route editing now supports repeated physical stops with distinct visit IDs. Bus
+editing selects those exact route visits and keeps their scheduled times
+separate. Existing visit IDs cannot be rebound to another physical station.
+See [stop occurrences](stop-occurrences.md) and implementation checkpoint 39.
+
+Dated departures also supports **Publish replacement**: choose its Colombo
+date/time, enter a public reason, and publish the cancellation/replacement/history
+atomically. Started operations cannot use this scheduling action. Original saved
+trips keep their selection and see a change notice. See
+[schedule history](schedule-history.md) and checkpoint 40 for local evidence and
+remaining migration/rollout limits.
+
+The local-v2 Users view now includes **Account access** for reasoned 72-hour or
+until-restored manual suspension and restoration. Independent community bans
+survive restoration. Trusted server checks protect self/admin accounts, audit
+decisions and queue active-operation reconciliation. This does not change Auth
+or delete accounts. See [manual account controls](manual-account-controls.md)
+and implementation checkpoint 41.

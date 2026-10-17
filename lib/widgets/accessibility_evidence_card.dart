@@ -1,3 +1,5 @@
+import '../l10n/evidence_presentation.dart';
+import '../l10n/localization_context.dart';
 import 'evidence_refresh.dart';
 
 import 'package:flutter/material.dart';
@@ -40,8 +42,8 @@ class AccessibilityEvidenceCard extends StatelessWidget {
               report.targetName.trim().toLowerCase() ==
                   stop.trim().toLowerCase()));
 
-  String _time(DateTime? time) {
-    if (time == null) return 'Unknown';
+  String _time(BuildContext context, DateTime? time) {
+    if (time == null) return context.l10n.resultsUnknown;
     final local = time.toLocal();
     return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')} ${TimeUtils.formatTimeString(local)}';
   }
@@ -139,33 +141,63 @@ class AccessibilityEvidenceCard extends StatelessWidget {
               color: context.textColor,
             ),
           ),
-          Text(state, style: TextStyle(color: context.subtextColor)),
           Text(
-            'Last checked: ${_time(StatusLogic.lastCheckedAt(report, currentTime: now))}',
+            context.evidenceText(state),
+            style: TextStyle(color: context.subtextColor),
+          ),
+          Text(
+            context.l10n.evidenceCheckedAt(
+              _time(
+                context,
+                StatusLogic.lastCheckedAt(report, currentTime: now),
+              ),
+            ),
             style: TextStyle(color: context.subtextColor),
           ),
           _AccountAttribution(reporter: report.userId, confirmers: accounts),
           if (report.lastRecheckedAt != null)
             Text(
-              'Last recheck: ${_time(report.lastRecheckedAt!.isAfter(now) ? null : report.lastRecheckedAt)} by ${report.lastRecheckedBy?.trim().isNotEmpty == true ? 'Community member' : 'Unknown'}. Unique confirmations unchanged.',
+              context.l10n.evidenceRecheckedAt(
+                _time(
+                  context,
+                  report.lastRecheckedAt!.isAfter(now)
+                      ? null
+                      : report.lastRecheckedAt,
+                ),
+                report.lastRecheckedBy?.trim().isNotEmpty == true
+                    ? context.l10n.evidenceMember
+                    : context.l10n.resultsUnknown,
+              ),
               style: TextStyle(color: context.subtextColor),
             ),
           Text(
-            '${StatusLogic.isPersistentBarrier(report) ? 'Recheck due' : 'Observation expires'}: ${_time(StatusLogic.freshUntil(report, currentTime: now))}',
+            StatusLogic.isPersistentBarrier(report)
+                ? context.l10n.evidenceDueAt(
+                    _time(
+                      context,
+                      StatusLogic.freshUntil(report, currentTime: now),
+                    ),
+                  )
+                : context.l10n.evidenceExpiresAt(
+                    _time(
+                      context,
+                      StatusLogic.freshUntil(report, currentTime: now),
+                    ),
+                  ),
             style: TextStyle(color: context.subtextColor),
           ),
           Text(
-            'Reported at: ${_time(report.createdAt)}',
+            context.l10n.evidenceReportedAt(_time(context, report.createdAt)),
             style: TextStyle(color: context.subtextColor),
           ),
           if (hasConfirmation)
             Text(
-              'Last confirmation recorded at: ${_time(confirmedAt)}',
+              context.l10n.evidenceConfirmedAt(_time(context, confirmedAt)),
               style: TextStyle(color: context.subtextColor),
             )
           else
             Text(
-              'Confirmation time: Unknown',
+              context.l10n.evidenceNoConfirmationTime,
               style: TextStyle(color: context.subtextColor),
             ),
         ],
@@ -244,7 +276,7 @@ class AccessibilityEvidenceCard extends StatelessWidget {
                 Semantics(
                   header: true,
                   child: Text(
-                    'Accessibility evidence',
+                    context.l10n.detailsEvidence,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -254,7 +286,7 @@ class AccessibilityEvidenceCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Community observations describe specific conditions; they do not verify the entire journey.',
+                  context.l10n.evidenceDisclosure,
                   style: TextStyle(
                     fontSize: 14,
                     height: 1.4,
@@ -273,7 +305,7 @@ class AccessibilityEvidenceCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      section.$1,
+                      context.evidenceText(section.$1),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -282,7 +314,7 @@ class AccessibilityEvidenceCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Unknown — no observation available',
+                      context.l10n.evidenceEmpty,
                       style: TextStyle(
                         fontSize: 14,
                         color: context.subtextColor,
@@ -311,7 +343,7 @@ class AccessibilityEvidenceCard extends StatelessWidget {
                     childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
                     title: Text(
-                      section.$1,
+                      context.evidenceText(section.$1),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -327,7 +359,7 @@ class AccessibilityEvidenceCard extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              summary.$1,
+                              context.evidenceText(summary.$1),
                               style: TextStyle(
                                 fontSize: 14,
                                 height: 1.4,
@@ -373,7 +405,7 @@ class _AccountAttributionState extends State<_AccountAttribution> {
     if (id.isEmpty) return {};
     final profile = await UserService().getUser(id);
     final name = profile?.name.trim();
-    return {id: name != null && name.isNotEmpty ? name : 'Community member'};
+    return name != null && name.isNotEmpty ? {id: name} : {};
   }
 
   @override
@@ -395,18 +427,19 @@ class _AccountAttributionState extends State<_AccountAttribution> {
     future: _names,
     builder: (context, snapshot) {
       final names = snapshot.data ?? const <String, String>{};
-      String name(String id) =>
-          id.trim().isEmpty ? 'Unknown' : names[id] ?? 'Community member';
+      String name(String id) => id.trim().isEmpty
+          ? context.l10n.resultsUnknown
+          : names[id] ?? context.l10n.evidenceMember;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Reported by: ${name(widget.reporter)}',
+            context.l10n.evidenceReporter(name(widget.reporter)),
             style: TextStyle(color: context.subtextColor),
           ),
           if (widget.confirmers.isNotEmpty)
             Text(
-              'Confirmed by: ${widget.confirmers.length} community member${widget.confirmers.length == 1 ? '' : 's'}',
+              context.l10n.evidenceConfirmers(widget.confirmers.length),
               style: TextStyle(color: context.subtextColor),
             ),
         ],

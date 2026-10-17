@@ -479,6 +479,15 @@ class FirestoreService {
         throw StateError('Publication identity changed.');
       }
     } else {
+      // An older/unconfigured launch must not silently try the retired writer
+      // after server policy v2 has been activated. Preserve its draft and give
+      // an actionable connection error instead of a generic rules denial.
+      final policy = await _db
+          .doc(SampleTestMode.collection('moderation_config/active'))
+          .get(const GetOptions(source: Source.server));
+      if (policy.data()?['enabled'] == true) {
+        throw const ModerationException('backend-not-configured');
+      }
       try {
         saved = await _db.runTransaction<Report>((transaction) async {
           final ref = _reportsRef.doc(reportId);

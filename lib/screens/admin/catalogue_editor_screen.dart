@@ -1,6 +1,11 @@
+import 'admin_scaffold.dart';
+import '../../widgets/accessible_dropdown.dart';
+import '../../l10n/admin_catalogue_labels.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../l10n/localization_context.dart';
 import '../../core/utils/time_utils.dart';
 import '../../services/admin_service.dart';
 
@@ -23,6 +28,7 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
   final _controllers = <String, TextEditingController>{};
   final _times = <String, TextEditingController>{};
   final _stops = <String>[];
+  final _stationIds = <String, String>{};
   List<AdminRecord> _stations = [],
       _routes = [],
       _drivers = [],
@@ -37,8 +43,9 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
         ),
       )
       .toList();
-  bool _loading = true, _saving = false;
-  String? _error, _routeId, _driverId;
+  bool _loading = true, _saving = false, _referencesReady = false;
+  Object? _error;
+  String? _routeId, _driverId;
   String _recordType = 'vehicle';
   bool? _ramp, _elevator, _lowFloor, _stepFree;
   bool _sourceReviewed = false;
@@ -54,6 +61,9 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
     super.initState();
     _c('id').text = widget.original?.id ?? '';
     _stops.addAll(List<String>.from(_original['stops'] ?? []));
+    _stationIds.addAll(
+      Map<String, String>.from(_original['stopStationIds'] as Map? ?? {}),
+    );
     _recordType = _original['catalogueRecordType']?.toString() ?? 'vehicle';
     _routeId = _original['routeId']?.toString();
     _driverId = _original['driverId']?.toString();
@@ -83,25 +93,31 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
   Future<void> _load() async {
     setState(() {
       _loading = true;
+      _referencesReady = false;
       _error = null;
     });
     try {
-      final stations = await widget.service.repository.load('stations');
+      final stations = await widget.service.repository.referencePages(
+        'stations',
+      );
       final routes = _bus
-          ? await widget.service.repository.load('routes')
+          ? await widget.service.repository.referencePages('routes')
           : <AdminRecord>[];
       final users = _bus
-          ? await widget.service.repository.load('users')
+          ? await widget.service.repository.referencePages('users')
           : <AdminRecord>[];
       final access = _bus
-          ? await widget.service.repository.load('operator_access')
+          ? await widget.service.repository.referencePages('operator_access')
           : <AdminRecord>[];
       final assignments = _bus
-          ? await widget.service.repository.load('driver_route_assignments')
+          ? await widget.service.repository.referencePages(
+              'driver_route_assignments',
+            )
           : <AdminRecord>[];
       if (!mounted) return;
       setState(() {
         _stations = stations;
+        _referencesReady = true;
         _routes = routes;
         _assignments = assignments;
         _drivers = users
@@ -132,7 +148,10 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
   }
 
   String _stopName(String id) =>
-      _stations.where((s) => s.id == id).firstOrNull?.text('name') ??
+      _stations
+          .where((s) => s.id == (_stationIds[id] ?? id))
+          .firstOrNull
+          ?.text('name') ??
       'Missing stop ($id)';
   Widget _field(
     String key,
@@ -149,9 +168,19 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
       minLines: lines,
       maxLines: lines == 1 ? 1 : lines + 2,
       keyboardType: keyboard,
-      decoration: InputDecoration(labelText: label, helperText: hint),
+      decoration: InputDecoration(
+        labelText: context.adminText(label),
+        helperText: hint == null ? null : context.adminText(hint),
+        helperMaxLines: 6,
+        prefixIcon: key == 'id'
+            ? const Icon(Icons.tag)
+            : key == 'sourceUrl'
+            ? const Icon(Icons.link)
+            : null,
+      ),
       validator: required
-          ? (v) => v?.trim().isNotEmpty == true ? null : 'Required'
+          ? (v) =>
+                v?.trim().isNotEmpty == true ? null : context.l10n.adminRequired
           : null,
     ),
   );
@@ -163,25 +192,31 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: DropdownButtonFormField<String>(
+      isDense: false,
+      itemHeight: null,
       initialValue: value == null
           ? 'unknown'
           : value
           ? 'yes'
           : 'no',
       isExpanded: true,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(labelText: context.adminText(label)),
       items: [
-        const DropdownMenuItem(
+        AccessibleDropdownMenuItem(
           value: 'unknown',
-          child: Text('Unknown / not assessed'),
+          child: Text(context.l10n.adminUnknown),
         ),
-        DropdownMenuItem(
+        AccessibleDropdownMenuItem(
           value: 'yes',
-          child: Text(capability ? 'Equipped' : 'Yes - assessed'),
+          child: Text(
+            context.adminText(capability ? 'Equipped' : 'Yes - assessed'),
+          ),
         ),
-        DropdownMenuItem(
+        AccessibleDropdownMenuItem(
           value: 'no',
-          child: Text(capability ? 'Not equipped' : 'No - assessed'),
+          child: Text(
+            context.adminText(capability ? 'Not equipped' : 'No - assessed'),
+          ),
         ),
       ],
       onChanged: _saving
@@ -196,13 +231,15 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
         : _bus
         ? 'bus / timetable'
         : 'route';
-    return Scaffold(
+    return AdminScaffold(
       backgroundColor: context.surfaceColor,
       appBar: AppBar(
-        title: Text('${widget.original == null ? 'Add' : 'Edit'} $label'),
+        title: Text(
+          '${context.adminText(widget.original == null ? 'Add' : 'Edit')} ${context.adminText(label)}',
+        ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator())
           : Form(
               key: _form,
               child: ListView(
@@ -214,13 +251,16 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 16),
                         child: Text(
-                          _error!,
+                          _error is String
+                              ? context.adminText(_error! as String)
+                              : context.adminFailure(_error!),
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.error,
                           ),
                         ),
                       ),
                     ),
+                  _sectionTitle(Icons.info_outline, context.adminText(label)),
                   _field(
                     'id',
                     'Record ID',
@@ -245,6 +285,10 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                         signed: true,
                       ),
                     ),
+                    _sectionTitle(
+                      Icons.accessible,
+                      context.l10n.adminAccessibilityDetails,
+                    ),
                     _assessment('Ramp capability', _ramp, (v) => _ramp = v),
                     _assessment(
                       'Elevator capability',
@@ -268,19 +312,21 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                     ),
                   ] else ...[
                     DropdownButtonFormField<String>(
+                      isDense: false,
+                      itemHeight: null,
                       initialValue: _recordType,
                       isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Catalogue record type',
+                      decoration: InputDecoration(
+                        labelText: context.l10n.adminCatalogueType,
                       ),
-                      items: const [
-                        DropdownMenuItem(
+                      items: [
+                        AccessibleDropdownMenuItem(
                           value: 'vehicle',
-                          child: Text('Physical vehicle'),
+                          child: Text(context.l10n.adminPhysicalVehicle),
                         ),
-                        DropdownMenuItem(
+                        AccessibleDropdownMenuItem(
                           value: 'published_timetable',
-                          child: Text('Published timetable'),
+                          child: Text(context.l10n.adminPublishedTimetable),
                         ),
                       ],
                       onChanged: _saving
@@ -292,14 +338,18 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
+                      isDense: false,
+                      itemHeight: null,
                       initialValue: _routes.any((r) => r.id == _routeId)
                           ? _routeId
                           : null,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Route'),
+                      decoration: InputDecoration(
+                        labelText: context.l10n.adminRouteField,
+                      ),
                       items: [
                         for (final route in _routes)
-                          DropdownMenuItem(
+                          AccessibleDropdownMenuItem(
                             value: route.id,
                             child: Text(
                               '${route.text('routeNo')} - ${route.text('routeName')}',
@@ -314,28 +364,31 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                               _driverId = '';
                               _stops.clear();
                             }),
-                      validator: (v) => v == null ? 'Choose a route' : null,
+                      validator: (v) =>
+                          v == null ? context.l10n.adminChooseRoute : null,
                     ),
                     const SizedBox(height: 16),
                     if (_recordType == 'vehicle') ...[
                       _field('busNo', 'Vehicle registration number'),
                       DropdownButtonFormField<String>(
+                        isDense: false,
+                        itemHeight: null,
                         key: ValueKey('driver-$_routeId'),
                         initialValue:
                             _routeDrivers.any((d) => d.id == _driverId)
                             ? _driverId
                             : '',
                         isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Assigned driver',
+                        decoration: InputDecoration(
+                          labelText: context.l10n.adminDriverField,
                         ),
                         items: [
-                          const DropdownMenuItem(
+                          AccessibleDropdownMenuItem(
                             value: '',
-                            child: Text('Unassigned'),
+                            child: Text(context.l10n.adminUnassigned),
                           ),
                           for (final driver in _routeDrivers)
-                            DropdownMenuItem(
+                            AccessibleDropdownMenuItem(
                               value: driver.id,
                               child: Text(
                                 '${driver.text('name')} (${driver.text('email')})',
@@ -348,32 +401,24 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                       const SizedBox(height: 16),
                       if (_driverId?.isNotEmpty == true &&
                           !_routeDrivers.any((d) => d.id == _driverId))
-                        const Text(
-                          'Assign an approved driver to this route first, or release the previous assignment.',
-                        ),
+                        Text(context.l10n.adminRouteFirst),
                       _assessment('Ramp capability', _ramp, (v) => _ramp = v),
                       _assessment(
                         'Low-floor capability',
                         _lowFloor,
                         (v) => _lowFloor = v,
                       ),
-                      const Text(
-                        'Capability is separate from a working-equipment observation. Operational checks are recorded by the assigned driver.',
-                      ),
+                      Text(context.l10n.adminCapabilityHelp),
                     ] else
-                      const Text(
-                        'A published timetable has no verified physical vehicle, driver or equipment status.',
-                      ),
+                      Text(context.l10n.adminTimetableHelp),
                   ],
                   if (!_station) ...[
                     const SizedBox(height: 20),
-                    Text(
-                      'Stops in travel order',
-                      style: Theme.of(context).textTheme.titleMedium,
+                    _sectionTitle(
+                      Icons.route_outlined,
+                      context.l10n.sharedStopsOrder,
                     ),
-                    const Text(
-                      'Add each stop in sequence. Reordering a bus stop moves its scheduled time with it.',
-                    ),
+                    Text(context.l10n.loopStopHelp),
                     const SizedBox(height: 12),
                     for (var i = 0; i < _stops.length; i++)
                       Card(
@@ -388,11 +433,13 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
+                              const SizedBox(height: 8),
                               Wrap(
+                                spacing: 8,
                                 alignment: WrapAlignment.end,
                                 children: [
-                                  IconButton(
-                                    tooltip: 'Move stop up',
+                                  IconButton.outlined(
+                                    tooltip: context.l10n.adminMoveUp,
                                     onPressed: _saving || i == 0
                                         ? null
                                         : () => setState(() {
@@ -401,8 +448,8 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                                           }),
                                     icon: const Icon(Icons.arrow_upward),
                                   ),
-                                  IconButton(
-                                    tooltip: 'Move stop down',
+                                  IconButton.outlined(
+                                    tooltip: context.l10n.adminMoveDown,
                                     onPressed: _saving || i == _stops.length - 1
                                         ? null
                                         : () => setState(() {
@@ -411,8 +458,8 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                                           }),
                                     icon: const Icon(Icons.arrow_downward),
                                   ),
-                                  IconButton(
-                                    tooltip: 'Remove stop',
+                                  IconButton.outlined(
+                                    tooltip: context.l10n.adminRemoveStop,
                                     onPressed: _saving
                                         ? null
                                         : () => setState(
@@ -429,32 +476,35 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                                     () => TextEditingController(),
                                   ),
                                   enabled: !_saving,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Scheduled time (HH:mm)',
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.schedule),
+                                    labelText: context.l10n.adminScheduledTime,
                                     hintText: '23:50',
                                   ),
                                   validator: (v) =>
                                       RegExp(r'^([01]\d|2[0-3]):[0-5]\d$')
                                           .hasMatch(v?.trim() ?? '')
                                       ? null
-                                      : 'Use 24-hour HH:mm',
+                                      : context.l10n.adminTimeFormat,
                                 ),
                             ],
                           ),
                         ),
                       ),
                     DropdownButtonFormField<String>(
+                      isDense: false,
+                      itemHeight: null,
                       key: ValueKey('${_routeId}_${_stops.join(',')}'),
                       isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Add a stop',
+                      decoration: InputDecoration(
+                        labelText: context.l10n.adminAddStop,
                       ),
                       items: [
                         for (final stop in _availableStops())
-                          DropdownMenuItem(
+                          AccessibleDropdownMenuItem(
                             value: stop.id,
                             child: Text(
-                              stop.text('name'),
+                              '${stop.text('name')}${_bus && AdminService.stationIdFor(_routes.firstWhere((r) => r.id == _routeId).data, stop.id) != stop.id ? ' (${(_routes.firstWhere((r) => r.id == _routeId).data['stops'] as List).indexOf(stop.id) + 1})' : ''}',
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -462,33 +512,64 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                       onChanged: _saving
                           ? null
                           : (v) {
-                              if (v != null) setState(() => _stops.add(v));
+                              if (v != null) {
+                                setState(() {
+                                  if (_bus) {
+                                    final route = _routes.firstWhere(
+                                      (r) => r.id == _routeId,
+                                    );
+                                    _stationIds[v] = AdminService.stationIdFor(
+                                      route.data,
+                                      v,
+                                    );
+                                    _stops.add(v);
+                                  } else {
+                                    final key = _stops.contains(v)
+                                        ? 'occ_${DateTime.now().microsecondsSinceEpoch}'
+                                        : v;
+                                    _stationIds[key] = v;
+                                    _stops.add(key);
+                                  }
+                                });
+                              }
                             },
                     ),
                   ],
                   const SizedBox(height: 24),
+                  _sectionTitle(
+                    Icons.fact_check_outlined,
+                    context.adminText('Source URL'),
+                  ),
                   _field(
                     'sourceUrl',
                     'Source URL',
                     hint: 'Authoritative timetable, stop or operator source. This is not a live-service verification.',
                   ),
                   CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    tileColor: context.cardColor,
                     value: _sourceReviewed,
                     onChanged: _saving
                         ? null
                         : (v) => setState(() => _sourceReviewed = v!),
-                    title: const Text(
-                      'I reviewed the source and the entered catalogue details.',
-                    ),
+                    title: Text(context.l10n.adminSourceChecked),
                   ),
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: _saving ? null : _save,
+                    onPressed: _saving || !_referencesReady ? null : _save,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Text(
-                        _saving ? 'Saving...' : 'Save catalogue record',
+                        context.adminText(
+                          _saving ? 'Saving...' : 'Save catalogue record',
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -496,7 +577,7 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
                   if (_error != null)
                     TextButton(
                       onPressed: _saving ? null : _load,
-                      child: const Text('Reload reference data'),
+                      child: Text(context.l10n.adminReloadReferences),
                     ),
                   const SizedBox(height: 24),
                 ],
@@ -505,17 +586,42 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
     );
   }
 
+  Widget _sectionTitle(IconData icon, String title) => Padding(
+    padding: const EdgeInsets.only(top: 8, bottom: 16),
+    child: Row(
+      children: [
+        Icon(icon, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
   List<AdminRecord> _availableStops() {
     final route = _routes.where((r) => r.id == _routeId).firstOrNull;
     final allowed = route?.data['stops'] as List? ?? [];
-    return _stations
-        .where(
-          (s) => !_stops.contains(s.id) && (!_bus || allowed.contains(s.id)),
-        )
-        .toList();
+    if (_bus) {
+      return [
+        for (final key in allowed.cast<String>())
+          if (!_stops.contains(key))
+            for (final s in _stations)
+              if (s.id == AdminService.stationIdFor(route!.data, key))
+                AdminRecord('stations', key, s.data),
+      ];
+    }
+    return _stations;
   }
 
   Future<void> _save() async {
+    if (!_referencesReady) return;
     if (!_form.currentState!.validate()) return;
     if (!_sourceReviewed) {
       setState(() => _error = 'Review the source before saving.');
@@ -538,6 +644,9 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
         });
       } else {
         data['stops'] = List<String>.of(_stops);
+        data['stopStationIds'] = {
+          for (final key in _stops) key: _stationIds[key] ?? key,
+        };
         if (!_bus) {
           data.addAll({
             'routeNo': _c('routeNo').text.trim(),
@@ -579,13 +688,7 @@ class _CatalogueEditorScreenState extends State<CatalogueEditorScreen> {
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
-        setState(
-          () => _error = e is FormatException
-              ? e.message
-              : e is StateError
-              ? e.message
-              : 'Save was not confirmed. Check connection/access and reload before retrying.',
-        );
+        setState(() => _error = e);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

@@ -73,14 +73,16 @@ class AssistanceTarget {
         .where(
           (id) => explicitId.isNotEmpty
               ? id == explicitId
-              : stations[id]?.name.trim().toLowerCase() ==
+              : stations[bus.stationIdFor(id)]?.name.trim().toLowerCase() ==
                     stopName.trim().toLowerCase(),
         )
         .toList();
     if (candidates.length != 1) return null;
-    final stop = stations[candidates.single];
+    final stop =
+        stations[bus.stationIdFor(candidates.single)] ??
+        stations[candidates.single];
     if (stop == null ||
-        stop.id != candidates.single ||
+        stop.id != bus.stationIdFor(candidates.single) ||
         stop.name.trim().isEmpty) {
       return null;
     }

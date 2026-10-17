@@ -1,3 +1,6 @@
+import '../../widgets/saved_schedule_record.dart';
+import '../../widgets/schedule_change_notice.dart';
+
 import 'dart:async';
 
 import '../../services/fare_catalogue.dart';
@@ -12,6 +15,8 @@ import 'package:flutter/foundation.dart';
 
 import 'package:flutter/material.dart';
 
+import '../../l10n/report_form_presentation.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
@@ -19,6 +24,8 @@ import '../../logic/bus_details_state.dart';
 import '../../logic/transit_time.dart';
 import '../../services/transit_search_backend.dart';
 import '../../l10n/localization_context.dart';
+import '../../l10n/journey_presentation.dart';
+import '../../l10n/home_presentation.dart';
 import '../../logic/status_logic.dart';
 import '../../models/assistance_target.dart';
 import '../../models/bus.dart';
@@ -92,6 +99,8 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
   late Stream<List<Report>> reports;
   late Future<List<Station>> stations;
   late Stream<ServiceRun?> runs;
+  StreamSubscription<ServiceRun?>? runSource;
+  ServiceRun? lastRun;
   Stream<TripModel?>? tripUpdates;
   late Stream<BusLocationModel?> locations;
   bool resolved = false;
@@ -111,7 +120,7 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
     } else {
       syncClock();
     }
-    pinnedRun = widget.route.serviceRunId;
+    pinnedRun = widget.savedJourney?.serviceRunId ?? widget.route.serviceRunId;
     refresh();
     evaluation.open(AccessibilityPreferencesService.instance.userId);
     final routeId = widget.bus?.routeId ?? widget.route.rawBus?.routeId;
@@ -165,11 +174,14 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
   }
 
   void refresh() {
+    runSource?.cancel();
+    runSource = null;
+    lastRun = null;
     tripUpdates = null;
     buses = repository.bus(widget.route.busId);
     reports = repository.reports(
       busId: widget.route.busId,
-      stopIds: BusDetailsState.segment(widget.route),
+      stopIds: BusDetailsState.physicalSegment(widget.route),
     );
     stations = repository.stations();
     locations = repository.location(widget.route.busId);
@@ -182,29 +194,40 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                   .where((r) => BusDetailsState.matchesRun(r, widget.route))
                   .toList();
               if (candidates.length > 1) {
-                throw StateError(
-                  'Departure identity is ambiguous. Refresh the selection.',
-                );
+                throw StateError('ambiguous-departure');
               }
               pinnedRun = candidates.singleOrNull?.id ?? pinnedRun;
               resolved = true;
             }
             final matching = list
                 .where(
-                  (r) =>
-                      r.id == pinnedRun &&
-                      BusDetailsState.matchesRun(r, widget.route),
+                  (r) => r.id == pinnedRun && r.busId == widget.route.busId,
                 )
                 .singleOrNull;
-            if (matching != null && tripUpdates == null) {
+            if (matching != null &&
+                BusDetailsState.matchesRun(matching, widget.route) &&
+                tripUpdates == null) {
               tripUpdates = repository.trip(matching.id);
             }
-            return matching;
+            return lastRun = matching;
           });
+    runs = runs
+        .handleError((Object error, StackTrace stack) {
+          lastRun = null;
+          Error.throwWithStackTrace(error, stack);
+        })
+        .asBroadcastStream(
+          onListen: (subscription) {
+            runSource = subscription;
+            if (subscription.isPaused) subscription.resume();
+          },
+          onCancel: (subscription) => subscription.pause(),
+        );
   }
 
   @override
   void dispose() {
+    runSource?.cancel();
     fareSubscription?.cancel();
     geometrySubscription?.cancel();
     clockRevision++;
@@ -219,7 +242,7 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
     if (journeys.signedInPassenger != owner) {
       return Scaffold(
         appBar: AppBar(title: Text(context.l10n.busDetails)),
-        body: const Center(child: Text('Account changed. Return to Search.')),
+        body: Center(child: Text(context.l10n.detailsAccountChanged)),
       );
     }
     return Scaffold(
@@ -258,23 +281,38 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
           final bus = busSnapshot.connectionState == ConnectionState.waiting
               ? widget.bus ?? widget.route.rawBus
               : busSnapshot.data;
+          final saved = widget.savedJourney;
+          if (saved?.scheduleSnapshot != null &&
+              (bus == null ||
+                  bus.routeId != saved!.routeId ||
+                  bus.routeNo != saved.routeNumber ||
+                  !saved.scheduleSnapshot!.matches(bus))) {
+            return SavedScheduleRecord(
+              journey: saved!,
+              selection: widget.route,
+              service: journeys,
+              runs: runs,
+              initialRun: lastRun,
+            );
+          }
           if (bus == null) {
             return Center(
               child: TextButton(
                 onPressed: () => setState(refresh),
-                child: const Text('Service unavailable. Retry'),
+                child: Text(context.l10n.detailsUnavailable),
               ),
             );
           }
           return FutureBuilder<List<Station>>(
             future: stations,
             builder: (context, stationSnapshot) {
-              final stops = {
+              final stops = bus.resolveStations({
                 ...widget.route.journeyStations,
                 for (final s in stationSnapshot.data ?? <Station>[]) s.id: s,
-              };
+              });
               return StreamBuilder<ServiceRun?>(
                 stream: runs,
+                initialData: lastRun,
                 builder: (context, runSnapshot) {
                   final run = runSnapshot.hasError ? null : runSnapshot.data;
                   return StreamBuilder<TripModel?>(
@@ -378,18 +416,18 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                         'in_progress',
                                       ].contains(run.status);
                                   final availability = runSnapshot.hasError
-                                      ? 'Run status unavailable'
+                                      ? context.l10n.detailsRunUnavailable
                                       : run == null
-                                      ? 'Scheduled · run not verified'
+                                      ? context.l10n.detailsRunUnverified
                                       : run.status == 'completed'
-                                      ? 'Completed'
+                                      ? context.l10n.detailsCompleted
                                       : run.status == 'cancelled'
-                                      ? 'Cancelled'
+                                      ? context.l10n.detailsCancelled
                                       : hasStarted
                                       ? (gps == null
-                                            ? 'Location unavailable or stale'
-                                            : 'LIVE GPS')
-                                      : 'Scheduled';
+                                            ? context.l10n.detailsStale
+                                            : context.l10n.detailsLive)
+                                      : context.l10n.resultsScheduled;
                                   return ListView(
                                     padding: const EdgeInsets.all(16),
                                     children: [
@@ -416,6 +454,13 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                     ),
                                                     const SizedBox(height: 8),
                                                     Text(availability),
+                                                    ScheduleChangeNotice(
+                                                      saved:
+                                                          widget.savedJourney,
+                                                      run: run,
+                                                      unavailable:
+                                                          runSnapshot.hasError,
+                                                    ),
                                                     if (estimate != null)
                                                       RouteProgressEtaText(
                                                         estimate: estimate,
@@ -430,31 +475,60 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                     ),
                                                     if (departure != null)
                                                       Text(
-                                                        'Scheduled boarding: ${TimeUtils.formatDateString(departure, clock: TransitTime.civil(now))} · ${TimeUtils.formatTimeString(departure)}',
+                                                        context.l10n.detailsBoardingAt(
+                                                          MaterialLocalizations.of(
+                                                            context,
+                                                          ).formatMediumDate(
+                                                            departure,
+                                                          ),
+                                                          TimeUtils.formatTimeString(
+                                                            departure,
+                                                          ),
+                                                        ),
                                                       ),
                                                     if (arrival != null)
                                                       Text(
-                                                        'Scheduled arrival: ${TimeUtils.formatDateString(arrival, clock: TransitTime.civil(now))} · ${TimeUtils.formatTimeString(arrival)}',
+                                                        context.l10n.detailsArrivalAt(
+                                                          MaterialLocalizations.of(
+                                                            context,
+                                                          ).formatMediumDate(
+                                                            arrival,
+                                                          ),
+                                                          TimeUtils.formatTimeString(
+                                                            arrival,
+                                                          ),
+                                                        ),
                                                       ),
                                                     Text(
-                                                      '${widget.route.durationMinutes} min · selected segment',
+                                                      context.l10n
+                                                          .detailsDuration(
+                                                            widget
+                                                                .route
+                                                                .durationMinutes,
+                                                          ),
                                                     ),
                                                     Text(
                                                       [
                                                         if (widget
                                                             .route
                                                             .wheelchairAccessRequired)
-                                                          'Wheelchair access',
+                                                          context
+                                                              .l10n
+                                                              .detailsWheelchair,
                                                         if (widget
                                                             .route
                                                             .stepFreeOnly)
-                                                          'Step-free',
+                                                          context
+                                                              .l10n
+                                                              .searchStepFreeChip,
                                                       ].join(' · '),
                                                     ),
                                                     if (widget.savedJourney !=
                                                         null)
-                                                      const Text(
-                                                        'Saved selection · times and needs are preserved; review current conditions.',
+                                                      Text(
+                                                        context
+                                                            .l10n
+                                                            .detailsSavedHelp,
                                                       ),
                                                     if (widget.savedJourney !=
                                                             null &&
@@ -470,12 +544,16 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                                 AccessibilityPreferencesService
                                                                     .instance
                                                                     .isStepFree))
-                                                      const Text(
-                                                        'Your current accessibility defaults differ from this saved selection.',
+                                                      Text(
+                                                        context
+                                                            .l10n
+                                                            .detailsDefaultsDiffer,
                                                       ),
                                                     if (busSnapshot.hasError)
-                                                      const Text(
-                                                        'Catalogue updates unavailable.',
+                                                      Text(
+                                                        context
+                                                            .l10n
+                                                            .detailsCatalogueUnavailable,
                                                       ),
                                                   ],
                                                 ),
@@ -507,7 +585,7 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                       CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
-                                                      'Stops on your journey',
+                                                      context.l10n.detailsStops,
                                                       style: Theme.of(context)
                                                           .textTheme
                                                           .titleMedium,
@@ -541,15 +619,33 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                         ),
                                                         subtitle: Text(
                                                           i == 0
-                                                              ? 'Board here · ${widget.route.departureTimeStr}'
+                                                              ? context.l10n
+                                                                    .detailsBoardHere(
+                                                                      widget
+                                                                          .route
+                                                                          .departureTimeStr,
+                                                                    )
                                                               : i ==
                                                                     segment.length -
                                                                         1
-                                                              ? 'Alight here · ${widget.route.arrivalTimeStr}'
+                                                              ? context.l10n
+                                                                    .detailsAlightHere(
+                                                                      widget
+                                                                          .route
+                                                                          .arrivalTimeStr,
+                                                                    )
                                                               : run?.stopTimes[segment[i]] !=
                                                                     null
-                                                              ? 'Scheduled ${TimeUtils.formatTimeString(TransitTime.civil(run!.stopTimes[segment[i]]!))}'
-                                                              : 'Intermediate stop · time unavailable',
+                                                              ? context.l10n.detailsScheduledStop(
+                                                                  TimeUtils.formatTimeString(
+                                                                    TransitTime.civil(
+                                                                      run!.stopTimes[segment[i]]!,
+                                                                    ),
+                                                                  ),
+                                                                )
+                                                              : context
+                                                                    .l10n
+                                                                    .detailsIntermediateUnknown,
                                                         ),
                                                       ),
                                                     if (gps != null &&
@@ -562,7 +658,15 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                                 1 <
                                                             trip.stops.length)
                                                       Text(
-                                                        'Next itinerary stop: ${stops[trip.stops[trip.currentStopIndex + 1]]?.name ?? trip.stops[trip.currentStopIndex + 1]}',
+                                                        context.l10n.detailsNextStop(
+                                                          stops[trip.stops[trip
+                                                                          .currentStopIndex +
+                                                                      1]]
+                                                                  ?.name ??
+                                                              trip.stops[trip
+                                                                      .currentStopIndex +
+                                                                  1],
+                                                        ),
                                                       ),
                                                   ],
                                                 ),
@@ -635,24 +739,29 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                     ExpansionTile(
                                                       tilePadding:
                                                           EdgeInsets.zero,
-                                                      title: const Text(
-                                                        'Accessibility evidence',
+                                                      title: Text(
+                                                        context
+                                                            .l10n
+                                                            .detailsEvidence,
                                                       ),
                                                       children: [
                                                         AccessibilityEvidenceCard(
                                                           reports: observations,
                                                           currentTime: now,
                                                           busId: bus.id,
-                                                          origin:
-                                                              widget
-                                                                  .route
-                                                                  .fromStationId ??
-                                                              '',
-                                                          destination:
-                                                              widget
-                                                                  .route
-                                                                  .toStationId ??
-                                                              '',
+                                                          origin: bus.stationIdFor(
+                                                            widget
+                                                                    .route
+                                                                    .fromStationId ??
+                                                                '',
+                                                          ),
+                                                          destination: bus
+                                                              .stationIdFor(
+                                                                widget
+                                                                        .route
+                                                                        .toStationId ??
+                                                                    '',
+                                                              ),
                                                           strictStopIds: true,
                                                         ),
                                                         Text(
@@ -724,7 +833,9 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                                         ) ||
                                                                         bus.driverId ==
                                                                             null))
-                                                            ? 'Driver assistance unavailable'
+                                                            ? context
+                                                                  .l10n
+                                                                  .detailsAssistanceUnavailable
                                                             : context
                                                                   .l10n
                                                                   .requestBoardingAssistance,
@@ -750,8 +861,10 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                       icon: const Icon(
                                                         Icons.edit_note,
                                                       ),
-                                                      label: const Text(
-                                                        'Report a condition',
+                                                      label: Text(
+                                                        context
+                                                            .l10n
+                                                            .detailsReport,
                                                       ),
                                                     ),
                                                   ],
@@ -790,8 +903,9 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                                 stops: {
                                                                   for (final id
                                                                       in segment)
-                                                                    id:
-                                                                        stops[id]
+                                                                    bus.stationIdFor(
+                                                                      id,
+                                                                    ): stops[id]
                                                                             ?.name ??
                                                                         id,
                                                                 },
@@ -815,7 +929,7 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                                     .route
                                                                     .busId,
                                                                 stopIds:
-                                                                    BusDetailsState.segment(
+                                                                    BusDetailsState.physicalSegment(
                                                                       widget
                                                                           .route,
                                                                     ),
@@ -830,8 +944,10 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                     else if (reportSnapshot
                                                             .connectionState ==
                                                         ConnectionState.waiting)
-                                                      const Text(
-                                                        'Loading reports…',
+                                                      Text(
+                                                        context
+                                                            .l10n
+                                                            .detailsLoadingReports,
                                                       )
                                                     else if (relevant.isEmpty)
                                                       Text(
@@ -846,10 +962,13 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                           contentPadding:
                                                               EdgeInsets.zero,
                                                           title: Text(
-                                                            report.problemType,
+                                                            context.reportFormText(
+                                                              report
+                                                                  .problemType,
+                                                            ),
                                                           ),
                                                           subtitle: Text(
-                                                            '${report.targetType == 'bus' ? bus.displayBusNo : stops[report.targetId]?.name ?? report.targetName}\n${StatusLogic.freshnessLabel(report, currentTime: now)} · ${report.createdAt == null ? 'Time unknown' : TimeUtils.formatRelativeTime(report.createdAt, clock: now)}',
+                                                            '${report.targetType == 'bus' ? bus.displayBusNo : stops[report.targetId]?.name ?? report.targetName}\n${context.journeyText(StatusLogic.freshnessLabel(report, currentTime: now))} · ${context.homeAge(report.createdAt, clock: now)}',
                                                           ),
                                                           trailing: const Icon(
                                                             Icons.chevron_right,
@@ -884,8 +1003,10 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                       TextButton(
                                                         onPressed: () =>
                                                             setState(refresh),
-                                                        child: const Text(
-                                                          'Retry updates',
+                                                        child: Text(
+                                                          context
+                                                              .l10n
+                                                              .detailsRetry,
                                                         ),
                                                       ),
                                                   ],
@@ -895,6 +1016,7 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                       ConnectionState.waiting &&
                                                   !runSnapshot.hasError)
                                                 SaveTripControl(
+                                                  run: run,
                                                   fareValidated: true,
                                                   fareQuote: currentFare,
                                                   key: ValueKey(
@@ -906,8 +1028,10 @@ class _BusDetailsScreenState extends State<BusDetailsScreen>
                                                   existing: widget.savedJourney,
                                                 )
                                               else
-                                                const Text(
-                                                  'Connect to verify this departure before saving.',
+                                                Text(
+                                                  context
+                                                      .l10n
+                                                      .detailsVerifySave,
                                                 ),
                                               const SizedBox(height: 24),
                                             ],

@@ -15,7 +15,7 @@ const timestamp = value => {
 const integer = value => { if (!Number.isSafeInteger(value)) fail('invalid-state'); return value; };
 const scopePrefix = scope => scope === 'normal' ? '' : scope === 'sample' ? 'sample_test/shared/' : fail('invalid-scope');
 function requireActive(access, now) {
-  if (access?.permanent === true || access?.communityPermanent === true || access?.manualSuspended === true ||
+  if (access?.authDisabled === true || access?.accountDeleted === true || access?.permanent === true || access?.communityPermanent === true || access?.manualSuspended === true ||
       (access?.communitySuspendedUntil && timestamp(access.communitySuspendedUntil) > now) ||
       (access?.manualSuspendedUntil && timestamp(access.manualSuspendedUntil) > now)) fail('account-suspended');
 }
@@ -55,7 +55,7 @@ export function createModerationPolicy({store, now = () => new Date(), effective
         if(!job||job.status==='completed')return {duplicate:true};
         if(!id(job.uid)||job.kind!=='reconcile-suspended-operation')fail('invalid-state');
         const access=await tx.get(`${p}account_access/${job.uid}`);
-        const restricted=access?.permanent===true||access?.communityPermanent===true||access?.manualSuspended===true||
+        const restricted=access?.authDisabled||access?.accountDeleted||access?.permanent===true||access?.communityPermanent===true||access?.manualSuspended===true||
           (access?.communitySuspendedUntil&&timestamp(access.communitySuspendedUntil)>time)||
           (access?.manualSuspendedUntil&&timestamp(access.manualSuspendedUntil)>time);
         // An overturned strike may remove the restriction before this job runs.
@@ -137,9 +137,9 @@ export function createModerationPolicy({store, now = () => new Date(), effective
         const deadlines = [access?.communitySuspendedUntil, access?.manualSuspendedUntil]
           .filter(Boolean).map(timestamp).filter(d => d > time).sort((a,b) => b-a);
         const state = access?.permanent === true || access?.communityPermanent === true ? 'permanent'
-          : access?.manualSuspended === true ? 'suspended' : deadlines.length ? 'temporary' : 'active';
+          : access?.authDisabled === true || access?.accountDeleted === true || access?.manualSuspended === true ? 'suspended' : deadlines.length ? 'temporary' : 'active';
         if (totals && totals.policyVersion !== 2) fail('migration-required');
-        return {state,serverTime:time.toISOString(),banReason:access?.communityPermanent===true?access.communityPermanentReason??null:null,
+        return {state,serverTime:time.toISOString(),banReason:access?.communityPermanent===true?access.communityPermanentReason??null:((access?.manualSuspended===true||(access?.manualSuspendedUntil&&timestamp(access.manualSuspendedUntil)>time))?access.manualReason??null:null),
           suspendedUntil:state === 'temporary' ? deadlines[0].toISOString() : null,
           points:totals ? integer(totals.points) : null};
       });

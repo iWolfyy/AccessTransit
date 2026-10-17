@@ -1,3 +1,6 @@
+import '../../widgets/accessible_tap_target.dart';
+import '../../widgets/assistance_labels.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/routing/app_navigation.dart';
@@ -18,13 +21,8 @@ void openBoardingAssistance(
   int? minutesAway,
 }) {
   if (target == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'The assistance bus or stop is unknown. Select a journey with an exact stop first.',
-        ),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(context.l10n.assistFormUnknown)));
     return;
   }
   Navigator.of(context).push(
@@ -113,7 +111,7 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
     }
 
     if (!_hasSelection) {
-      _showSnack('Please select at least one assistance option.');
+      _showSnack(context.l10n.assistFormSelect);
       return;
     }
 
@@ -123,9 +121,7 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
       widget.stopName,
       widget.busLabel,
     ].any((value) => value.trim().isEmpty)) {
-      _showSnack(
-        'Choose the exact bus and stop from your journey before requesting assistance.',
-      );
+      _showSnack(context.l10n.assistFormTarget);
       return;
     }
 
@@ -138,6 +134,7 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
             : 'Boarding Help',
     ];
 
+    final reviewOwner = _authService.currentUser?.uid;
     setState(() => _isSubmitting = true);
 
     try {
@@ -149,28 +146,26 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
           station == null ||
           station.id != widget.stationId ||
           !bus.stops.contains(station.id)) {
-        _showSnack(
-          'This stop could not be verified on the selected bus. Return to your journey and choose the correct target.',
-        );
+        _showSnack(context.l10n.assistFormWrongStop);
         return;
       }
       final approved = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Confirm assistance target'),
+          title: Text(context.l10n.assistFormConfirm),
           content: Text(
-            '${bus.displayBusNo} (Route ${bus.routeNo})\n'
-            '${widget.purpose == AssistancePurpose.alighting ? 'Getting off' : 'Boarding'} at ${station.name}\n'
-            '${selected.join(', ')}',
+            '${context.l10n.assistFormBusRoute(bus.displayBusNo, bus.routeNo)}\n'
+            '${widget.purpose == AssistancePurpose.alighting ? context.l10n.assistFormAlightAt(station.name) : context.l10n.assistFormBoardAt(station.name)}\n'
+            '${selected.map((value) => assistanceType(context, value)).join(', ')}',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Edit request'),
+              child: Text(context.l10n.assistFormEdit),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Confirm and send'),
+              child: Text(context.l10n.assistFormSendConfirm),
             ),
           ],
         ),
@@ -178,7 +173,11 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
       if (!mounted || approved != true) return;
       final user = _authService.currentUser;
       if (user == null || user.uid.isEmpty) {
-        _showSnack('Please sign in before sending an assistance request.');
+        _showSnack(context.l10n.assistFormSignIn);
+        return;
+      }
+      if (user.uid != reviewOwner) {
+        _showSnack(context.l10n.assistFormAccountChanged);
         return;
       }
       final riderId = user.uid;
@@ -221,9 +220,7 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
         ),
       );
     } catch (e) {
-      _showSnack(
-        'Could not prepare the request. Check your sign-in and device storage, then try again.',
-      );
+      _showSnack(context.l10n.assistFormPrepareError);
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -258,13 +255,15 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                           busLabel: widget.busLabel,
                           minutesAway: widget.minutesAway,
                           stopName:
-                              '${widget.purpose == AssistancePurpose.alighting ? 'Getting off' : 'Boarding'} at ${widget.stopName}',
+                              widget.purpose == AssistancePurpose.alighting
+                              ? context.l10n.assistFormAlightAt(widget.stopName)
+                              : context.l10n.assistFormBoardAt(widget.stopName),
                         ),
                         const SizedBox(height: 16),
                         const _CommunityStatusBadge(),
                         const SizedBox(height: 24),
                         Text(
-                          'Request Assistance',
+                          context.l10n.assistFormTitle,
                           style: TextStyle(
                             fontSize: 18,
                             height: 24 / 18,
@@ -284,14 +283,14 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                             final tiles = [
                               _AssistanceTile(
                                 icon: Icons.accessible,
-                                label: 'Deploy Ramp',
+                                label: context.l10n.assistFormRamp,
                                 selected: _deployRamp,
                                 onTap: () =>
                                     setState(() => _deployRamp = !_deployRamp),
                               ),
                               _AssistanceTile(
                                 icon: Icons.schedule,
-                                label: 'Extra Time',
+                                label: context.l10n.assistFormTime,
                                 selected: _extraTime,
                                 onTap: () =>
                                     setState(() => _extraTime = !_extraTime),
@@ -301,8 +300,8 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                                 label:
                                     widget.purpose ==
                                         AssistancePurpose.alighting
-                                    ? 'Getting Off Help'
-                                    : 'Boarding Help',
+                                    ? context.l10n.assistFormAlighting
+                                    : context.l10n.assistFormBoarding,
                                 selected: _boardingHelp,
                                 onTap: () => setState(
                                   () => _boardingHelp = !_boardingHelp,
@@ -337,8 +336,10 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                           color: isHC ? Colors.black : AppColors.surfaceVariant,
                         ),
                         const SizedBox(height: 24),
-                        SizedBox(
-                          height: context.buttonHeight,
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: context.buttonHeight,
+                          ),
                           child: FilledButton.icon(
                             onPressed: _isSubmitting ? null : _sendRequest,
                             style: FilledButton.styleFrom(
@@ -361,12 +362,14 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                               ),
                             ),
                             icon: Icon(Icons.send, size: context.tapIconSize),
-                            label: const Text('Send Request'),
+                            label: Text(context.l10n.assistFormSend),
                           ),
                         ),
                         const SizedBox(height: 8),
-                        SizedBox(
-                          height: context.buttonHeight,
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: context.buttonHeight,
+                          ),
                           child: OutlinedButton(
                             onPressed: () => Navigator.of(context).maybePop(),
                             style: OutlinedButton.styleFrom(
@@ -388,7 +391,7 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            child: const Text('Cancel'),
+                            child: Text(context.l10n.profileCancel),
                           ),
                         ),
                       ],
@@ -424,8 +427,10 @@ class _TopBar extends StatelessWidget {
           : null,
       child: SafeArea(
         bottom: false,
-        child: SizedBox(
-          height: context.hasLargeTargets ? 56 : 48,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: context.hasLargeTargets ? 56 : 48,
+          ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
@@ -438,7 +443,7 @@ class _TopBar extends StatelessWidget {
                     size: context.tapIconSize,
                   ),
                   color: isHC ? Colors.black : AppColors.primary,
-                  tooltip: 'Back',
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                 ),
                 Expanded(
                   child: Text(
@@ -457,7 +462,7 @@ class _TopBar extends StatelessWidget {
                   onPressed: onMenu,
                   icon: Icon(Icons.person_outline, size: context.tapIconSize),
                   color: isHC ? Colors.black : AppColors.primary,
-                  tooltip: 'Profile',
+                  tooltip: context.l10n.homeProfile,
                 ),
               ],
             ),
@@ -501,8 +506,7 @@ class _ArrivingSoonCard extends StatelessWidget {
                 ),
               ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: _ArrivingHeader(
         children: [
           Expanded(
             child: Column(
@@ -511,7 +515,7 @@ class _ArrivingSoonCard extends StatelessWidget {
                 Text(
                   minutesAway == null
                       ? busLabel
-                      : '$busLabel — estimated arrival in $minutesAway mins',
+                      : context.l10n.assistFormArrival(busLabel, minutesAway!),
                   style: TextStyle(
                     fontSize: 18,
                     height: 24 / 18,
@@ -565,7 +569,9 @@ class _ArrivingSoonCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  minutesAway == null ? 'ETA unknown' : 'MIN (est.)',
+                  minutesAway == null
+                      ? context.l10n.assistFormEtaUnknown
+                      : context.l10n.assistFormMinutes,
                   style: TextStyle(
                     fontSize: 12,
                     height: 16 / 12,
@@ -616,7 +622,7 @@ class _CommunityStatusBadge extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Assistance is confirmed only after the driver acknowledges your request.',
+              context.l10n.assistFormAckHelp,
               style: TextStyle(
                 fontSize: 14,
                 height: 20 / 14,
@@ -655,64 +661,90 @@ class _AssistanceTile extends StatelessWidget {
                 ? AppColors.primaryContainer.withValues(alpha: 0.1)
                 : AppColors.surfaceContainerLowest),
       borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          height: 128,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: isHC
-                ? Border.all(
-                    color: selected ? const Color(0xFF001F3F) : Colors.black,
-                    width: selected ? 3 : 2,
-                  )
-                : Border.all(
-                    color: selected
-                        ? AppColors.primary
-                        : AppColors.outlineVariant,
-                    width: selected ? 1.5 : 1,
-                  ),
-            boxShadow: isHC
-                ? null
-                : [
-                    BoxShadow(
-                      color: AppColors.onSurface.withValues(alpha: 0.04),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 40,
-                color: isHC
-                    ? (selected ? const Color(0xFF001F3F) : Colors.black)
-                    : (selected
+      child: AccessibleTapTarget(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 128),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: isHC
+                  ? Border.all(
+                      color: selected ? const Color(0xFF001F3F) : Colors.black,
+                      width: selected ? 3 : 2,
+                    )
+                  : Border.all(
+                      color: selected
                           ? AppColors.primary
-                          : AppColors.onSurfaceVariant),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 20 / 14,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                          : AppColors.outlineVariant,
+                      width: selected ? 1.5 : 1,
+                    ),
+              boxShadow: isHC
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: AppColors.onSurface.withValues(alpha: 0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 40,
                   color: isHC
                       ? (selected ? const Color(0xFF001F3F) : Colors.black)
-                      : (selected ? AppColors.primary : AppColors.onSurface),
+                      : (selected
+                            ? AppColors.primary
+                            : AppColors.onSurfaceVariant),
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 20 / 14,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    color: isHC
+                        ? (selected ? const Color(0xFF001F3F) : Colors.black)
+                        : (selected ? AppColors.primary : AppColors.onSurface),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+class _ArrivingHeader extends StatelessWidget {
+  const _ArrivingHeader({required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (constraints.maxWidth < 380 ||
+          MediaQuery.textScalerOf(context).scale(14) > 20) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final child in children)
+              if (child is Expanded) child.child else child,
+          ],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      );
+    },
+  );
 }

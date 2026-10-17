@@ -4,7 +4,7 @@ const fail=code=>{throw new PolicyError(code);};
 const id=v=>typeof v==='string'&&v.length>0&&v.length<=128&&!v.includes('/')&&!['.','..'].includes(v);
 const date=v=>v instanceof Date?v:v?.toDate?.();
 const running=r=>r&&['boarding','in_progress'].includes(r.status);
-const active=(a,t)=>!a?.permanent&&!a?.communityPermanent&&!a?.manualSuspended&&!(date(a?.communitySuspendedUntil)>t)&&!(date(a?.manualSuspendedUntil)>t);
+const active=(a,t)=>!a?.authDisabled&&!a?.accountDeleted&&!a?.permanent&&!a?.communityPermanent&&!a?.manualSuspended&&!(date(a?.communitySuspendedUntil)>t)&&!(date(a?.manualSuspendedUntil)>t);
 
 /** Trusted, transactional transfer of a dated operation. Assistance is reconciled
  * in bounded batches; authorization follows the run immediately, before batching. */

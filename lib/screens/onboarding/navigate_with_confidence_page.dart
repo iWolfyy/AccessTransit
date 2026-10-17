@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/localization_context.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import 'transit_preview.dart';
@@ -103,115 +105,124 @@ class _NavigateWithConfidencePageState extends State<NavigateWithConfidencePage>
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 400;
 
-    return Column(
-      children: [
-        Expanded(
-          child: Center(
-            child: FadeTransition(
-              opacity: _fade(0, 0.4),
-              child: AnimatedBuilder(
-                animation: Listenable.merge([
-                  _routeController,
-                  _pulseController,
-                  _entranceController,
-                ]),
-                builder: (context, _) {
-                  final routeProgress = widget.reduceMotion
-                      ? 0.55
-                      : _routeController.value;
-                  final drawProgress = widget.reduceMotion
-                      ? 1.0
-                      : CurvedAnimation(
-                          parent: _entranceController,
-                          curve: const Interval(
-                            0.05,
-                            0.72,
-                            curve: Curves.easeInOutCubic,
-                          ),
-                        ).value;
-                  final pulse = widget.reduceMotion
-                      ? 0.4
-                      : _pulseController.value;
-
-                  return FittedBox(
-                    fit: BoxFit.contain,
-                    child: SizedBox(
-                      width: 400,
-                      height: 300,
-                      child: TransitPreview(
-                        routeProgress: routeProgress,
-                        drawProgress: drawProgress,
-                        pulse: pulse,
-                        busPill: FadeTransition(
-                          opacity: _fade(0.16, 0.58),
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(-0.12, 0),
-                              end: Offset.zero,
-                            ).animate(_fade(0.16, 0.58)),
-                            child: OnboardingBusPill(pulse: pulse),
-                          ),
-                        ),
-                        assistanceCard: FadeTransition(
-                          opacity: _fade(0.24, 0.7),
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 0.18),
-                              end: Offset.zero,
-                            ).animate(_fade(0.24, 0.7)),
-                            child: OnboardingAssistanceCard(
-                              checkScale: _checkScale.value,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        FadeTransition(
-          opacity: _fade(0.35, 0.8),
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.12),
-              end: Offset.zero,
-            ).animate(_fade(0.35, 0.8)),
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: IntrinsicHeight(
             child: Column(
               children: [
-                Text(
-                  'Navigate with Confidence',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: wide ? 24 : 22,
-                    height: wide ? 32 / 24 : 28 / 22,
-                    fontWeight: FontWeight.w700,
-                    color: context.textColor,
+                Expanded(
+                  child: Center(
+                    child: FadeTransition(
+                      opacity: _fade(0, 0.4),
+                      child: AnimatedBuilder(
+                        animation: Listenable.merge([
+                          _routeController,
+                          _pulseController,
+                          _entranceController,
+                        ]),
+                        builder: (context, _) {
+                          final routeProgress = widget.reduceMotion
+                              ? 0.55
+                              : _routeController.value;
+                          final drawProgress = widget.reduceMotion
+                              ? 1.0
+                              : CurvedAnimation(
+                                  parent: _entranceController,
+                                  curve: const Interval(
+                                    0.05,
+                                    0.72,
+                                    curve: Curves.easeInOutCubic,
+                                  ),
+                                ).value;
+                          final pulse = widget.reduceMotion
+                              ? 0.4
+                              : _pulseController.value;
+
+                          return FittedBox(
+                            fit: BoxFit.contain,
+                            child: SizedBox(
+                              width: 400,
+                              height: 300,
+                              child: TransitPreview(
+                                routeProgress: routeProgress,
+                                drawProgress: drawProgress,
+                                pulse: pulse,
+                                busPill: FadeTransition(
+                                  opacity: _fade(0.16, 0.58),
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(-0.12, 0),
+                                      end: Offset.zero,
+                                    ).animate(_fade(0.16, 0.58)),
+                                    child: OnboardingBusPill(pulse: pulse),
+                                  ),
+                                ),
+                                assistanceCard: FadeTransition(
+                                  opacity: _fade(0.24, 0.7),
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0, 0.18),
+                                      end: Offset.zero,
+                                    ).animate(_fade(0.24, 0.7)),
+                                    child: OnboardingAssistanceCard(
+                                      checkScale: _checkScale.value,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Preview only. Check shared GPS when available; assistance needs an operator response.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 24 / 16,
-                    fontWeight: context.isHighContrast
-                        ? FontWeight.w600
-                        : FontWeight.normal,
-                    color: context.isHighContrast
-                        ? Colors.black
-                        : AppColors.onSurfaceVariant,
+                const SizedBox(height: 24),
+                FadeTransition(
+                  opacity: _fade(0.35, 0.8),
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.12),
+                      end: Offset.zero,
+                    ).animate(_fade(0.35, 0.8)),
+                    child: Column(
+                      children: [
+                        Text(
+                          context.l10n.onboardingNavigate,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: wide ? 24 : 22,
+                            height: wide ? 32 / 24 : 28 / 22,
+                            fontWeight: FontWeight.w700,
+                            color: context.textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          context.l10n.onboardingLiveHelp,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            height: 24 / 16,
+                            fontWeight: context.isHighContrast
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: context.isHighContrast
+                                ? Colors.black
+                                : AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }

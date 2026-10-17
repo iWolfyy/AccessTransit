@@ -1,5 +1,10 @@
+import '../../widgets/accessible_tap_target.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import '../../l10n/localization_context.dart';
+import '../../l10n/recovery_presentation.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -11,10 +16,11 @@ import 'login_screen.dart';
 import 'password_reset_success_screen.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
-  const ResetPasswordScreen({super.key, this.actionCode});
+  const ResetPasswordScreen({super.key, this.actionCode, this.authService});
 
   /// Firebase password reset code from the email link (oobCode).
   final String? actionCode;
+  final AuthService? authService;
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
@@ -25,7 +31,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
   final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final AuthService _authService = AuthService();
+  late final AuthService _authService = widget.authService ?? AuthService();
 
   late final AnimationController _entranceController;
   late final AnimationController _buttonScaleController;
@@ -55,10 +61,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
     );
 
     _buttonScale = Tween<double>(begin: 1, end: 0.98).animate(
-      CurvedAnimation(
-        parent: _buttonScaleController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _buttonScaleController, curve: Curves.easeInOut),
     );
 
     _passwordController.addListener(_updatePasswordStrength);
@@ -101,10 +104,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
   Widget _staggered(int index, Widget child) {
     return FadeTransition(
       opacity: _fade(index),
-      child: SlideTransition(
-        position: _slide(index),
-        child: child,
-      ),
+      child: SlideTransition(position: _slide(index), child: child),
     );
   }
 
@@ -137,9 +137,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const PasswordResetSuccessScreen(),
-        ),
+        MaterialPageRoute(builder: (_) => const PasswordResetSuccessScreen()),
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -148,7 +146,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showMessage('Unable to reset password. Please try again.', isError: true);
+      _showMessage(
+        'Unable to reset password. Please try again.',
+        isError: true,
+      );
     }
   }
 
@@ -157,9 +158,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
-          backgroundColor:
-              isError ? AppColors.error : AppColors.primaryContainer,
+          content: Text(context.recoveryText(message)),
+          backgroundColor: isError
+              ? AppColors.error
+              : AppColors.primaryContainer,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           margin: const EdgeInsets.all(16),
@@ -167,20 +169,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
       );
   }
 
-  String _getErrorMessage(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'expired-action-code':
-        return 'This reset link has expired. Please request a new one.';
-      case 'invalid-action-code':
-        return 'This reset link is invalid. Please request a new one.';
-      case 'weak-password':
-        return 'Password is too weak. Please choose a stronger password.';
-      case 'network-request-failed':
-        return 'Network error. Please check your internet connection.';
-      default:
-        return e.message ?? 'Unable to reset password.';
-    }
-  }
+  String _getErrorMessage(FirebaseAuthException e) =>
+      context.recoveryFailure(e.code, reset: true);
 
   @override
   Widget build(BuildContext context) {
@@ -201,12 +191,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
                       decoration: BoxDecoration(
                         color: context.cardColor,
                         borderRadius: BorderRadius.circular(12),
-                        border: isHC ? Border.all(color: Colors.black, width: 2) : null,
+                        border: isHC
+                            ? Border.all(color: Colors.black, width: 2)
+                            : null,
                         boxShadow: isHC
                             ? null
                             : [
                                 BoxShadow(
-                                  color: AppColors.onSurface.withValues(alpha: 0.08),
+                                  color: AppColors.onSurface.withValues(
+                                    alpha: 0.08,
+                                  ),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),
@@ -266,8 +260,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
                 ),
               ],
       ),
-      child: SizedBox(
-        height: 56,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
         child: Row(
           children: [
             IconButton(
@@ -276,18 +270,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
                   ? null
                   : () {
                       Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => const LoginScreen(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
                       );
                     },
               icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize),
               color: isHC ? Colors.black : AppColors.primary,
-              tooltip: 'Go back',
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
             ),
             Expanded(
               child: Text(
-                'Reset Password',
+                context.l10n.recoveryTitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 22,
@@ -309,7 +301,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
     return Column(
       children: [
         Text(
-          'Create New Password',
+          context.l10n.recoveryCreate,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 24,
@@ -320,13 +312,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
         ),
         const SizedBox(height: 8),
         Text(
-          'Please choose a strong password that you haven\'t used before.',
+          context.l10n.recoveryPasswordHelp,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
             height: 20 / 14,
             fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
-            color: isHC ? Colors.black : AppColors.onSurfaceVariant.withValues(alpha: 0.95),
+            color: isHC
+                ? Colors.black
+                : AppColors.onSurfaceVariant.withValues(alpha: 0.95),
           ),
         ),
       ],
@@ -339,13 +333,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
       children: [
         AuthInputField(
           controller: _passwordController,
-          label: 'New Password',
-          hint: 'Enter your new password',
+          label: context.l10n.recoveryNewPassword,
+          hint: context.l10n.recoveryPasswordHint,
           prefixIcon: Icons.lock_outline_rounded,
           obscureText: _obscurePassword,
           textInputAction: TextInputAction.next,
           autofillHints: const [AutofillHints.newPassword],
-          validator: Validators.registerPassword,
+          validator: (v) =>
+              context.recoveryValidation(Validators.registerPassword(v)),
           suffixIcon: IconButton(
             onPressed: () {
               setState(() => _obscurePassword = !_obscurePassword);
@@ -354,10 +349,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
               _obscurePassword
                   ? Icons.visibility_off_outlined
                   : Icons.visibility_outlined,
-              color: AppColors.onSurfaceVariant,
+              color: context.subtextColor,
               size: 20,
             ),
-            tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+            tooltip: _obscurePassword
+                ? context.l10n.recoveryShow
+                : context.l10n.recoveryHide,
           ),
         ),
         PasswordStrengthIndicator(
@@ -371,15 +368,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
   Widget _buildConfirmPasswordField() {
     return AuthInputField(
       controller: _confirmPasswordController,
-      label: 'Confirm New Password',
-      hint: 'Re-enter your new password',
+      label: context.l10n.recoveryConfirm,
+      hint: context.l10n.recoveryConfirmHint,
       prefixIcon: Icons.lock_outline_rounded,
       obscureText: _obscureConfirmPassword,
       textInputAction: TextInputAction.done,
       autofillHints: const [AutofillHints.newPassword],
-      validator: (value) => Validators.confirmPassword(
-        value,
-        _passwordController.text,
+      validator: (value) => context.recoveryValidation(
+        Validators.confirmPassword(value, _passwordController.text),
       ),
       onFieldSubmitted: (_) {
         if (!_isLoading) _resetPassword();
@@ -392,10 +388,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
           _obscureConfirmPassword
               ? Icons.visibility_off_outlined
               : Icons.visibility_outlined,
-          color: AppColors.onSurfaceVariant,
+          color: context.subtextColor,
           size: 20,
         ),
-        tooltip: _obscureConfirmPassword ? 'Show password' : 'Hide password',
+        tooltip: _obscureConfirmPassword
+            ? context.l10n.recoveryShow
+            : context.l10n.recoveryHide,
       ),
     );
   }
@@ -412,15 +410,17 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
               : AppColors.secondary.withValues(alpha: 0.9),
         ),
         const SizedBox(width: 6),
-        Text(
-          'Your security is our priority.',
-          style: TextStyle(
-            fontSize: 12,
-            height: 16 / 12,
-            fontWeight: isHC ? FontWeight.w700 : FontWeight.w500,
-            color: isHC
-                ? const Color(0xFF003833)
-                : AppColors.secondary.withValues(alpha: 0.95),
+        Flexible(
+          child: Text(
+            context.l10n.recoverySecurity,
+            style: TextStyle(
+              fontSize: 12,
+              height: 16 / 12,
+              fontWeight: isHC ? FontWeight.w700 : FontWeight.w500,
+              color: isHC
+                  ? const Color(0xFF003833)
+                  : AppColors.secondary.withValues(alpha: 0.95),
+            ),
           ),
         ),
       ],
@@ -428,46 +428,54 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
   }
 
   Widget _buildResetButton(bool isHC) {
-    return GestureDetector(
-      onTapDown: _isLoading ? null : (_) => _buttonScaleController.forward(),
-      onTapUp: _isLoading ? null : (_) => _buttonScaleController.reverse(),
-      onTapCancel: () => _buttonScaleController.reverse(),
-      child: ScaleTransition(
-        scale: _buttonScale,
-        child: SizedBox(
-          height: context.buttonHeight,
-          child: FilledButton(
-            onPressed: _isLoading ? null : _resetPassword,
-            style: FilledButton.styleFrom(
-              backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: isHC
-                  ? const Color(0xFF001F3F).withValues(alpha: 0.6)
-                  : AppColors.primaryContainer.withValues(alpha: 0.6),
-              disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
-                side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+    return AccessibleTapTarget(
+      child: GestureDetector(
+        onTapDown: _isLoading ? null : (_) => _buttonScaleController.forward(),
+        onTapUp: _isLoading ? null : (_) => _buttonScaleController.reverse(),
+        onTapCancel: () => _buttonScaleController.reverse(),
+        child: ScaleTransition(
+          scale: _buttonScale,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: context.buttonHeight),
+            child: FilledButton(
+              onPressed: _isLoading ? null : _resetPassword,
+              style: FilledButton.styleFrom(
+                backgroundColor: isHC
+                    ? const Color(0xFF001F3F)
+                    : AppColors.primaryContainer,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: isHC
+                    ? const Color(0xFF001F3F).withValues(alpha: 0.6)
+                    : AppColors.primaryContainer.withValues(alpha: 0.6),
+                disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  side: isHC
+                      ? const BorderSide(color: Colors.black, width: 2)
+                      : BorderSide.none,
+                ),
+                elevation: isHC ? 0 : 1,
+                shadowColor: isHC
+                    ? null
+                    : AppColors.primary.withValues(alpha: 0.15),
+                textStyle: TextStyle(
+                  fontSize: context.hasLargeTargets ? 15.5 : 14,
+                  height: 20 / 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
+                ),
               ),
-              elevation: isHC ? 0 : 1,
-              shadowColor: isHC ? null : AppColors.primary.withValues(alpha: 0.15),
-              textStyle: TextStyle(
-                fontSize: context.hasLargeTargets ? 15.5 : 14,
-                height: 20 / 14,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.1,
-              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(context.l10n.recoveryTitle),
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Reset Password'),
           ),
         ),
       ),

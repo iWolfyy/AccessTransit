@@ -1,4 +1,5 @@
 import 'support/fixture_search_backend.dart';
+
 import 'dart:async';
 
 import 'package:access_transit/data/seed_data.dart';
@@ -17,6 +18,17 @@ import 'package:access_transit/widgets/evidence_refresh.dart';
 import 'package:access_transit/widgets/live_accessibility_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class ClockCommunityService extends FirestoreService {
+  ClockCommunityService(this.report);
+  final Report report;
+  @override
+  Stream<List<Report>> streamReports({
+    String? status,
+    String? userId,
+    bool surfaceErrors = false,
+  }) => Stream.value([report]);
+}
 
 void main() {
   final start = DateTime(2026, 10, 15, 10);
@@ -128,10 +140,12 @@ void main() {
     'community crowding moves to past reports without a backend event',
     (tester) async {
       final r = report(crowding: true);
-      await FirestoreService(reportWriter: (_) async {}).createReport(r);
       await tester.pumpWidget(
         MaterialApp(
-          home: EvidenceClock(now: () => now, child: const CommunityScreen()),
+          home: EvidenceClock(
+            now: () => now,
+            child: CommunityScreen(service: ClockCommunityService(r)),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -177,7 +191,8 @@ void main() {
         MaterialApp(
           home: EvidenceClock(
             now: () => now,
-            child: RouteResultsScreen(searchBackend: FixtureSearchBackend(now: () => now), 
+            child: RouteResultsScreen(
+              searchBackend: FixtureSearchBackend(now: () => now),
               fromStationId: 'st_pettah',
               wheelchairAccessRequired: true,
               stepFreeOnly: false,

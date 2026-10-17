@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../constants/firestore_constants.dart';
 import '../logic/tariff_fare.dart';
+import 'saved_schedule_snapshot.dart';
 
 /// Status of a passenger journey/booking.
 enum JourneyStatus {
@@ -54,6 +55,7 @@ class JourneyModel {
     this.fareQuote,
     this.busNo,
     this.serviceRunId,
+    this.scheduleSnapshot,
     this.wheelchairAccessRequired = false,
     this.stepFreeOnly = false,
   });
@@ -89,6 +91,7 @@ class JourneyModel {
   final TariffFareQuote? fareQuote;
   final String? busNo;
   final String? serviceRunId;
+  final SavedScheduleSnapshot? scheduleSnapshot;
   final bool wheelchairAccessRequired;
   final bool stepFreeOnly;
   bool get isOpen =>
@@ -123,6 +126,7 @@ class JourneyModel {
           : null,
       busNo: map['busNo'] as String?,
       serviceRunId: map['serviceRunId'] as String?,
+      scheduleSnapshot: _readSnapshot(map['scheduleSnapshot']),
       wheelchairAccessRequired: map['wheelchairAccessRequired'] == true,
       stepFreeOnly: map['stepFreeOnly'] == true,
     );
@@ -156,6 +160,8 @@ class JourneyModel {
       if (fareQuote != null) 'fareQuote': fareQuote!.toMap(),
       if (busNo != null) 'busNo': busNo,
       if (serviceRunId != null) 'serviceRunId': serviceRunId,
+      if (scheduleSnapshot != null)
+        'scheduleSnapshot': scheduleSnapshot!.toMap(),
       'wheelchairAccessRequired': wheelchairAccessRequired,
       'stepFreeOnly': stepFreeOnly,
     };
@@ -194,9 +200,20 @@ class JourneyModel {
       fareQuote: fareQuote,
       busNo: busNo,
       serviceRunId: serviceRunId,
+      scheduleSnapshot: scheduleSnapshot,
       wheelchairAccessRequired: wheelchairAccessRequired,
       stepFreeOnly: stepFreeOnly,
     );
+  }
+
+  static SavedScheduleSnapshot? _readSnapshot(dynamic raw) {
+    try {
+      return raw is Map
+          ? SavedScheduleSnapshot.fromMap(Map<String, dynamic>.from(raw))
+          : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   static DateTime? _parseTimestamp(dynamic value) {

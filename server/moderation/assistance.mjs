@@ -3,7 +3,7 @@ const fail=code=>{throw new PolicyError(code);};
 const id=v=>typeof v==='string'&&v.length>0&&v.length<=128&&!v.includes('/')&&!['.','..'].includes(v);
 const date=v=>v instanceof Date?v:v?.toDate?.();
 const open=r=>['pending','acknowledged'].includes(r.status);
-const active=(a,t)=>!a?.permanent&&!a?.communityPermanent&&!a?.manualSuspended&&!(date(a?.communitySuspendedUntil)>t)&&!(date(a?.manualSuspendedUntil)>t);
+const active=(a,t)=>!a?.authDisabled&&!a?.accountDeleted&&!a?.permanent&&!a?.communityPermanent&&!a?.manualSuspended&&!(date(a?.communitySuspendedUntil)>t)&&!(date(a?.manualSuspendedUntil)>t);
 const wire=(key,r)=>({...r,id:key,createdAt:date(r.createdAt)?.toISOString(),expiresAt:date(r.expiresAt)?.toISOString()});
 
 export function createAssistancePolicy({store,now=()=>new Date()}) {
@@ -76,9 +76,9 @@ export function createAssistancePolicy({store,now=()=>new Date()}) {
         const op=await operation(tx,p,serviceRunId),run=op?.run;
         if(!op?.driver||!['scheduled','boarding','in_progress'].includes(run?.status)||run.busId!==busId||op.bus?.catalogueSource!=='operator_catalogue'||op.bus?.catalogueRecordType==='published_timetable'||(run.status==='scheduled'&&(!date(run.latestStartAt)||date(run.latestStartAt)<time)))fail('assistance-unavailable');
         const stops=run.stops??[],board=stops.indexOf(boardingStationId),alight=stops.indexOf(alightingStationId);
-        if(board<0||alight<=board||new Set(stops).size!==stops.length||stationId!==(purpose==='boarding'?boardingStationId:alightingStationId))fail('invalid-request');
+        if(board<0||alight<=board||new Set(stops).size!==stops.length||stationId!==(run.stopStationIds?.[purpose==='boarding'?boardingStationId:alightingStationId]??(purpose==='boarding'?boardingStationId:alightingStationId)))fail('invalid-request');
         const [station,trip]=await Promise.all([tx.get(p+'stations/'+stationId),tx.get(p+'trips/'+serviceRunId)]);
-        const at=date(run.initialStopTimes?.[stationId]?.estimatedArrival),boardAt=date(run.initialStopTimes?.[boardingStationId]?.estimatedArrival),stopIndex=purpose==='boarding'?board:alight;
+        const at=date(run.initialStopTimes?.[purpose==='boarding'?boardingStationId:alightingStationId]?.estimatedArrival),boardAt=date(run.initialStopTimes?.[boardingStationId]?.estimatedArrival),stopIndex=purpose==='boarding'?board:alight;
         if(station?.catalogueSource!=='operator_catalogue'||station?.isDemo||station?.deletionPending||!at||!boardAt||boardAt>new Date(+time+86400000)||trip?.currentStopIndex>stopIndex||(purpose==='boarding'&&stopIndex===0&&trip?.actualDepartureTime))fail('assistance-unavailable');
         if(run.status!=='scheduled'&&(!trip||trip.driverId!==op.driver||trip.busId!==busId||trip.status!=='in_progress'))fail('assistance-unavailable');
         const expiresAt=new Date(Math.max(+at+1800000,run.status==='scheduled'?0:+time+1800000));

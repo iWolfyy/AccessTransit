@@ -26,6 +26,8 @@ class BoardingRequest {
     this.endReason,
     this.policyVersion = 1,
     this.assignmentVersion = 0,
+    this.boardingIndex,
+    this.alightingIndex,
   });
 
   final String id;
@@ -36,6 +38,7 @@ class BoardingRequest {
       endReason;
   final DateTime? expiresAt;
   final int policyVersion, assignmentVersion;
+  final int? boardingIndex, alightingIndex;
   final String riderId;
   final String riderName;
   final String busId;
@@ -69,6 +72,8 @@ class BoardingRequest {
     return BoardingRequest(
       serviceRunId: map['serviceRunId'] as String?,
       boardingStationId: map['boardingStationId'] as String?,
+      boardingIndex: map['boardingIndex'] as int?,
+      alightingIndex: map['alightingIndex'] as int?,
       alightingStationId: map['alightingStationId'] as String?,
       driverId: map['driverId'] as String?,
       expiresAt: _parseTimestamp(map['expiresAt'])?.toUtc(),
@@ -126,6 +131,8 @@ class BoardingRequest {
     return {
       if (serviceRunId != null) 'serviceRunId': serviceRunId,
       if (boardingStationId != null) 'boardingStationId': boardingStationId,
+      if (boardingIndex != null) 'boardingIndex': boardingIndex,
+      if (alightingIndex != null) 'alightingIndex': alightingIndex,
       if (alightingStationId != null) 'alightingStationId': alightingStationId,
       if (driverId != null) 'driverId': driverId,
       if (expiresAt != null) 'expiresAt': Timestamp.fromDate(expiresAt!),
@@ -164,6 +171,8 @@ class BoardingRequest {
     return BoardingRequest(
       serviceRunId: serviceRunId,
       boardingStationId: boardingStationId,
+      boardingIndex: boardingIndex,
+      alightingIndex: alightingIndex,
       alightingStationId: alightingStationId,
       driverId: driverId,
       expiresAt: expiresAt,

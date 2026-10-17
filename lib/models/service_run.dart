@@ -12,12 +12,24 @@ class ServiceRun {
     required this.latestStartAt,
     required this.stopTimes,
     this.status = 'scheduled',
+    this.stopStationIds = const {},
+    this.scheduleVersion = 1,
+    this.replacementRunId,
+    this.replacesRunId,
+    this.changeReason,
+    this.replacementDepartureAt,
     this.handoverPending = false,
   });
   final String id, busId, routeId, routeNo, serviceDate, status;
   final DateTime plannedDepartureAt, latestStartAt;
   final Map<String, DateTime> stopTimes;
   final bool handoverPending;
+  final int scheduleVersion;
+  final String? replacementRunId, replacesRunId, changeReason;
+  final DateTime? replacementDepartureAt;
+  final Map<String, String> stopStationIds;
+  String stationIdFor(String occurrence) =>
+      stopStationIds[occurrence] ?? occurrence;
   static const maximumLateStart = Duration(minutes: 30);
   DateTime get earliestStartAt =>
       plannedDepartureAt.subtract(const Duration(minutes: 5));
@@ -59,6 +71,16 @@ class ServiceRun {
     }
     return ServiceRun(
       id: id,
+      scheduleVersion: d['scheduleVersion'] as int? ?? 1,
+      replacementRunId: d['replacementRunId'] as String?,
+      replacesRunId: d['replacesRunId'] as String?,
+      changeReason: d['changeReason'] as String?,
+      replacementDepartureAt: d['replacementDepartureAt'] is Timestamp
+          ? time(d['replacementDepartureAt'])
+          : null,
+      stopStationIds: Map<String, String>.from(
+        d['stopStationIds'] as Map? ?? {},
+      ),
       busId: d['busId'] as String,
       routeId: d['routeId'] as String,
       routeNo: d['routeNo'] as String,

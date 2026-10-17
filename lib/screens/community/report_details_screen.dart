@@ -1,3 +1,6 @@
+import '../../widgets/accessible_tap_target.dart';
+import '../../l10n/report_view_presentation.dart';
+import '../../l10n/evidence_presentation.dart';
 import '../../widgets/report_v2_votes.dart';
 import '../../widgets/evidence_refresh.dart';
 
@@ -13,7 +16,6 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/time_utils.dart';
 import '../../logic/status_logic.dart';
 import '../../logic/report_mutation.dart';
 import '../../models/report.dart';
@@ -113,7 +115,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     if (_isLoadingAction) return;
     final actor = _repository.currentReportActorId;
     if (actor == null || actor.isEmpty) {
-      _showSnack('Sign in before changing a shared report.');
+      _showSnack(context.l10n.reportSignInChange);
       return;
     }
     setState(() => _isLoadingAction = true);
@@ -130,22 +132,26 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         ReportMutationAction.flag => _repository.flagReport(report.id, actor),
         ReportMutationAction.resolve => _repository.resolveReport(report.id),
       }).timeout(const Duration(seconds: 15));
-      if (_repository.currentReportActorId == actor) _showSnack(result.message);
+      if (mounted && _repository.currentReportActorId == actor) {
+        _showSnack(context.reportViewText(result.message));
+      }
     } catch (_) {
-      _showSnack(
-        'Change is not confirmed. Check your connection and sign-in, then retry or refresh the shared report.',
-      );
+      if (!mounted) return;
+      _showSnack(context.l10n.reportChangeUnconfirmed);
     } finally {
       if (mounted) setState(() => _isLoadingAction = false);
     }
   }
 
-  void _shareReport(Report? report, String targetTitle) {
+  Future<void> _shareReport(Report? report, String targetTitle) async {
     final title = report?.problemType ?? widget.title;
-    final text =
-        'AccessTransit Alert: $title at $targetTitle. Check live status in AccessTransit.';
-    Clipboard.setData(ClipboardData(text: text));
-    _showSnack('Alert link & text copied to clipboard!');
+    final text = context.l10n.reportShareText(title, targetTitle);
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (mounted) _showSnack(context.l10n.reportCopied);
+    } catch (_) {
+      if (mounted) _showSnack(context.l10n.reportCopyFailed);
+    }
   }
 
   void _showFullPhotoDialog(String photoPath) {
@@ -165,9 +171,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   ? Image.network(
                       photoPath,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const Center(
+                      errorBuilder: (_, _, _) => Center(
                         child: Text(
-                          'Image preview unavailable',
+                          context.l10n.reportImageUnavailable,
                           style: TextStyle(color: Colors.white70),
                         ),
                       ),
@@ -175,9 +181,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   : Image.file(
                       File(photoPath),
                       fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const Center(
+                      errorBuilder: (_, _, _) => Center(
                         child: Text(
-                          'Image preview unavailable',
+                          context.l10n.reportImageUnavailable,
                           style: TextStyle(color: Colors.white70),
                         ),
                       ),
@@ -190,7 +196,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                 color: Colors.white,
                 size: context.tapIconSize + 4,
               ),
-              tooltip: 'Close',
+              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
               constraints: context.appBarActionConstraints,
             ),
           ],
@@ -220,12 +226,10 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           }
           if (_latestReport == null) {
             return Scaffold(
-              appBar: AppBar(title: const Text('Report Details')),
-              body: const Padding(
+              appBar: AppBar(title: Text(context.l10n.reportDetailsTitle)),
+              body: Padding(
                 padding: EdgeInsets.all(24),
-                child: Text(
-                  'Shared report unavailable or removed. Reopen the feed to refresh.',
-                ),
+                child: Text(context.l10n.reportRemoved),
               ),
             );
           }
@@ -281,11 +285,11 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             size: context.tapIconSize,
           ),
           onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: 'Back',
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
           constraints: context.appBarActionConstraints,
         ),
         title: Text(
-          'Report Details',
+          context.l10n.reportDetailsTitle,
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -300,7 +304,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               size: context.tapIconSize,
             ),
             onPressed: () => _shareReport(report, targetTitle),
-            tooltip: 'Share alert',
+            tooltip: context.l10n.reportShare,
             constraints: context.appBarActionConstraints,
           ),
           const SizedBox(width: 8),
@@ -313,23 +317,25 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             child: ListView(
               padding: EdgeInsets.fromLTRB(16, isDesktop ? 24 : 12, 16, 40),
               children: [
-                if (_readUnavailable)
-                  const Text(
-                    'Shared updates unavailable. Showing the last received observation; refresh before acting.',
-                  ),
+                if (_readUnavailable) Text(context.l10n.reportStaleUpdates),
                 if (_currentUserId().isEmpty)
-                  const Text(
-                    'Sign in to confirm, flag or resolve shared reports.',
-                  ),
+                  Text(context.l10n.reportSignInActions),
                 if (report?.status == 'resolved') ...[
-                  const Text(
-                    'Resolution is the author\'s recorded observation; it does not independently verify a repair.',
+                  Text(context.l10n.reportResolutionDisclosure),
+                  Text(
+                    context.l10n.reportResolvedBy(
+                      report?.resolvedBy ?? context.l10n.resultsUnknown,
+                    ),
                   ),
-                  Text('Resolved by: ${report?.resolvedBy ?? 'Unknown'}'),
                   Text(
                     report?.resolvedAt == null
-                        ? 'Resolution time: Unknown'
-                        : 'Resolved at: ${TimeUtils.formatDateString(report!.resolvedAt!)}, ${TimeUtils.formatTimeString(report.resolvedAt!)}',
+                        ? context.l10n.reportResolutionUnknown
+                        : context.l10n.reportResolvedAt(
+                            MaterialLocalizations.of(context)
+                                .formatFullDate(report!.resolvedAt!),
+                            TimeOfDay.fromDateTime(report.resolvedAt!)
+                                .format(context),
+                          ),
                   ),
                 ],
                 // 1. Status Banner Header
@@ -425,7 +431,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'This report is hidden after three independent inaccuracy flags. This does not prove the condition was false.',
+                            context.l10n.reportHiddenHelp(
+                              report?.flagThreshold ?? 3,
+                            ),
                             style: TextStyle(
                               color: isHC
                                   ? const Color(0xFF8B0000)
@@ -467,24 +475,28 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
       bgColor = isHC ? Colors.white : AppColors.success.withValues(alpha: 0.12);
       fgColor = isHC ? const Color(0xFF003833) : AppColors.success;
       icon = Icons.check_circle_rounded;
-      statusTitle = 'Condition Resolved';
-      statusSubtitle = 'This accessibility issue has been marked fixed.';
+      statusTitle = context.l10n.reportResolvedTitle;
+      statusSubtitle = context.l10n.reportResolvedHelp;
     } else if (report != null &&
         report.createdAt == null &&
         !StatusLogic.needsRecheck(report, currentTime: now)) {
       bgColor = isHC ? Colors.white : AppColors.surfaceContainer;
       fgColor = isHC ? Colors.black : AppColors.outline;
       icon = Icons.help_outline;
-      statusTitle = 'Observation time unknown';
-      statusSubtitle = 'The observation date is unavailable. Current condition cannot be confirmed.';
+      statusTitle = context.l10n.reportObservationUnknown;
+      statusSubtitle = context.l10n.reportUnknownHelp;
     } else if (report != null &&
         StatusLogic.needsRecheck(report, currentTime: now)) {
       bgColor = isHC ? Colors.white : const Color(0xFFFFF3E0);
       fgColor = isHC ? const Color(0xFF8B0000) : const Color(0xFFE65100);
       icon = Icons.history_rounded;
-      statusTitle = 'Unresolved barrier — needs recheck';
-      statusSubtitle =
-          'Last checked ${TimeUtils.formatRelativeTime(StatusLogic.lastCheckedAt(report, currentTime: now), clock: now)}. Current condition unknown; no repair recorded.';
+      statusTitle = context.l10n.detailsRecheck;
+      statusSubtitle = context.l10n.reportRecheckAge(
+        context.evidenceAge(
+          StatusLogic.lastCheckedAt(report, currentTime: now),
+          now,
+        ),
+      );
     } else if (!_readUnavailable &&
         report != null &&
         confirmCount > 0 &&
@@ -499,21 +511,20 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           : AppColors.primaryContainer.withValues(alpha: 0.35);
       fgColor = isHC ? const Color(0xFF001F3F) : AppColors.primary;
       icon = Icons.verified_rounded;
-      statusTitle = 'Community-confirmed observation';
-      statusSubtitle =
-          'Confirmed by $confirmCount fellow rider${confirmCount == 1 ? "" : "s"}.';
+      statusTitle = context.l10n.reportConfirmedTitle;
+      statusSubtitle = context.l10n.reportConfirmedRiders(confirmCount);
     } else if (isReportActive) {
       bgColor = isHC ? Colors.white : const Color(0xFFFFF3E0);
       fgColor = isHC ? const Color(0xFF8B0000) : const Color(0xFFE65100);
       icon = Icons.bolt_rounded;
-      statusTitle = 'Active Transit Alert';
-      statusSubtitle = 'Recently reported by a commuter. Real-time active.';
+      statusTitle = context.l10n.reportActiveTitle;
+      statusSubtitle = context.l10n.reportActiveHelp;
     } else {
       bgColor = isHC ? Colors.white : AppColors.surfaceContainer;
       fgColor = isHC ? Colors.black : AppColors.outline;
       icon = Icons.history_rounded;
-      statusTitle = 'Past Report (Expired)';
-      statusSubtitle = 'This report was active earlier and is now archived.';
+      statusTitle = context.l10n.reportExpiredTitle;
+      statusSubtitle = context.l10n.reportExpiredHelp;
     }
 
     return Container(
@@ -543,7 +554,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
                     Text(
                       statusTitle,
@@ -569,8 +582,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                               ? Border.all(color: Colors.black, width: 1)
                               : null,
                         ),
-                        child: const Text(
-                          'YOUR REPORT',
+                        child: Text(
+                          context.l10n.reportYours,
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
@@ -668,8 +681,12 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     const SizedBox(height: 2),
                     Text(
                       isBus
-                          ? 'Transit Vehicle • ${report?.targetId ?? widget.vehicleLabel}'
-                          : 'Transit Station • ${report?.targetId ?? "Central Corridor"}',
+                          ? context.l10n.reportTransitVehicle(
+                              report?.targetId ?? widget.vehicleLabel,
+                            )
+                          : context.l10n.reportTransitStation(
+                              report?.targetId ?? widget.targetTitle,
+                            ),
                       style: TextStyle(
                         fontSize: 13,
                         color: context.subtextColor,
@@ -678,25 +695,27 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: isHC ? Colors.white : AppColors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(8),
-                  border: isHC
-                      ? Border.all(color: Colors.black, width: 1.5)
-                      : null,
-                ),
-                child: Text(
-                  isBus ? 'BUS' : 'STATION',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                    color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isHC ? Colors.white : AppColors.surfaceContainer,
+                    borderRadius: BorderRadius.circular(8),
+                    border: isHC
+                        ? Border.all(color: Colors.black, width: 1.5)
+                        : null,
+                  ),
+                  child: Text(
+                    isBus ? context.l10n.reportBus : context.l10n.reportStation,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                      color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),
@@ -721,18 +740,18 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     switch (severity) {
       case 'major':
         severityColor = isHC ? const Color(0xFF8B0000) : AppColors.error;
-        severityLabel = 'High Severity';
+        severityLabel = context.l10n.reportHighSeverity;
         break;
       case 'minor':
         severityColor = isHC ? const Color(0xFF003833) : AppColors.success;
-        severityLabel = 'Minor Issue';
+        severityLabel = context.l10n.reportMinorSeverity;
         break;
       case 'moderate':
       default:
         severityColor = isHC
             ? const Color(0xFF8B4500)
             : const Color(0xFFF57F17);
-        severityLabel = 'Moderate';
+        severityLabel = context.l10n.reportModerateSeverity;
         break;
     }
 
@@ -758,7 +777,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Reported Condition Details',
+            context.l10n.reportConditionDetails,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
@@ -846,14 +865,16 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                             : AppColors.primary,
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        _formatCategoryName(report.category),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: isHC
-                              ? const Color(0xFF001F3F)
-                              : AppColors.primary,
+                      Flexible(
+                        child: Text(
+                          _formatCategoryName(report.category),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isHC
+                                ? const Color(0xFF001F3F)
+                                : AppColors.primary,
+                          ),
                         ),
                       ),
                     ],
@@ -890,14 +911,16 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                         color: isHC ? Colors.black : AppColors.onSurfaceVariant,
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        'Rider Note:',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: isHC
-                              ? Colors.black
-                              : AppColors.onSurfaceVariant,
+                      Flexible(
+                        child: Text(
+                          context.l10n.reportRiderNote,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isHC
+                                ? Colors.black
+                                : AppColors.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ],
@@ -954,12 +977,14 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                 color: isHC ? Colors.black : AppColors.primary,
               ),
               const SizedBox(width: 8),
-              Text(
-                'Attached Photo Evidence',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: context.textColor,
+              Flexible(
+                child: Text(
+                  context.l10n.reportPhotoEvidence,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: context.textColor,
+                  ),
                 ),
               ),
             ],
@@ -967,62 +992,69 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              onTap: () => _showFullPhotoDialog(photoPath),
-              child: Stack(
-                children: [
-                  photoPath.startsWith('http')
-                      ? Image.network(
-                          photoPath,
-                          height: 220,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => _buildImageFallback(),
-                        )
-                      : Image.file(
-                          File(photoPath),
-                          height: 220,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => _buildImageFallback(),
+            child: AccessibleTapTarget(
+              child: InkWell(
+                onTap: () => _showFullPhotoDialog(photoPath),
+                child: Stack(
+                  children: [
+                    photoPath.startsWith('http')
+                        ? Image.network(
+                            photoPath,
+                            height: 220,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => _buildImageFallback(),
+                          )
+                        : Image.file(
+                            File(photoPath),
+                            height: 220,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => _buildImageFallback(),
+                          ),
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.sizeOf(context).width - 96,
                         ),
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.75),
-                        borderRadius: BorderRadius.circular(6),
-                        border: isHC
-                            ? Border.all(color: Colors.white, width: 1)
-                            : null,
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.fullscreen_rounded,
-                            size: 14,
-                            color: Colors.white,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Tap to enlarge',
-                            style: TextStyle(
-                              fontSize: 11,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(6),
+                          border: isHC
+                              ? Border.all(color: Colors.white, width: 1)
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.fullscreen_rounded,
+                              size: 14,
                               color: Colors.white,
-                              fontWeight: FontWeight.w600,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                context.l10n.reportEnlarge,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1049,11 +1081,13 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             color: isHC ? Colors.black : AppColors.outline,
           ),
           const SizedBox(width: 8),
-          Text(
-            'Photo unavailable',
-            style: TextStyle(
-              color: isHC ? Colors.black : AppColors.onSurfaceVariant,
-              fontSize: 13,
+          Flexible(
+            child: Text(
+              context.l10n.reportPhotoUnavailable,
+              style: TextStyle(
+                color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+                fontSize: 13,
+              ),
             ),
           ),
         ],
@@ -1064,12 +1098,9 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   /// Trust & verification timeline card
   Widget _buildTrustTimelineCard(Report report, DateTime now) {
     final isHC = context.isHighContrast;
-    final reportedAgo = TimeUtils.formatRelativeTime(
-      report.createdAt,
-      clock: now,
-    );
+    final reportedAgo = context.evidenceAge(report.createdAt, now);
     final confirmedAgo = report.lastConfirmedAt != null
-        ? TimeUtils.formatRelativeTime(report.lastConfirmedAt!, clock: now)
+        ? context.evidenceAge(report.lastConfirmedAt!, now)
         : null;
 
     return Container(
@@ -1085,7 +1116,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Community Trust & Verification Metrics',
+            context.l10n.reportMetrics,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
@@ -1104,7 +1135,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Unique confirmations: ${report.confirmCount} rider${report.confirmCount == 1 ? "" : "s"}',
+                  context.l10n.reportUniqueCount(report.confirmCount),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1130,7 +1161,10 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Inaccuracy flags: ${report.falseCount} / ${report.flagThreshold} (Report hidden at ${report.flagThreshold} independent flags)',
+                  context.l10n.reportFlagCount(
+                    report.falseCount,
+                    report.flagThreshold,
+                  ),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1160,7 +1194,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Originally reported: $reportedAgo',
+                  context.l10n.reportOriginally(reportedAgo),
                   style: TextStyle(fontSize: 12, color: context.subtextColor),
                 ),
               ),
@@ -1168,11 +1202,17 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           ),
           if (report.lastRecheckedAt != null) ...[
             Text(
-              'Last recheck: ${TimeUtils.formatRelativeTime(report.lastRecheckedAt!.isAfter(now) ? null : report.lastRecheckedAt, clock: now)} by ${report.lastRecheckedBy ?? 'Unknown'}',
+              context.l10n.reportLastRecheck(
+                context.evidenceAge(
+                  report.lastRecheckedAt!.isAfter(now)
+                      ? null
+                      : report.lastRecheckedAt,
+                  now,
+                ),
+                report.lastRecheckedBy ?? context.l10n.resultsUnknown,
+              ),
             ),
-            const Text(
-              'Rechecks are dated observations; unique confirmations are unchanged.',
-            ),
+            Text(context.l10n.reportRecheckDisclosure),
           ],
           if (confirmedAgo != null && report.confirmCount > 0) ...[
             const SizedBox(height: 6),
@@ -1186,7 +1226,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Last confirmed: $confirmedAgo',
+                    context.l10n.reportLastConfirmed(confirmedAgo),
                     style: TextStyle(
                       fontSize: 12,
                       color: isHC ? const Color(0xFF003833) : AppColors.success,
@@ -1235,7 +1275,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Vote Report Accuracy',
+            context.l10n.reportVoteHeading,
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -1244,7 +1284,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Confirm only what you observed. Previous confirmers can recheck the same condition 30 minutes after the latest check; unique votes and points do not increase. If the condition changed, submit a new report. Three independent flags hide a report.',
+            context.l10n.reportLegacyVoteHelp(report.flagThreshold),
             style: TextStyle(fontSize: 13, color: context.subtextColor),
           ),
           const SizedBox(height: 16),
@@ -1254,8 +1294,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             children: [
               // 1. True Flag Button
               Expanded(
-                child: SizedBox(
-                  height: context.buttonHeight,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: context.buttonHeight),
                   child: FilledButton.icon(
                     onPressed:
                         (hasConfirmed &&
@@ -1302,8 +1342,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     ),
                     label: Text(
                       hasConfirmed
-                          ? 'Recheck condition'
-                          : 'True Flag (${report.confirmCount})',
+                          ? context.l10n.reportRecheckAction
+                          : context.l10n.reportTrueCount(report.confirmCount),
                       style: TextStyle(
                         fontSize: context.hasLargeTargets ? 14 : 13,
                         fontWeight: FontWeight.w700,
@@ -1316,8 +1356,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
               // 2. False Flag Button
               Expanded(
-                child: SizedBox(
-                  height: context.buttonHeight,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: context.buttonHeight),
                   child: OutlinedButton.icon(
                     onPressed:
                         (hasFlagged ||
@@ -1351,8 +1391,14 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     ),
                     label: Text(
                       hasFlagged
-                          ? 'False (${report.falseCount}/${report.flagThreshold})'
-                          : 'False Flag (${report.falseCount}/${report.flagThreshold})',
+                          ? context.l10n.reportFalseRecorded(
+                              report.falseCount,
+                              report.flagThreshold,
+                            )
+                          : context.l10n.reportFalseCount(
+                              report.falseCount,
+                              report.flagThreshold,
+                            ),
                       style: TextStyle(
                         fontSize: context.hasLargeTargets ? 14 : 13,
                         fontWeight: FontWeight.w700,
@@ -1367,8 +1413,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           const SizedBox(height: 14),
 
           // Mark Resolved Button
-          SizedBox(
-            height: context.buttonHeight - 4,
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: context.buttonHeight - 4),
             child: OutlinedButton.icon(
               onPressed:
                   (isResolved ||
@@ -1396,8 +1442,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
               label: Text(
                 isResolved
-                    ? 'Condition Marked Fixed'
-                    : 'Mark Condition as Fixed / Resolved',
+                    ? context.l10n.reportFixed
+                    : context.l10n.reportResolveAction,
                 style: TextStyle(
                   fontSize: context.hasLargeTargets ? 14 : 13,
                   fontWeight: FontWeight.w700,
@@ -1413,15 +1459,15 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   String _formatCategoryName(String category) {
     switch (category) {
       case 'rampAccess':
-        return 'Ramp & Access';
+        return context.l10n.reportRampCategory;
       case 'elevatorOut':
-        return 'Elevator / Lift';
+        return context.l10n.reportLiftCategory;
       case 'crowding':
-        return 'Crowding';
+        return context.l10n.reportCrowdingCategory;
       case 'cleanliness':
-        return 'Cleanliness';
+        return context.l10n.reportCleanCategory;
       case 'safetyHazard':
-        return 'Safety Hazard';
+        return context.l10n.reportSafetyCategory;
       default:
         return category;
     }

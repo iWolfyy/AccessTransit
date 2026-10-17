@@ -382,9 +382,19 @@ class ReportSubmissionService extends ChangeNotifier {
       return published;
     } catch (error) {
       check(); // Never resurrect a removed draft after a late upload/failure.
+      // Log only a stable code: report text, photos and credentials stay private.
+      if (kDebugMode) {
+        final code = error is ModerationException
+            ? error.code
+            : error is FirebaseException
+            ? error.code
+            : error.runtimeType.toString();
+        debugPrint('Report publication failed: $code');
+      }
       final transient =
           error is TimeoutException ||
           error is http.ClientException ||
+          error is ModerationException && error.code == 'service-unavailable' ||
           error is PhotoUploadException && error.isTransient ||
           error is FirebaseException &&
               const {
@@ -408,6 +418,15 @@ class ReportSubmissionService extends ChangeNotifier {
             ? error.toString()
             : error is ModerationException && error.code == 'report-cooldown'
             ? 'Same-issue cooldown. Retry after ${error.retryAt?.toUtc().toIso8601String() ?? '5 minutes'} (UTC). Your draft is saved.'
+            : error is ModerationException
+            ? 'publication:${error.code}'
+            : error is FirebaseException &&
+                  const {
+                    'permission-denied',
+                    'not-authorized',
+                    'unauthenticated',
+                  }.contains(error.code)
+            ? 'publication:${error.code}'
             : transient
             ? 'Waiting for a connection. This report is not confirmed as published.'
             : 'Upload failed. Check your sign-in, photo and service access, then retry.',

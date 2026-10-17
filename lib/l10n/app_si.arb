@@ -1,4 +1,48 @@
 {
+  "authControlsTitle": "Firebase ගිණුම් පාලනය",
+  "authControlsExplanation": "පිවිසීම සහ සැසි කළමනාකරණය කරන්න. පිවිසීම යළි සක්‍රිය කළත් වෙනම පරිපාලක හා ප්‍රජා සීමා පවතී. වෙනස්කම් සේවාදායකයෙන් තහවුරු විය යුතුයි.",
+  "authDeleteExplanation": "Firebase පිවිසුම් ගිණුම මකා පෞද්ගලික profile එකේ අනන්‍යතා තොරතුරු ඉවත් කරයි. පොදු වාර්තා, ගමන් සහ විගණන යොමු රැකේ. මුලින් පිවිසීම අක්‍රිය කර ක්‍රියාත්මක ගමන් නිරාකරණය කරන්න. මෙය ආපසු හැරවිය නොහැක.",
+  "authCancel": "අවලංගු කරන්න",
+  "authConfirmRequired": "මකාදැමීම තහවුරු කිරීමට නිවැරදි ගිණුම් UID එක ටයිප් කරන්න.",
+  "authDisableFirst": "මකාදැමීම අනුමත කිරීමට පෙර පිවිසීම අක්‍රිය කරන්න.",
+  "authActiveTrip": "මකාදැමීමට පෙර ක්‍රියාත්මක ගමන නිරාකරණය කළ යුතුයි.",
+  "authPending": "ක්‍රියාව තවම තහවුරු වී නැත හෝ සමාලෝචනය අවශ්‍යයි. ඊළඟ තීරණයට පෙර ප්‍රතිඵලය නැවත ලබාගන්න.",
+  "authNormalScope": "Firebase Auth පාලන සාමාන්‍ය ගිණුම් පරිසරයට පමණයි.",
+  "authReload": "ගිණුම් තත්ත්වය නැවත ලබාගන්න",
+  "authDeleted": "ගිණුම මකා ඇත; අවසර ලත් සමාලෝචකයන්ට ඉතිහාසය පවතී.",
+  "authDisabled": "Firebase පිවිසීම අක්‍රියයි",
+  "authEnabled": "Firebase පිවිසීම සක්‍රියයි",
+  "authCompleted": "අවසන් ක්‍රියාව සම්පූර්ණයි",
+  "authReconcile": "එම ක්‍රියාව සමාලෝචනය කර නැවත උත්සාහ කරන්න",
+  "authConfirmLabel": "මකාදැමීම තහවුරු කරන ගිණුම් UID",
+  "authEnable": "පිවිසීම සක්‍රිය කරන්න",
+  "authDisable": "පිවිසීම අක්‍රිය කරන්න",
+  "authRevoke": "පවතින සැසි අවලංගු කරන්න",
+  "authDeleteRequest": "මකාදැමීමේ සමාලෝචනය ඉල්ලන්න",
+  "authDeleteReject": "මකාදැමීම ප්‍රතික්ෂේප කරන්න",
+  "authDeleteApprove": "ගිණුම මකාදැමීම අනුමත කරන්න",
+  "accountControlsUntil": "{when} දක්වා (Asia/Colombo)",
+  "@accountControlsUntil": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "accountControlsTitle": "ගිණුම් ප්‍රවේශය",
+  "accountControlsExplanation": "මෙම පරිසරයේ යෙදුම් ප්‍රවේශය කළමනාකරණය කරන්න. අතින් දැමූ සීමාව ඉවත් කළත් ප්‍රජා සීමා පවතී. ක්‍රියාත්මක රියදුරු ගමන් සේවාදායකයෙන් සමාලෝචනය කරයි.",
+  "accountControlsReasonRequired": "අක්ෂර 5 සිට 2,000 දක්වා හේතුවක් ඇතුළත් කරන්න.",
+  "accountControlsStale": "ගිණුම් ප්‍රවේශය වෙනස් වී ඇත. තීරණයට පෙර නැවත ලබාගන්න.",
+  "accountControlsProtected": "ඔබගේ ගිණුම සහ පරිපාලක ගිණුම් ආරක්ෂිතයි.",
+  "accountControlsUnavailable": "ප්‍රවේශය තහවුරු කළ නොහැක. නැවත උත්සාහ කරන්න.",
+  "accountControlsRestricted": "පරිපාලක සීමාව ක්‍රියාත්මකයි",
+  "accountControlsClear": "ක්‍රියාත්මක පරිපාලක සීමාවක් නැත",
+  "accountControlsCommunity": "වෙනම ප්‍රජා සීමාවක් තවමත් ක්‍රියාත්මකයි.",
+  "accountControlsIndefinite": "පරිපාලක ප්‍රවේශය යළි දෙන තෙක්",
+  "accountControlsDuration": "එසේ නැත්නම් සේවාදායක වේලාවෙන් පැය 72කට අත්හිටුවයි.",
+  "accountControlsSuspend": "ප්‍රවේශය අත්හිටුවන්න",
+  "accountControlsRestore": "පරිපාලක සීමාව ඉවත් කරන්න",
+  "accountControlsRetry": "නැවත උත්සාහ කරන්න",
   "busDetails": "බස් රථ විස්තර",
   "communityReports": "ප්‍රජා වාර්තා",
   "saveTrip": "ගමන සුරකින්න",
@@ -307,19 +351,19 @@
   "segmentReportsEmptyPage": "මෙම පිටුවේ වත්මන් දෘශ්‍ය වාර්තා නැත. තිබේ නම් ඊළඟ පිටුව බලන්න.",
   "segmentReportsEmptyPreview": "මෙම පෙරදසුනේ වත්මන් වාර්තා නැත.",
   "segmentReportsViewAll": "අදාළ සියලු වාර්තා බලන්න",
-  "calendarTitle": "???? ??? ??????",
-  "calendarHelp": "???????? ???? ???, ???? ??????? ????? ?? ????? ??? 31?? ?????? ?????. ?????? ????????? ??????. ????? ???? ????? ????. ??? ?????? ???????? ?????????? ????? ???? ?????? ????.",
-  "calendarDates": "???? ??? ??????",
-  "calendarTime": "???? ??????? ????? ??????",
-  "calendarPublish": "??? ?????? ??????? ?????",
-  "calendarGenerate": "??? ???? ????????? ??????",
-  "calendarRetire": "??? ?????? ???????? ???????",
-  "calendarFailed": "???? ?? ???? ???????? ?????? ?????. ??????? ?? ???? ????? ?????. ??????? ????? ??? ?? ????? ??? 31?? ????? ?????. ????? ?? ????????? ?? ??? ???????? ????????.",
-  "calendarConfirmed": "??? ????? ???? ?????? ???.",
-  "calendarGenerated": "????????? {created}?? ??????; ????? {preserved}?? ??????.",
-  "calendarPublished": "????????? ??? ??????",
-  "calendarRetired": "???????? ?????? ??? ??????",
-  "calendarEmpty": "??? ??? ???? ??? ????? ?????.",
+  "calendarTitle": "සේවා දින දර්ශනය",
+  "calendarHelp": "ධාවන දින, කොළඹ පිටත්වන වේලාව සහ උපරිම දින 31ක් සමාලෝචනය කර ප්‍රකාශ කරන්න. ඉන්පසු පිටත්වීම් සාදන්න. පවතින ගමන් වෙනස් නොවේ. දින දර්ශනය විශ්‍රාම ගැන්වීමෙන් පවතින ගමන් අවලංගු නොවේ.",
+  "calendarDates": "සේවා දින තෝරන්න",
+  "calendarTime": "කොළඹ පිටත්වන වේලාව තෝරන්න",
+  "calendarPublish": "දින දර්ශනය ප්‍රකාශ කරන්න",
+  "calendarGenerate": "දින අනුව පිටත්වීම් සාදන්න",
+  "calendarRetire": "දින දර්ශනය විශ්‍රාම ගන්වන්න",
+  "calendarFailed": "වෙනස හෝ දත්ත ලබාගැනීම තහවුරු නොවීය. සම්බන්ධ වී නැවත පූරණය කරන්න. සතියේ දින සහ උපරිම දින 31ක් තෝරන්න. වෙනස් වූ කාලසටහනකට නව දින දර්ශනයක් අවශ්‍යයි.",
+  "calendarConfirmed": "දින දර්ශන වෙනස තහවුරු විය.",
+  "calendarGenerated": "පිටත්වීම් {created}ක් සෑදිණි; පවතින {preserved}ක් රැකිණි.",
+  "calendarPublished": "ප්‍රකාශිත දින දර්ශනය",
+  "calendarRetired": "විශ්‍රාම ගැන්වූ දින දර්ශනය",
+  "calendarEmpty": "මෙම බස් රථයට දින දර්ශන නොමැත.",
   "@calendarGenerated": {
     "placeholders": {
       "created": {
@@ -329,5 +373,2854 @@
         "type": "int"
       }
     }
+  },
+  "loopStopHelp": "නැවතුම් අනුපිළිවෙළින් එක් කරන්න. එකම නැවතුම නැවත එක් කළ හැකියි. සෑම පැමිණීමකටම වෙනම වේලාවක් සහ අනන්‍යතාවක් ඇත. අනුපිළිවෙළ මාරු කළ විට එම වේලාවද මාරු වේ.",
+  "journeyVisitPositions": "මාර්ගයේ {boarding} වන නැවතුමෙන් නැඟී {alighting} වන නැවතුමෙන් බසින්න.",
+  "@journeyVisitPositions": {
+    "placeholders": {
+      "boarding": {
+        "type": "int"
+      },
+      "alighting": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduleReschedule": "වෙනත් පිටත්වීමක් ප්‍රකාශ කරන්න",
+  "scheduleRescheduleHelp": "පැරණි පිටත්වීම අවලංගු කර තෝරාගත් කොළඹ දිනය සහ වේලාවට සම්බන්ධිත නව පිටත්වීමක් ප්‍රකාශ කරන්න. සුරැකි ගමන්වල මුල් තේරීම රැකේ. පහත හේතුව සැමට පෙනේ.",
+  "schedulePublicReason": "සැමට පෙනෙන වෙනස්කම් හේතුව",
+  "scheduleReasonRequired": "අවම වශයෙන් අක්ෂර පහක් ඇතුළත් කරන්න.",
+  "scheduleStatusUnavailable": "වත්මන් ගමන් තත්ත්වය ලබාගත නොහැක. සුරැකි වේලාවන් බස් රථය ධාවනය වන බව තහවුරු නොකරයි.",
+  "scheduleCancelled": "මෙම පිටත්වීම අවලංගු කර ඇත. ඔබගේ සුරැකි තේරීම වෙනත් ගමනකට මාරු කර නැත.",
+  "scheduleChanged": "වත්මන් කාලසටහන සුරැකි තේරීමට වඩා වෙනස්ය. මුල් සුරැකි වේලාවන් පෙන්වයි. වත්මන් විකල්ප බැලීමට නැවත සොයන්න.",
+  "scheduleReplacement": "සම්බන්ධිත වෙනත් පිටත්වීමක් ප්‍රකාශ කර ඇත. එහි වත්මන් තත්ත්වය බැලීමට නැවත සොයන්න.",
+  "scheduleReplacementAt": "{time} සඳහා වෙනත් පිටත්වීමක් ප්‍රකාශ කර ඇත. එහි වත්මන් තත්ත්වය බැලීමට නැවත සොයන්න.",
+  "scheduleSavedRecord": "මුල් සුරැකි කාලසටහනයි. වත්මන් බස් රථය හෝ මාර්ගය ලබාගත නොහැක හෝ වෙනස් වී ඇත. මෙය සජීවී ස්ථානය හෝ වත්මන් ප්‍රවේශ පහසුකම් තහවුරු නොකරයි.",
+  "scheduleTimeUnknown": "සුරැකි අතරමැදි වේලාව නොමැත",
+  "scheduleSavedFare": "සුරැකි ගාස්තුව: {fare}",
+  "@scheduleReplacementAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@scheduleSavedFare": {
+    "placeholders": {
+      "fare": {
+        "type": "String"
+      }
+    }
+  },
+  "manualAppealsTitle": "සීමා කිරීම් පිළිබඳ අභියාචනා",
+  "manualAppealsExplanation": "ගිණුමට පනවා ඇති පරිපාලන සීමාවකට අභියාචනයක් යවන්න. යැවීමෙන් ප්‍රවේශය නැවත ලැබෙන්නේ නැත. පිළිගත් අභියාචනය අදාළ පරිපාලන සීමාව පමණක් ඉවත් කරයි.",
+  "manualAppealReason": "අභියාචනය පැහැදිලි කරන්න",
+  "manualAppealSubmit": "අභියාචනය යවන්න",
+  "manualAppealNoNew": "වත්මන් සීමාව සඳහා අලුත් අභියාචනයක් යැවිය නොහැක.",
+  "manualAppealRestore": "පරිපාලන සීමාව ඉවත් කරන්න",
+  "manualAppealUphold": "සීමාව තහවුරු කරන්න",
+  "manualAppealClose": "සමාලෝචනය වසන්න",
+  "manualAppealPending": "සමාලෝචනය බලාපොරොත්තුවෙන්",
+  "manualAppealAccepted": "අභියාචනය පිළිගෙන ඇත",
+  "manualAppealRejected": "අභියාචනය ප්‍රතික්ෂේප කර ඇත",
+  "manualAppealReview": "අභියාචනය සමාලෝචනය කරන්න",
+  "manualAppealEmpty": "සීමා කිරීම් පිළිබඳ අභියාචනා නැත.",
+  "manualAppealFailed": "ඉල්ලීම තහවුරු කළ නොහැකි විය. නව තීරණයකට පෙර වත්මන් සීමාව නැවත පූරණය කරන්න. තහවුරු නොවූ ඉල්ලීම එම විස්තර සමඟම නැවත යවන්න.",
+  "adminLoadMore": "තවත් පූරණය කරන්න",
+  "adminSearchLoaded": "පූරණය කළ වාර්තා සොයන්න",
+  "adminLoadedPages": "ගණන් සහ සෙවීම පූරණය කළ පිටුවලට අදාළ වේ. තවත් වාර්තා බැලීමට තවත් පූරණය කරන්න.",
+  "manualAppealRevision": "සීමාවේ අනුවාදය {revision}",
+  "@manualAppealRevision": {
+    "placeholders": {
+      "revision": {
+        "type": "int"
+      }
+    }
+  },
+  "adminConsole": "පරිපාලක පුවරුව",
+  "adminOverview": "දළ විස්තර",
+  "adminBuses": "බස් රථ",
+  "adminRoutes": "මාර්ග",
+  "adminStops": "බස් නැවතුම්",
+  "adminUsers": "පරිශීලකයන්",
+  "adminDrivers": "රියදුරන්",
+  "adminActivity": "ක්‍රියාකාරකම්",
+  "adminRefresh": "සේවාදායක දත්ත නැවත පූරණය කරන්න",
+  "adminSignOut": "ඉවත් වන්න",
+  "adminSampleCatalogue": "ආදර්ශ/පරීක්ෂණ නාමාවලි පරිපාලනය",
+  "adminUnavailable": "සේවාදායක දත්ත ලබාගත නොහැක.",
+  "adminLoading": "සේවාදායක වාර්තා පූරණය වෙමින්...",
+  "adminNoMatches": "ගැළපෙන වාර්තා නැත.",
+  "adminReviewAccess": "ප්‍රවේශය සමාලෝචනය කරන්න",
+  "adminAssignRoute": "මාර්ගයක් පවරන්න",
+  "adminEditProfile": "පැතිකඩ සංස්කරණය කරන්න",
+  "adminReviewDriver": "රියදුරු සමාලෝචනය කරන්න",
+  "adminDatedDepartures": "දින නියමිත පිටත්වීම්",
+  "adminRestore": "ප්‍රතිස්ථාපනය කරන්න",
+  "adminEdit": "සංස්කරණය කරන්න",
+  "adminDelete": "මකන්න",
+  "adminFinishDeletion": "මකා දැමීම අවසන් කරන්න",
+  "adminCancel": "අවලංගු කරන්න",
+  "adminDeleteRecord": "වාර්තාව මකන්න",
+  "adminEditUser": "පරිශීලක පැතිකඩ සංස්කරණය කරන්න",
+  "adminName": "නම",
+  "adminPhone": "දුරකථනය",
+  "adminSaveProfile": "පැතිකඩ සුරකින්න",
+  "adminAssignedRoute": "පවරා ඇති මාර්ගය",
+  "adminNoRoute": "මාර්ගයක් නැත / පැවරීම ඉවත් කරන්න",
+  "adminAssignmentReason": "පැවරීමේ හේතුව (අවම අක්ෂර 10)",
+  "adminSaveAssignment": "පැවරීම සුරකින්න",
+  "adminDecision": "තීරණය",
+  "adminApprove": "අනුමත කරන්න",
+  "adminReject": "ප්‍රතික්ෂේප කරන්න",
+  "adminRevoke": "ප්‍රවේශය ඉවත් කරන්න",
+  "adminReviewReason": "සමාලෝචන සාක්ෂි / හේතුව",
+  "adminConfirmDecision": "තීරණය තහවුරු කරන්න",
+  "adminApproved": "අනුමතයි",
+  "adminRejected": "ප්‍රතික්ෂේපිතයි",
+  "adminRevoked": "ඉවත් කර ඇත",
+  "adminPending": "සමාලෝචනය බලාපොරොත්තුවෙන්",
+  "adminUnassigned": "පවරා නැත",
+  "adminAdd": "එක් කරන්න",
+  "adminBusStop": "බස් නැවතුම",
+  "adminBusTimetable": "බස් රථය / කාලසටහන",
+  "adminRoute": "මාර්ගය",
+  "adminRecordId": "වාර්තා හැඳුනුම",
+  "adminStopName": "නැවතුමේ නම",
+  "adminSourceUrl": "මූලාශ්‍ර සබැඳිය",
+  "adminUnknown": "නොදනී / ඇගයීමට ලක් කර නැත",
+  "adminEquipped": "උපකරණ ඇත",
+  "adminNotEquipped": "උපකරණ නැත",
+  "adminYesAssessed": "ඔව් - ඇගයීමට ලක් කර ඇත",
+  "adminNoAssessed": "නැත - ඇගයීමට ලක් කර ඇත",
+  "adminCatalogueType": "නාමාවලි වාර්තා වර්ගය",
+  "adminPhysicalVehicle": "සැබෑ වාහනය",
+  "adminPublishedTimetable": "ප්‍රකාශිත කාලසටහන",
+  "adminRouteField": "මාර්ගය",
+  "adminDriverField": "පවරා ඇති රියදුරු",
+  "adminScheduledTime": "නියමිත වේලාව (HH:mm)",
+  "adminAddStop": "නැවතුමක් එක් කරන්න",
+  "adminSaving": "සුරකිමින්...",
+  "adminSaveCatalogue": "නාමාවලි වාර්තාව සුරකින්න",
+  "adminReloadReferences": "යොමු දත්ත නැවත පූරණය කරන්න",
+  "adminOpenPassenger": "මගී යෙදුම විවෘත කරන්න",
+  "adminTransit": "ප්‍රවාහන පරිපාලනය",
+  "adminChangeConfirmed": "වෙනස සේවාදායකය තහවුරු කළා.",
+  "adminSourceChecked": "මූලාශ්‍රය සහ ඇතුළත් නාමාවලි විස්තර සමාලෝචනය කළෙමි.",
+  "adminDeleteHelp": "මෙය නාමාවලි වාර්තාව ඉවත් කරයි. යොමු ඇති වාර්තා සහ ධාවනය වන බස් මකා දැමිය නොහැක. මෙය ආපසු හැරවිය නොහැක.",
+  "adminDriverChecked": "මෙම රියදුරුගේ අනන්‍යතාව සහ ධාවන බලය පරීක්ෂා කළෙමි.",
+  "adminSourceLoadError": "සේවාදායක වාර්තා පූරණය කළ නොහැක. සම්බන්ධතාව/ප්‍රවේශය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "adminLatitude": "අක්ෂාංශය",
+  "adminLongitude": "දේශාංශය",
+  "adminRamp": "බෑවුම් ප්‍රවේශ පහසුකම",
+  "adminElevator": "සෝපාන පහසුකම",
+  "adminStepFree": "ඇගයූ පඩි රහිත මාර්ගය",
+  "adminRouteNumber": "මාර්ග අංකය",
+  "adminRouteName": "මාර්ගයේ නම",
+  "adminDescription": "විස්තරය",
+  "adminVehicleRegistration": "වාහන ලියාපදිංචි අංකය",
+  "adminLowFloor": "පහත් බිම් මට්ටම් පහසුකම",
+  "adminStableId": "ස්ථාවර හැඳුනුමකි. නිර්මාණයෙන් පසු වෙනස් කළ නොහැක.",
+  "adminSourceHelp": "බලයලත් කාලසටහන්, නැවතුම් හෝ ක්‍රියාකරු මූලාශ්‍රයකි. මෙය සජීවී සේවා තහවුරු කිරීමක් නොවේ.",
+  "adminOverviewHelp": "මූලාශ්‍ර සහිත නාමාවලිය පවත්වා ක්‍රියාකරු ප්‍රවේශය සමාලෝචනය කරන්න. සියලු වෙනස්කම් සේවාදායකයෙන් තහවුරු විය යුතුය.",
+  "adminRegistrationHelp": "රියදුරු ලියාපදිංචිය ප්‍රවේශ අයදුමකි. අනුමැතියට පෙර අනන්‍යතාව සහ ධාවන බලය සමාලෝචනය කරන්න. අනුමැතිය උපකරණ හෝ සේවාවක් සහතික නොකරයි.",
+  "adminBusCountLabel": "බස් සහ කාලසටහන් (පූරණය කළ)",
+  "adminRouteCountLabel": "මාර්ග (පූරණය කළ)",
+  "adminStopCountLabel": "බස් නැවතුම් (පූරණය කළ)",
+  "adminUserCountLabel": "පරිශීලකයන් (පූරණය කළ)",
+  "adminDriverCountLabel": "සමාලෝචනය අපේක්ෂිත රියදුරන් (පූරණය කළ)",
+  "adminReferencesError": "යොමු වාර්තා සම්පූර්ණයෙන් පූරණය කළ නොහැක. සුරැකීමට පෙර නැවත පූරණය කරන්න.",
+  "adminRouteFor": "{name} සඳහා මාර්ගය",
+  "@adminRouteFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminReviewFor": "{name} සමාලෝචනය",
+  "@adminReviewFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminDeleteFor": "{name} මකන්නද?",
+  "@adminDeleteFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminAssignedRouteFor": "පවරා ඇති මාර්ගය: {name}",
+  "@adminAssignedRouteFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminCurrentAccessFor": "වත්මන් ප්‍රවේශය: {name}",
+  "@adminCurrentAccessFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminPreviousReviewFor": "පෙර සමාලෝචනය: {name}",
+  "@adminPreviousReviewFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminNoActiveRoute": "සක්‍රිය මාර්ග පැවරීමක් නැත",
+  "adminRequired": "අවශ්‍යයි",
+  "adminReviewSource": "සුරැකීමට පෙර මූලාශ්‍රය සමාලෝචනය කරන්න.",
+  "adminRouteFirst": "පළමුව අනුමත රියදුරෙකු මෙම මාර්ගයට පවරන්න හෝ පෙර පැවරීම ඉවත් කරන්න.",
+  "adminAuthProfileHelp": "පිවිසුම් ඊමේල්, මුරපද සහ Auth ගිණුම් මකා දැමීම Firebase Authentication හරහා කළමනාකරණය වේ.",
+  "adminReferenceWithdrawHelp": "ප්‍රවේශය සහ බස් පැවරීම් ඉවත් කෙරේ. සක්‍රිය ගමන්/ස්ථාන වාර්තා සංහිඳියාව සඳහා රැඳේ; ඒවා අවසන් ලෙස නොසලකයි.",
+  "adminCapabilityHelp": "පහසුකම තිබීම සහ එය ක්‍රියා කිරීම වෙන වෙනම සලකන්න. ක්‍රියාකාරී පරීක්ෂා පවරා ඇති රියදුරු සටහන් කරයි.",
+  "adminTimetableHelp": "ප්‍රකාශිත කාලසටහනක සැබෑ වාහනය, රියදුරු හෝ උපකරණ තත්ත්වය තහවුරු කර නැත.",
+  "adminOrderedStops": "ගමන් අනුපිළිවෙළට නැවතුම්",
+  "adminMoveUp": "නැවතුම ඉහළට ගෙනයන්න",
+  "adminMoveDown": "නැවතුම පහළට ගෙනයන්න",
+  "adminRemoveStop": "නැවතුම ඉවත් කරන්න",
+  "adminChooseRoute": "මාර්ගයක් තෝරන්න",
+  "adminTimeFormat": "පැය 24 HH:mm ආකෘතිය භාවිත කරන්න",
+  "adminAssignmentHelp": "අනුමැතිය සහ මාර්ග පැවරීම වෙන වෙනම සිදු වේ. මාර්ගය වෙනස් කිරීමට හෝ ඉවත් කිරීමට පෙර සක්‍රිය ගමන අවසන් කරන්න.",
+  "adminReviewChecksHelp": "අනන්‍යතා සහ ධාවන බල පරීක්ෂා හෝ තීරණයට හේතුව සටහන් කරන්න.",
+  "adminChangeUnconfirmed": "වෙනස තහවුරු නොවීය. ප්‍රවේශය/සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කිරීමට පෙර දත්ත පූරණය කරන්න.",
+  "adminSaveUnconfirmed": "සුරැකීම තහවුරු නොවීය. සම්බන්ධතාව/ප්‍රවේශය පරීක්ෂා කර නැවත උත්සාහ කිරීමට පෙර දත්ත පූරණය කරන්න.",
+  "adminCursorChanged": "පිටු දත්ත වෙනස් වී ඇත. නැවත පූරණය කරන්න.",
+  "adminAccountReferenceChanged": "ගිණුම වෙනස් වී ඇත. යොමු දත්ත නැවත පූරණය කරන්න.",
+  "adminAccessRequired": "පරිපාලක ප්‍රවේශය අවශ්‍යයි.",
+  "adminAccountSignInChanged": "ගිණුම වෙනස් වී ඇත. නැවත පිවිසෙන්න.",
+  "adminConnectionRequired": "සේවාදායක සම්බන්ධතාවක් අවශ්‍යයි. සම්බන්ධ වූ පසු නැවත උත්සාහ කරන්න.",
+  "adminRecordChanged": "මෙම වාර්තාව වෙනස් වී ඇත. සුරැකීමට පෙර නැවත පූරණය කරන්න.",
+  "adminTwoStops": "ගමන් අනුපිළිවෙළට අවම වශයෙන් වෙනස් නැවතුම් දෙකක් තෝරන්න.",
+  "adminOccurrenceStation": "සෑම නැවතුම් අවස්ථාවක්ම පැහැදිලිව හඳුනාගත් සැබෑ නැවතුමකට සම්බන්ධ විය යුතුය.",
+  "adminSourceInvalid": "නාමාවලියේ මූලාශ්‍ර සබැඳිය ඇතුළත් කරන්න.",
+  "adminVehicleTypeInvalid": "වාහනයක් හෝ ප්‍රකාශිත කාලසටහනක් තෝරන්න.",
+  "adminNoTimetableDriver": "කාලසටහනකට රියදුරෙකු පැවරිය නොහැක.",
+  "adminTimePerStop": "සෑම නැවතුමකටම පැය 24 HH:mm වේලාවක් ඇතුළත් කරන්න. මධ්‍යම රාත්‍රියෙන් පසු වේලාව ඊළඟ දිනයට යා හැක.",
+  "adminRecordIdInvalid": "වාර්තා හැඳුනුම සඳහා අකුරු, අංක, යටිකුරු හෝ ඉරිකුරු භාවිත කරන්න.",
+  "adminRestoreFirst": "සංස්කරණයට පෙර මෙම වාර්තාව ප්‍රතිස්ථාපනය කරන්න.",
+  "adminReferenceDeleting": "යොමු වාර්තාවක් මකා දැමීමට නියමිතයි. එය ප්‍රතිස්ථාපනය කරන්න හෝ වෙනත් වාර්තාවක් තෝරන්න.",
+  "adminStopMissing": "තෝරාගත් නැවතුමක් දැන් නොමැත. පෝරමය නැවත පූරණය කරන්න.",
+  "adminDependentBuses": "මාර්ග අංකය හෝ නැවතුම් අනුපිළිවෙළ වෙනස් කිරීමට පෙර ඒවා භාවිත කරන බස් යාවත්කාලීන කරන්න.",
+  "adminOccurrenceRebind": "පවතින නැවතුම් අවස්ථා වෙනත් නැවතුමකට යළි සම්බන්ධ කළ නොහැක. අලුත් අවස්ථා හැඳුනුම් භාවිත කරන්න.",
+  "adminRouteMismatch": "එම මාර්ග අංකයම ඇති පවතින මාර්ගයක් තෝරන්න.",
+  "adminStopOrderInvalid": "වාහනයේ නැවතුම් තෝරාගත් මාර්ගයේ අනුපිළිවෙළ අනුගමනය කළ යුතුය.",
+  "adminApprovedOnly": "අනුමත ක්‍රියාකරුවෙකු පමණක් පැවරිය හැක.",
+  "adminGrantFirst": "පළමුව අනුමත රියදුරු මෙම මාර්ගයට පවරන්න.",
+  "adminBusActive": "මෙම බස් රථයේ සක්‍රිය ගමනක් හෝ ස්ථාන විකාශයක් ඇත. පැවරීම, මාර්ගය හෝ නැවතුම් වෙනස් කිරීමට පෙර එය අවසන් කරන්න.",
+  "adminNotDeleting": "මෙම වාර්තාව මකා දැමීමට නියමිත නැත.",
+  "adminReviewInputInvalid": "ක්‍රියාකරුවෙකු තෝරා අක්ෂර 10–2000ක සමාලෝචනයක්/හේතුවක් ඇතුළත් කරන්න.",
+  "adminGrantInputInvalid": "රියදුරෙකු තෝරා අක්ෂර 10–2000ක හේතුවක් ඇතුළත් කරන්න.",
+  "adminApproveFirst": "මාර්ගයක් පැවරීමට පෙර රියදුරු අනුමත කරන්න.",
+  "adminReviewedRoute": "ලබාගත හැකි සමාලෝචිත මාර්ගයක් තෝරන්න.",
+  "adminProfileInputInvalid": "නම (අක්ෂර 100 දක්වා) සහ දුරකථනය (අක්ෂර 40 දක්වා) ඇතුළත් කරන්න.",
+  "adminFieldRequired": "{field} අවශ්‍යයි (උපරිම අක්ෂර {maximum}).",
+  "@adminFieldRequired": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "maximum": {
+        "type": "int"
+      }
+    }
+  },
+  "adminCoordinateInvalid": "වලංගු {field} ඛණ්ඩාංක ඇතුළත් කරන්න.",
+  "@adminCoordinateInvalid": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "adminDependencyDelete": "මකා දැමිය නොහැක: {kind} මෙම වාර්තාවට යොමු වේ. සම්බන්ධය ඉවත් කරන්න හෝ ඉතිහාසය සඳහා රඳවාගන්න.",
+  "@adminDependencyDelete": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "adminLoadKindsFailed": "සේවාදායකයෙන් {kinds} තහවුරු කළ නොහැක. ක්‍රියා අක්‍රියයි. නැවත පූරණය කර උත්සාහ කරන්න.",
+  "@adminLoadKindsFailed": {
+    "placeholders": {
+      "kinds": {
+        "type": "String"
+      }
+    }
+  },
+  "adminBusSummary": "මාර්ගය {route} | {kind}\nරියදුරු: {driver}",
+  "@adminBusSummary": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      },
+      "kind": {
+        "type": "String"
+      },
+      "driver": {
+        "type": "String"
+      }
+    }
+  },
+  "adminStopCount": "අනුපිළිවෙළේ නැවතුම් {count}",
+  "@adminStopCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminAuditBy": "සිදු කළේ {actor}",
+  "@adminAuditBy": {
+    "placeholders": {
+      "actor": {
+        "type": "String"
+      }
+    }
+  },
+  "adminTimetableFor": "මාර්ග {route} කාලසටහන",
+  "@adminTimetableFor": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      }
+    }
+  },
+  "adminRunHelp": "මෙම බස් කාලසටහන කොළඹ වේලා කලාපයේ නිශ්චිත සේවා දිනයකට ප්‍රකාශ කරන්න. ගමන ආරම්භ කිරීමෙන් මගීන් නැගීම විවෘත වේ; පිටත්වීම වෙනම සටහන් වේ.",
+  "adminRunRescheduleHelp": "නැවත කාල නියම කිරීමට පෙර නියමිත ගමන අවලංගු කර ඒ වෙනුවට අලුත් ගමනක් ප්‍රකාශ කරන්න. නැවතුම් අතර කාල පරතර සහ බස් කාලසටහන රඳවා ගනී.",
+  "adminRunWindowHelp": "ආරම්භ කළ හැකි කාලය: පිටත්වීමට විනාඩි 5කට පෙර සිට විනාඩි 30කට පසු දක්වා. ප්‍රමාද ආරම්භ සඳහා හේතුවක් අවශ්‍යයි.",
+  "adminRunPublish": "දින නියමිත පිටත්වීම ප්‍රකාශ කරන්න",
+  "adminRunReload": "පිටත්වීම් නැවත පූරණය කරන්න",
+  "adminRunCancel": "නියමිත ගමන අවලංගු කරන්න",
+  "adminRunConfirmed": "දින නියමිත පිටත්වීමේ වෙනස තහවුරුයි.",
+  "adminRunLoadFailed": "දින නියමිත පිටත්වීම් පූරණය කළ නොහැක. සම්බන්ධ වූ පසු නැවත උත්සාහ කරන්න.",
+  "adminRunChangeFailed": "වෙනස තහවුරු නොවීය. නැවත පූරණය කර උත්සාහ කරන්න.",
+  "adminRunReviewTimetable": "සුරැකි කාලසටහන පරිපාලක සමාලෝචනයට ලක් කළ යුතුය.",
+  "adminRunEmpty": "මෙම බස් රථයට දින නියමිත පිටත්වීම් නැත.",
+  "adminRunScheduled": "නියමිතයි",
+  "adminRunBoarding": "මගීන් නගිමින්",
+  "adminRunInProgress": "ධාවනය වෙමින්",
+  "adminRunCompleted": "අවසන්",
+  "adminRunCancelled": "අවලංගුයි",
+  "adminRunUnknown": "තත්ත්වය ලබාගත නොහැක",
+  "adminCalendarDatesInvalid": "සතියේ දින සහ උපරිම දින 31ක කාල පරාසයක් තෝරන්න.",
+  "adminCalendarReload": "ප්‍රකාශිත දින දර්ශනය නැවත පූරණය කරන්න.",
+  "adminCalendarPublishedOnly": "පිටත්වීම් ජනනය කළ හැක්කේ ප්‍රකාශිත දින දර්ශනයකින් පමණි.",
+  "adminCalendarInvalid": "දින දර්ශනය වලංගු නැත. සමාලෝචිත ආදේශකයක් ප්‍රකාශ කරන්න.",
+  "adminCalendarBusChanged": "බස් කාලසටහන වෙනස් වී ඇත. සමාලෝචිත ආදේශක දින දර්ශනයක් ප්‍රකාශ කරන්න.",
+  "adminColomboTimeInvalid": "වලංගු කොළඹ වේලා කලාපයේ පිටත්වීමේ වේලාවක් තෝරන්න.",
+  "adminPhysicalBusRequired": "ලබාගත හැකි සැබෑ බස් රථයක් තෝරන්න.",
+  "adminCompleteTimetableRequired": "දින නියමිත ගමනකට සම්පූර්ණ සමාලෝචිත කාලසටහනක් අවශ්‍යයි.",
+  "adminRouteUnavailable": "මාර්ගය ලබාගත නොහැක.",
+  "adminRescheduleInputInvalid": "ආදේශ නොකළ, ආරම්භ නොවූ ගමනක් තෝරා ප්‍රසිද්ධ හේතුවක් (අක්ෂර 5–300) ඇතුළත් කරන්න.",
+  "adminReviewBusTimetable": "පළමුව සැබෑ බස් රථයේ වත්මන් කාලසටහන සමාලෝචනය කරන්න.",
+  "adminDifferentDeparture": "වෙනත් පිටත්වීමේ වේලාවක් තෝරන්න.",
+  "adminReviewScheduleVersion": "මුල් කාලසටහන් අනුවාදය සමාලෝචනය කරන්න.",
+  "adminReconcileFirst": "පළමුව සක්‍රිය ධාවන කටයුත්ත නිරාකරණය කරන්න.",
+  "adminCancelNotStartedOnly": "මෙහි අවලංගු කළ හැක්කේ ආරම්භ නොවූ ගමනක් පමණි.",
+  "adminServiceDate": "සේවා දිනය: {date}",
+  "@adminServiceDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "adminColomboDeparture": "කොළඹ වේලා කලාපයේ පිටත්වීම: {time}",
+  "@adminColomboDeparture": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "adminLateReason": "ප්‍රමාද ආරම්භයට හේතුව: {reason}",
+  "@adminLateReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "adminPublishedStopTimes": "ප්‍රකාශිත නැවතුම් වේලා: {times}",
+  "@adminPublishedStopTimes": {
+    "placeholders": {
+      "times": {
+        "type": "String"
+      }
+    }
+  },
+  "adminColomboDateTime": "{date} {time} (Asia/Colombo)",
+  "@adminColomboDateTime": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "adminGeometryRouteId": "මාර්ග හැඳුනුම",
+  "adminGeometryImportJson": "සමාලෝචිත මාර්ග හැඩ දත්ත JSON",
+  "adminGeometryActionFailed": "මාර්ග හැඩ දත්ත වෙනස තහවුරු නොවීය. නැවත උත්සාහ කිරීමට පෙර ප්‍රවේශය, හේතුව සහ වත්මන් මාර්ග/නැවතුම් දත්ත පරීක්ෂා කරන්න.",
+  "adminFareLoadFailed": "ගාස්තු ප්‍රකාශන පූරණය කළ නොහැක. සම්බන්ධ වූ පසු නැවත පූරණය කරන්න; නාමාවලිය හිස් බව තහවුරු කර නැත.",
+  "adminFarePublished": "ප්‍රකාශිතයි",
+  "adminFareArchived": "සංරක්ෂිතයි",
+  "adminFarePublicationInvalid": "ගාස්තු ප්‍රකාශනය වලංගු නැත",
+  "adminFareBusesRequired": "සමාලෝචිත බස් තෝරන්න",
+  "adminFareSplitRequired": "මෙම ප්‍රකාශනය කුඩා සමාලෝචිත වාර්තාවලට වෙන් කරන්න",
+  "adminFareApplicabilityMismatch": "ගාස්තු වගුව සහ නැවතුම් ගැළපීම අදාළ වන පරාස නොගැළපේ",
+  "adminFareReviewRequired": "මූලාශ්‍රය, ගාස්තු අදියර, සේවා පන්තිය සහ වලංගු දින සමාලෝචනය කර හේතුවක් ඇතුළත් කරන්න.",
+  "adminFareRouteUnavailable": "මාර්ගය ලබාගත නොහැක",
+  "adminFareItineraryMismatch": "බස් ගමන් සැලැස්මක් හෝ මාර්ගයක් සමාලෝචිත ගැළපීමට නොගැළපේ",
+  "adminFareArchiveReasonRequired": "සංරක්ෂණයට හේතුවක් ඇතුළත් කරන්න",
+  "adminFareTextInvalid": "ගාස්තු නාමාවලි පාඨය වලංගු නැත",
+  "adminFareDateInvalid": "ගාස්තුව අදාළ වන දිනය වලංගු නැත",
+  "adminFareSourceInvalid": "ගාස්තු මූලාශ්‍රය වලංගු නැත",
+  "adminFareUnreviewed": "සමාලෝචනය නොකළ හෝ සහාය නොදක්වන ගාස්තු වගුවකි",
+  "adminFareTableInvalid": "ගාස්තු වගුව වලංගු නැත",
+  "adminFareMatrixInvalid": "ගාස්තු අගයන්ගේ වගුව වලංගු නැත",
+  "adminFareMinorInvalid": "සුළු මුදල් ඒකකවල ගාස්තු අගය වලංගු නැත",
+  "adminFareMappingInvalid": "ගාස්තු ගැළපීම සමාලෝචනය කර නැත හෝ වලංගු නැත",
+  "adminFareOccurrencesInvalid": "ගාස්තු නැවතුම් අවස්ථා වලංගු නැත",
+  "adminGeometryReviewRequired": "මාර්ග හැඩ දත්ත සමාලෝචනය කර හේතුවක් ඇතුළත් කරන්න",
+  "adminGeometryRouteChanged": "වත්මන් දිශානුගත මාර්ග ගමන් සැලැස්ම සමාලෝචනය කරන්න",
+  "adminGeometryModeMismatch": "මාර්ග හැඩ දත්ත වෙනත් දත්ත ආකාරයකට අයත් වේ",
+  "adminGeometryVersionRequired": "අලුත් සමාලෝචිත අනුවාදයක් භාවිත කරන්න",
+  "adminGeometryStopMismatch": "සෑම නැවතුම් ඛණ්ඩාංකයක් සහ එහි මාර්ග ලක්ෂ්‍යය සමාලෝචනය කරන්න",
+  "adminGeometryReasonRequired": "සමාලෝචන හේතුවක් ඇතුළත් කරන්න",
+  "adminGeometryMissing": "ඉවත් කිරීමට මාර්ග හැඩ දත්ත නැත",
+  "adminGeometryDataInvalid": "සමාලෝචිත මාර්ග හැඩ දත්ත වලංගු නැත",
+  "adminGeometryStopsInvalid": "මාර්ග හැඩයේ නැවතුම් අනුපිළිවෙළ වලංගු නැත",
+  "adminGeometryCoordinatesInvalid": "ඛණ්ඩාංක වලංගු නැත",
+  "adminGeometryVerticesInvalid": "නැවතුම් මාර්ග ලක්ෂ්‍ය අනුක්‍රමයෙන් වැඩි විය යුතුය",
+  "adminGeometryResolutionInvalid": "මාර්ග හැඩයේ විස්තර මට්ටම සමාලෝචනය කරන්න",
+  "adminGeometryTooLong": "මාර්ගය දිග වැඩියි",
+  "adminFarePreviewRoute": "මාර්ගය: {route} · සේවා පන්තිය: {serviceClass}",
+  "@adminFarePreviewRoute": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      },
+      "serviceClass": {
+        "type": "String"
+      }
+    }
+  },
+  "adminFarePreviewDates": "අදාළ දින: {from} – {until}",
+  "@adminFarePreviewDates": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "until": {
+        "type": "String"
+      }
+    }
+  },
+  "adminImportSource": "මූලාශ්‍රය: {source}",
+  "@adminImportSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "adminFareVersions": "ගාස්තු අනුවාදය: {table} · ගැළපුම් අනුවාදය: {mapping}",
+  "@adminFareVersions": {
+    "placeholders": {
+      "table": {
+        "type": "String"
+      },
+      "mapping": {
+        "type": "String"
+      }
+    }
+  },
+  "adminFareBuses": "බස් රථ: {buses}",
+  "@adminFareBuses": {
+    "placeholders": {
+      "buses": {
+        "type": "String"
+      }
+    }
+  },
+  "adminFareCell": "{from} → {to}: {amount}",
+  "@adminFareCell": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "adminGeometryVersion": "මාර්ගය: {route} · අනුවාදය: {version}",
+  "@adminGeometryVersion": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "adminGeometryDistance": "{stops} · කි.මී. {distance}",
+  "@adminGeometryDistance": {
+    "placeholders": {
+      "stops": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "adminFareRowStatus": "{status} · අනුවාදය: {version}",
+  "@adminFareRowStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewAccessRequired": "මෙම සිද්ධිය සමාලෝචනය කිරීමට පරිපාලක ප්‍රවේශය අවශ්‍යයි.",
+  "reviewSelfForbidden": "ඔබේම ගිණුමට අදාළ සිද්ධියක් ඔබට සමාලෝචනය කළ නොහැක.",
+  "reviewSignInRequired": "ඔබේ සැසිය දැන් වලංගු නැත. ඉදිරියට යාමට පෙර නැවත පිවිසෙන්න.",
+  "reviewAccountChanged": "පිවිසි ගිණුම වෙනස් වී ඇත. වත්මන් ගිණුමෙන් මෙම තිරය නැවත විවෘත කරන්න.",
+  "reviewRestricted": "සීමා කර ඇති විට මෙම ගිණුමට පරිපාලන ක්‍රියා කළ නොහැක.",
+  "reviewAlreadyDecided": "මෙම සමාලෝචනයට දැනටමත් තීරණයක් ඇත. සටහන් කළ ප්‍රතිඵලය බැලීමට නැවත පූරණය කරන්න.",
+  "reviewUnavailable": "මෙම සමාලෝචනය ලබාගත නොහැක. වෙනත් ක්‍රියාවකට පෙර නැවත පූරණය කරන්න.",
+  "reviewOperationUnavailable": "මෙම ක්‍රියාව සඳහා මෙම ගමන දැන් ලබාගත නොහැක. වත්මන් තත්ත්වය නැවත පූරණය කරන්න.",
+  "reviewRetryConflict": "මෙම ඉල්ලීම සටහන් කළ ඉල්ලීමකට නොගැළපේ. අලුත් ක්‍රියාවකට පෙර නැවත පූරණය කර ප්‍රතිඵලය පරීක්ෂා කරන්න.",
+  "reviewVoteUnknown": "ඡන්දය ලබාගත නොහැක",
+  "reviewRunDriver": "ගමන: {run}\nරියදුරු: {driver}",
+  "@reviewRunDriver": {
+    "placeholders": {
+      "run": {
+        "type": "String"
+      },
+      "driver": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewDriverId": "රියදුරු: {driver}",
+  "@reviewDriverId": {
+    "placeholders": {
+      "driver": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewVoteEvidence": "{user} · {vote}",
+  "@reviewVoteEvidence": {
+    "placeholders": {
+      "user": {
+        "type": "String"
+      },
+      "vote": {
+        "type": "String"
+      }
+    }
+  },
+  "profileMissing": "පැතිකඩ හමු නොවීය. නැවත පිවිසෙන්න.",
+  "profileLoadFailed": "දත්ත ගබඩාවෙන් පැතිකඩ ලබාගත නොහැක.",
+  "profileUnavailable": "පැතිකඩ ලබාගත නොහැක.",
+  "profilePassenger": "මගියා",
+  "profileContributor": "ප්‍රජා දායකයා",
+  "profileOperator": "බස් රියදුරු",
+  "profileAdministrator": "පද්ධති පරිපාලක",
+  "profileCommuter": "මගියා",
+  "profileEdit": "සංස්කරණය",
+  "profileEditTitle": "පැතිකඩ සංස්කරණය",
+  "profileFullName": "සම්පූර්ණ නම",
+  "profileEmail": "විද්‍යුත් තැපෑල",
+  "profilePhone": "දුරකථන අංකය",
+  "profileNameRequired": "ඔබේ නම ඇතුළත් කරන්න",
+  "profileSave": "වෙනස්කම් සුරකින්න",
+  "profileSaved": "පැතිකඩ යාවත්කාලීන විය!",
+  "profileSaveFailed": "පැතිකඩ වෙනස්කම් තහවුරු කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
+  "profileSignOutFailed": "පෞද්ගලික කෙටුම්පත් ඉවත් කිරීමට හෝ පිටවීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
+  "profileSignedOut": "ඔබ ගිණුමෙන් පිටවී ඇත.",
+  "profileSignOut": "පිටවන්න",
+  "profileCancel": "අවලංගු කරන්න",
+  "profileRetry": "නැවත උත්සාහ කරන්න",
+  "profileLogoutQuestion": "පිටවී මෙම උපාංගයේ පොරොත්තු වාර්තා කෙටුම්පත් සහ ඡායාරූප ඉවත් කරන්නද? දැනටමත් යැවූ ඉල්ලීම් තවමත් සම්පූර්ණ විය හැක. නැවත පිවිසීමෙන් පළ කළ වාර්තා ලබාගත හැක.",
+  "profileSettings": "සැකසුම්",
+  "profileSupport": "සහාය",
+  "profilePersonalInfo": "පෞද්ගලික තොරතුරු",
+  "profileAdminConsole": "පරිපාලක පුවරුව",
+  "profileAccessibility": "ප්‍රවේශතා මනාප",
+  "profilePush": "තල්ලු දැනුම්දීම්",
+  "profilePassword": "මුරපදය වෙනස් කරන්න",
+  "profilePlaces": "සුරැකි ස්ථාන",
+  "profileRate": "අපව ඇගයීමට ලක් කරන්න",
+  "profileHelp": "උපකාර මධ්‍යස්ථානය",
+  "profileUpdates": "යාවත්කාලීන පරීක්ෂා කරන්න",
+  "profileNotSet": "සකසා නැත",
+  "profileReports": "වාර්තා",
+  "profileVerifications": "තහවුරු කිරීම්",
+  "profileBadges": "ලාංඡන",
+  "profileImpact": "ප්‍රජා දායකත්ව ලකුණු",
+  "profileSeeAll": "සියල්ල බලන්න →",
+  "profileBadgeDetails": "ලැබූ ලාංඡන බලන්න",
+  "profileDelete": "ගිණුම මකන්න",
+  "profileDeleteUnavailable": "මෙහි ස්වයං ගිණුම් මැකීම තවම ලබාගත නොහැක",
+  "profileComingSoon": "{feature} ඉදිරි යාවත්කාලීනයකින් ලබාගත හැක.",
+  "@profileComingSoon": {
+    "placeholders": {
+      "feature": {
+        "type": "String"
+      }
+    }
+  },
+  "profileContributionSummary": "ලකුණු {points} • වාර්තා {reports} • ලාංඡන {badges}",
+  "@profileContributionSummary": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      },
+      "reports": {
+        "type": "int"
+      },
+      "badges": {
+        "type": "int"
+      }
+    }
+  },
+  "driverDashboard": "රියදුරු පුවරුව",
+  "driverFallback": "රියදුරු",
+  "driverAddStop": "මාර්ගයට නැවතුමක් එක් කරන්න",
+  "driverNoBuses": "ඔබට පැවරූ මාර්ගයේ සැබෑ බස් රථ නොමැත. බස් රථයක් එක් කිරීමට හෝ සමාලෝචනයට පරිපාලකගෙන් ඉල්ලන්න.",
+  "driverNoGps": "හවුල් GPS යාවත්කාලීනයක් නැත",
+  "driverBusUnavailable": "තෝරාගත් බස් රථය ලබාගත නොහැක; උපාංගයෙන් විකාශනය නවතා ඇත",
+  "driverAssignmentUnavailable": "බස් පැවරුම තහවුරු කළ නොහැක; උපාංගයෙන් විකාශනය නවතා ඇත",
+  "driverVerifyRuns": "දින නියමිත පිටත්වීම් තහවුරු කිරීමට සම්බන්ධ වන්න.",
+  "driverSignInFirst": "පළමුව අනුමත රියදුරෙකු ලෙස පිවිසෙන්න.",
+  "driverAssignedOnly": "මෙම බස් රථය යාවත්කාලීන කළ හැක්කේ පැවරූ රියදුරුට පමණි.",
+  "driverClaimFailed": "බස් පැවරුම තහවුරු නොවීය. යළි පූරණය කර නැවත උත්සාහ කරන්න.",
+  "driverRampWorkingSaved": "බෑවුම් පුවරුව ක්‍රියාත්මක බවට නිරීක්ෂණය සුරැකිණි",
+  "driverRampBrokenSaved": "බෑවුම් පුවරුව අක්‍රිය බවට නිරීක්ෂණය සුරැකිණි",
+  "driverRampFailed": "සියලු බෑවුම් පුවරු යාවත්කාලීන තහවුරු නොවීය. යළි පූරණය කර නැවත උත්සාහ කරන්න.",
+  "driverOccupancyFailed": "සියලු මගී පිරීමේ යාවත්කාලීන තහවුරු නොවීය. යළි පූරණය කර නැවත උත්සාහ කරන්න.",
+  "driverClaimFirst": "ගමන ආරම්භ කිරීමට පෙර මෙම බස් රථය ඔබට පවරා ගන්න.",
+  "driverSelectRun": "පරිපාලක පළ කළ දින නියමිත පිටත්වීමක් තෝරන්න.",
+  "driverLateTitle": "ප්‍රමාද ආරම්භයට හේතුව",
+  "driverLateHelp": "අවම අක්ෂර 5ක්. පිටත්වීමෙන් විනාඩි 30ක් දක්වා ආරම්භ කළ හැක.",
+  "driverContinue": "ඉදිරියට",
+  "driverLateRequired": "ප්‍රමාද ආරම්භයට අවම අක්ෂර 5ක හේතුවක් ඇතුළත් කරන්න.",
+  "driverGpsAcknowledged": "හවුල් GPS ලැබීම තහවුරු විය",
+  "driverTrackingTitle": "AccessTransit සජීවී බස් ස්ථානය",
+  "driverGpsUnavailable": "GPS ලබාගත නොහැක; අවසන් හවුල් ස්ථානය පැරණි විය හැක",
+  "driverGpsStreamError": "GPS යාවත්කාලීන නොලැබේ. ස්ථාන අවසර පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "driverBoardingStarted": "මගීන් නැගීම ආරම්භ විය. පිටත්වන විට සැබෑ පිටත්වීම සටහන් කරන්න.",
+  "driverRunResumed": "දින නියමිත සක්‍රිය ගමන නැවත ඇරඹිණි. GPS විකාශනය තහවුරු විය.",
+  "driverStartFailed": "ගමන ආරම්භය තහවුරු නොවීය. යළි පූරණය කර නැවත උත්සාහ කරන්න.",
+  "driverGpsPending": "GPS උඩුගත කිරීම පොරොත්තුවේ; ඛණ්ඩාංක උපාංගයේ පමණි",
+  "driverGpsRetry": "GPS උඩුගත නොවීය/සම්බන්ධතාව නැත; ඊළඟ ස්ථාන දත්ත සමඟ නැවත උත්සාහ වේ",
+  "driverBoardingEnded": "මගීන් නැගීම අවලංගු විය; විකාශනය අවසන්",
+  "driverCompletionAcknowledged": "හවුල් ගමනේ අවසානය තහවුරු විය",
+  "driverBoardingCancelled": "මගීන් නැගීම අවලංගු විය. විකාශනය අවසන්.",
+  "driverTripCompleted": "ගමනේ අවසානය සුරැකිණි. විකාශනය අවසන්.",
+  "driverStopPending": "උපාංගයේ GPS නවතා ඇත; හවුල් අවසානය තහවුරු නොවීය. නැවත නවත්වන්න.",
+  "driverStopFailed": "හවුල් ගමනේ අවසානය තහවුරු නොවීය. නැවත නවත්වන්න.",
+  "driverDatedDeparture": "දින නියමිත පිටත්වීම",
+  "driverNoRuns": "දින නියමිත පිටත්වීම් පළ කර නැත. මෙම බස් රථය කාලසටහන්ගත කිරීමට පරිපාලකගෙන් ඉල්ලන්න.",
+  "driverColomboDeparture": "කොළඹ වේලාවෙන් සේවා පිටත්වීම",
+  "driverBoardingHelp": "ආරම්භ කිරීමෙන් මගීන් නැගීම ඇරඹේ. සැබෑ පිටත්වීම වෙනම සටහන් කරන්න; ප්‍රමාද ආරම්භයට හේතුවක් අවශ්‍යයි.",
+  "driverDepartureSaved": "සැබෑ පිටත්වීම සේවාදායකය තහවුරු කළා.",
+  "driverDepartureFailed": "පිටත්වීම තහවුරු නොවීය. යළි පූරණය කර නැවත උත්සාහ කරන්න.",
+  "driverRecordDeparture": "සැබෑ පිටත්වීම සටහන් කරන්න",
+  "driverActive": "ගමන ක්‍රියාත්මකයි",
+  "driverInactive": "ගමන අක්‍රියයි",
+  "driverStart": "ගමන ආරම්භ කරන්න",
+  "driverStop": "ගමන නවත්වන්න",
+  "driverTelemetry": "සජීවී ස්ථාන දත්ත",
+  "driverGpsInactive": "GPS අක්‍රියයි. සජීවී ස්ථානය ලබාගැනීමට ගමන ආරම්භ කරන්න.",
+  "driverLatitude": "අක්ෂාංශ:",
+  "driverLongitude": "දේශාංශ:",
+  "driverSpeed": "වේගය:",
+  "driverHeading": "දිශාව:",
+  "driverLocalFix": "උපාංගයේ GPS ස්ථානය:",
+  "driverAccessibility": "බස් රථයේ ප්‍රවේශතා තත්ත්වය",
+  "driverReadOnly": "කියවීමට පමණි (පවරා නැත)",
+  "driverRampObservation": "රෝද පුටු බෑවුම් පුවරු නිරීක්ෂණය",
+  "driverUnknownRamp": "නොදනී - තේරීමට පෙර පරීක්ෂා කරන්න",
+  "driverWorkingObserved": "ක්‍රියාත්මක බව නිරීක්ෂණය කළා",
+  "driverBrokenObserved": "අක්‍රිය බව නිරීක්ෂණය කළා",
+  "driverLift": "පහත් බිම් සෝපානය ක්‍රියාත්මකයි",
+  "driverStopLiftHelp": "නැවතුම් සෝපාන නිරීක්ෂණ වෙනම වාර්තා කෙරේ",
+  "driverOccupancy": "මගී පිරීම:",
+  "driverLow": "අඩු",
+  "driverMedium": "මධ්‍යම",
+  "driverHigh": "ඉහළ",
+  "driverAccess": "රියදුරු ප්‍රවේශය",
+  "driverChecking": "රියදුරු අනුමැතිය පරීක්ෂා කෙරේ...",
+  "driverSignInApproval": "රියදුරු අනුමැතිය පරීක්ෂා කිරීමට පිවිසෙන්න.",
+  "driverApprovalRequired": "රියදුරු අනුමැතිය අවශ්‍යයි. ගිණුම සමාලෝචනය කිරීමට පරිපාලකගෙන් ඉල්ලන්න. ලියාපදිංචියේ රියදුරු තේරීමෙන් අනුමැතිය නොලැබේ. ප්‍රවේශය තහවුරු කිරීමට සක්‍රිය සම්බන්ධතාවක් අවශ්‍යයි.",
+  "driverCheckAgain": "නැවත පරීක්ෂා කරන්න",
+  "driverReturnSignIn": "පිවිසීමට ආපසු යන්න",
+  "driverSignOutFailed": "පිටවීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
+  "driverRouteAssignment": "රියදුරු මාර්ග පැවරුම",
+  "driverRouteRequired": "බස් රථයක් ධාවනයට පෙර පරිපාලක ඔබට ලබාගත හැකි මාර්ගයක් පැවරිය යුතුයි. පැවරුම තහවුරු කිරීමට සක්‍රිය සම්බන්ධතාවක් අවශ්‍යයි.",
+  "driverCheckAssignment": "පැවරුම පරීක්ෂා කරන්න",
+  "driverScheduled": "කාලසටහන්ගතයි",
+  "driverBoarding": "මගීන් නැගීම",
+  "driverInProgress": "ක්‍රියාත්මකයි",
+  "driverCompleted": "සම්පූර්ණයි",
+  "driverCancelled": "අවලංගුයි",
+  "driverUnknownState": "තත්ත්වය ලබාගත නොහැක",
+  "driverName": "රියදුරු: {name}",
+  "@driverName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "driverBusAssigned": "බස් {bus} දැන් ඔබට පවරා ඇත!",
+  "@driverBusAssigned": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      }
+    }
+  },
+  "driverOccupancySaved": "මගී පිරීම {level} ලෙස යාවත්කාලීන විය",
+  "@driverOccupancySaved": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "driverTrackingBody": "බස් {bus} සඳහා GPS ස්ථානය; හවුල් දත්ත ලැබීම යෙදුමේ පෙන්වයි",
+  "@driverTrackingBody": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      }
+    }
+  },
+  "driverRunWindow": "ආරම්භ කළ හැකි කාලය: {earliest} සිට {latest}",
+  "@driverRunWindow": {
+    "placeholders": {
+      "earliest": {
+        "type": "String"
+      },
+      "latest": {
+        "type": "String"
+      }
+    }
+  },
+  "driverRunOption": "{time} · {status}",
+  "@driverRunOption": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "driverActiveSummary": "{status}\nගත වූ කාලය: {duration}",
+  "@driverActiveSummary": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      },
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "driverStartHelp": "බස් {bus} සඳහා පසුබිම් GPS ස්ථානය සක්‍රිය කිරීමට ගමන ආරම්භ කරන්න.",
+  "@driverStartHelp": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      }
+    }
+  },
+  "driverGpsStale": "හවුල් GPS පැරණියි; {status}",
+  "@driverGpsStale": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "driverLastReceipt": "අවසන් හවුල් දත්ත ලැබීම: {time}",
+  "@driverLastReceipt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverProgress": "ගමනේ මාර්ග ප්‍රගතිය",
+  "driverNoActive": "සක්‍රිය ගමනක් නැත",
+  "driverNoActiveHelp": "සක්‍රිය ගමනක් නැත. ඉහතින් දින නියමිත පිටත්වීමක් තෝරා මගීන් නැගීම අරඹන්න; පිටත්වන විට සැබෑ පිටත්වීම වෙනම සටහන් කරන්න.",
+  "driverFinalDestination": "අවසන් ගමනාන්තයට ළඟා විය",
+  "driverFinalAcknowledged": "අවසන් පැමිණීම සහ ගමනේ අවසානය තහවුරු විය",
+  "driverArrivalFailed": "පැමිණීම තහවුරු නොවීය. යළි පූරණය කර නැවත උත්සාහ කරන්න.",
+  "driverNextReached": "ඊළඟ නැවතුමට ළඟා විය",
+  "driverFinalReached": "අවසන් නැවතුමට ළඟා විය",
+  "driverEnd": "ගමන අවසන් කරන්න",
+  "driverUnknown": "නොදනී",
+  "driverNotRecorded": "සටහන් කර නැත",
+  "driverEtaHelp": "ඇස්තමේන්තුගත පැමිණීම් සැබෑ පිටත්වීම හා සටහන් කළ පැමිණීම් අනුව යාවත්කාලීන වේ. කාලසටහන් පරතර නැති විට විනාඩි 6ක ඇස්තමේන්තුවක් යෙදේ; වේලාව රියදුරුගෙන් තහවුරු කරගන්න.",
+  "driverScheduledArrival": "නියමිත පැමිණීම",
+  "driverTimetableTarget": "කාලසටහන් ඉලක්කය",
+  "driverCurrentEta": "වත්මන් පැමිණීමේ ඇස්තමේන්තුව",
+  "driverDelayCleared": "ප්‍රමාද දැනුම්දීම ඉවත් කිරීම සුරැකිණි.",
+  "driverDelayClearFailed": "ප්‍රමාද දැනුම්දීම ඉවත් කිරීම තහවුරු නොවීය. නැවත උත්සාහ කරන්න.",
+  "driverClear": "ඉවත් කරන්න",
+  "driverUpdateDelay": "ප්‍රමාදය / තදබද හේතුව යාවත්කාලීන කරන්න",
+  "driverReportDelay": "තදබදය / ප්‍රමාදය වාර්තා කරන්න (+විනාඩි 5, 10)",
+  "driverTraffic": "මාර්ග තදබදය",
+  "driverRain": "තද වැසි / ගංවතුර",
+  "driverAccident": "ඉදිරියේ අනතුරක්",
+  "driverRoadworks": "මාර්ග ඉදිකිරීම්",
+  "driverBreakdown": "යාන්ත්‍රික දෝෂය",
+  "driverDelayTitle": "ප්‍රමාදය / සිදුවීම වාර්තා කරන්න",
+  "driverDelayHelp": "මගී තිරවලට දැනුම්දී පැමිණීමේ ඇස්තමේන්තු යාවත්කාලීන කරයි.",
+  "driverDelayTime": "ඇස්තමේන්තුගත ප්‍රමාද කාලය",
+  "driverDelayReason": "ප්‍රමාදයට හේතුව",
+  "driverDelayFailed": "ප්‍රමාද දත්ත උඩුගත කිරීම තහවුරු නොවීය. නැවත උත්සාහ කරන්න.",
+  "driverDepartsNow": "නියමිත වේලාවට (දැන් පිටත්වේ)",
+  "driverOrigin": "ආරම්භක නැවතුම",
+  "driverPreTrip": "ගමනට පෙර කාලසටහන් පරීක්ෂාව",
+  "driverOnTimeMinute": "නියමිත වේලාවට (±විනාඩි 1)",
+  "driverEarly": "වේලාවට පෙර ධාවනය වේ",
+  "driverOnTimeTarget": "නියමිත වේලා ඉලක්කය",
+  "driverDelayed": "ප්‍රමාදයි",
+  "driverMinusFive": "විනාඩි -5",
+  "driverZeroSchedule": "0 (කාලසටහන අනුව)",
+  "driverPlusFifteen": "විනාඩි +15",
+  "driverZeroMinutes": "විනාඩි 0",
+  "driverSelectBus": "බස් ධාවනය තෝරන්න",
+  "driverAssigned": "ඔබට පවරා ඇත",
+  "driverAssignMe": "මට පවරන්න",
+  "driverAssignedOther": "වෙනත් රියදුරෙකුට පවරා ඇත",
+  "driverUpcoming": "ඉදිරියට නියමිතයි",
+  "driverDeparted": "පිටත්ව ඇත",
+  "driverAssistanceUnavailable": "හවුල් ඉල්ලීම් යාවත්කාලීන නොලැබේ. පෙන්වන ඉල්ලීම් පැරණි විය හැක.",
+  "driverAssistanceTitle": "බසයට නැගීමේ සහාය ඉල්ලීම්",
+  "driverAssistanceEmpty": "මෙම බස් රථයට සක්‍රිය සහාය ඉල්ලීම් නැත.",
+  "driverBoardingAt": "බසයට නැගීම",
+  "driverAlightingAt": "බසයෙන් බැසීම",
+  "driverStopPosition": "වත්මන් ස්ථානය: නැවතුම් {total}න් {index}",
+  "@driverStopPosition": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "driverNextStop": "ඊළඟ නැවතුම: {stop}",
+  "@driverNextStop": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverArrivalSaved": "{stop} පැමිණීම සුරැකිණි. ඊළඟට: {next}",
+  "@driverArrivalSaved": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      },
+      "next": {
+        "type": "String"
+      }
+    }
+  },
+  "driverFinalSaved": "අවසන් {stop} පැමිණීම සුරැකිණි. ගමන සම්පූර්ණයි.",
+  "@driverFinalSaved": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverTarget": "ඉලක්කය: {stop}",
+  "@driverTarget": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverDestination": "ගමනාන්තය: {stop}",
+  "@driverDestination": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverPlannedDeparture": "නියමිත පිටත්වීම (කොළඹ): {time}",
+  "@driverPlannedDeparture": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverActualDeparture": "සැබෑ පිටත්වීම (කොළඹ): {time}",
+  "@driverActualDeparture": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverBroadcastReason": "මගීන්ට විකාශනය කළේ: {reason}",
+  "@driverBroadcastReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "driverAddedMinutes": "මගී පැමිණීමේ ඇස්තමේන්තුවලට විනාඩි +{minutes}ක් එක් කර ඇත",
+  "@driverAddedMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverMinuteOption": "විනාඩි +{minutes}",
+  "@driverMinuteOption": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverDelaySaved": "ප්‍රමාද දැනුම්දීම සුරැකිණි: {reason} (විනාඩි +{minutes})",
+  "@driverDelaySaved": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverBroadcastDelay": "ප්‍රමාදය විකාශනය කරන්න (විනාඩි +{minutes})",
+  "@driverBroadcastDelay": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverDepartsIn": "විනාඩි {minutes}කින් පිටත්වේ",
+  "@driverDepartsIn": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverLateMinutes": "විනාඩි {minutes}ක් ප්‍රමාදයි",
+  "@driverLateMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverScheduledDep": "නියමිත පිටත්වීම: {time} ({stop})",
+  "@driverScheduledDep": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverEarlyMinutes": "වේලාවට පෙර ධාවනය වේ (විනාඩි {minutes})",
+  "@driverEarlyMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverLateShort": "විනාඩි +{minutes}ක් ප්‍රමාදයි",
+  "@driverLateShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverEarlyShort": "විනාඩි {minutes}ක් කලින්",
+  "@driverEarlyShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverBusOption": "බස් {bus} (පිටත්වීම: {time}){endpoints}{assigned}",
+  "@driverBusOption": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "endpoints": {
+        "type": "String"
+      },
+      "assigned": {
+        "type": "String"
+      }
+    }
+  },
+  "driverRouteName": "මාර්ගය {route}",
+  "@driverRouteName": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      }
+    }
+  },
+  "driverDepartureTime": "පිටත්වීම: {time}",
+  "@driverDepartureTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverStopCount": "නැවතුම් {count}",
+  "@driverStopCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "driverActiveRequests": "සක්‍රිය {count}",
+  "@driverActiveRequests": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "driverClosedRequests": "අවසන් කළ ඉල්ලීම් ({count})",
+  "@driverClosedRequests": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "driverRequestSummary": "{stop} හි {rider} ({types})",
+  "@driverRequestSummary": {
+    "placeholders": {
+      "rider": {
+        "type": "String"
+      },
+      "stop": {
+        "type": "String"
+      },
+      "types": {
+        "type": "String"
+      }
+    }
+  },
+  "driverAssistanceStop": "{purpose}: {stop}",
+  "@driverAssistanceStop": {
+    "placeholders": {
+      "purpose": {
+        "type": "String"
+      },
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverEtaUnavailable": "පැමිණීමේ ඇස්තමේන්තුව නොමැත",
+  "driverSchedulePassed": "නියමිත වේලාව පසු වී ඇත",
+  "driverArrivingNow": "දැන් ළඟා වේ",
+  "driverScheduledFor": "{time}ට නියමිතයි",
+  "@driverScheduledFor": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverTomorrowAt": "හෙට {time}ට",
+  "@driverTomorrowAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverTomorrowIn": "හෙට {time}ට (පැය {hours} විනාඩි {minutes}කින්)",
+  "@driverTomorrowIn": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverDepartedAgo": "විනාඩි {minutes}කට පෙර පිටත්ව ඇත",
+  "@driverDepartedAgo": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverArrivingMinutes": "විනාඩි {minutes}කින් ළඟා වේ",
+  "@driverArrivingMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverArrivingHours": "පැය {hours} විනාඩි {minutes}කින් ළඟා වේ",
+  "@driverArrivingHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "recoveryTitle": "මුරපදය යළි සකසන්න",
+  "recoveryCheckEmail": "ඔබේ විද්‍යුත් තැපෑල බලන්න",
+  "recoveryInboxHelp": "නව මුරපදයක් සෑදීමට ඔබේ තැපැල් පෙට්ටියේ ඇති සබැඳිය භාවිත කරන්න.",
+  "recoveryBackLogin": "පිවිසුමට ආපසු යන්න",
+  "recoveryResend": "ඊමේල් නැවත යවන්න",
+  "recoveryForgot": "මුරපදය අමතකද?",
+  "recoveryEmailHelp": "ඔබේ ගිණුමේ විද්‍යුත් තැපැල් ලිපිනය ඇතුළත් කරන්න. මුරපදය යළි සැකසීමට උපදෙස් යවන්නෙමු.",
+  "recoveryEmail": "විද්‍යුත් තැපැල් ලිපිනය",
+  "recoveryEmailHint": "උදා: name@example.com",
+  "recoveryPrivacy": "ඔබේ විද්‍යුත් තැපැල් ලිපිනය බෙදා නොගන්නෙමු.",
+  "recoverySend": "යළි සැකසුම් සබැඳිය යවන්න",
+  "recoveryCreate": "නව මුරපදයක් සාදන්න",
+  "recoveryPasswordHelp": "ඔබ මීට පෙර භාවිත නොකළ ශක්තිමත් මුරපදයක් තෝරන්න.",
+  "recoveryNewPassword": "නව මුරපදය",
+  "recoveryPasswordHint": "නව මුරපදය ඇතුළත් කරන්න",
+  "recoveryConfirm": "නව මුරපදය තහවුරු කරන්න",
+  "recoveryConfirmHint": "නව මුරපදය නැවත ඇතුළත් කරන්න",
+  "recoveryShow": "මුරපදය පෙන්වන්න",
+  "recoveryHide": "මුරපදය සඟවන්න",
+  "recoverySecurity": "ඔබේ ආරක්ෂාව අපගේ ප්‍රමුඛතාවයි.",
+  "recoveryUpdated": "මුරපදය යාවත්කාලීන විය",
+  "recoverySuccess": "ඔබේ මුරපදය යළි සැකසිණි. දැන් නව මුරපදයෙන් පිවිසිය හැක.",
+  "recoveryGoLogin": "පිවිසුමට යන්න",
+  "recoveryEmailRequired": "ඔබේ විද්‍යුත් තැපැල් ලිපිනය ඇතුළත් කරන්න.",
+  "recoveryEmailInvalid": "වලංගු විද්‍යුත් තැපැල් ලිපිනයක් ඇතුළත් කරන්න.",
+  "recoveryAccountMissing": "මෙම විද්‍යුත් තැපැල් ලිපිනයට ගිණුමක් හමු නොවීය.",
+  "recoveryDisabled": "මෙම ගිණුම අක්‍රිය කර ඇත.",
+  "recoveryTooMany": "ඉල්ලීම් වැඩියි. පසුව නැවත උත්සාහ කරන්න.",
+  "recoveryNetwork": "ජාල දෝෂයකි. අන්තර්ජාල සම්බන්ධතාව පරීක්ෂා කරන්න.",
+  "recoverySendFailed": "මුරපද යළි සැකසුම් ඊමේල් යැවීම තහවුරු කළ නොහැක.",
+  "recoveryResetFailed": "මුරපදය යළි සැකසීම තහවුරු නොවීය. නැවත උත්සාහ කරන්න.",
+  "recoveryLinkUnavailable": "මෙම සබැඳිය අවලංගු හෝ කල් ඉකුත් වී ඇත. අලුත් සබැඳියක් ඉල්ලන්න.",
+  "recoveryExpired": "මෙම සබැඳිය කල් ඉකුත් වී ඇත. අලුත් සබැඳියක් ඉල්ලන්න.",
+  "recoveryInvalid": "මෙම සබැඳිය අවලංගුයි. අලුත් සබැඳියක් ඉල්ලන්න.",
+  "recoveryWeak": "මුරපදය ඉතා දුර්වලයි. වඩා ශක්තිමත් මුරපදයක් තෝරන්න.",
+  "recoveryCreateRequired": "මුරපදයක් සාදන්න.",
+  "recoveryEightCharacters": "මුරපදයේ අවම අක්ෂර 8ක් තිබිය යුතුයි.",
+  "recoveryLetterRequired": "මුරපදයේ අවම එක් අකුරක් තිබිය යුතුයි.",
+  "recoveryNumberRequired": "මුරපදයේ අවම එක් අංකයක් තිබිය යුතුයි.",
+  "recoveryConfirmRequired": "මුරපදය තහවුරු කරන්න.",
+  "recoveryMismatch": "මුරපද නොගැළපේ.",
+  "recoveryStrength": "මුරපදයේ ශක්තිය",
+  "recoveryStrengthWeak": "දුර්වලයි — තවත් අක්ෂර එක් කරන්න",
+  "recoveryStrengthFair": "සාමාන්‍යයි — අංක හෝ සංකේත එක් කරන්න",
+  "recoveryStrengthGood": "හොඳ ශක්තියක්",
+  "recoveryStrengthStrong": "ශක්තිමත් මුරපදයකි",
+  "recoveryInstructionsSent": "මුරපදය යළි සැකසීමේ උපදෙස් යැව්වේ\n{email}",
+  "@recoveryInstructionsSent": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMorning": "සුබ උදෑසනක්",
+  "homeAfternoon": "සුබ දහවලක්",
+  "homeEvening": "සුබ සන්ධ්‍යාවක්",
+  "homeReady": "ගමනට සූදානම්ද?",
+  "homeWhere": "ඔබ කොහෙද යන්නේ?",
+  "homePlanHint": "ගමන සැලසුම් කිරීමට තට්ටු කරන්න",
+  "homeMenu": "මෙනුව විවෘත කරන්න",
+  "homeProfileAction": "පැතිකඩ විවෘත කරන්න",
+  "homeTrack": "බස්\nස්ථානය",
+  "homePlanAction": "ගමන\nසැලසුම් කරන්න",
+  "homePreferencesAction": "ප්‍රවේශතා\nමනාප",
+  "homeHome": "මුල් පිටුව",
+  "homePlan": "සැලසුම",
+  "homePlanJourney": "ගමන සැලසුම් කරන්න",
+  "homeCommunity": "ප්‍රජාව",
+  "homeProfile": "පැතිකඩ",
+  "homeRewards": "ත්‍යාග සහ දායකත්ව",
+  "homeHelp": "උපකාර සහ සහාය",
+  "homeLogout": "පිටවන්න",
+  "homeRecentReports": "මෑත ප්‍රජා වාර්තා",
+  "homeNoReports": "මෑත ප්‍රජා වාර්තා නැත.",
+  "homeReportsUnavailable": "ප්‍රජා වාර්තා ලබාගත නොහැක. පසුව නැවත උත්සාහ කරන්න.",
+  "homeReport": "වාර්තාව",
+  "homeRecentJourney": "මෑත ගමන",
+  "homeNoJourney": "සටහන් කළ ගමනක් නැත",
+  "homeStartPlanning": "ගමනක් සැලසුම් කර අරඹන්න",
+  "homeJourneysLoading": "මෑත ගමන පූරණය වෙමින්…",
+  "homeJourneysUnavailable": "මෑත ගමන ලබාගත නොහැක",
+  "homeRetryLater": "පසුව නැවත උත්සාහ කරන්න",
+  "homeOrigin": "ආරම්භය",
+  "homeDestination": "ගමනාන්තය",
+  "homeRecent": "මෑතදී",
+  "homeReplan": "නැවත සැලසුම් කරන්න",
+  "homeAssistance": "සහාය",
+  "homeJustNow": "දැන්ම",
+  "homeUnknownAge": "නිරීක්ෂණ වේලාව නොමැත",
+  "homeGreeting": "{greeting}, {name}",
+  "@homeGreeting": {
+    "placeholders": {
+      "greeting": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeTrueCount": "සත්‍ය: {count}",
+  "@homeTrueCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeFalseCount": "අසත්‍ය: {count}/{threshold}",
+  "@homeFalseCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "homeJourneySegment": "{origin} සිට {destination} දක්වා",
+  "@homeJourneySegment": {
+    "placeholders": {
+      "origin": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMinutesAgo": "විනාඩි {count}කට පෙර",
+  "@homeMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeHoursAgo": "පැය {count}කට පෙර",
+  "@homeHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeDaysAgo": "දින {count}කට පෙර",
+  "@homeDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeMonthsAgo": "මාස {count}කට පෙර",
+  "@homeMonthsAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "registrationTitle": "ලියාපදිංචිය",
+  "registrationJoin": "Access Transit සමඟ එක්වන්න",
+  "registrationIntro": "සැමට ප්‍රවේශ විය හැකි ඔබේ ගමන මෙතැනින් ඇරඹේ.",
+  "registrationNameHint": "සම්පූර්ණ නම ඇතුළත් කරන්න",
+  "registrationEmailHint": "විද්‍යුත් තැපෑල ඇතුළත් කරන්න",
+  "registrationPassword": "මුරපදය",
+  "registrationPasswordHint": "මුරපදයක් සාදන්න",
+  "registrationConfirm": "මුරපදය තහවුරු කරන්න",
+  "registrationConfirmHint": "මුරපදය නැවත ඇතුළත් කරන්න",
+  "registrationNeeds": "මට විශේෂ ප්‍රවේශතා අවශ්‍යතා ඇත",
+  "registrationNeedsExample": "(උදා: රෝද පුටු බෑවුම් පුවරුව, පහත් බිම් බස් රථය)",
+  "registrationAccountType": "ගිණුම් වර්ගය",
+  "registrationCreate": "ගිණුම සාදන්න",
+  "registrationOr": "හෝ",
+  "registrationGoogle": "Google සමඟ ලියාපදිංචි වන්න",
+  "registrationApple": "Apple සමඟ ලියාපදිංචි වන්න",
+  "registrationGoogleFeature": "Google ලියාපදිංචිය",
+  "registrationAppleFeature": "Apple ලියාපදිංචිය",
+  "registrationAlready": "දැනටමත් ගිණුමක් තිබේද? ",
+  "registrationLogin": "පිවිසෙන්න",
+  "registrationExists": "මෙම විද්‍යුත් තැපෑලට දැනටමත් ගිණුමක් ඇත.",
+  "registrationNotEnabled": "විද්‍යුත් තැපෑල/මුරපද පිවිසුම සක්‍රිය කර නැත.",
+  "registrationRequiredFields": "සියලු අනිවාර්ය තොරතුරු නිවැරදිව ඇතුළත් කරන්න.",
+  "registrationFailed": "ලියාපදිංචිය තහවුරු නොවීය. සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "registrationNameRequired": "සම්පූර්ණ නම ඇතුළත් කරන්න.",
+  "registrationNameShort": "නමේ අවම අක්ෂර 2ක් තිබිය යුතුයි.",
+  "registrationNameLetters": "නම සඳහා අකුරු, හිස්තැන්, තනි උද්ධෘත ලකුණු, තිත් හෝ යා ඉරි යොදන්න.",
+  "onboardingSkipTooltip": "හැඳින්වීම මඟහරින්න",
+  "onboardingSkip": "මඟහරින්න",
+  "onboardingStart": "අරඹන්න",
+  "onboardingNext": "ඊළඟට",
+  "onboardingTailored": "ඔබට ගැළපෙන සේවාවක්",
+  "onboardingNeedsHelp": "රෝද පුටු සහ පඩි රහිත අවශ්‍යතා තෝරා වත්මන් සාක්ෂි සමාලෝචනය කරන්න. හඬ මඟපෙන්වීම ලබාගත නොහැක.",
+  "onboardingNavigate": "විශ්වාසයෙන් ගමන් කරන්න",
+  "onboardingLiveHelp": "මෙය පෙරදසුනක් පමණි. හවුල් GPS තිබේ නම් පරීක්ෂා කරන්න; සහාය සඳහා රියදුරුගේ ප්‍රතිචාරය අවශ්‍යයි.",
+  "onboardingCommunity": "ප්‍රජාවේ නෙත් වන්න",
+  "onboardingReportsHelp": "බෑවුම් පුවරු සහ සෝපාන නිරීක්ෂණ බෙදාගන්න. උඩුගත කිරීම තහවුරු වූ පසු වාර්තා ප්‍රසිද්ධ වේ; ත්‍යාග සමාලෝචනයට යටත්ය.",
+  "onboardingReportIssue": "ගැටලුව වාර්තා කරන්න",
+  "onboardingRamps": "බෑවුම් පුවරු",
+  "onboardingLowFloor": "පහත් බිම්",
+  "onboardingExampleEta": "උදාහරණ පැමිණීම: විනාඩි 3",
+  "onboardingBoardingHelp": "බසයට නැගීමේ සහාය",
+  "onboardingAwaitingReply": "උදාහරණය: පිළිතුරක් බලාපොරොත්තුවෙන්",
+  "loginFailed": "පිවිසීම තහවුරු නොවීය. නැවත උත්සාහ කරන්න.",
+  "loginInvalidCredentials": "විද්‍යුත් තැපෑල හෝ මුරපදය වැරදියි. තොරතුරු පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "loginDisabled": "මෙම ගිණුම අක්‍රිය කර ඇත. සහාය අමතන්න.",
+  "loginTooMany": "පිවිසුම් උත්සාහ වැඩියි. මඳක් රැඳී නැවත උත්සාහ කරන්න.",
+  "loginNetwork": "ජාල දෝෂයකි. සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "loginForgot": "මුරපදය අමතකද?",
+  "loginPasswordHint": "මුරපදය ඇතුළත් කරන්න",
+  "loginPasswordRequired": "මුරපදය ඇතුළත් කරන්න.",
+  "loginPasswordShort": "මුරපදයේ අවම අක්ෂර 6ක් තිබිය යුතුයි.",
+  "loginOrContinue": "නැතහොත් මෙයින් ඉදිරියට යන්න",
+  "loginBiometrics": "ජෛවමිතික දත්ත සමඟ පිවිසෙන්න",
+  "loginBiometricFeature": "ජෛවමිතික පිවිසුම",
+  "loginGoogle": "Google සමඟ පිවිසෙන්න",
+  "loginGoogleFeature": "Google පිවිසුම",
+  "loginNoAccount": "ගිණුමක් නැද්ද?",
+  "loginSignUp": "ලියාපදිංචි වන්න",
+  "settingsSaveFailed": "මනාප සුරැකීම තහවුරු නොවීය. නැවත උත්සාහ කරන්න.",
+  "settingsGuestSaved": "උපාංග සැකසුම් සුරැකිණි. ආගන්තුක ගමන් අවශ්‍යතා මෙම සැසියට පමණි.",
+  "settingsAccountSaved": "මෙම උපාංගයේ මෙම ගිණුම සඳහා මනාප සුරැකිණි.",
+  "settingsProfile": "පරිශීලක පැතිකඩ",
+  "settingsPersonalized": "ඔබට ගැළපෙන ගමන් අත්දැකීම",
+  "settingsScopeHelp": "ඉහළ ප්‍රතිවිරුද්ධ වර්ණ හා තට්ටු ඉලක්ක මෙම උපාංගයට අදාළයි. ගමන් අවශ්‍යතා මෙම උපාංගයේ එක් එක් පිවිසි ගිණුමට වෙනම සුරැකේ. ආගන්තුක අවශ්‍යතා මෙම සැසියට පමණි. නව ගිණුම් රෝද පුටු ප්‍රවේශය අවශ්‍ය ලෙස ඇරඹේ; ඔබේ අවශ්‍යතා සමාලෝචනය කරන්න.",
+  "settingsMobility": "චලනය සහ භෞතික ප්‍රවේශය",
+  "settingsWheelchair": "රෝද පුටු ප්‍රවේශය අවශ්‍යයි",
+  "settingsRampHelp": "ගැළපෙන බස් සඳහා වත්මන් බෑවුම් පුවරු සාක්ෂි අවශ්‍යයි",
+  "settingsStepFree": "පඩි රහිත මාර්ග පමණි",
+  "settingsStepFreeHelp": "පඩි භාවිතය අවශ්‍ය නැවතුම් සහ පර්යන්ත මඟහරින්න",
+  "settingsWalking": "ඇවිදින දුර අඩු කරන්න",
+  "settingsWalkingUnavailable": "තවම ලබාගත නොහැක — ඇවිදින මාර්ග හා දුර මැන නැත",
+  "settingsSensory": "සංවේදන සහ දෘශ්‍ය",
+  "settingsContrast": "ඉහළ ප්‍රතිවිරුද්ධ වර්ණ",
+  "settingsContrastHelp": "පාඨ පැහැදිලිකම සහ තද මායිම් වැඩි කරන්න (WCAG AAA)",
+  "settingsLargeTargets": "විශාල තට්ටු ඉලක්ක (48dp+)",
+  "settingsTargetsHelp": "බොත්තම් හා පාලන සඳහා අවම 48dp තට්ටු ඉලක්ක යොදන්න",
+  "settingsTargetsEnabled": "විශාල තට්ටු ඉලක්ක (48dp+) සක්‍රියයි",
+  "settingsTargetsStandard": "සාමාන්‍ය තට්ටු ඉලක්ක සක්‍රියයි",
+  "settingsVoice": "ගමන් සඳහා හඬ මඟපෙන්වීම",
+  "settingsVoiceUnavailable": "තවම ලබාගත නොහැක — අතුරුමුහුණත් පාඨ කියවීමට දුරකථනයේ තිර කියවනය භාවිත කරන්න",
+  "settingsHaptics": "නැවතුම් සඳහා කම්පන දැනුම්දීම්",
+  "settingsHapticsUnavailable": "තවම ලබාගත නොහැක — ස්වයංක්‍රීය කම්පන දැනුම්දීම් සඳහා සහාය නැත",
+  "settingsAssistance": "සහාය සහ පරිසරය",
+  "settingsBoarding": "බසයට නැගීමේ සහාය අවශ්‍යයි",
+  "settingsBoardingUnavailable": "ස්වයංක්‍රීය ඉල්ලීම් තවම නොමැත — ගමන් තිරයෙන් සහාය ඉල්ලන්න",
+  "settingsQuiet": "නිහඬ මාර්ග පෙන්වන්න",
+  "settingsQuietUnavailable": "තවම ලබාගත නොහැක — ශබ්ද මට්ටම් නොදනී",
+  "settingsSave": "මනාප සුරකින්න",
+  "searchSwapped": "⇄ නැගීමේ සහ ගමනාන්ත නැවතුම් මාරු කළා",
+  "searchSelectBoarding": "නගින නැවතුම තෝරන්න",
+  "searchSelectDestination": "බසින නැවතුම තෝරන්න",
+  "searchTravelChoice": "ගමන් වේලාව තෝරන්න",
+  "searchLeaveNow": "දැන් පිටත් වන්න",
+  "searchSpecificTime": "වේලාවක් තෝරන්න",
+  "searchChooseTime": "පිටත්වීමේ වේලාව තෝරන්න",
+  "searchChangeDate": "ගමන් දිනය වෙනස් කරන්න",
+  "searchNeedsTitle": "ප්‍රවේශ පහසුකම් අවශ්‍යතා",
+  "searchTemporaryHelp": "මෙම ගමනට පමණක් වෙනස් කරන්න. Settings හි සුරැකි ප්‍රවේශ පහසුකම් මනාප වෙනස් නොවේ.",
+  "searchWheelchairChip": "♿ රෝද පුටුව",
+  "searchStepFreeChip": "පඩි රහිත",
+  "searchResetHelp": "සුරැකි ප්‍රවේශ පහසුකම් මනාප යළි යොදන්න",
+  "searchReset": "යළි සකසන්න",
+  "searchRamp": "රෝද පුටු බෑවුම",
+  "searchRampHelp": "ක්‍රියාකාරී රෝද පුටු බෑවුම් ඇති බස් අවශ්‍යයි",
+  "searchStepFree": "නැවතුමට පඩි රහිත ප්‍රවේශය",
+  "searchStepFreeHelp": "විදුලි සෝපාන හෝ සමතලා මාර්ග ඇති නැවතුම් පමණක්",
+  "searchMinWalking": "ඇවිදින දුර අඩු කරන්න",
+  "searchWalkingUnknown": "තවම නොමැත — ඇවිදින දුර නොදනී",
+  "searchApply": "මෙම ගමනට යොදන්න",
+  "searchEndpointsRequired": "නගින සහ බසින නැවතුම් තෝරන්න.",
+  "searchEndpointsDifferent": "නගින සහ බසින නැවතුම් එකම විය නොහැක.",
+  "searchRampRequired": "රෝද පුටු බෑවුම අවශ්‍යයි",
+  "searchStepFreeFilter": "පඩි රහිත",
+  "searchMinWalkFilter": "අඩු ඇවිදීම",
+  "searchFind": "බස් සොයන්න",
+  "searchNoStops": "හවුල් නැවතුම් දත්ත නොමැත. සම්බන්ධ වී යළි උත්සාහ කරන්න.",
+  "searchPlan": "ගමන සැලසුම් කරන්න",
+  "searchSync": "බස් දත්ත නැවත ලබාගන්න",
+  "searchBoardingHeading": "නගින නැවතුම",
+  "searchChooseBoarding": "නගින නැවතුම තෝරන්න",
+  "searchRampAvailable": "♿ රෝද පුටු බෑවුම ඇත",
+  "searchStandardStop": "සාමාන්‍ය නැවතුම",
+  "searchTapBoarding": "නගින නැවතුම තෝරන්න",
+  "searchSwap": "නගින සහ බසින නැවතුම් මාරු කරන්න",
+  "searchDestinationHeading": "ඔබ යන්නේ කොහේද?",
+  "searchChooseDestination": "ගමනාන්තය තෝරන්න",
+  "searchAccessibleDestination": "♿ ප්‍රවේශ පහසුකම් සහිත ගමනාන්තය",
+  "searchTapDestination": "බසින නැවතුම තෝරන්න",
+  "searchMyLocation": "මගේ ස්ථානය",
+  "searchBoardingSuggestions": "නගින නැවතුම් යෝජනා",
+  "searchDestinationSuggestions": "බසින නැවතුම් යෝජනා",
+  "searchSuggestions": "නැවතුම් යෝජනා බලන්න",
+  "searchDepartNow": "දැන් පිටත් වන්න",
+  "searchTravelHeading": "ගමන් වේලාව",
+  "searchChange": "වෙනස් කරන්න",
+  "searchOptions": "ප්‍රවේශ පහසුකම්",
+  "searchConfigure": "සකසන්න",
+  "searchAllBusesHelp": "සියලු බස් පෙන්වයි. රෝද පුටු බෑවුම් හෝ පඩි රහිත ප්‍රවේශය අවශ්‍ය නම් සකසන්න.",
+  "searchStationHint": "නැවතුම හෝ නගරය ලියන්න (උදා: Pettah, Mount Lavinia)...",
+  "searchAllStops": "සියලු නැවතුම්",
+  "searchNoMatches": "ගැළපෙන නැවතුම් නැත.\nවෙනත් අක්ෂර වින්‍යාසයක් යොදන්න හෝ පෙරහන් ඉවත් කරන්න.",
+  "searchRampBadge": "බෑවුම  ",
+  "searchElevatorBadge": "සෝපානය  ",
+  "searchSuggestionIcon": "නැවතුම් යෝජනා",
+  "searchSuggestedBoarding": "නගින නැවතුම් යෝජනා",
+  "searchSuggestedDestination": "බසින නැවතුම් යෝජනා",
+  "searchVoiceUnavailable": "හඬ හඳුනාගැනීම තවම නොමැත. පහත නැවතුමක් තෝරන්න:",
+  "searchSelectedTime": "තේරූ වේලාව: {time}",
+  "searchTodayAt": "අද {time}",
+  "searchDateAt": "{date} දින {time}",
+  "searchStopSelected": "තේරූ නැවතුම: {name}",
+  "searchActiveNeeds": "{count, plural, =1{සක්‍රිය 1} other{සක්‍රිය {count}}}",
+  "@searchSelectedTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchTodayAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchDateAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchStopSelected": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchActiveNeeds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsScheduled": "කාලසටහන අනුව",
+  "resultsPastUnconfirmed": "නියමිත වේලාව පසු වී ඇත — පිටත්වීම තහවුරු නැත",
+  "resultsNowUnconfirmed": "නියමිත වේලාව දැන් — පිටත්වීම තහවුරු නැත",
+  "resultsRampReady": "රෝද පුටු බෑවුම සූදානම් · පඩි රහිත පිවිසුම",
+  "resultsRampEquipped": "බෑවුම සවි කර ඇත · රියදුරු සහාය විමසන්න",
+  "resultsStandardService": "සාමාන්‍ය බස් සේවාව",
+  "resultsUnknown": "නොදනී",
+  "resultsLow": "අඩු",
+  "resultsMedium": "මධ්‍යම",
+  "resultsHigh": "වැඩි",
+  "resultsStarted": "ආරම්භ කළ ධාවනය",
+  "resultsDemoTimetable": "ආදර්ශ කාලසටහන",
+  "resultsPublishedTimetable": "ප්‍රකාශිත කාලසටහන",
+  "resultsWheelchairBus": "රෝද පුටු ප්‍රවේශ පහසුකම් ඇති බසය",
+  "resultsRampBus": "බෑවුම සහිත සාමාන්‍ය බසය",
+  "resultsStandardBus": "සාමාන්‍ය බසය",
+  "resultsEstimatedTimes": "සමහර වේලාවන් ඇස්තමේන්තුය; රියදුරුගෙන් තහවුරු කරන්න.",
+  "resultsWalkingUnknown": "මෙම ගමනේ ඇවිදින දුර නොමැත. ප්‍රතිඵල ඇවිදින දුර අනුව පෙළගස්වා නැත.",
+  "resultsReviewNeeds": "ගමනේ අවශ්‍යතා සමාලෝචනය කරන්න",
+  "resultsReviewHelp": "වෙනස්කම් මෙම සෙවුමට පමණි. අවශ්‍යතාවක් ඉවත් කළ විට ප්‍රවේශය නොදන්නා හෝ බාධා වාර්තා වූ සේවා පෙන්විය හැක. ගමන තේරීමට පෙර සාක්ෂි බලන්න.",
+  "resultsKeepNeeds": "අවශ්‍යතා තබාගන්න",
+  "resultsApplyNeeds": "මෙම සෙවුමට යොදන්න",
+  "resultsNoAccessible": "ප්‍රවේශ අවශ්‍යතා සපුරන බස් හමු නොවීය",
+  "resultsNoDirect": "සෘජු බස් හමු නොවීය",
+  "resultsNoAccessibleHelp": "මෙම අවශ්‍යතාවලට ගැළපෙන තහවුරු කළ ප්‍රවේශ පහසුකම් ඇති නියමිත ගමන් නැත. නැවතුම් ප්‍රවේශය නොදන්නා හෝ බාධාවක් වාර්තා වී තිබිය හැක. ප්‍රවේශ පෙරහන් සමාලෝචනය කරන්න.",
+  "resultsShowAll": "ගැළපෙන සියලු බස් පෙන්වන්න",
+  "resultsShowAllHelp": "ප්‍රවේශය නොදන්නා හෝ බාධා වාර්තා වූ සේවා ඇතුළුව Accessible tab එකෙන් පිටත විකල්ප පෙන්වයි. ඔබේ ගමන් අවශ්‍යතා දිගටම යෙදේ.",
+  "resultsTitle": "ලබාගත හැකි බස්",
+  "resultsChooseHelp": "විස්තර බැලීමට බසයක් තෝරන්න",
+  "resultsFastest": "වේගවත්ම",
+  "resultsRoute": "මාර්ගය",
+  "resultsTimetableHelp": "කාලසටහන් ඇස්තමේන්තු — පිටත්වීම තහවුරු නැත. GPS තත්ත්වය සඳහා බස් විස්තර බලන්න.",
+  "resultsDeparture": "පිටත්වීම",
+  "resultsArrival": "පැමිණීම",
+  "resultsRampAvailable": "බෑවුම ඇත",
+  "resultsLowFloor": "පහත් බිම",
+  "detailsAmbiguous": "පිටත්වීම නිශ්චිත නැත. තේරීම නැවත ලබාගන්න.",
+  "detailsAccountChanged": "ගිණුම වෙනස් විය. සෙවුමට ආපසු යන්න.",
+  "detailsUnavailable": "සේවාව නොමැත. යළි උත්සාහ කරන්න",
+  "detailsRunUnavailable": "ධාවන තත්ත්වය නොමැත",
+  "detailsRunUnverified": "කාලසටහන අනුව · ධාවනය තහවුරු නැත",
+  "detailsCompleted": "අවසන්",
+  "detailsCancelled": "අවලංගුයි",
+  "detailsStale": "ස්ථානය නොමැත හෝ පැරණියි",
+  "detailsLive": "සජීවී GPS",
+  "detailsWheelchair": "රෝද පුටු ප්‍රවේශය",
+  "detailsSavedHelp": "සුරැකි තේරීම · වේලාවන් හා අවශ්‍යතා තබා ඇත; වත්මන් තත්ත්වයන් බලන්න.",
+  "detailsDefaultsDiffer": "වත්මන් ප්‍රවේශ මනාප මෙම සුරැකි තේරීමට වෙනස්ය.",
+  "detailsCatalogueUnavailable": "නාමාවලි යාවත්කාලීන නොමැත.",
+  "detailsStops": "ඔබේ ගමනේ නැවතුම්",
+  "detailsIntermediateUnknown": "අතරමැදි නැවතුම · වේලාව නොමැත",
+  "detailsEvidence": "ප්‍රවේශ පහසුකම් පිළිබඳ සාක්ෂි",
+  "detailsAssistanceUnavailable": "රියදුරු සහාය නොමැත",
+  "detailsReport": "තත්ත්වයක් වාර්තා කරන්න",
+  "detailsLoadingReports": "වාර්තා ලබාගනිමින්…",
+  "detailsRetry": "යාවත්කාලීන නැවත උත්සාහ කරන්න",
+  "detailsVerifySave": "සුරැකීමට පෙර සම්බන්ධ වී මෙම පිටත්වීම තහවුරු කරන්න.",
+  "resultsSafe": "ප්‍රවේශ සාක්ෂි ගැළපේ",
+  "resultsWarning": "සැලකිලිමත් වන්න",
+  "resultsNotAccessible": "ප්‍රවේශ පහසුකම් නොගැළපේ",
+  "detailsResolved": "විසඳා ඇත",
+  "detailsRecheckUnknown": "නොවිසඳුණු බාධාවක් — නිරීක්ෂණ වේලාව නොදනී; නැවත පරීක්ෂා කරන්න",
+  "detailsObservationUnknown": "නිරීක්ෂණ වේලාව නොදනී",
+  "detailsExpired": "කල් ඉකුත් වී හෝ නොමැත",
+  "detailsRecheck": "නොවිසඳුණු බාධාවක් — නැවත පරීක්ෂා කරන්න",
+  "detailsRecent": "මෑත නිරීක්ෂණය",
+  "resultsRouteNumber": "මාර්ගය {number}",
+  "@resultsRouteNumber": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsScheduledDate": "නියමිත: {date}, {time}",
+  "@resultsScheduledDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsScheduledAt": "නියමිත: {date} දින {time}",
+  "@resultsScheduledAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsTomorrow": "හෙට නියමිත: {time}",
+  "@resultsTomorrow": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsTomorrowAt": "හෙට නියමිත වේලාව {time}",
+  "@resultsTomorrowAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsToday": "අද නියමිත: {time}",
+  "@resultsToday": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsTodayAt": "අද නියමිත වේලාව {time}",
+  "@resultsTodayAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsScheduledIn": "{minutes, plural, =1{මිනිත්තු 1කින් නියමිතයි - {time}} other{මිනිත්තු {minutes}කින් නියමිතයි - {time}}}",
+  "@resultsScheduledIn": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsBoardingEstimate": "නැගීමේ ඇස්තමේන්තුව {time} · {source}",
+  "@resultsBoardingEstimate": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsCountTitle": "ලබාගත හැකි බස් ({count})",
+  "@resultsCountTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsAvailableCount": "{count, plural, =1{බස් 1ක් ඇත} other{බස් {count}ක් ඇත}}",
+  "@resultsAvailableCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsNoDirectHelp": "දැනට {origin} සිට {destination} දක්වා සෘජු බස් මාර්ග නැත.",
+  "@resultsNoDirectHelp": {
+    "placeholders": {
+      "origin": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsAllTab": "සියල්ල ({count})",
+  "@resultsAllTab": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsAccessibleTab": "ප්‍රවේශ පහසුකම් ({count})",
+  "@resultsAccessibleTab": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsDuration": "~මිනිත්තු {minutes}",
+  "@resultsDuration": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsCrowd": "මගී තදබදය: {level}",
+  "@resultsCrowd": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsBoardingSource": "නැගීමේ ඇස්තමේන්තුව · {source}",
+  "@resultsBoardingSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsBoardingAt": "නියමිත නැගීම: {date} · {time}",
+  "@detailsBoardingAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsArrivalAt": "නියමිත පැමිණීම: {date} · {time}",
+  "@detailsArrivalAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsDuration": "මිනිත්තු {minutes} · තෝරාගත් ගමන් කොටස",
+  "@detailsDuration": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "detailsBoardHere": "මෙතැනින් නගින්න · {time}",
+  "@detailsBoardHere": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsAlightHere": "මෙතැනින් බසින්න · {time}",
+  "@detailsAlightHere": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsScheduledStop": "නියමිත {time}",
+  "@detailsScheduledStop": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsNextStop": "ගමනේ ඊළඟ නැවතුම: {name}",
+  "@detailsNextStop": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsSourceDated": "දින නියමිත කාලසටහන",
+  "resultsSourceRoad": "මාර්ග ප්‍රගතිය + කාලසටහන (අඩු විශ්වාසය)",
+  "resultsSourceBoarding": "නගින නැවතුමේ GPS",
+  "resultsSourceInterval": "GPS නිරීක්ෂිත නැවතුමේ සිට කාලසටහන් කාල පරතරය",
+  "evidenceRecheckSummary": "නොවිසඳුණු බාධාවක් - නැවත පරීක්ෂා කරන්න",
+  "evidenceBarrierSummary": "බාධාවක් වාර්තා වී ඇත - ගමනට පෙර බලන්න",
+  "evidencePositiveSummary": "ධනාත්මක නිරීක්ෂණයක් - විස්තර බලන්න",
+  "evidenceUnknownSummary": "නොදනී - වත්මන් නිරීක්ෂණයක් නැත",
+  "evidenceTimeUnknown": "නොදනී - නිරීක්ෂණ වේලාව නොමැත",
+  "evidenceExpired": "නොදනී — අවසන් නිරීක්ෂණයේ කාලය ඉකුත් වී ඇත",
+  "evidenceRecheckUnknown": "නොවිසඳුණු බාධාවක් — නැවත පරීක්ෂා කරන්න; වත්මන් තත්ත්වය නොදනී",
+  "evidenceConditionUnknown": "නොදනී — තත්ත්වය නිශ්චය කළ නොහැකි විය",
+  "evidenceBarrierConfirmed": "බාධාවක් — ප්‍රජාව තහවුරු කළ නිරීක්ෂණය",
+  "evidencePositiveConfirmed": "ධනාත්මක — ප්‍රජාව තහවුරු කළ නිරීක්ෂණය",
+  "evidenceBarrierUnverified": "බාධාවක් වාර්තා වී ඇත — තහවුරු කිරීම නොදනී",
+  "evidencePositiveUnverified": "ධනාත්මක තත්ත්වයක් වාර්තා වී ඇත — තහවුරු කිරීම නොදනී",
+  "evidenceNoConfirmationTime": "තහවුරු කළ වේලාව: නොදනී",
+  "evidenceVehicleSection": "බසයේ බෑවුමේ තත්ත්වයන්",
+  "evidenceBoardingSection": "නගින නැවතුමේ තත්ත්වයන්",
+  "evidenceDestinationSection": "බසින නැවතුමේ තත්ත්වයන්",
+  "evidenceAssistanceSection": "රියදුරු සහාය පිළිබඳ නිරීක්ෂණ",
+  "evidenceDisclosure": "ප්‍රජා නිරීක්ෂණ විශේෂිත තත්ත්වයන් විස්තර කරයි; මුළු ගමනම තහවුරු නොකරයි.",
+  "evidenceEmpty": "නොදනී — නිරීක්ෂණයක් නොමැත",
+  "evidenceMember": "ප්‍රජා සාමාජිකයෙක්",
+  "rampWorkingObserved": "ක්‍රියාකාරී බව නිරීක්ෂණය කර ඇත",
+  "rampBrokenUnresolved": "දෝෂයක් වාර්තා වී ඇත - නොවිසඳුණු අවදානමක්",
+  "rampNewCheck": "නොදනී - නව පරීක්ෂාවක් අවශ්‍යයි",
+  "rampEquipped": "සවි කර ඇත",
+  "rampNotListed": "ලැයිස්තුගත කර නැත",
+  "rampTitle": "බසයේ බෑවුම",
+  "rampOperatorSource": "රියදුරු නිරීක්ෂණය",
+  "rampBarrierDisclosure": "ක්‍රියාකාරී බවට නිරීක්ෂණයක් තිබීමෙන් පවතින ප්‍රජා බාධා විසඳී ඇතැයි අදහස් නොවේ.",
+  "mapMissingCoordinates": "සිතියම නොමැත · නැවතුම් ඛණ්ඩාංක සමාලෝචනය කර නැත. නැවතුම් ලැයිස්තුව භාවිත කරන්න.",
+  "mapCurrentBus": "බසයේ වත්මන් ස්ථානය",
+  "mapNoRoadGeometry": "නැවතුම් ස්ථාන · මාර්ගයේ ජ්‍යාමිතික දත්ත නොමැත",
+  "mapTileRetry": "සිතියම් කොටස් නොමැත · යළි උත්සාහ කරන්න හෝ නැවතුම් ලැයිස්තුව බලන්න",
+  "timetableUnassigned": "ප්‍රකාශිත කාලසටහන • බසයක් පවරා නැත",
+  "timetableUnknownDisclosure": "වේලාවන් වෙනස් විය හැක. බස් ලියාපදිංචිය, ප්‍රවේශ පහසුකම් සහ සජීවී ස්ථානය නොදනී. අවසරලත් බසයක් සම්බන්ධ කරන තුරු රියදුරු සහාය නොමැත.",
+  "evidenceCheckedAt": "අවසන් පරීක්ෂාව: {time}",
+  "@evidenceCheckedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceRecheckedAt": "අවසන් නැවත පරීක්ෂාව: {time}, {name} විසින්. අනන්‍ය තහවුරු කිරීම් වෙනස් වී නැත.",
+  "@evidenceRecheckedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceDueAt": "නැවත පරීක්ෂා කළ යුතු වේලාව: {time}",
+  "@evidenceDueAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceExpiresAt": "නිරීක්ෂණය කල් ඉකුත් වන වේලාව: {time}",
+  "@evidenceExpiresAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceReportedAt": "වාර්තා කළ වේලාව: {time}",
+  "@evidenceReportedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceConfirmedAt": "අවසන් තහවුරු කිරීම සටහන් කළ වේලාව: {time}",
+  "@evidenceConfirmedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceReporter": "වාර්තා කළේ: {name}",
+  "@evidenceReporter": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceConfirmers": "{count, plural, =1{තහවුරු කළේ: ප්‍රජා සාමාජිකයන් 1යි} other{තහවුරු කළේ: ප්‍රජා සාමාජිකයන් {count}යි}}",
+  "@evidenceConfirmers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rampCapability": "බෑවුම සවි කර තිබීම: {capability}",
+  "@rampCapability": {
+    "placeholders": {
+      "capability": {
+        "type": "String"
+      }
+    }
+  },
+  "rampCheckedAge": "බෑවුමේ අවසන් පරීක්ෂාව: {age}",
+  "@rampCheckedAge": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "rampSource": "බෑවුම් නිරීක්ෂණයේ මූලාශ්‍රය: {source}",
+  "@rampSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "rampRecordedAt": "පරීක්ෂාව සටහන් කළ වේලාව: {time}",
+  "@rampRecordedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "mapUpdatedAt": "ස්ථානය යාවත්කාලීන කළේ: {time}",
+  "@mapUpdatedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "timetableSource": "මූලාශ්‍රය: {source}",
+  "@timetableSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "reportSignInChange": "හවුල් වාර්තාව වෙනස් කිරීමට පෙර පිවිසෙන්න.",
+  "reportChangeUnconfirmed": "වෙනස තහවුරු නැත. සම්බන්ධතාව සහ පිවිසීම පරීක්ෂා කර යළි උත්සාහ කරන්න හෝ වාර්තාව නැවත ලබාගන්න.",
+  "reportCopied": "දැනුම්දීමේ පෙළ පිටපත් කළා!",
+  "reportCopyFailed": "දැනුම්දීම පිටපත් කළ නොහැකි විය. යළි උත්සාහ කරන්න.",
+  "reportImageUnavailable": "ඡායාරූප පෙරදසුන නොමැත",
+  "reportDetailsTitle": "වාර්තා විස්තර",
+  "reportRemoved": "හවුල් වාර්තාව නොමැත හෝ ඉවත් කර ඇත. යාවත්කාලීන කිරීමට feed එක නැවත විවෘත කරන්න.",
+  "reportShare": "දැනුම්දීම බෙදාගන්න",
+  "reportStaleUpdates": "හවුල් යාවත්කාලීන නොමැත. අවසන් වරට ලැබුණු නිරීක්ෂණය පෙන්වයි; ක්‍රියා කිරීමට පෙර නැවත ලබාගන්න.",
+  "reportSignInActions": "හවුල් වාර්තා තහවුරු කිරීමට, සලකුණු කිරීමට හෝ විසඳුම සටහන් කිරීමට පිවිසෙන්න.",
+  "reportResolutionDisclosure": "විසඳුම කර්තෘ සටහන් කළ නිරීක්ෂණයකි; එය අලුත්වැඩියාවක් ස්වාධීනව තහවුරු නොකරයි.",
+  "reportResolutionUnknown": "විසඳුම සටහන් කළ වේලාව: නොදනී",
+  "reportResolvedTitle": "විසඳූ බව සටහන් කර ඇත",
+  "reportResolvedHelp": "කර්තෘ මෙම තත්ත්වය විසඳූ බව සටහන් කර ඇත.",
+  "reportObservationUnknown": "නිරීක්ෂණ වේලාව නොදනී",
+  "reportUnknownHelp": "නිරීක්ෂණ දිනය නොමැත. වත්මන් තත්ත්වය තහවුරු කළ නොහැක.",
+  "reportConfirmedTitle": "ප්‍රජාව තහවුරු කළ නිරීක්ෂණය",
+  "reportActiveTitle": "ක්‍රියාත්මක ගමනාගමන වාර්තාව",
+  "reportActiveHelp": "මගියකු වාර්තා කර ඇත. නිරීක්ෂණ වේලාව සහ වත්මන් සාක්ෂි බලන්න.",
+  "reportExpiredTitle": "පැරණි වාර්තාව (කල් ඉකුත් වී ඇත)",
+  "reportExpiredHelp": "මෙම නිරීක්ෂණය කල් ඉකුත් වී ඇත; එය වත්මන් තත්ත්වය තහවුරු නොකරයි.",
+  "reportYours": "ඔබේ වාර්තාව",
+  "reportBus": "බසය",
+  "reportStation": "නැවතුම",
+  "reportHighSeverity": "බරපතළ",
+  "reportMinorSeverity": "සුළු ගැටලුවක්",
+  "reportModerateSeverity": "මධ්‍යස්ථ",
+  "reportConditionDetails": "වාර්තා කළ තත්ත්වයේ විස්තර",
+  "reportRiderNote": "මගියාගේ සටහන:",
+  "reportPhotoEvidence": "අමුණා ඇති ඡායාරූප සාක්ෂි",
+  "reportEnlarge": "විශාල කිරීමට තට්ටු කරන්න",
+  "reportPhotoUnavailable": "ඡායාරූපය නොමැත",
+  "reportMetrics": "ප්‍රජා තහවුරු කිරීම් සහ සලකුණු",
+  "reportRecheckDisclosure": "නැවත පරීක්ෂා කිරීම් දින සහිත නිරීක්ෂණ වේ; අනන්‍ය තහවුරු කිරීම් වෙනස් නොවේ.",
+  "reportVoteHeading": "වාර්තාවේ නිරවද්‍යතාවට ඡන්දය දෙන්න",
+  "reportRecheckAction": "තත්ත්වය නැවත පරීක්ෂා කරන්න",
+  "reportFixed": "විසඳූ බව සලකුණු කර ඇත",
+  "reportResolveAction": "තත්ත්වය විසඳූ බව සටහන් කරන්න",
+  "reportRampCategory": "බෑවුම සහ ප්‍රවේශය",
+  "reportLiftCategory": "විදුලි සෝපානය",
+  "reportCrowdingCategory": "මගී තදබදය",
+  "reportCleanCategory": "පිරිසිදුකම",
+  "reportSafetyCategory": "ආරක්ෂාවට අවදානමක්",
+  "deliveryTitle": "වාර්තාව යැවීම",
+  "deliveryStatus": "ප්‍රකාශන තත්ත්වය",
+  "deliveryDraftUnavailable": "කෙටුම්පත නොමැත",
+  "deliveryPublished": "ප්‍රකාශිතයි",
+  "deliveryPending": "යැවීමට රැඳී ඇත",
+  "deliveryFailed": "අසාර්ථකයි",
+  "deliveryPublicHelp": "ඔබේ වාර්තාව අනෙක් මගීන්ට දැකිය හැක.",
+  "deliveryRemovedHelp": "මෙම කෙටුම්පත ඉවත් කර ඇත, කල් ඉකුත් වී ඇත හෝ වෙනත් ගිණුමකට අයත්ය. ප්‍රකාශනය තහවුරු වී නැත.",
+  "deliveryPendingHelp": "මෙම උපාංගයේ සුරැකිණි. ප්‍රකාශනය තහවුරු වී නැත.",
+  "deliveryLocalUnavailable": "උපාංගයේ කෙටුම්පත නොමැත",
+  "deliveryObservation": "ඔබේ නිරීක්ෂණය",
+  "deliveryTarget": "ස්ථානය / බසය",
+  "deliveryCondition": "වාර්තා කළ තත්ත්වය",
+  "deliveryPhoto": "අමුණා ඇති ඡායාරූපය",
+  "deliveryPhotoUnavailable": "ඡායාරූප පෙරදසුන නොමැත",
+  "deliveryUploading": "යවමින්…",
+  "deliveryRetry": "නැවත යවන්න",
+  "deliveryRemoveDevice": "මෙම උපාංගයෙන් කෙටුම්පත ඉවත් කරන්න",
+  "deliveryAboutDrafts": "උපාංගයේ කෙටුම්පත් ගැන",
+  "deliveryDraftExpiry": "කෙටුම්පත් දින 7කින් කල් ඉකුත් වන අතර පිටවීමේදී හෝ ගිණුම මාරු කිරීමේදී ඉවත් වේ.",
+  "deliveryViewFeed": "ප්‍රජා වාර්තා බලන්න",
+  "deliveryHome": "මුල් පිටුවට යන්න",
+  "deliverySaveFailed": "යැවීමේ තත්ත්වය සුරැකිය නොහැකි විය. යළි උත්සාහ කරන්න.",
+  "deliveryRemoveQuestion": "උපාංගයේ කෙටුම්පත ඉවත් කරන්නද?",
+  "deliveryRemoveHelp": "ඉදිරි නැවත යැවීම් නවතා උපාංගයේ සටහන/ඡායාරූපය ඉවත් කරයි. දැනටමත් යැවූ ඉල්ලීමක් අවසන් විය හැක. මෙය ප්‍රසිද්ධ වාර්තාවක් හෝ යැවූ ඡායාරූපයක් මකා නොදමයි.",
+  "deliveryKeep": "කෙටුම්පත තබාගන්න",
+  "deliveryRemove": "කෙටුම්පත ඉවත් කරන්න",
+  "deliveryRemoveFailed": "උපාංගයෙන් ඉවත් කිරීම සුරැකිය නොහැකි විය. යළි උත්සාහ කරන්න.",
+  "deliveryUnknownTime": "නිරීක්ෂණ වේලාව නොදනී. යැවීමට පෙර නව වාර්තාවක් සාදන්න.",
+  "deliveryWaiting": "සම්බන්ධතාවක් සඳහා රැඳී ඇත. මෙම වාර්තාව ප්‍රකාශිත බව තහවුරු නැත.",
+  "deliveryUploadFailed": "යැවීම අසාර්ථකයි. පිවිසීම, ඡායාරූපය සහ සේවා ප්‍රවේශය පරීක්ෂා කර යළි උත්සාහ කරන්න.",
+  "reportAlreadySaved": "මෙම ක්‍රියාව දැනටමත් සටහන් කර ඇත.",
+  "reportWaitRecheck": "නැවත පරීක්ෂාව සුරැකී නැත. අවසන් පරීක්ෂාවෙන් මිනිත්තු 30කට පසු යළි උත්සාහ කරන්න.",
+  "reportChangeSaved": "වෙනස සුරැකිණි. සම්බන්ධ වූ විට හවුල් විස්තර යාවත්කාලීන වේ.",
+  "reportConfirmationSaved": "හවුල් වාර්තාවට තහවුරු කිරීම සුරැකිණි.",
+  "reportRecheckSaved": "නැවත පරීක්ෂාව සුරැකිණි. අනන්‍ය තහවුරු කිරීම් සහ ලකුණු වෙනස් නොවේ.",
+  "reportFlagSaved": "හවුල් වාර්තාවට සලකුණ සුරැකිණි.",
+  "reportFlagHiddenLegacy": "සලකුණ සුරැකිණි. ස්වාධීන සලකුණු තුනකට පසු වාර්තාව සඟවා ඇත.",
+  "reportResolutionSaved": "හවුල් වාර්තාවට විසඳුම සුරැකිණි.",
+  "reportShareText": "AccessTransit දැනුම්දීම: {target} හි {title}. AccessTransit තුළ නිරීක්ෂණය බලන්න.",
+  "@reportShareText": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "reportResolvedBy": "විසඳුම සටහන් කළේ: {name}",
+  "@reportResolvedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportResolvedAt": "විසඳුම සටහන් කළේ: {date}, {time}",
+  "@reportResolvedAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reportHiddenHelp": "ස්වාධීන වැරදි බව දැක්වීමේ සලකුණු {threshold}කට පසු මෙම වාර්තාව සඟවා ඇත. තත්ත්වය අසත්‍ය බව මෙයින් සනාථ නොවේ.",
+  "@reportHiddenHelp": {
+    "placeholders": {
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "reportRecheckAge": "අවසන් පරීක්ෂාව {age}. වත්මන් තත්ත්වය නොදනී; අලුත්වැඩියාවක් සටහන් වී නැත.",
+  "@reportRecheckAge": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "reportConfirmedRiders": "{count, plural, =1{සෙසු මගීන් 1 දෙනකු තහවුරු කර ඇත.} other{සෙසු මගීන් {count} දෙනකු තහවුරු කර ඇත.}}",
+  "@reportConfirmedRiders": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportTransitVehicle": "ගමනාගමන බසය • {name}",
+  "@reportTransitVehicle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportTransitStation": "ගමනාගමන නැවතුම • {name}",
+  "@reportTransitStation": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportUniqueCount": "{count, plural, =1{අනන්‍ය තහවුරු කිරීම්: මගීන් 1යි} other{අනන්‍ය තහවුරු කිරීම්: මගීන් {count}යි}}",
+  "@reportUniqueCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportFlagCount": "වැරදි බව දැක්වීමේ සලකුණු: {count} / {threshold} (ස්වාධීන සලකුණු {threshold}කින් වාර්තාව සැඟවේ)",
+  "@reportFlagCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "reportOriginally": "මුලින් වාර්තා කළේ: {age}",
+  "@reportOriginally": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "reportLastRecheck": "අවසන් නැවත පරීක්ෂාව: {age}, {name} විසින්",
+  "@reportLastRecheck": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportLastConfirmed": "අවසන් තහවුරු කිරීම: {age}",
+  "@reportLastConfirmed": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "reportLegacyVoteHelp": "ඔබ නිරීක්ෂණය කළ දේ පමණක් තහවුරු කරන්න. පෙර තහවුරු කළ අයට අවසන් පරීක්ෂාවෙන් මිනිත්තු 30කට පසු නැවත පරීක්ෂා කළ හැක; අනන්‍ය ඡන්ද සහ ලකුණු වැඩි නොවේ. තත්ත්වය වෙනස් වී නම් නව වාර්තාවක් දෙන්න. ස්වාධීන සලකුණු {threshold}කින් වාර්තාව සැඟවේ.",
+  "@reportLegacyVoteHelp": {
+    "placeholders": {
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "reportTrueCount": "සත්‍යයි ({count})",
+  "@reportTrueCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportFalseCount": "අසත්‍යයි ({count}/{threshold})",
+  "@reportFalseCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "reportFalseRecorded": "අසත්‍යයි ({count}/{threshold})",
+  "@reportFalseRecorded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "deliveryCooldownAt": "එම ගැටලුව නැවත වාර්තා කිරීමට රැඳී සිටින්න. {time} (UTC) පසු නැවත උත්සාහ කරන්න. කෙටුම්පත සුරැකිණි.",
+  "@deliveryCooldownAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "formPhotoFailed": "ඡායාරූපය ඇමිණිය නොහැකි විය. අවසර පරීක්ෂා කර යළි උත්සාහ කරන්න.",
+  "formSubmitFailed": "වාර්තාව යැවීම තහවුරු නැත. පිවිසීම සහ සම්බන්ධතාව පරීක්ෂා කර යළි උත්සාහ කරන්න.",
+  "formSignIn": "වාර්තාව ප්‍රකාශ කිරීමට පෙර පිවිසෙන්න.",
+  "formAccountChanged": "ගිණුම වෙනස් විය. වාර්තාව නැවත සමාලෝචනය කරන්න.",
+  "formReviewTarget": "ස්ථානය / බසය: {target}",
+  "@formReviewTarget": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "formReviewCondition": "තත්ත්වය: {condition}",
+  "@formReviewCondition": {
+    "placeholders": {
+      "condition": {
+        "type": "String"
+      }
+    }
+  },
+  "formReviewCrowding": "තදබදය: {level}",
+  "@formReviewCrowding": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "formReviewNote": "සටහන: {note}",
+  "@formReviewNote": {
+    "placeholders": {
+      "note": {
+        "type": "String"
+      }
+    }
+  },
+  "formBusRoute": "බසය {number}",
+  "@formBusRoute": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "formVehicleRoute": "{vehicle} (මාර්ගය {number})",
+  "@formVehicleRoute": {
+    "placeholders": {
+      "vehicle": {
+        "type": "String"
+      },
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "formBusRamp": "{vehicle} ♿ (බෑවුම)",
+  "@formBusRamp": {
+    "placeholders": {
+      "vehicle": {
+        "type": "String"
+      }
+    }
+  },
+  "formLowCrowd": "අඩු තදබදය",
+  "formPlentyOfRoomWheelchairBay": "ඉඩ ඇත; රෝද පුටු ඉඩ හිස්ය",
+  "formModerate": "මධ්‍යම",
+  "formSeatsFullStandingRoomAvailable": "ආසන පිරී ඇත; හිටගෙන යාමට ඉඩ ඇත",
+  "formCrowdedPacked": "තදබදය වැඩියි",
+  "formWheelchairSpaceOrAisleBlocked": "රෝද පුටු ඉඩ හෝ මැද මාර්ගය අවහිරයි",
+  "formRampBay": "බෑවුම සහ රෝද පුටු ඉඩ",
+  "formRampWorking": "බෑවුම ක්‍රියාකරයි",
+  "formDriverAssistedDeployedRamp": "රියදුරු උදව් කර බෑවුම යෙදවීය",
+  "formRampBroken": "බෑවුම දෝෂ සහිතයි",
+  "formMotorJammedOrRampBroken": "මෝටරය හිර වී හෝ බෑවුම කැඩී ඇත",
+  "formRampDenied": "බෑවුම් සහාය ප්‍රතික්ෂේප කළා",
+  "formDriverDidNotLowerOr": "රියදුරු බෑවුම පහත් කළේ හෝ යෙදවූයේ නැත",
+  "formBayBlocked": "රෝද පුටු ඉඩ අවහිරයි",
+  "formBlockedByBagsOrStanding": "බෑග් හෝ හිටගෙන සිටින මගීන් නිසා අවහිරයි",
+  "formSeats": "ආසන",
+  "formSeatsFree": "ආසන හිස්ය",
+  "formElderlyDisabledSeatsFree": "වැඩිහිටි / ආබාධ සහිත අයට වෙන් කළ ආසන හිස්ය",
+  "formSeatsOccupied": "ආසන පිරී ඇත",
+  "formOthersNotGivingUpSeats": "අනෙක් අය ආසන ලබා දෙන්නේ නැත",
+  "formSeatBroken": "ආසනය කැඩී ඇත",
+  "formDamagedOrLooseSeating": "හානි වූ හෝ බුරුල් ආසන",
+  "formSafetyClean": "ආරක්ෂාව සහ පිරිසිදුකම",
+  "formCleanSafe": "පිරිසිදු සහ ආරක්ෂිතයි",
+  "formVehicleWellMaintained": "බසය හොඳින් නඩත්තු කර ඇත",
+  "formDirtyOdor": "අපිරිසිදු / දුර්ගන්ධය",
+  "formSpillOrUnpleasantSmell": "දියර ඉහිරීමක් හෝ දුර්ගන්ධයක්",
+  "formRailBroken": "අත් වැට කැඩී ඇත",
+  "formGrabRailsOrStrapsLoose": "අත් වැටවල් හෝ අත් පටි බුරුල්ය",
+  "formRecklessDriving": "අනාරක්ෂිත රිය පැදවීම",
+  "formSuddenJerksUnsafeRide": "හදිසි ගැස්සීම්; අනාරක්ෂිත ගමනක්",
+  "formElevator": "විදුලි සෝපානය",
+  "formElevatorWorking": "සෝපානය ක්‍රියාකරයි",
+  "formOperatingSmoothlyAccessible": "හොඳින් ක්‍රියාකරයි; ප්‍රවේශ විය හැක",
+  "formOutOfService": "සේවයෙන් ඉවත් කර ඇත",
+  "formElevatorShutDownOrRepair": "සෝපානය නවතා හෝ අලුත්වැඩියා කරමින් ඇත",
+  "formDoorButtonFault": "දොර / බොත්තම් දෝෂයක්",
+  "formDoorsStuckOrButtonsBroken": "දොරවල් හිර වී හෝ බොත්තම් කැඩී ඇත",
+  "formRampPath": "බෑවුම සහ මාර්ගය",
+  "formRampClear": "බෑවුම පැහැදිලියි",
+  "formSmoothWheelchairSlope": "සුමට රෝද පුටු බෑවුමක්",
+  "formPathBlocked": "මාර්ගය අවහිරයි",
+  "formVendorsOrParkedVehicles": "වෙළෙන්දන් හෝ නවතා ඇති වාහන",
+  "formDamagedSteep": "හානි වූ / දැඩි බෑවුමක්",
+  "formPavementCrackedOrSteepSlope": "පදික මාර්ගය ඉරිතලා හෝ බෑවුම දැඩියි",
+  "formTactileTiles": "ස්පර්ශ මාර්ග ටයිල්",
+  "formTilesIntact": "ටයිල් හොඳ තත්ත්වයේ",
+  "formGuidedTactileTilesClear": "ස්පර්ශ මාර්ග ටයිල් අවහිර නැත",
+  "formTilesBroken": "ටයිල් කැඩී ඇත",
+  "formLooseTilesCausingTripHazard": "බුරුල් ටයිල් නිසා පැකිළීමේ අවදානමක්",
+  "formUnsafeEdgeGap": "අනාරක්ෂිත දාර පරතරයක්",
+  "formExcessiveGapBetweenCurbBus": "පදික දාරය හා බසය අතර වැඩි පරතරයක්",
+  "formShelterLight": "ආවරණය සහ ආලෝකය",
+  "formShelterGood": "ආවරණය හොඳ තත්ත්වයේ",
+  "formRainProtectionSeatingIntact": "වැසි ආවරණය සහ ආසන හොඳ තත්ත්වයේ",
+  "formRoofDamaged": "වහලයට හානි වී ඇත",
+  "formDamagedRoofOrBrokenBenches": "හානි වූ වහලය හෝ කැඩුණු බංකු",
+  "formDarkUnsafe": "අඳුරු / අනාරක්ෂිතයි",
+  "formPoorNightLightingInWalkway": "රාත්‍රියේ ඇවිදින මාර්ගයේ ආලෝකය අඩුයි",
+  "formPhotoAttachedSuccessfully": "ඡායාරූපය අමුණා ඇත!",
+  "formAttachEvidencePhoto": "සාක්ෂි ඡායාරූපයක් අමුණන්න",
+  "formHelpVerifyConditionForCommuters": "ආබාධ සහිත මගීන්ට තත්ත්වය තේරුම් ගැනීමට උදව් කරන්න",
+  "formTakePhoto": "ඡායාරූපයක් ගන්න",
+  "formFromGallery": "ගැලරියෙන් තෝරන්න",
+  "formSelectTheExactBusOr": "ඔබ නිරීක්ෂණය කළ නිශ්චිත බසය හෝ නැවතුම තෝරන්න.",
+  "formChooseTheConditionAndCrowding": "ඔබ නිරීක්ෂණය කළ තත්ත්වය සහ තදබද මට්ටම තෝරන්න.",
+  "formChooseTheConditionYouObserved": "ඔබ නිරීක්ෂණය කළ තත්ත්වය තෝරන්න.",
+  "formConfirmYourObservation": "ඔබේ නිරීක්ෂණය තහවුරු කරන්න",
+  "formEvidence1PhotoAttached": "සාක්ෂි: ඡායාරූප 1ක් අමුණා ඇත",
+  "formYourObservationNoteAndAttached": "ප්‍රකාශනයෙන් පසු නිරීක්ෂණය, සටහන සහ ඡායාරූපය ප්‍රසිද්ධ වේ. මුහුණු, හඳුනාගත හැකි විස්තර සහ සංවේදී පෞද්ගලික තොරතුරු ඇතුළත් නොකරන්න. බෙදාගැනීමට අවසර ඇති ඡායාරූප පමණක් යවන්න.",
+  "formPendingDraftsStayOnThis": "කෙටුම්පත් දින 7ක් දක්වා මෙම උපාංගයේ පවතින අතර පිටවීමේදී හෝ ගිණුම මාරු කිරීමේදී ඉවත් වේ. Your uploads වෙතින් ඉවත් කළ හැක. දැනටමත් යැවූ ඉල්ලීමක් ආපසු ගැනීමට හෝ ප්‍රසිද්ධ වාර්තාවක්/ඡායාරූපයක් මැකීමට කෙටුම්පත ඉවත් කිරීම ප්‍රමාණවත් නොවේ.",
+  "formAndroidDraftsUseEncryptedPrivate": "Android කෙටුම්පත් සංකේතනය කළ පෞද්ගලික ගබඩාවක පවතී. අනෙක් platforms වල කෙටුම්පත් මෙම app session එකට පමණි.",
+  "formEditReport": "වාර්තාව සංස්කරණය කරන්න",
+  "formConfirmAndSubmit": "තහවුරු කර යවන්න",
+  "formCommunityReport": "ප්‍රජා වාර්තාව",
+  "formHelpAccessibleTransitCommutersIn": "මගීන්ට ඔබේ නිරීක්ෂණ බෙදාගන්න",
+  "formSelectBusRoute": "බස් මාර්ගය තෝරන්න",
+  "formWhichRouteAreYouTraveling": "ඔබ ගමන් කරන හෝ බලා සිටින මාර්ගය කුමක්ද?",
+  "formWhereIsTheIssue": "ගැටලුව කොතැනද?",
+  "formChooseWhetherYouAreInside": "ඔබ බසය තුළද නැවතුමකද යන්න තෝරන්න",
+  "formVehicleAccessibilityCondition": "බසයේ ප්‍රවේශ පහසුකම් තත්ත්වය",
+  "formStationAccessibilityCondition": "නැවතුමේ ප්‍රවේශ පහසුකම් තත්ත්වය",
+  "formReportCrowdingLevelAndWheelchair": "බසයේ තදබදය සහ රෝද පුටු ප්‍රවේශය වාර්තා කරන්න",
+  "formReportElevatorRampAndPlatform": "නැවතුමේ සෝපාන, බෑවුම් සහ වේදිකා තත්ත්වයන් වාර්තා කරන්න",
+  "formEvidencePhotoOptional": "සාක්ෂි ඡායාරූපය (අත්‍යවශ්‍ය නැත)",
+  "formTakeAPhotoOrUpload": "තත්ත්වයට අදාළ ඡායාරූපයක් ගන්න හෝ ගැලරියෙන් තෝරන්න",
+  "formAdditionalNoteOptional": "අමතර සටහන (අත්‍යවශ්‍ය නැත)",
+  "formAddHelpfulDetailsForFellow": "රෝද පුටු භාවිත කරන හෝ වැඩිහිටි මගීන්ට උපකාරී විස්තර එක් කරන්න",
+  "formEGRampWasLowered": "උදා: බෑවුම පහත් කළ නමුත් රියදුරුට වෙනත් අයකුගේ උදව් අවශ්‍ය විය",
+  "formSubmittingReport": "වාර්තාව යවමින්…",
+  "formReviewAndSubmitReport": "වාර්තාව බලලා යවන්න",
+  "formSelectARouteOptional": "මාර්ගයක් තෝරන්න (අත්‍යවශ්‍ය නැත)",
+  "formOnABus": "බසයක් තුළ",
+  "formInsideTheVehicle": "බසය තුළ",
+  "formAtABusStop": "බස් නැවතුමක",
+  "formStationPlatform": "නැවතුම සහ වේදිකාව",
+  "formSelectSpecificBusLicensePlate": "නිශ්චිත බසය / ලියාපදිංචි අංකය තෝරන්න",
+  "formSelectStopAlongThisRoute": "මෙම මාර්ගයේ නැවතුම තෝරන්න",
+  "formCrowdingLevel": "තදබද මට්ටම",
+  "formChooseTheCrowdingLevelYou": "ඔබ නිරීක්ෂණය කළ තදබද මට්ටම තෝරන්න.",
+  "formAccessibilityIssueCategory": "ප්‍රවේශ ගැටලු කාණ්ඩය",
+  "formStationFacilityCategory": "නැවතුම් පහසුකම් කාණ්ඩය",
+  "formPhotoUploadsAreCurrentlyUnavailable": "දැනට ඡායාරූප යැවිය නොහැක. ඡායාරූපයක් නැතිව වාර්තාව යැවිය හැක.",
+  "formPhotoAttached": "ඡායාරූපය අමුණා ඇත",
+  "formWillBeUploadedWithReport": "වාර්තාව සමඟ යවනු ඇත",
+  "formRemovePhoto": "ඡායාරූපය ඉවත් කරන්න",
+  "formAddPhoto": "ඡායාරූපයක් එක් කරන්න",
+  "formTapToTakePhotoOr": "ඡායාරූපයක් ගන්න හෝ උපාංගයෙන් තෝරන්න",
+  "formNotSelected": "තෝරා නැත",
+  "formReportSummary": "වාර්තා සාරාංශය",
+  "formLocationVehicle": "ස්ථානය / බසය",
+  "formAccessibilityStatus": "ප්‍රවේශ පහසුකම් තත්ත්වය",
+  "formPhotoEvidence": "ඡායාරූප සාක්ෂි",
+  "form1PhotoAttached": "ඡායාරූප 1ක් අමුණා ඇත",
+  "communityHubTitle": "ප්‍රජා මධ්‍යස්ථානය",
+  "communitySubtitle": "මගීන්ගේ ප්‍රවේශ පහසුකම් නිරීක්ෂණ",
+  "communityReportAction": "තත්ත්වයක් වාර්තා කරන්න",
+  "communityPastReports": "විසඳූ සහ පැරණි වාර්තා",
+  "communityNoOwnReports": "තවම වාර්තා නැත",
+  "communityEmptyTitle": "වත්මන් වාර්තා නැත",
+  "communityOwnEmptyHelp": "රෝද පුටු ප්‍රවේශය, තදබදය හෝ සෝපාන ගැන ඔබ යවන වාර්තා මෙහි පෙන්වයි.",
+  "communityEmptyHelp": "මෙම ලැයිස්තුවේ වත්මන් වාර්තා නොමැත. මෙයින් ප්‍රවේශ පහසුකම් හෝ ආරක්ෂාව තහවුරු නොවේ.",
+  "communitySubmitReport": "තත්ත්ව වාර්තාවක් යවන්න",
+  "communityUpdatesTab": "යාවත්කාලීන",
+  "communityMyReportsTab": "මගේ වාර්තා",
+  "communityContributor": "ප්‍රජා දායකයා",
+  "communityPhoto": "ඡායාරූපය",
+  "communityRecheckHelp": "අවසන් පරීක්ෂාවෙන් මිනිත්තු 30කට පසු එම තත්ත්වය නැවත පරීක්ෂා කරන්න. අමතර ඡන්ද හෝ ලකුණු නැත. වෙනස් වූ තත්ත්වයන් වෙනම වාර්තා කරන්න.",
+  "communityActiveBadge": "ක්‍රියාත්මකයි",
+  "communityConfirmedBadge": "ප්‍රජාව තහවුරු කර ඇත",
+  "communityResolvedBadge": "විසඳූ බව සටහන් කර ඇත",
+  "communityPastBadge": "පැරණි",
+  "communityUnavailable": "ප්‍රජා වාර්තා නොමැත. සම්බන්ධ වී යළි උත්සාහ කරන්න.",
+  "communityRetry": "වාර්තා නැවත ලබාගන්න",
+  "communityOwnSignIn": "ඔබේ වාර්තා සහ උපාංගයේ කෙටුම්පත් බැලීමට පිවිසෙන්න.",
+  "outboxTitle": "ඔබේ යැවීම්",
+  "outboxHelp": "කෙටුම්පත් දින 7කින් කල් ඉකුත් වේ. යළි යැවීමට හෝ ඉවත් කිරීමට යැවීමක් විවෘත කරන්න. පිටවීමේදී උපාංගයේ කෙටුම්පත් ඉවත් වේ.",
+  "communityStationTarget": "නැවතුම {id}",
+  "@communityStationTarget": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "communityBusTarget": "බසය {id}",
+  "@communityBusTarget": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "communityRouteTarget": "බස් මාර්ගය {number}",
+  "@communityRouteTarget": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "communityContributionCount": "{count, plural, =1{දැනට හවුල් වාර්තා 1ක් ලැයිස්තුගතයි. මෙහි ත්‍යාග ගණනය නොවේ.} other{දැනට හවුල් වාර්තා {count}ක් ලැයිස්තුගතයි. මෙහි ත්‍යාග ගණනය නොවේ.}}",
+  "@communityContributionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "communityChecked": "{freshness} · අවසන් පරීක්ෂාව: {age}",
+  "@communityChecked": {
+    "placeholders": {
+      "freshness": {
+        "type": "String"
+      },
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "communityTrueCount": "සත්‍යයි: {count}",
+  "@communityTrueCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "communityFalseCount": "අසත්‍යයි: {count}/{threshold}",
+  "@communityFalseCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "helpIntro": "AccessTransit භාවිතය",
+  "helpSearchTitle": "බස් රථයක් සොයන්නේ කෙසේද?",
+  "helpSearchBody": "නගින නැවතුම, ගමනාන්තය සහ ඉදිරි පැය 24 ඇතුළත නගින වේලාව තෝරන්න. සෙවීමට ඔබ සුරැකි ප්‍රවේශ පහසුකම් අවශ්‍යතා යෙදේ. සෙවීමේදී කරන වෙනස්කම් එම සෙවීමට පමණි. ගිණුමේ පෙරනිමි අවශ්‍යතා වෙනස් කිරීමට Settings හි සුරකින්න.",
+  "helpSaveTitle": "Save Trip මඟින් සිදුවන්නේ කුමක්ද?",
+  "helpSaveBody": "ප්‍රතිඵලයක් විවෘත කර බස් විස්තර සහ තෝරාගත් නැවතුම් කොටස බලන්න. සුරැකීම අත්‍යවශ්‍ය නැත. එය පසුව සුරැකි ගමන් වෙතින් විස්තර නැවත බැලීමට තෝරාගැනීම සුරකියි. ආසනයක් වෙන් කිරීමක් හෝ ගමන ආරම්භ කිරීමක් සිදු නොවේ. නැවත විවෘත කරන විට යාවත්කාලීන වේලාවන් සහ අවලංගු කිරීම් බලන්න.",
+  "helpLocationTitle": "My Location භාවිතය",
+  "helpLocationBody": "අසල නගින නැවතුම් සෙවීමට ඉල්ලූ විට ස්ථාන අවසරය දෙන්න. සෙවීමට පෙර තෝරාගත් නැවතුම සහ දිශාව පරීක්ෂා කරන්න. ළඟ පිහිටීම පඩි රහිත ඇවිදින මාර්ගයක් ඇති බව තහවුරු නොකරයි. ස්ථානය ලබාගත නොහැකි නම් හෝ අවසර නොදුන්නේ නම් නැවතුම ඔබම තෝරන්න.",
+  "helpLiveTitle": "කාලසටහන සහ සජීවී ස්ථානය",
+  "helpLiveBody": "කාලසටහන සැලැස්මකි; බස් රථය ආරම්භ වූ බවට සාක්ෂියක් නොවේ. අනාගත හෝ ආරම්භ නොකළ ධාවන සඳහා කාලසටහන පෙන්වයි. සජීවී ස්ථානයට තෝරාගත් ධාවනය ආරම්භ වී අලුත් GPS දත්ත තිබිය යුතුය. ස්ථානය පැරණි හෝ නොමැති නම් අවසන් යාවත්කාලීන පණිවිඩය බලන්න. ඇස්තමේන්තු සහ පැමිණීමේ වේලාවන් වෙනස් විය හැක.",
+  "helpReportsTitle": "වාර්තා සහ යැවීමට ඇති කෙටුම්පත්",
+  "helpReportsBody": "නිවැරදි බස් රථය හෝ නැවතුම සහ ඔබ නිරීක්ෂණය කළ දේ වාර්තා කරන්න. උපකරණයේ කෙටුම්පතක් පෞද්ගලිකය; එය ප්‍රකාශිත වාර්තාවක් නොවේ. My Reports යටතේ ඔබේ යැවීම් විවෘත කර යළි යැවීමට හෝ ඉවත් කිරීමට හැක. කෙටුම්පත් දින 7කින් කල් ඉකුත් වන අතර පිටවීමේදී ඉවත් වේ. ප්‍රසිද්ධ සටහන් සහ ඡායාරූපවල පෞද්ගලික තොරතුරු නොදමන්න.",
+  "helpVotesTitle": "ඡන්ද සහ ප්‍රජා විවාද",
+  "helpVotesBody": "කර්තෘට තම වාර්තාවට True හෝ False ඡන්ද දිය නොහැක. ඔබේ නිරීක්ෂණ මත පමණක් ඡන්ද දෙන්න; False සඳහා හේතුවක් දෙන්න. v2 ප්‍රතිපත්තිය අනුව සුදුසු වෙනත් පරිශීලකයන් පස්දෙනෙකුගේ False ඡන්දවලින් වාර්තාව සඟවා අදාළ ලකුණු දඩය සහ වරද සටහන් වේ. මෙය ප්‍රජා විවාදයකි; වාර්තාව බොරු බවට සාක්ෂියක් නොවේ. කර්තෘට වාර්තා සමාලෝචන සහ අභියාචනා තිර භාවිත කළ හැක.",
+  "helpAssistanceTitle": "බස් රථයට නැගීමට සහාය",
+  "helpAssistanceBody": "බස් විස්තර තුළ සහාය ඉල්ලීම විකල්පයකි. බස් රථය, ධාවනය සහ නගින නැවතුම පරීක්ෂා කරන්න. Submitted යනු ඉල්ලීම සටහන් වූ බවය; Accepted යනු පැවරූ රියදුරු එය පිළිගත් බවය. ගමන සුරැකීම හෝ ඉල්ලීම යැවීම සහාය සහතික නොකරයි. ප්‍රතික්ෂේප කිරීම, අවලංගු කිරීම හෝ කල් ඉකුත් වීම ඇතුළු අලුත්ම තත්ත්වය බලන්න.",
+  "helpAccessTitle": "ගිණුම් ප්‍රවේශය සහ සමාලෝචනය",
+  "helpAccessBody": "ප්‍රවේශය සීමා වී ඇත්නම් පෙන්වන හේතුව සහ කල් ඉකුත් වන වේලාව කියවා තිබෙන අභියාචනා ක්‍රියාව භාවිත කරන්න. අභියාචනයක් යැවීමෙන් සීමාව ස්වයංක්‍රීයව ඉවත් නොවේ. ස්ථිර තහනමකට පරිපාලක සමාලෝචනය අවශ්‍යය. Profile තුළ තමන්ම ගිණුම මකා දැමීම නැත; පරිපාලක සමාලෝචනයෙන් මකා දැමීම වෙනම ක්‍රියාවලියකි.",
+  "rewardsTitle": "ලකුණු සහ දායකත්ව",
+  "rewardsMine": "මගේ දායකත්ව",
+  "rewardsSettingsSoon": "සැකසුම් පසුව ලබාගත හැක.",
+  "rewardsReports": "යැවූ වාර්තා",
+  "rewardsConfirmations": "සටහන් කළ තහවුරු කිරීම්",
+  "rewardsViewCard": "සාමාජික කාඩ්පත බලන්න",
+  "rewardsTotal": "මුළු ලකුණු",
+  "rewardsGold": "රන් දායකයා",
+  "rewardsSilver": "රිදී දායකයා",
+  "rewardsBronze": "ලෝකඩ දායකයා",
+  "memberGold": "රන් සාමාජිකයා",
+  "memberSilver": "රිදී සාමාජිකයා",
+  "memberBronze": "ලෝකඩ සාමාජිකයා",
+  "memberBack": "ලකුණු වෙත ආපසු",
+  "memberTitle": "ඩිජිටල් සාමාජික කාඩ්පත",
+  "memberPointsLabel": "දායකත්ව ලකුණු",
+  "memberNoCash": "ලකුණුවලට මුදල් හෝ වවුචර් වටිනාකමක් නැත",
+  "memberNoRedemption": "ලකුණු හුවමාරුව ලබාගත නොහැක",
+  "memberAvailability": "ප්‍රතිලාභ ලබාගත හැකි බව",
+  "memberNoVouchers": "හවුල්කාර වට්ටම් සහ වවුචර් ලබාගත නොහැක.",
+  "memberBenefits": "සාමාජික ප්‍රතිලාභ",
+  "memberNoPriority": "සාමාජිකත්වයෙන් ප්‍රමුඛ සහාය හෝ සහතික කළ ප්‍රවේශයක් නොලැබේ.",
+  "memberRecognition": "ප්‍රජා ඇගයීම",
+  "memberLedgerNotice": "දායකත්ව ලකුණු සටහන් කළ ලකුණු ප්‍රතිපත්තිය අනුව යාවත්කාලීන වේ. ඒවා ප්‍රවේශ පහසුකම් තහවුරු නොකරයි.",
+  "rewardsLegacyNotice": "පැරණි ප්‍රතිපත්තිය: පරිපාලක සමාලෝචනයෙන් පසු ලකුණු යාවත්කාලීන වීමට කාලයක් ගත විය හැක. ප්‍රකාශිත වාර්තාවකට ලකුණු 10කි; අනන්‍ය තහවුරු කිරීමකට ලකුණු 5කි. ඡන්ද ඉවත් කළ විට සහ වාර්තා සැඟවූ හෝ මැකූ විට ලකුණු ආපසු හැරේ. ලකුණු ප්‍රවේශ පහසුකම් තහවුරු නොකරන අතර මුදල් වටිනාකමක් නැත.",
+  "rewardsLevel": "මට්ටම: {level}",
+  "memberPointCount": "ලකුණු {count}",
+  "memberIdentity": "හැඳුනුම් අංකය: {id}",
+  "@rewardsLevel": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "@memberPointCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@memberIdentity": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "assistFormUnknown": "සහාය සඳහා බස් රථය හෝ නැවතුම නොදනී. පළමුව නිශ්චිත නැවතුමක් සහිත ගමනක් තෝරන්න.",
+  "assistFormSelect": "අවම වශයෙන් එක් සහාය විකල්පයක් තෝරන්න.",
+  "assistFormTarget": "සහාය ඉල්ලීමට පෙර ගමනෙන් නිවැරදි බස් රථය සහ නැවතුම තෝරන්න.",
+  "assistFormWrongStop": "තෝරාගත් බස් රථයේ මෙම නැවතුම තහවුරු කළ නොහැකි විය. ගමනට ආපසු ගොස් නිවැරදි ඉලක්කය තෝරන්න.",
+  "assistFormConfirm": "සහාය ඉල්ලීමේ ඉලක්කය තහවුරු කරන්න",
+  "assistFormEdit": "ඉල්ලීම සංස්කරණය කරන්න",
+  "assistFormSendConfirm": "තහවුරු කර යවන්න",
+  "assistFormSignIn": "සහාය ඉල්ලීමක් යැවීමට පෙර පිවිසෙන්න.",
+  "assistFormPrepareError": "ඉල්ලීම සූදානම් කළ නොහැකි විය. පිවිසීම සහ උපකරණයේ ගබඩාව පරීක්ෂා කර යළි උත්සාහ කරන්න.",
+  "assistFormTitle": "සහාය ඉල්ලන්න",
+  "assistFormRamp": "බෑවුම් පුවරුව යොදන්න",
+  "assistFormTime": "අමතර කාලය",
+  "assistFormBoarding": "නැගීමට සහාය",
+  "assistFormAlighting": "බැසීමට සහාය",
+  "assistFormSend": "ඉල්ලීම යවන්න",
+  "assistFormAckHelp": "සහාය තහවුරු වන්නේ රියදුරු ඔබේ ඉල්ලීම පිළිගත් පසුව පමණි.",
+  "assistFormEtaUnknown": "පැමිණීමේ ඇස්තමේන්තුව නොදනී",
+  "assistFormMinutes": "මිනිත්තු (ඇස්.)",
+  "assistFormAccountChanged": "සමාලෝචනය අතරතුර ගිණුම වෙනස් විය. යැවීමට පෙර ඉල්ලීම නැවත සමාලෝචනය කරන්න.",
+  "assistFormBoardAt": "නගින නැවතුම: {stop}",
+  "assistFormAlightAt": "බසින නැවතුම: {stop}",
+  "assistFormBusRoute": "{bus} (මාර්ගය {route})",
+  "assistFormArrival": "{bus} - මිනිත්තු {minutes}කින් පැමිණීමට ඇස්තමේන්තු කර ඇත",
+  "@assistFormBoardAt": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistFormAlightAt": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistFormBusRoute": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      },
+      "route": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistFormArrival": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "assistReceiptTitle": "සහාය ඉල්ලීම",
+  "assistReceiptOwner": "මෙම ඉල්ලීමේ තත්ත්වය බැලීමට එය සෑදූ ගිණුමෙන් පිවිසෙන්න.",
+  "assistReceiptSent": "පොදු සේවාවට යවා ඇත",
+  "assistReceiptUnknown": "ඉල්ලීමේ තත්ත්වය නොදනී",
+  "assistReceiptPendingHint": "ඉල්ලීම සුරැකීමෙන් රියදුරු එය පිළිගත් බව අදහස් නොවේ.",
+  "assistReceiptAcceptedHint": "රියදුරු ඉල්ලීම පිළිගෙන ඇත. සහාය සම්පූර්ණ කළ බව තවම සටහන් කර නැත.",
+  "assistReceiptDelivery": "ඉල්ලීම යැවීම",
+  "assistReceiptOwn": "ඔබේ සහාය ඉල්ලීම",
+  "assistReceiptSupport": "ඉල්ලූ සහාය",
+  "assistReceiptUnspecified": "සඳහන් කර නැත",
+  "assistReceiptDriver": "රියදුරු ප්‍රතිචාරය",
+  "assistReceiptUnconfirmed": "රියදුරුගේ පිළිගැනීම තහවුරු වී නැත.",
+  "assistReceiptStale": "සජීවී තත්ත්ව යාවත්කාලීන නොමැත. පෙන්වන්නේ අවසන් වරට ලැබුණු රියදුරු තත්ත්වයයි.",
+  "assistReceiptSending": "යවමින් තිබේද?",
+  "assistReceiptRetry": "නැවත යවන්න",
+  "assistReceiptCancelling": "අවලංගු වෙමින් තිබේද?",
+  "assistReceiptCancel": "ඉල්ලීම අවලංගු කරන්න",
+  "assistReceiptRetryError": "නැවත යැවීම මෙම උපකරණයේ සුරැකිය නොහැකි විය. යළි උත්සාහ කරන්න.",
+  "assistReceiptCancelError": "අවලංගු කිරීම තහවුරු වී නැත. සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "assistReceiptPendingUpload": "යැවීමට නියමිතයි",
+  "assistReceiptDeliverySent": "යවා ඇත",
+  "assistReceiptFailed": "අසාර්ථකයි",
+  "assistReceiptExpired": "නැවත යැවීමේ කාලය ඉකුත් වී ඇත",
+  "assistReceiptOld": "මෙම ඉල්ලීම පැරණි බැවින් ස්වයංක්‍රීය නැවත යැවීම් නැවැත්වීය. රියදුරු තත්ත්වය බලන්න; යැවීම තවම තහවුරු නොවී තිබිය හැක.",
+  "assistReceiptDeliveryError": "යැවීම තහවුරු වී නැත. සම්බන්ධ වූ විට නැවත යවා රියදුරු තත්ත්වයත් පරීක්ෂා කරන්න.",
+  "assistReceiptSendError": "ඉල්ලීම යැවිය නොහැකි විය. පිවිසීම සහ ඉලක්කය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "assistReceiptRestoreError": "සුරැකි සහාය ඉල්ලීම් කිහිපයක් නැවත ලබාගත නොහැකි විය. පොදු සේවාවේ ඉල්ලීම් ඉතිහාසය බලන්න.",
+  "assistReceiptSaveError": "නවතම ඉල්ලීමේ තත්ත්වය මෙම උපකරණයේ සුරැකිය නොහැකි විය. පොදු සේවාවේ ඉල්ලීම් ඉතිහාසය බලන්න.",
+  "assistReceiptHistory": "ඔබේ සහාය ඉල්ලීම්",
+  "assistReceiptHistoryStale": "පොදු සේවාවේ ඉල්ලීම් යාවත්කාලීන නොමැත. සුරැකි ලදුපත් පැරණි විය හැක.",
+  "assistReceiptError": "ඉල්ලීමේ තත්ත්වය ලබාගත නොහැක. සම්බන්ධතාව සහ ගිණුම පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "assistReceiptRoute": "මාර්ගය {route}",
+  "assistReceiptSummary": "මාර්ගය {route} · {stop}",
+  "@assistReceiptRoute": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistReceiptSummary": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      },
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "sharedCatalogueDemo": "ආදර්ශනය: නියැදි ප්‍රවාහන දත්ත. හවුල් වාර්තා, සහාය සහ ගමන් අක්‍රියයි.",
+  "sharedCatalogueSaved": "සුරැකි ප්‍රවාහන දත්ත. යාවත්කාලීන බැලීමට නැවුම් කරන්න; කාලසටහන් හා ලබාගත හැකි සේවා වෙනස් වී තිබිය හැක.",
+  "sharedCatalogueUnavailable": "ප්‍රවාහන දත්ත නොමැත. සම්බන්ධ වී නැවත උත්සාහ කරන්න; ඒ වෙනුවට නියැදි සේවා පෙන්වන්නේ නැත.",
+  "sharedCatalogueEmpty": "මෙම නාමාවලිය සඳහා හවුල් ප්‍රවාහන දත්ත නොමැත. පසුව නැවත උත්සාහ කරන්න.",
+  "sharedRefresh": "නැවුම් කරන්න",
+  "sharedRefreshing": "නැවුම් කරමින්…",
+  "sharedSavingStatus": "තත්ත්වය සුරකිමින්…",
+  "sharedOperatorStatusError": "තත්ත්ව වෙනස තහවුරු වී නැත. සම්බන්ධතාව, රියදුරු අනුමැතිය සහ බස් පැවරීම පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "sharedAdminAccess": "පරිපාලක ප්‍රවේශය",
+  "sharedAdminChecking": "පරිපාලක ප්‍රවේශය පරීක්ෂා කරමින්…",
+  "sharedAdminRequired": "පරිපාලක අවසරය සහ අන්තර්ජාල සම්බන්ධතාව අවශ්‍යයි. පැතිකඩෙහි භූමිකාව පමණක් ප්‍රවේශය ලබා නොදෙයි.",
+  "sharedCheckAgain": "නැවත පරීක්ෂා කරන්න",
+  "sharedSignIn": "පිවිසෙන්න",
+  "sharedSavedJourney": "සුරැකි ගමන",
+  "sharedJourneyUpdatesError": "සුරැකි ගමනේ යාවත්කාලීන නොමැත. සම්බන්ධතාව පරීක්ෂා කර මුල් පිටුව නැවත විවෘත කරන්න.",
+  "sharedJourneyChangeError": "ගමනේ තත්ත්ව වෙනස තහවුරු වී නැත. සම්බන්ධ වූ පසු නැවත උත්සාහ කරන්න.",
+  "sharedResume": "ගමන නැවත විවෘත කරන්න",
+  "sharedComplete": "අවසන් ලෙස සලකුණු කරන්න",
+  "sharedCancelJourney": "සුරැකි ගමන අවලංගු කරන්න",
+  "sharedSaveDisclosure": "සුරැකීමෙන් මෙම තේරීම තබා ගනී. එයින් අසුනක් වෙන් කිරීමක් හෝ ගමනක් ආරම්භ කිරීමක් සිදු නොවේ.",
+  "sharedSaveStatusError": "සුරැකි තත්ත්වය නොමැත. සුරැකීම තහවුරු කිරීමට නැවත උත්සාහ කරන්න.",
+  "sharedSaveError": "සුරැකීමේ වෙනස තහවුරු වී නැත. සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "sharedSaveOwner": "මෙම ගමන සුරකින ගිණුමෙන් පිවිසෙන්න.",
+  "sharedSaveMismatch": "සුරැකි ගමනේ තහවුරු කිරීම නොගැළපේ.",
+  "sharedSaveSignIn": "මෙම ගමන සුරැකීමට පිවිසෙන්න.",
+  "sharedSaving": "සුරකිමින්…",
+  "sharedStopAlert": "නැවතුම් දැනුම්දීම නොමැත",
+  "sharedStopAlertHelp": "ස්වයංක්‍රීය නැවතුම් හා පසුබිම් දැනුම්දීම් නොමැත. ගමනේ ප්‍රගතිය ඔබම බලන්න; ඔබේ නැවතුමට පෙර යෙදුම දැනුම් නොදෙයි.",
+  "sharedSplashTagline": "සැමට පහසු ගමන් සඳහා ඔබේ ගමන මෙතැනින් ඇරඹේ.",
+  "sharedLoading": "පූරණය වෙමින්.",
+  "sharedStopsOrder": "ගමන් අනුපිළිවෙළට නැවතුම්",
+  "sharedDriverReviewHelp": "රියදුරු ලියාපදිංචිය ප්‍රවේශය සඳහා අයදුම්පතකි. අනුමැතියට පෙර අනන්‍යතාව හා ධාවන අවසරය සමාලෝචනය කරන්න. අනුමැතියෙන් උපකරණ තහවුරු කිරීමක් හෝ සේවා සහතිකයක් නොලැබේ.",
+  "sharedAddStation": "නව නැවතුමක් එක් කරන්න",
+  "sharedStationName": "නැවතුමේ නම",
+  "sharedStationExample": "උදා. බම්බලපිටිය හන්දිය",
+  "sharedStationId": "නැවතුම් හැඳුනුම (උදා. bambalapitiya_junc)",
+  "sharedTargetRoute": "අදාළ බස් මාර්ගය",
+  "sharedInsertIndex": "එක් කරන ස්ථානයේ අංකය (0 සිට)",
+  "sharedInsertHint": "1 (දෙවන නැවතුම ලෙස එක් කරන්න)",
+  "sharedRequired": "අවශ්‍යයි",
+  "sharedRamp": "ප්‍රවේශ බෑවුම",
+  "sharedElevator": "විදුලි සෝපානය",
+  "sharedCancel": "අවලංගු කරන්න",
+  "sharedAddStationAction": "නැවතුම එක් කරන්න",
+  "sharedStationError": "නැවතුම එක් කළ නොහැකි විය. ප්‍රවේශය හා සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "sharedLiveAccessibility": "ප්‍රවේශ පහසුකම් පිළිබඳ නිරීක්ෂණ",
+  "sharedEquipmentHelp": "උපකරණ පරීක්ෂා සජීවී GPS වෙතින් වෙනස්ය. ක්‍රියාකරන බවට වාර්තාවකින් මුළු ගමනම තහවුරු නොවේ.",
+  "sharedConditionsUnavailable": "තත්ත්ව යාවත්කාලීන නොමැත. ක්‍රියාකාරී තත්ත්වය නොදනී; පෙර අනතුරු ඇඟවීම් තබා ඇත.",
+  "sharedRampWarning": "වාහනයේ බෑවුම පිළිබඳ දත්ත ගැටලුවක් දක්වයි. උපකරණ පරීක්ෂා කළ වේලාව නොදනී; නැගීමට පෙර පරීක්ෂා කරන්න.",
+  "sharedCommunityObservations": "ප්‍රජා නිරීක්ෂණ",
+  "sharedRampUnknown": "නොදනී — වාහන බෑවුම් අනතුරු ඇඟවීම පරීක්ෂා කළ යුතුය",
+  "sharedDriverAssistance": "රියදුරු සහාය",
+  "sharedPositiveAssistance": "සහාය ලැබුණු බවට නිරීක්ෂණය",
+  "sharedOperatorCheck": "රියදුරු වාහන පරීක්ෂාව",
+  "sharedHideObservations": "නිරීක්ෂණ විස්තර සඟවන්න",
+  "sharedViewObservations": "නිරීක්ෂණ විස්තර බලන්න",
+  "sharedVehicle": "වාහනය: {vehicle}",
+  "sharedTimetable": "කාලසටහන: {time}",
+  "sharedStationAdded": "\"{name}\" නැවතුම {bus} වෙත {index} ස්ථානයේ එක් කළා.",
+  "sharedBusOption": "බස් {route} ({id})",
+  "sharedBoardingElevator": "නගින නැවතුමේ සෝපානය — {stop}",
+  "sharedDestinationElevator": "බසින නැවතුමේ සෝපානය — {stop}",
+  "legacyUi0": "ක්‍රියාකරන බව වාර්තා කර ඇත",
+  "legacyUi1": "බාධාවක් වාර්තා කර ඇත",
+  "legacyUi2": "ගමන සුරැකීමට සහ නැවත විවෘත කිරීමට පිවිසෙන්න.",
+  "legacyUi3": "ගමනේ හිමිකාරිත්වය හෝ තත්ත්වය වෙනස් විය. සුරැකි ගමන් නැවත විවෘත කරන්න.",
+  "legacyUi4": "ගමන සුරැකීම තහවුරු වී නැත. සම්බන්ධතාව හා පිවිසීම පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "legacyUi5": "වාහනය සඳහන් කර නැත",
+  "legacyUi6": "ආපසු",
+  "legacyUi7": "ගමන තහවුරු කරන්න",
+  "legacyUi8": "ගමන් කාලසටහන",
+  "legacyUi9": "තෝරාගත් දිනය",
+  "legacyUi10": "තෝරාගත් වේලාව",
+  "legacyUi11": "තෝරාගත් දිනයේ පළමුව ලබාගත හැකි සේවාව",
+  "legacyUi12": "කාලසටහනේ පිටත්වීම",
+  "legacyUi13": "ඇස්තමේන්තුගත පැමිණීම",
+  "legacyUi14": "කාලසටහනේ ඇතැම් කාල පරතර නොමැත. වේලාවලට ආකෘති ඇස්තමේන්තු ඇතුළත්ය; රියදුරුගෙන් තහවුරු කරන්න.",
+  "legacyUi15": "ඇස්තමේන්තුගත ගාස්තුව",
+  "legacyUi16": "මූලාකෘති ඇස්තමේන්තුවකි. සැබෑ ගාස්තුව රියදුරුගෙන් තහවුරු කරන්න.",
+  "legacyUi17": "ගාස්තු විස්තර",
+  "legacyUi18": "ගමන් අවශ්‍යතා",
+  "legacyUi19": "ගමන සුරැකීමෙන් අසුනක් වෙන් කිරීමක් හෝ බස් රථය ධාවනය වන බව තහවුරු කිරීමක් සිදු නොවේ. වත්මන් තත්ත්ව සාක්ෂි බලන්න.",
+  "legacyUi20": "ගමන සුරකිමින්…",
+  "legacyUi21": "තහවුරු කර ගමන සුරකින්න",
+  "legacyUi22": "සේවාව නොමැත. පළමුව හවුල් සේවාවක් තෝරන්න.",
+  "legacyUi23": "මෙම සේවාව නොමැත. සෙවීමට ආපසු යන්න.",
+  "legacyUi24": "පිටත්වීම සහ මාර්ග විස්තර",
+  "legacyUi25": "සුරැකි පිහිටීමකි — සජීවී යාවත්කාලීන නොමැත. මෙය වත්මන් බස් චලනය නොවේ.",
+  "legacyUi26": "කාලසටහන",
+  "legacyUi27": "කාලසටහන්ගත",
+  "legacyUi28": "අපේක්ෂිත පැමිණීම",
+  "legacyUi29": "නැගීමේ සහාය ඉල්ලන්න",
+  "legacyUi30": "මාර්ග නැවතුම් කාලසටහන සහ සජීවී ප්‍රගතිය",
+  "legacyUi31": "ඔබ නගින නැවතුම",
+  "legacyUi32": "බස් රථය දැන් මෙහි ඇත",
+  "legacyUi33": "තෝරාගත් කොටස සඳහා ඇස්තමේන්තුවකි; ගෙවීම් ක්‍රම තහවුරු කර නැත.",
+  "legacyUi34": "නොදනී — තත්ත්ව සාක්ෂි නොමැත.",
+  "legacyUi35": "වාහනයේ ප්‍රවේශ පහසුකම්",
+  "legacyUi36": "ප්‍රවේශ පහසුකම් අනතුරු ඇඟවීම",
+  "legacyUi37": "ප්‍රවේශ අපහසුතා දැනුම්දීම",
+  "legacyUi38": "තත්ත්වය නොදනී",
+  "legacyUi39": "ආරක්ෂාව සහ ගමන් තත්ත්ව",
+  "legacyUi40": "බස් රථයේ තදබද මට්ටම",
+  "legacyUi41": "ප්‍රජා ආරක්ෂක වාර්තා",
+  "legacyUi42": "ගමන සමාලෝචනය කර තහවුරු කරන්න",
+  "legacyUi43": "ගමන් සැලැස්මට සුරකින්න",
+  "legacyUi44": "ප්‍රවේශ තත්ත්වය වාර්තා කරන්න",
+  "legacyUi45": "ගමන පූරණය කළ නොහැක",
+  "legacyUi46": "සේවාදායකයෙන් සජීවී ගමන් විස්තර පූරණය කරමින්",
+  "legacyUi47": "ඔබේ ගමන පූරණය කරමින්…",
+  "legacyUi48": "බස් රථයක් තවම පවරා නැත.",
+  "legacyUi49": "සුරැකි ගමනකින් අසුනක් වෙන් කිරීමක් හෝ බස් පැවරීමක් සහතික නොවේ. තෝරාගත් සේවාවේ තත්ත්වය බලන්න.",
+  "legacyUi50": "මුල් පිටුවට ආපසු යන්න",
+  "legacyUi51": "සජීවී මගපෙන්වීම වසන්න",
+  "legacyUi52": "සජීවී මගපෙන්වීම",
+  "legacyUi53": "මාර්ග ප්‍රතිඵල වෙත ආපසු",
+  "legacyUi54": "සජීවී ගමන් ප්‍රගතිය",
+  "legacyUi55": "සජීවී",
+  "legacyUi56": "කාලසටහන",
+  "legacyUi57": "සජීවී නැවතුම් ප්‍රගතිය සහ පැමිණීමේ ඇස්තමේන්තුව",
+  "legacyUi58": "සජීවී නැවතුම්",
+  "legacyUi59": "ඔබේ නැවතුම",
+  "legacyUi60": "බස් රථය දැනට මෙහි ඇත",
+  "legacyUi61": "පසු කර ඇත",
+  "legacyUi62": "සජීවී GPS යාවත්කාලීන නොමැත. උපකරණ නිරීක්ෂණ පහතින් වෙනම දැක්වේ.",
+  "legacyUi63": "● සිදුවෙමින්",
+  "legacyUi64": "● කාලසටහන්ගත",
+  "legacyUi65": "ලුහුබැඳීම වාහනයේ වත්මන් පිහිටීම දක්වයි; ඔබේ කාලසටහන්ගත ධාවනය තහවුරු නොකරයි.",
+  "legacyUi66": "සවිස්තර වාහන දත්ත",
+  "legacyUi67": "වේගය, GPS සංඥා සහ මුල් ගමන් දත්ත",
+  "legacyUi68": "ළඟාවෙමින්",
+  "legacyUi69": "ඔබ මෙතැනින් නගින්න",
+  "legacyUi70": "කාලසටහන",
+  "legacyUi71": "සිතියම කුඩා කරන්න",
+  "legacyUi72": "සිතියම විශාල කරන්න",
+  "legacyUi73": "ගමන සම්පූර්ණයෙන් පෙන්වන්න",
+  "legacyUi74": "බස් රථය පෙන්වන්න",
+  "legacyUi75": "මගේ නැවතුම පෙන්වන්න",
+  "legacyUi76": "විශාල කරන්න",
+  "legacyUi77": "කුඩා කරන්න",
+  "legacyUi78": "GPS සංඥාව නොමැත",
+  "legacyUi79": "සංඥාව නැති විය",
+  "legacyUi80": "මාර්ගයේ ගමන් කරමින්",
+  "legacyUi81": "නවතා ඇත",
+  "legacyUi82": "ගමන අවසන්",
+  "legacyUi83": "සම්බන්ධතාව නොමැත",
+  "legacyUi84": "සුරැකි පිහිටීම — යාවත්කාලීන නොමැත",
+  "legacyUi85": "තත්ත්වය: සජීවී GPS යාවත්කාලීන ලැබෙමින්",
+  "legacyUi86": "තත්ත්වය: පිහිටීම නොමැත",
+  "legacyUi87": "ලබාගත නොහැක",
+  "legacyUi88": "වත්මන් තත්ත්වය",
+  "legacyUi89": "අවසන් යාවත්කාලීනය",
+  "legacyUi90": "ඊළඟ නැවතුම",
+  "legacyUi91": "ඔබේ ගමනාන්තය",
+  "legacyUi92": "ඊළඟ: ",
+  "legacyUi93": "අවසාන: ",
+  "legacyUi94": "නැගීමට හෝ බැසීමට රියදුරු සහාය ඉල්ලන්න",
+  "legacyUi95": "නැවතුම් සහාය ඉල්ලන්න",
+  "legacyUi96": "හදිසි ඇමතුම් නොමැත. සහාය ඇමතීමට ඔබේ දුරකථනය භාවිත කරන්න.",
+  "legacyUi97": "හදිසි සහාය",
+  "legacyUi98": "ප්‍රවේශ ගැටලුවක් හෝ වාහන තත්ත්වයක් වාර්තා කරන්න",
+  "legacyUi99": "මෙම යෙදුමේ හදිසි ඇමතුම් නොමැත. සහාය ඇමතීමට ඔබේ දුරකථනය භාවිත කරන්න.",
+  "legacyUi100": "එක් එක් නැවතුමේ සජීවී කාලරේඛාව",
+  "legacyUi101": "සජීවී ධාවනය",
+  "sharedCatalogueRefreshError": "ප්‍රවාහන දත්ත නැවුම් කළ නොහැකි විය. සුරැකි දත්ත පැරණි විය හැක; සම්බන්ධ වූ පසු නැවත උත්සාහ කරන්න.",
+  "legacyFormat0": "බස් {p0}",
+  "legacyFormat1": "මාර්ගය {p0}",
+  "legacyFormat2": "ඉදිරි නැවතුම් ({p0})",
+  "legacyFormat3": "කාලසටහන: {p0}",
+  "legacyFormat4": "මිනිත්තු {p0}කින් පැමිණේ",
+  "legacyFormat5": "ගමනාන්තය: {p0}",
+  "legacyFormat6": "{p1} වෙත යන {p0} බස් රථය පෙන්වන සජීවී සිතියම",
+  "legacyFormat7": "ඊළඟ නැවතුම: {p0}",
+  "legacyFormat8": "බස් තත්ත්වය: {p0}. අවසන් යාවත්කාලීනය: {p1}. ඊළඟ නැවතුම: {p2}. මගියාගේ නැවතුම: {p3}.",
+  "legacyFormat9": "{p0} හිදී",
+  "legacyFormat10": "කාලසටහන: {p0}",
+  "legacyFormat11": "අපේක්ෂිත: {p0}",
+  "legacyFormat12": "රියදුරු දැනුම්දීම: {p0} (+මිනිත්තු {p1})",
+  "legacyFormat13": "දුර: {p1} වෙත කි.මී. {p0}",
+  "legacyFormat14": "ගමන් ප්‍රගතිය: {p1} වෙත යන බස් රථය ඊළඟ {p0} නැවතුමට ළඟාවෙමින්",
+  "legacyFormat15": "{p0} හිදී අමතර කාලය හෝ බෑවුම අවශ්‍ය බව රියදුරුට දන්වන්න.",
+  "legacyFormat16": "{p0}ට ළඟා විය",
+  "legacyFormat17": "බස් රථය දැන් මෙහි ඇත ({p0}ට තහවුරු කළා)",
+  "legacyFormat18": "ඇස්තමේන්තුව: {p0} (මිනිත්තු {p1}කින් පමණ)",
+  "legacyFormat19": "තෝරාගත් කාලසටහන් පිටත්වීම: {p0} — වත්මන් GPS මෙම ධාවනය තහවුරු නොකරයි.",
+  "legacyFormat20": "මිනිත්තු {p0}ක් ප්‍රමාදයි",
+  "legacyFormat21": "රියදුරු දැනුම්දීම: {p0} (+මිනිත්තු {p1})",
+  "legacyFormat22": "{p0} හිදී",
+  "legacyFormat23": "{p0}ට පසු කළා",
+  "legacyFormat24": "කාලසටහන: {p0} · අපේක්ෂිත: {p1}",
+  "legacyFormat25": "(මිනිත්තු {p0}ක් ප්‍රමාදයි)",
+  "legacyFormat26": "තදබදය: {p0}",
+  "sharedOnTime": "නියමිත වේලාවට",
+  "sharedSampleNotice": "SAMPLE / TEST MODE — කල්පිත වාහන, වාර්තා, උපකරණ සහ GPS. ගමන් තීරණ සඳහා නොවේ.",
+  "sharedLocalNotice": "LOCAL TEST ONLY — නියැදි සේවා පමණි; සැබෑ ප්‍රවාහනය හෝ Cloudinary උඩුගත කිරීම් නොමැත.",
+  "legacyEtaNow": "බස් රථය දැන් පැමිණේ",
+  "legacyEtaApprox": "බස් රථය මිනිත්තු {minutes}කින් පමණ පැමිණේ",
+  "legacySpeedNext": "පැ.කි.මී. {speed} · ඊළඟ: {stop}",
+  "formReviewPublicNotice": "ඔබේ වාර්තාව සහ ඡායාරූපය සියලු දෙනාට පෙනේ. මුහුණු සහ පෞද්ගලික තොරතුරු ඇතුළත් නොකරන්න.",
+  "formReviewDetails": "පෞද්ගලිකත්වය සහ සුරැකි කෙටුම්පත්",
+  "formReviewCooldownShort": "මෙම ස්ථානයේ එකම ගැටලුව නැවත වාර්තා කිරීමට විනාඩි 5ක් රැඳී සිටින්න.",
+  "deliveryServiceUnavailable": "වාර්තා සේවාවට සම්බන්ධ විය නොහැක. කෙටුම්පත සුරැකී ඇත. සේවාව තිබෙන විට නැවත උත්සාහ කරන්න.",
+  "deliveryServiceConfiguration": "මෙම යෙදුම වාර්තා සේවාවට සම්බන්ධ කර නැත. නිසි ලෙස සකස් කළ ප්‍රධාන යෙදුම විවෘත කර සුරැකි කෙටුම්පත නැවත යවන්න.",
+  "deliveryPermissionDenied": "වාර්තාව පළ කිරීමට අවසර ලැබුණේ නැත. නිසි ලෙස සකස් කළ ප්‍රධාන යෙදුම භාවිත කරන බව පරීක්ෂා කර නැවත පිවිස උත්සාහ කරන්න. කෙටුම්පත සුරැකී ඇත.",
+  "deliveryTargetIneligible": "මෙම බසය හෝ නැවතුම සඳහා වාර්තාව පළ කළ නොහැක. පරිපාලකයෙකු එහි නාමාවලි වාර්තාව පරීක්ෂා කළ යුතුය. කෙටුම්පත සුරැකී ඇත.",
+  "deliveryInvalidReport": "සේවාවට මෙම වාර්තාවේ විස්තර පිළිගත නොහැකි විය. තෝරාගත් බසය හෝ නැවතුම සහ නිරීක්ෂණය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "adminAccessibilityDetails": "ප්‍රවේශ පහසුකම් විස්තර",
+
+  "resultsOutsideNeeds": "ඔබගේ වත්මන් ප්‍රවේශ අවශ්‍යතා සපුරන්නේ නැති කාලසටහන් {count}ක් ඇත.",
+  "resultsRemoveAccessFilters": "ප්‍රවේශ පෙරහන් ඉවත් කර පෙන්වන්න",
+  "resultsTemporaryFiltersHelp": "මෙම සෙවීමට පමණයි. මෙම සේවාවල ප්‍රවේශය නොදන්නා හෝ බාධා තිබිය හැක. සුරැකි මනාප වෙනස් නොවේ.",
+  "@resultsOutsideNeeds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
+
 }

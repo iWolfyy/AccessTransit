@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "AccessTransit: main app, real Firebase + localhost",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "deviceId": "emulator-5554",
+      "toolArgs": [
+        "--dart-define=MODERATION_V2=true",
+        "--dart-define=LOCAL_API=true"
+      ]
+    },
+    {
+      "name": "AccessTransit: realistic SAMPLE data (same app)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "deviceId": "emulator-5554",
+      "toolArgs": [
+        "--dart-define=MODERATION_V2=true",
+        "--dart-define=LOCAL_API=true",
+        "--dart-define=SAMPLE_TEST=true"
+      ]
+    }
+  ]
+}

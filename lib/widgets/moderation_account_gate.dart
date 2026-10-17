@@ -1,3 +1,4 @@
+import '../screens/community/manual_appeals_screen.dart';
 import '../l10n/localization_context.dart';
 
 import 'dart:async';
@@ -9,9 +10,10 @@ import 'package:flutter/material.dart';
 import '../services/moderation_client.dart';
 import '../screens/community/report_reviews_screen.dart';
 import '../services/sample_test_mode.dart';
+import '../services/server_snapshot_stream.dart';
 
-/// Disposes authenticated workspaces on a confirmed restriction or unavailable
-/// access check. Backend rules independently protect all client mutations.
+/// Verifies initial access before mounting the workspace. Subsequent checks run
+/// in the background; restrictions/failed checks dispose the workspace.
 class ModerationAccountGate extends StatefulWidget {
   const ModerationAccountGate({
     super.key,
@@ -36,8 +38,9 @@ class _ModerationAccountGateState extends State<ModerationAccountGate>
   String? uid;
   ModerationAccountStatus? status;
   bool ready = false, failed = false;
-  bool showReviews = false;
+  bool showReviews = false, showManualAppeals = false;
   int revision = 0;
+  String? loadingOwner;
   @override
   void initState() {
     super.initState();
@@ -50,59 +53,81 @@ class _ModerationAccountGateState extends State<ModerationAccountGate>
               access?.cancel();
               expiry?.cancel();
               uid = next;
+              loadingOwner = null;
               revision++;
               setState(() {
                 ready = next == null;
                 status = null;
                 failed = false;
                 showReviews = false;
+                showManualAppeals = false;
               });
               if (next != null) {
                 final watchedOwner = next;
                 final stream =
                     widget.changes?.call(next) ??
-                    FirebaseFirestore.instance
-                        .collection(SampleTestMode.collection('account_access'))
-                        .doc(next)
-                        .snapshots(includeMetadataChanges: true)
-                        .map((s) {
-                          if (s.metadata.isFromCache ||
-                              s.metadata.hasPendingWrites) {
-                            throw StateError(
-                              'Connect to verify account access.',
-                            );
-                          }
-                        });
+                    serverSnapshotStream(
+                      FirebaseFirestore.instance
+                          .collection(
+                            SampleTestMode.collection('account_access'),
+                          )
+                          .doc(next)
+                          .snapshots(includeMetadataChanges: true),
+                      isVerified: (s) =>
+                          !s.metadata.isFromCache &&
+                          !s.metadata.hasPendingWrites,
+                    ).map((_) {});
                 access = stream.listen(
                   (_) {
                     if (mounted && uid == watchedOwner) reload();
                   },
                   onError: (_) {
                     if (!mounted || uid != watchedOwner) return;
-                    revision++;
-                    expiry?.cancel();
-                    if (mounted) {
-                      setState(() {
-                        ready = false;
-                        failed = true;
-                      });
-                    }
+                    // Metadata can temporarily become cached during token
+                    // refresh. Verify through the trusted API rather than
+                    // restarting the entire Navigator on each cache event.
+                    reload();
                   },
                 );
+                reload();
               }
             });
   }
 
   Future<void> reload() async {
-    if (uid == null) return;
+    if (uid == null || loadingOwner == uid) return;
     final owner = uid, version = ++revision;
+    loadingOwner = owner;
     expiry?.cancel();
     setState(() {
-      ready = false;
+      // A previously verified account can keep navigating during revalidation.
+      // Every mutation still checks server-owned access independently. Initial
+      // checks and account switches have no verified status and remain blocked.
+      ready = status?.isSuspended == false;
       failed = false;
     });
     try {
-      final value = await client.accountStatus();
+      ModerationAccountStatus? result;
+      for (var attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await client.accountStatus();
+          break;
+        } on ModerationException catch (e) {
+          if (attempt == 2 ||
+              !{
+                'service-unavailable',
+                'authentication-unavailable',
+                'network-error',
+              }.contains(e.code)) {
+            rethrow;
+          }
+          await Future<void>.delayed(
+            Duration(milliseconds: 300 * (attempt + 1)),
+          );
+          if (!mounted || owner != uid || version != revision) return;
+        }
+      }
+      final value = result!;
       if (!mounted || owner != uid || version != revision) return;
       setState(() {
         status = value;
@@ -121,6 +146,8 @@ class _ModerationAccountGateState extends State<ModerationAccountGate>
           failed = true;
         });
       }
+    } finally {
+      if (version == revision) loadingOwner = null;
     }
   }
 
@@ -142,8 +169,45 @@ class _ModerationAccountGateState extends State<ModerationAccountGate>
 
   @override
   Widget build(BuildContext context) {
-    if (ready && (uid == null || status?.isSuspended == false)) {
-      return widget.child;
+    final allowed = ready && (uid == null || status?.isSuspended == false);
+    final retainWorkspace =
+        allowed || (!failed && uid != null && status?.isSuspended == false);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (retainWorkspace)
+          Offstage(
+            offstage: !allowed,
+            child: ExcludeFocus(
+              excluding: !allowed,
+              child: IgnorePointer(
+                ignoring: !allowed,
+                child: TickerMode(enabled: allowed, child: widget.child),
+              ),
+            ),
+          ),
+        if (!allowed)
+          Overlay(
+            key: ValueKey((
+              uid,
+              revision,
+              failed,
+              ready,
+              showReviews,
+              showManualAppeals,
+            )),
+            initialEntries: [OverlayEntry(builder: _blockedBody)],
+          ),
+      ],
+    );
+  }
+
+  Widget _blockedBody(BuildContext context) {
+    if (uid != null && showManualAppeals) {
+      return ManualAppealsScreen(
+        client: client,
+        onClose: () => setState(() => showManualAppeals = false),
+      );
     }
     if (uid != null && showReviews) {
       return ReportReviewsScreen(
@@ -182,6 +246,11 @@ class _ModerationAccountGateState extends State<ModerationAccountGate>
                   TextButton(
                     onPressed: () => setState(() => showReviews = true),
                     child: Text(context.l10n.reviewsTitle),
+                  ),
+                if (uid != null)
+                  TextButton(
+                    onPressed: () => setState(() => showManualAppeals = true),
+                    child: Text(context.l10n.manualAppealsTitle),
                   ),
                 TextButton(
                   onPressed: () => FirebaseAuth.instance.signOut(),

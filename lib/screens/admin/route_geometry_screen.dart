@@ -1,3 +1,9 @@
+import 'admin_scaffold.dart';
+
+import 'package:intl/intl.dart';
+
+import '../../l10n/admin_catalogue_labels.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -21,6 +27,7 @@ class _RouteGeometryScreenState extends State<RouteGeometryScreen> {
   ReviewedRouteGeometry? preview;
   bool reviewed = false, busy = false;
   String? error;
+  Object? failure;
   @override
   void dispose() {
     route.dispose();
@@ -40,11 +47,13 @@ class _RouteGeometryScreenState extends State<RouteGeometryScreen> {
         preview = value;
         reviewed = false;
         error = null;
+        failure = null;
       });
-    } catch (_) {
+    } catch (e) {
       setState(() {
         preview = null;
-        error = context.l10n.geometryInvalid;
+        error = 'invalid';
+        failure = e;
       });
     }
   }
@@ -59,6 +68,7 @@ class _RouteGeometryScreenState extends State<RouteGeometryScreen> {
     setState(() {
       busy = true;
       error = null;
+      failure = null;
     });
     try {
       await AdminRouteGeometryService(widget.repository)
@@ -72,15 +82,20 @@ class _RouteGeometryScreenState extends State<RouteGeometryScreen> {
       });
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(context.l10n.geometrySaved)));
-    } catch (_) {
-      if (mounted) setState(() => error = context.l10n.fareAdminError);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          error = 'save';
+          failure = e;
+        });
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => AdminScaffold(
     appBar: AppBar(title: Text(context.l10n.geometryTitle)),
     body: ListView(
       padding: const EdgeInsets.all(16),
@@ -91,7 +106,9 @@ class _RouteGeometryScreenState extends State<RouteGeometryScreen> {
           controller: route,
           enabled: !busy,
           maxLength: 128,
-          decoration: const InputDecoration(labelText: 'Route ID'),
+          decoration: InputDecoration(
+            labelText: context.l10n.adminGeometryRouteId,
+          ),
           onChanged: (_) => setState(() => preview = null),
         ),
         TextField(
@@ -101,7 +118,9 @@ class _RouteGeometryScreenState extends State<RouteGeometryScreen> {
           minLines: 4,
           maxLines: 10,
           maxLength: 300000,
-          decoration: InputDecoration(labelText: context.l10n.fareImportJson),
+          decoration: InputDecoration(
+            labelText: context.l10n.adminGeometryImportJson,
+          ),
           onChanged: (_) => setState(() => preview = null),
         ),
         OutlinedButton(
@@ -115,10 +134,21 @@ class _RouteGeometryScreenState extends State<RouteGeometryScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${preview!.routeId} · ${preview!.version}'),
-                  Text(preview!.source),
                   Text(
-                    '${preview!.stops.join(' → ')} · ${(preview!.distances.last / 1000).toStringAsFixed(2)} km',
+                    context.l10n.adminGeometryVersion(
+                      preview!.routeId,
+                      preview!.version,
+                    ),
+                  ),
+                  Text(context.l10n.adminImportSource(preview!.source)),
+                  Text(
+                    context.l10n.adminGeometryDistance(
+                      preview!.stops.join(' → '),
+                      NumberFormat(
+                        '0.00',
+                        Localizations.localeOf(context).toString(),
+                      ).format(preview!.distances.last / 1000),
+                    ),
                   ),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
@@ -162,6 +192,7 @@ class _RouteGeometryScreenState extends State<RouteGeometryScreen> {
                   setState(() {
                     busy = true;
                     error = null;
+                    failure = null;
                   });
                   try {
                     await AdminRouteGeometryService(widget.repository)
@@ -175,9 +206,12 @@ class _RouteGeometryScreenState extends State<RouteGeometryScreen> {
                         SnackBar(content: Text(context.l10n.geometryWithdrawn)),
                       );
                     }
-                  } catch (_) {
+                  } catch (e) {
                     if (mounted) {
-                      setState(() => error = context.l10n.fareAdminError);
+                      setState(() {
+                        error = 'save';
+                        failure = e;
+                      });
                     }
                   } finally {
                     if (mounted) setState(() => busy = false);
@@ -186,7 +220,14 @@ class _RouteGeometryScreenState extends State<RouteGeometryScreen> {
           child: Text(context.l10n.geometryWithdraw),
         ),
         if (busy) const Center(child: CircularProgressIndicator()),
-        if (error != null) Text(error!),
+        if (error != null)
+          Text(
+            error == 'invalid'
+                ? context.l10n.geometryInvalid
+                : context.l10n.adminGeometryActionFailed,
+          ),
+        if (error != null && context.adminImportFailure(failure) != null)
+          Text(context.adminImportFailure(failure)!),
       ],
     ),
   );

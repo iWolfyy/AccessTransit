@@ -1,6 +1,10 @@
+import '../../core/theme/app_theme.dart';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../../l10n/localization_context.dart';
 
 import '../../core/theme/app_colors.dart';
 
@@ -33,109 +37,116 @@ class CommunityPreview extends StatelessWidget {
         ? 0.21
         : 0.21 + math.sin((float + 0.35) * math.pi * 2) * 0.04;
 
-    return AspectRatio(
-      aspectRatio: 1,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0A000000),
-              blurRadius: 8,
-              offset: Offset(0, 2),
+    return ExcludeSemantics(
+      child: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1,
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Stack(
-            children: [
-              const Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.primaryFixed,
-                        AppColors.surfaceBright,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: ColoredBox(
-                  color: AppColors.surfaceContainerLow.withValues(alpha: 0.5),
-                ),
-              ),
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _RipplePainter(progress: pulse, opacity: forumT),
-                ),
-              ),
-              Align(
-                alignment: const Alignment(0, -0.18),
-                child: Opacity(
-                  opacity: forumT,
-                  child: Transform.translate(
-                    offset: Offset(0, bob - 8),
-                    child: Transform.scale(
-                      scale: forumScale,
-                      child: Container(
-                        width: 96,
-                        height: 96,
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryContainer,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primaryContainer.withValues(
-                                alpha: 0.28 + pulse * 0.18,
-                              ),
-                              blurRadius: 18 + pulse * 10,
-                              spreadRadius: 2,
-                            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Stack(
+                children: [
+                  const Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.primaryFixed,
+                            AppColors.surfaceBright,
                           ],
-                        ),
-                        child: const Icon(
-                          Icons.forum_rounded,
-                          color: AppColors.onPrimary,
-                          size: 48,
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              Align(
-                alignment: const Alignment(0, 0.38),
-                child: Opacity(
-                  opacity: pillT,
-                  child: Transform.translate(
-                    offset: Offset(0, reduceMotion ? 0 : (1 - pillT) * 18),
-                    child: const _ReportPill(),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 16,
-                right: 28,
-                child: Opacity(
-                  opacity: badgeT,
-                  child: Transform.rotate(
-                    angle: badgeWobble,
-                    child: Transform.scale(
-                      scale: reduceMotion
-                          ? 1
-                          : Curves.easeOutBack.transform(badgeT),
-                      child: const _ContributionBadge(),
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color: AppColors.surfaceContainerLow.withValues(
+                        alpha: 0.5,
+                      ),
                     ),
                   ),
-                ),
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _RipplePainter(progress: pulse, opacity: forumT),
+                    ),
+                  ),
+                  Align(
+                    alignment: const Alignment(0, -0.18),
+                    child: Opacity(
+                      opacity: forumT,
+                      child: Transform.translate(
+                        offset: Offset(0, bob - 8),
+                        child: Transform.scale(
+                          scale: forumScale,
+                          child: Container(
+                            width: 96,
+                            height: 96,
+                            decoration: BoxDecoration(
+                              color: context.primaryContainerColor,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primaryContainer.withValues(
+                                    alpha: 0.28 + pulse * 0.18,
+                                  ),
+                                  blurRadius: 18 + pulse * 10,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.forum_rounded,
+                              color: AppColors.onPrimary,
+                              size: 48,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: const Alignment(0, 0.38),
+                    child: Opacity(
+                      opacity: pillT,
+                      child: Transform.translate(
+                        offset: Offset(0, reduceMotion ? 0 : (1 - pillT) * 18),
+                        child: const _ReportPill(),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 16,
+                    right: 28,
+                    child: Opacity(
+                      opacity: badgeT,
+                      child: Transform.rotate(
+                        angle: badgeWobble,
+                        child: Transform.scale(
+                          scale: reduceMotion
+                              ? 1
+                              : Curves.easeOutBack.transform(badgeT),
+                          child: const _ContributionBadge(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -167,21 +178,23 @@ class _ReportPill extends StatelessWidget {
           ),
         ],
       ),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.report, color: AppColors.error, size: 22),
+            Icon(Icons.report, color: context.errorColor, size: 22),
             SizedBox(width: 6),
-            Text(
-              'Report Issue',
-              style: TextStyle(
-                fontSize: 14,
-                height: 20 / 14,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.1,
-                color: AppColors.onSurface,
+            Flexible(
+              child: Text(
+                context.l10n.onboardingReportIssue,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 20 / 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
+                  color: context.textColor,
+                ),
               ),
             ),
           ],

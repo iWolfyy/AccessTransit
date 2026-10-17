@@ -5,6 +5,8 @@ import {initializeTestEnvironment,assertFails} from '@firebase/rules-unit-testin
 import {doc,getDoc,getDocs,collection,query,where,setDoc,updateDoc,deleteDoc,runTransaction,serverTimestamp,orderBy,documentId,startAfter,limit} from 'firebase/firestore';
 import {createAppealPolicy} from '../../server/moderation/appeals.mjs';
 import {createBanPolicy} from '../../server/moderation/bans.mjs';
+import {createAccountPolicy} from '../../server/moderation/accounts.mjs';
+import {createManualAppeals} from '../../server/moderation/manual_appeals.mjs';
 import {createAssistancePolicy} from '../../server/moderation/assistance.mjs';
 import {createOperationPolicy} from '../../server/moderation/operations.mjs';
 import {createNotificationPolicy,localNotificationProvider} from '../../server/moderation/notifications.mjs';
@@ -790,5 +792,146 @@ test('suspension reconciliation cancels the owned operation once and never touch
     await setDoc(doc(db,'operation_locks/author'),{active:true,busId:'b',tripId:'newer',updatedAt:new Date(+clock+1000)});
     const result=await s.reconcileOperation({reportId:'new'});assert.equal(result.reviewRequired,true);
     assert.equal((await read(db,'operation_locks/author')).active,true);
+  });
+});
+
+
+test('loop assistance targets the later visit while retaining the physical station and exact progress', async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    const db=c.firestore(),a=assistance(db);
+    for(const [prefix,scope] of [['','normal'],['sample_test/shared/','sample']]) {
+      await assistanceSeed(db,prefix);
+      const stops=['s1','s2','s1-return','s3'],stopStationIds={s1:'s1',s2:'s2','s1-return':'s1',s3:'s3'};
+      await updateDoc(doc(db,prefix+'service_runs/run1'),{stops,stopStationIds,
+        initialStopTimes:{s1:{estimatedArrival:clock},s2:{estimatedArrival:new Date(+clock+600000)},'s1-return':{estimatedArrival:new Date(+clock+1200000)},s3:{estimatedArrival:new Date(+clock+1800000)}}});
+      await updateDoc(doc(db,prefix+'buses/b'),{stops,stopStationIds});
+      await updateDoc(doc(db,prefix+'trips/run1'),{currentStopIndex:1});
+      await assert.rejects(a.submit({...helpInput,scope,requestId:'first-passed'}),{code:'assistance-unavailable'});
+      const input={...helpInput,scope,requestId:'later-visit',boardingStationId:'s1-return'};
+      const saved=(await a.submit(input)).request;
+      assert.equal(saved.stationId,'s1');assert.equal(saved.boardingStationId,'s1-return');
+      assert.equal(saved.stopIndex,2);assert.equal(saved.driverId,'u1');
+      assert.equal((await a.submit(input)).request.id,'later-visit');
+      await assert.rejects(a.submit({...input,requestId:'forged-station',stationId:'s2'}),{code:'invalid-request'});
+      await assert.rejects(a.submit({...input,requestId:'reversed-visit',alightingStationId:'s1'}),{code:'invalid-request'});
+      await updateDoc(doc(db,prefix+'trips/run1'),{currentStopIndex:3});
+      assert.equal((await a.reconcile({scope,requestId:'later-visit'})).request.endReason,'stop-passed');
+    }
+  });
+});
+
+test('manual access is scoped, idempotent, revision checked and expires at exactly 72 hours', async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    const db=c.firestore();
+    for(const p of ['', 'sample_test/shared/']){
+      await setDoc(doc(db,p+'users/admin'),{name:'Admin'});
+      await setDoc(doc(db,p+'users/rider'),{name:'Rider'});
+    }
+    const s=createAccountPolicy({store:store(db),accountAdmin:async()=>false,now:()=>clock});
+    const input={actorUid:'admin',actorAdmin:true,accountId:'rider',operationId:'manual-one',expectedRevision:0,action:'suspend',durationHours:72,reason:'Reviewed conduct issue'};
+    const results=await Promise.all([s.change(input),s.change(input)]);
+    assert.equal(results.filter(r=>!r.duplicate).length,1);
+    assert.equal((await s.detail(input)).manualActive,true);
+    assert.equal((await s.detail({...input,scope:'sample'})).manualActive,false);
+    assert.equal((await service(db).accountStatus({actorUid:'rider'})).banReason,input.reason);
+    const until=new Date(initial.getTime()+72*3600000);
+    clock=new Date(until.getTime()-1);assert.equal((await s.detail(input)).restricted,true);
+    clock=until;assert.equal((await s.detail(input)).restricted,false);
+    await assert.rejects(s.change({...input,operationId:'stale'}),{code:'review-stale'});
+    await s.change({...input,operationId:'restore',expectedRevision:1,action:'restore',durationHours:null});
+    await s.change(input); // A late retry must never restore an old restriction.
+    assert.equal((await s.detail(input)).manualActive,false);
+    assert.equal((await s.detail(input)).revision,2);
+    await s.change({...input,scope:'sample',operationId:'sample-only',durationHours:null});
+    assert.equal((await s.detail({...input,scope:'sample'})).manualActive,true);
+    assert.equal((await s.detail(input)).manualActive,false);
+    assert.equal((await getDocs(collection(db,'manual_account_decisions'))).size,2);
+    assert.equal((await read(db,'notification_outbox/manual-account-'+createHash('sha256').update('manual-one').digest('hex')+'/events/reconcile-operation')).uid,'rider');
+  });
+});
+
+test('manual restore preserves community restrictions; scope and actor protections cannot be bypassed', async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    const db=c.firestore();await seed(db);
+    await setDoc(doc(db,'users/admin'),{name:'Admin'});
+    await setDoc(doc(db,'account_access/author'),{communityPermanent:true,communityPermanentReason:'Reviewed community dispute',manualSuspended:true,manualRevision:1});
+    let protectedUid='protected';
+    const s=createAccountPolicy({store:store(db),accountAdmin:async uid=>uid===protectedUid,now:()=>clock});
+    const i={actorUid:'admin',actorAdmin:true,accountId:'author',operationId:'restore-community',expectedRevision:1,action:'restore',reason:'Restore manual restriction'};
+    await s.change(i);
+    const d=await s.detail(i);assert.equal(d.manualActive,false);assert.equal(d.communityRestricted,true);assert.equal(d.restricted,true);
+    await assert.rejects(s.change({...i,actorAdmin:false}),{code:'admin-required'});
+    await assert.rejects(s.change({...i,accountId:'admin'}),{code:'self-review-forbidden'});
+    await assert.rejects(s.change({...i,accountId:'protected'}),{code:'admin-account-protected'});
+    await assert.rejects(s.change({...i,reason:'Different reason'}),{code:'request-id-conflict'});
+    await setDoc(doc(db,'account_access/admin'),{manualSuspended:true});
+    await assert.rejects(s.detail(i),{code:'account-suspended'});
+    await assert.rejects(s.change({...i,operationId:'blocked'}),{code:'account-suspended'});
+  });
+});
+
+test('failed manual transaction changes neither restriction nor ledger; client decisions are denied', async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    const db=c.firestore();await setDoc(doc(db,'users/admin'),{});await setDoc(doc(db,'users/rider'),{});
+    const s=createAccountPolicy({store:store(db,true),accountAdmin:async()=>false,now:()=>clock});
+    await assert.rejects(s.change({actorUid:'admin',actorAdmin:true,accountId:'rider',operationId:'rollback',expectedRevision:0,action:'suspend',reason:'Reviewed incident'}));
+    assert.equal(await read(db,'account_access/rider'),undefined);
+    assert.equal((await getDocs(collection(db,'manual_account_decisions'))).size,0);
+  });
+  for(const p of ['', 'sample_test/shared/']) {
+    const db=env.authenticatedContext('admin',{admin:true}).firestore();
+    await assertFails(setDoc(doc(db,p+'account_access/rider'),{manualSuspended:true}));
+    await assertFails(setDoc(doc(db,p+'manual_account_decisions/forged'),{action:'restore'}));
+  }
+});
+
+test('Auth disabled/deleted and revoked sessions fail profile writes/reads across normal and Sample scopes',async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    for(const p of ['', 'sample_test/shared/'])await setDoc(doc(c.firestore(),p+'users/session-user'),{
+      uid:'session-user',name:'Original',email:'session@local.test',phone:null,role:'passenger',points:0,reportsSubmitted:0,verifiedCount:0});
+    await setDoc(doc(c.firestore(),'account_access/session-user'),{sessionsValidAfterSeconds:100});
+  });
+  for(const p of ['', 'sample_test/shared/']){
+    const old=env.authenticatedContext('session-user',{email:'session@local.test',auth_time:99}).firestore();
+    const fresh=env.authenticatedContext('session-user',{email:'session@local.test',auth_time:100}).firestore();
+    await assertFails(getDoc(doc(old,p+'users/session-user')));
+    await assertFails(updateDoc(doc(old,p+'users/session-user'),{name:'Old session'}));
+    await getDoc(doc(fresh,p+'users/session-user'));
+    await updateDoc(doc(fresh,p+'users/session-user'),{name:'Fresh session'});
+  }
+  for(const state of [{authDisabled:true},{accountDeleted:true}]){
+    await env.withSecurityRulesDisabled(c=>setDoc(doc(c.firestore(),'account_access/session-user'),state));
+    for(const p of ['', 'sample_test/shared/']){
+      const client=env.authenticatedContext('session-user',{email:'session@local.test',auth_time:1000}).firestore();
+      await assertFails(getDoc(doc(client,p+'users/session-user')));
+      await assertFails(updateDoc(doc(client,p+'users/session-user'),{name:'Forged restoration'}));
+    }
+  }
+  const admin=env.authenticatedContext('admin',{admin:true,auth_time:1000}).firestore();
+  for(const p of ['', 'sample_test/shared/'])for(const path of ['auth_operations/forged','auth_deletion_reviews/session-user','account_access/session-user']){
+    await assertFails(setDoc(doc(admin,p+path),{authDisabled:false,status:'completed'}));
+  }
+});
+
+
+test('manual appeals: suspended author can submit through trusted transactions, clients cannot read/write private queue',async()=>{
+  await env.withSecurityRulesDisabled(async ctx=>{
+    const db=ctx.firestore();
+    for(const uid of ['admin','rider','other'])await setDoc(doc(db,'users/'+uid),{uid,role:'passenger'});
+    await setDoc(doc(db,'account_access/rider'),{manualRevision:1,manualSuspended:true,manualReason:'Reviewed restriction',communityPermanent:true});
+    const appeals=createManualAppeals({store:store(db),now:()=>clock});
+    const input={actorUid:'rider',expectedRevision:1,reason:'Please review supporting evidence'};
+    const result=await appeals.submit(input);
+    assert.equal((await appeals.submit(input)).duplicate,true);
+    assert.equal((await appeals.list({actorUid:'other'})).items.length,0);
+    await assert.rejects(appeals.review({actorUid:'other',appealId:result.appealId,outcome:'restore',reason:'Unauthorized decision'}),{code:'admin-required'});
+    await appeals.review({actorUid:'admin',actorAdmin:true,appealId:result.appealId,outcome:'restore',reason:'Review supports restoration'});
+    const access=await read(db,'account_access/rider');assert.equal(access.manualSuspended,false);assert.equal(access.communityPermanent,true);
+    const owner=env.authenticatedContext('rider').firestore(),admin=env.authenticatedContext('admin',{admin:true}).firestore();
+    for(const client of [owner,admin]){
+      await assertFails(getDoc(doc(client,'manual_account_appeals/'+result.appealId)));
+      await assertFails(setDoc(doc(client,'manual_account_appeals/forged'),{accountId:'rider',status:'accepted'}));
+      await assertFails(updateDoc(doc(client,'manual_account_appeals/'+result.appealId),{status:'rejected'}));
+    }
   });
 });

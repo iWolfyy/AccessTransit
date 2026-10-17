@@ -6,7 +6,7 @@ const instant=value=>value instanceof Date?value:value?.toDate?.();
 const iso=value=>instant(value)?.toISOString()??null;
 const reason=value=>{if(typeof value!=='string'||value.trim().length<5||value.length>2000)fail('reason-required');return value.trim();};
 function adminAccess(access,time){
-  if(access?.permanent||access?.communityPermanent||access?.manualSuspended||instant(access?.communitySuspendedUntil)>time||instant(access?.manualSuspendedUntil)>time)fail('account-suspended');
+  if(access?.authDisabled||access?.accountDeleted||access?.permanent||access?.communityPermanent||access?.manualSuspended||instant(access?.communitySuspendedUntil)>time||instant(access?.manualSuspendedUntil)>time)fail('account-suspended');
 }
 
 /** Admin authority is supplied ONLY by the verified server auth adapter. */

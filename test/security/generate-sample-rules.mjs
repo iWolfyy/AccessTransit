@@ -10,8 +10,8 @@ if(start<header.length || !base.endsWith('  }\n}\n'))throw new Error('Unexpected
 let body=base.slice(start,-6);
 body=body.replaceAll('/databases/$(database)/documents/','/databases/$(database)/documents/sample_test/shared/');
 // Existing same-project accounts authenticate; approval exists only in this scope.
-body=body.replace('function signedIn() { return request.auth != null; }',
-  'function signedIn() { return request.auth != null && exists(/databases/$(database)/documents/sample_test/shared/users/$(request.auth.uid)); }');
+body=body.replace('function authenticated() { return request.auth != null; }',
+  'function authenticated() { return request.auth != null && exists(/databases/$(database)/documents/sample_test/shared/users/$(request.auth.uid)) && (!exists(/databases/$(database)/documents/account_access/$(request.auth.uid)) || sessionPermitted(get(/databases/$(database)/documents/account_access/$(request.auth.uid)).data)); }');
 const scoped=body.split('\n').map(line=>line.trim()?'  '+line:'').join('\n');
 const generated=base.slice(0,-6)+marker+'\n    // Source: root policy above; regenerate with test/security/generate-sample-rules.mjs.\n    match /sample_test/shared {\n'+scoped+'\n    }\n  }\n}\n';
 await writeFile(path,generated);

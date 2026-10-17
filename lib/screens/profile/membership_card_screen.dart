@@ -1,3 +1,6 @@
+import '../../l10n/localization_context.dart';
+import '../../l10n/reward_presentation.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -70,7 +73,9 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
 
     final resolvedName =
         widget.memberName ??
-        (_user?.name.trim().isNotEmpty == true ? _user!.name : 'Commuter');
+        (_user?.name.trim().isNotEmpty == true
+            ? _user!.name
+            : context.l10n.profileCommuter);
     final resolvedPoints = widget.points ?? _user?.points ?? 0;
     final badges = _user?.badges ?? (resolvedPoints ~/ 100);
     final resolvedTier =
@@ -78,11 +83,13 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
         (badges >= 3
             ? 'Gold Member'
             : (badges >= 1 ? 'Silver Member' : 'Bronze Member'));
-    final resolvedRole = widget.roleLabel ?? 'Community Contributor';
+    final resolvedRole = widget.roleLabel ?? context.l10n.profileContributor;
     final rawUid = _user?.uid ?? '';
     final shortUid = rawUid.length > 8
         ? rawUid.substring(0, 8).toUpperCase()
-        : (rawUid.isNotEmpty ? rawUid.toUpperCase() : 'Unavailable');
+        : (rawUid.isNotEmpty
+              ? rawUid.toUpperCase()
+              : context.l10n.resultsUnknown);
     final resolvedMemberId = widget.memberId ?? 'AT-$shortUid';
 
     return Scaffold(
@@ -113,7 +120,7 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
                             children: [
                               _MembershipCard(
                                 memberName: resolvedName,
-                                memberTier: resolvedTier,
+                                memberTier: context.rewardTier(resolvedTier),
                                 roleLabel: resolvedRole,
                                 points: resolvedPoints,
                                 memberId: resolvedMemberId,
@@ -126,8 +133,10 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
                                 onSecondaryFixed: _onSecondaryFixed,
                               ),
                               const SizedBox(height: 24),
-                              SizedBox(
-                                height: context.buttonHeight,
+                              ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: context.buttonHeight,
+                                ),
                                 child: FilledButton.icon(
                                   onPressed: () =>
                                       Navigator.of(context).maybePop(),
@@ -156,7 +165,7 @@ class _MembershipCardScreenState extends State<MembershipCardScreen> {
                                     Icons.arrow_back,
                                     size: context.tapIconSize,
                                   ),
-                                  label: const Text('Back to Rewards'),
+                                  label: Text(context.l10n.memberBack),
                                 ),
                               ),
                             ],
@@ -191,15 +200,15 @@ class _TopBar extends StatelessWidget {
           : null,
       child: SafeArea(
         bottom: false,
-        child: SizedBox(
-          height: 48,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
                 IconButton(
                   onPressed: onBack,
-                  tooltip: 'Back',
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                   icon: Icon(
                     Icons.arrow_back,
                     color: isHC ? Colors.black : AppColors.primary,
@@ -209,10 +218,8 @@ class _TopBar extends StatelessWidget {
                 ),
                 Expanded(
                   child: Text(
-                    'Digital Membership Card',
+                    context.l10n.memberTitle,
                     textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 22,
                       height: 28 / 22,
@@ -295,14 +302,14 @@ class _MembershipCard extends StatelessWidget {
             padding: EdgeInsets.all(isWide ? 24 : 16),
             child: Column(
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                _MemberHeader(
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Icon(
                                 Icons.directions_bus,
@@ -350,8 +357,8 @@ class _MembershipCard extends StatelessWidget {
                                   ? Border.all(color: Colors.black, width: 1.5)
                                   : null,
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                            child: Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 Icon(
                                   Icons.workspace_premium,
@@ -394,8 +401,8 @@ class _MembershipCard extends StatelessWidget {
                                 ? Border.all(color: Colors.black, width: 1.5)
                                 : null,
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Icon(
                                 Icons.handshake,
@@ -417,7 +424,7 @@ class _MembershipCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          '$points Points',
+                          context.l10n.memberPointCount(points),
                           style: TextStyle(
                             fontSize: 18,
                             height: 24 / 18,
@@ -445,8 +452,9 @@ class _MembershipCard extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Icon(
                             Icons.card_giftcard_rounded,
@@ -455,7 +463,7 @@ class _MembershipCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Contribution points',
+                            context.l10n.memberPointsLabel,
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
@@ -466,7 +474,7 @@ class _MembershipCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Points have no cash or voucher value',
+                        context.l10n.memberNoCash,
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -477,7 +485,7 @@ class _MembershipCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'ID: $memberId',
+                        context.l10n.memberIdentity(memberId),
                         style: TextStyle(
                           fontSize: 14,
                           height: 20 / 14,
@@ -488,9 +496,8 @@ class _MembershipCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 48),
                         child: FilledButton.icon(
                           onPressed: null,
                           style: FilledButton.styleFrom(
@@ -507,7 +514,7 @@ class _MembershipCard extends StatelessWidget {
                           ),
                           icon: const Icon(Icons.redeem_rounded, size: 20),
                           label: Text(
-                            'Redemption unavailable',
+                            context.l10n.memberNoRedemption,
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -544,22 +551,22 @@ class _BenefitsSection extends StatelessWidget {
         Icons.loyalty,
         AppColors.primaryFixed,
         AppColors.primary,
-        'Reward availability',
-        'Partner discounts and vouchers are not available.',
+        context.l10n.memberAvailability,
+        context.l10n.memberNoVouchers,
       ),
       (
         Icons.card_membership,
         AppColors.primaryFixed,
         AppColors.primary,
-        'Member Benefits',
-        'Membership does not include priority support or guaranteed access.',
+        context.l10n.memberBenefits,
+        context.l10n.memberNoPriority,
       ),
       (
         Icons.verified,
         secondaryFixed,
         onSecondaryFixed,
-        'Community Recognition',
-        'Contribution points update after administrator review.',
+        context.l10n.memberRecognition,
+        context.l10n.memberLedgerNotice,
       ),
     ];
 
@@ -583,7 +590,7 @@ class _BenefitsSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Member Benefits',
+            context.l10n.memberBenefits,
             style: TextStyle(
               fontSize: 18,
               height: 24 / 18,
@@ -685,4 +692,33 @@ class _BenefitRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MemberHeader extends StatelessWidget {
+  const _MemberHeader({required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (constraints.maxWidth < 600 ||
+          MediaQuery.textScalerOf(context).scale(14) > 20) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final child in children)
+              if (child is Expanded)
+                child.child
+              else if (child is SizedBox)
+                const SizedBox(height: 12)
+              else
+                child,
+          ],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      );
+    },
+  );
 }

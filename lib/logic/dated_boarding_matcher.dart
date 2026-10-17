@@ -43,6 +43,40 @@ abstract final class DatedBoardingMatcher {
     Map<String, Station> stations = const {},
     ReviewedRouteGeometry? geometry,
   }) {
+    if (bus.stops.toSet().length != bus.stops.length) return const [];
+    return [
+      for (final board in bus.occurrencesAt(from))
+        for (final alight in bus.occurrencesAt(to))
+          if (bus.stops.indexOf(board) < bus.stops.indexOf(alight))
+            ..._forOccurrences(
+              bus: bus,
+              from: board,
+              to: alight,
+              window: window,
+              notBefore: notBefore,
+              selectedDate: selectedDate,
+              runs: runs,
+              trips: trips,
+              locations: locations,
+              stations: stations,
+              geometry: geometry,
+            ),
+    ];
+  }
+
+  static List<DatedBoardingOption> _forOccurrences({
+    required Bus bus,
+    required String from,
+    required String to,
+    required BoardingSearchWindow window,
+    required DateTime notBefore,
+    DateTime? selectedDate,
+    required List<ServiceRun> runs,
+    Map<String, TripModel> trips = const {},
+    Map<String, BusLocationModel> locations = const {},
+    Map<String, Station> stations = const {},
+    ReviewedRouteGeometry? geometry,
+  }) {
     final options = <DatedBoardingOption>[];
     bool eligible(DateTime at) =>
         window.contains(at) &&
@@ -72,6 +106,7 @@ abstract final class DatedBoardingMatcher {
           run.routeId != (bus.routeId ?? '') ||
           run.serviceDate != TransitTime.serviceDate(run.plannedDepartureAt) ||
           !listEquals(run.stopTimes.keys.toList(), bus.stops) ||
+          bus.stops.any((s) => run.stationIdFor(s) != bus.stationIdFor(s)) ||
           !const [
             'scheduled',
             'boarding',
@@ -143,7 +178,7 @@ abstract final class DatedBoardingMatcher {
           // Without reviewed road geometry, only a stationary GPS fix at the
           // recorded stop supports a timetable-interval boarding estimate.
           final anchorId = stops[trip.currentStopIndex];
-          final anchor = stations[anchorId];
+          final anchor = stations[bus.stationIdFor(anchorId)];
           if (anchor == null ||
               !anchor.lat.isFinite ||
               !anchor.lng.isFinite ||

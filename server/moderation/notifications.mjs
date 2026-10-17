@@ -4,7 +4,7 @@ const fail=code=>{throw new PolicyError(code);};
 const hash=v=>createHash('sha256').update(v).digest('hex');
 const id=v=>typeof v==='string'&&v.length>0&&v.length<=128&&!v.includes('/')&&!['.','..'].includes(v);
 const date=v=>v instanceof Date?v:v?.toDate?.();
-const active=(a,t)=>!a?.permanent&&!a?.communityPermanent&&!a?.manualSuspended&&!(date(a?.communitySuspendedUntil)>t)&&!(date(a?.manualSuspendedUntil)>t);
+const active=(a,t)=>!a?.authDisabled&&!a?.accountDeleted&&!a?.permanent&&!a?.communityPermanent&&!a?.manualSuspended&&!(date(a?.communitySuspendedUntil)>t)&&!(date(a?.manualSuspendedUntil)>t);
 const scopes=i=>i.scope==null||i.scope==='normal'?'':i.scope==='sample'?'sample_test/shared/':fail('invalid-scope');
 
 /** Delivery is at-least-once. A provider receipt is never a device receipt or

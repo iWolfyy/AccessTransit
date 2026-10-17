@@ -1,6 +1,10 @@
+import '../../core/theme/app_theme.dart';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../../l10n/localization_context.dart';
 
 import '../../core/theme/app_colors.dart';
 
@@ -21,67 +25,72 @@ class MobilityPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 1,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.surfaceVariant),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0A000000),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              CustomPaint(
-                painter: _MobilityBackdropPainter(
-                  progress: entrance,
-                  orbit: orbit,
+    return ExcludeSemantics(
+      child: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1,
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.surfaceVariant),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
                 ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CustomPaint(
+                    painter: _MobilityBackdropPainter(
+                      progress: entrance,
+                      orbit: orbit,
+                    ),
+                  ),
+                  _node(
+                    alignment: const Alignment(-0.55, 0.18),
+                    icon: Icons.accessible_rounded,
+                    background: AppColors.primaryContainer,
+                    foreground: AppColors.onPrimary,
+                    size: 76,
+                    delay: 0.08,
+                    floatPhase: 0,
+                  ),
+                  _node(
+                    alignment: const Alignment(0.02, -0.5),
+                    icon: Icons.elderly,
+                    background: AppColors.surfaceBright,
+                    foreground: AppColors.primary,
+                    size: 64,
+                    delay: 0.18,
+                    floatPhase: 0.45,
+                    outlined: true,
+                  ),
+                  _node(
+                    alignment: const Alignment(0.56, 0.1),
+                    icon: Icons.blind,
+                    background: AppColors.secondaryContainer,
+                    foreground: AppColors.onSecondaryContainer,
+                    size: 70,
+                    delay: 0.28,
+                    floatPhase: 0.7,
+                  ),
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                    child: _chips(context),
+                  ),
+                ],
               ),
-              _node(
-                alignment: const Alignment(-0.55, 0.18),
-                icon: Icons.accessible_rounded,
-                background: AppColors.primaryContainer,
-                foreground: AppColors.onPrimary,
-                size: 76,
-                delay: 0.08,
-                floatPhase: 0,
-              ),
-              _node(
-                alignment: const Alignment(0.02, -0.5),
-                icon: Icons.elderly,
-                background: AppColors.surfaceBright,
-                foreground: AppColors.primary,
-                size: 64,
-                delay: 0.18,
-                floatPhase: 0.45,
-                outlined: true,
-              ),
-              _node(
-                alignment: const Alignment(0.56, 0.1),
-                icon: Icons.blind,
-                background: AppColors.secondaryContainer,
-                foreground: AppColors.onSecondaryContainer,
-                size: 70,
-                delay: 0.28,
-                floatPhase: 0.7,
-              ),
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16,
-                child: _chips(),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -126,7 +135,7 @@ class MobilityPreview extends StatelessWidget {
     );
   }
 
-  Widget _chips() {
+  Widget _chips(BuildContext context) {
     final t = Curves.easeOutCubic.transform(
       ((entrance - 0.45) / 0.55).clamp(0.0, 1.0),
     );
@@ -135,12 +144,17 @@ class MobilityPreview extends StatelessWidget {
       opacity: reduceMotion ? 1 : t,
       child: Transform.translate(
         offset: Offset(0, reduceMotion ? 0 : (1 - t) * 12),
-        child: const Row(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            _PreferenceChip(label: 'Ramps', icon: Icons.accessible_rounded),
+            _PreferenceChip(
+              label: context.l10n.onboardingRamps,
+              icon: Icons.accessible_rounded,
+            ),
             SizedBox(width: 8),
             _PreferenceChip(
-              label: 'Low-floor',
+              label: context.l10n.onboardingLowFloor,
               icon: Icons.directions_bus_rounded,
             ),
           ],
@@ -215,15 +229,15 @@ class _PreferenceChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: AppColors.primary),
+            Icon(icon, size: 14, color: context.primaryColor),
             const SizedBox(width: 6),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 height: 16 / 12,
                 fontWeight: FontWeight.w500,
-                color: AppColors.onSurface,
+                color: context.textColor,
               ),
             ),
           ],
@@ -234,10 +248,7 @@ class _PreferenceChip extends StatelessWidget {
 }
 
 class _MobilityBackdropPainter extends CustomPainter {
-  _MobilityBackdropPainter({
-    required this.progress,
-    required this.orbit,
-  });
+  _MobilityBackdropPainter({required this.progress, required this.orbit});
 
   final double progress;
   final double orbit;

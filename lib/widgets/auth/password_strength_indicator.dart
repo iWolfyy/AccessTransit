@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/recovery_presentation.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/validators.dart';
@@ -94,7 +96,7 @@ class PasswordStrengthIndicator extends StatelessWidget {
             key: ValueKey(label),
             alignment: Alignment.centerRight,
             child: Text(
-              label,
+              context.recoveryText(label),
               style: TextStyle(
                 fontSize: 12,
                 height: 16 / 12,

@@ -1,3 +1,8 @@
+import '../../l10n/home_presentation.dart';
+import '../../l10n/driver_presentation.dart';
+import '../../l10n/localization_context.dart';
+import '../../l10n/legacy_journey_presentation.dart';
+import '../../widgets/accessible_tap_target.dart';
 import '../../widgets/fare_estimate_text.dart';
 import '../../widgets/published_timetable_notice.dart';
 
@@ -117,12 +122,12 @@ class _LiveJourneyScreenState extends State<LiveJourneyScreen> {
         final busNumber = liveBus != null && liveBus.routeNumber.isNotEmpty
             ? liveBus.routeNumber
             : resolvedBusId.replaceAll('bus_', '');
-        final busName = 'Bus $busNumber';
+        final busName = context.l10n.legacyFormat0(busNumber);
         final routeName = journey?.routeTitle.isNotEmpty == true
             ? journey!.routeTitle
             : (liveBus?.routeName.isNotEmpty == true
                   ? liveBus!.routeName
-                  : 'Route $busNumber');
+                  : context.l10n.legacyFormat1(busNumber));
         final passengerStop = journey?.destination ?? widget.destination;
         final isBroadcasting =
             liveBus != null && liveBus.isBroadcasting && !isStale;
@@ -518,39 +523,32 @@ class _ErrorBody extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  size: 56,
-                  color: AppColors.error,
-                ),
+                Icon(Icons.error_outline, size: 56, color: context.errorColor),
                 const SizedBox(height: 20),
-                const Text(
-                  'Unable to Load Journey',
+                Text(
+                  context.legacyText('Unable to Load Journey'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                    color: context.textColor,
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   error,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.onSurfaceVariant,
-                  ),
+                  style: TextStyle(fontSize: 14, color: context.subtextColor),
                 ),
                 const SizedBox(height: 32),
                 OutlinedButton.icon(
                   onPressed: onClose,
                   icon: const Icon(Icons.arrow_back_rounded),
-                  label: const Text('Back to Home'),
+                  label: Text(context.legacyText('Back to Home')),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(
-                      color: AppColors.primaryContainer,
+                    foregroundColor: context.primaryColor,
+                    side: BorderSide(
+                      color: context.primaryContainerColor,
                       width: 2,
                     ),
                     minimumSize: const Size(200, 48),
@@ -580,7 +578,9 @@ class _LoadingBody extends StatelessWidget {
         Expanded(
           child: Center(
             child: Semantics(
-              label: 'Loading live journey details from server',
+              label: context.legacyText(
+                'Loading live journey details from server',
+              ),
               liveRegion: true,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -588,11 +588,11 @@ class _LoadingBody extends StatelessWidget {
                   CircularProgressIndicator(),
                   SizedBox(height: 16),
                   Text(
-                    'Loading your journey…',
+                    context.legacyText('Loading your journey…'),
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.onSurfaceVariant,
+                      color: context.subtextColor,
                     ),
                   ),
                 ],
@@ -619,7 +619,7 @@ class _NoJourneyBody extends StatelessWidget {
             padding: const EdgeInsets.all(32),
             child: Semantics(
               container: true,
-              label: 'Bus has not been assigned yet. Your booking is confirmed and waiting for bus assignment.',
+              label: context.legacyText('Bus has not been assigned yet.'),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -630,44 +630,46 @@ class _NoJourneyBody extends StatelessWidget {
                       color: AppColors.surfaceContainer,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.directions_bus_outlined,
                       size: 44,
-                      color: AppColors.onSurfaceVariant,
+                      color: context.subtextColor,
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text(
-                    'Bus has not been assigned yet.',
+                  Text(
+                    context.legacyText('Bus has not been assigned yet.'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
+                      color: context.textColor,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Your booking is confirmed. The operator will assign a bus before departure. Check back shortly.',
+                  Text(
+                    context.legacyText(
+                      'A saved trip does not reserve a seat or guarantee bus assignment. Check the selected service status.',
+                    ),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
                       height: 1.5,
-                      color: AppColors.onSurfaceVariant,
+                      color: context.subtextColor,
                     ),
                   ),
                   const SizedBox(height: 32),
                   Semantics(
                     button: true,
-                    label: 'Return to Home screen',
+                    label: context.legacyText('Return to Home screen'),
                     child: OutlinedButton.icon(
                       onPressed: onClose,
                       icon: const Icon(Icons.arrow_back_rounded),
-                      label: const Text('Back to Home'),
+                      label: Text(context.legacyText('Back to Home')),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: const BorderSide(
-                          color: AppColors.primaryContainer,
+                        foregroundColor: context.primaryColor,
+                        side: BorderSide(
+                          color: context.primaryContainerColor,
                           width: 2,
                         ),
                         minimumSize: const Size(200, 48),
@@ -721,14 +723,14 @@ class _TopBar extends StatelessWidget {
                 children: [
                   Semantics(
                     button: true,
-                    label: 'Close Live Navigation',
+                    label: context.legacyText('Close Live Navigation'),
                     child: IconButton(
                       onPressed: onClose,
                       icon: const Icon(Icons.close_rounded, size: 28),
                       color: isHighContrast
                           ? Colors.black
                           : AppColors.onSurface,
-                      tooltip: 'Close Live Navigation',
+                      tooltip: context.legacyText('Close Live Navigation'),
                     ),
                   ),
                   Expanded(
@@ -736,7 +738,7 @@ class _TopBar extends StatelessWidget {
                       child: Semantics(
                         header: true,
                         child: Text(
-                          'Live Navigation',
+                          context.legacyText('Live Navigation'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 20,
@@ -814,14 +816,17 @@ class _FloatingTopBar extends StatelessWidget {
             children: [
               Semantics(
                 button: true,
-                label: 'Back to Route Results',
+                label: context.legacyText('Back to Route Results'),
                 child: IconButton(
                   onPressed: onClose,
                   icon: const Icon(Icons.arrow_back_rounded, size: 24),
                   color: isHighContrast ? Colors.black : AppColors.onSurface,
-                  tooltip: 'Back',
+                  tooltip: context.legacyText('Back'),
                   style: IconButton.styleFrom(
-                    minimumSize: const Size(48, 48),
+                    minimumSize: Size(
+                      context.buttonHeight,
+                      context.buttonHeight,
+                    ),
                     padding: EdgeInsets.zero,
                   ),
                 ),
@@ -855,7 +860,7 @@ class _FloatingTopBar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Live Tracking to',
+                      context.legacyText('Live Tracking to'),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: isHighContrast
@@ -919,7 +924,9 @@ class _FloatingTopBar extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      isLiveGps ? 'LIVE' : 'SCHED',
+                      isLiveGps
+                          ? context.legacyText('LIVE')
+                          : context.legacyText('SCHED'),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
@@ -1004,7 +1011,7 @@ class _EnhancedStopsTimelineCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Upcoming Stops (${stopsTimeline.length})',
+                      context.l10n.legacyFormat2('${stopsTimeline.length}'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1016,7 +1023,7 @@ class _EnhancedStopsTimelineCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Real-time stop progression & ETA',
+                      context.legacyText('Real-time stop progression & ETA'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1046,7 +1053,7 @@ class _EnhancedStopsTimelineCard extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  'Live Stops',
+                  context.legacyText('Live Stops'),
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
@@ -1282,7 +1289,7 @@ class _StopTimelineItem extends StatelessWidget {
                                   ),
                                 ),
                                 child: Text(
-                                  'YOUR STOP',
+                                  context.legacyText('YOUR STOP'),
                                   style: TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.w900,
@@ -1299,10 +1306,12 @@ class _StopTimelineItem extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           isCurrent
-                              ? 'Bus is currently here'
+                              ? context.legacyText('Bus is currently here')
                               : (isPassed
-                                    ? 'Passed'
-                                    : 'Scheduled: ${stop.scheduledTimeStr}'),
+                                    ? context.legacyText('Passed')
+                                    : context.l10n.legacyFormat3(
+                                        stop.scheduledTimeStr,
+                                      )),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: isHighContrast
@@ -1344,7 +1353,7 @@ class _StopTimelineItem extends StatelessWidget {
                             !isPassed) ...[
                           const SizedBox(height: 2),
                           Text(
-                            stop.delayLabel,
+                            context.driverText(stop.delayLabel),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
@@ -1434,8 +1443,10 @@ class _DraggableJourneySheetContent extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         if (telemetryUnavailable)
-          const Text(
-            'Live GPS updates are unavailable. Equipment observations are shown separately below.',
+          Text(
+            context.legacyText(
+              'Live GPS updates are unavailable. Equipment observations are shown separately below.',
+            ),
           ),
         if (!isDesktop) ...[
           Center(
@@ -1513,7 +1524,9 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      isBroadcasting ? '● Ongoing' : '● Scheduled',
+                      isBroadcasting
+                          ? context.legacyText('● Ongoing')
+                          : context.legacyText('● Scheduled'),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
@@ -1599,8 +1612,10 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                   children: [
                     Text(
                       etaResult.countdownText.isNotEmpty
-                          ? etaResult.countdownText
-                          : 'Arriving in ${etaResult.countdownMinutes} min',
+                          ? context.driverCountdown(etaResult)
+                          : context.l10n.legacyFormat4(
+                              '${etaResult.countdownMinutes}',
+                            ),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: isHighContrast
@@ -1611,7 +1626,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Destination: $effectiveDestination',
+                      context.l10n.legacyFormat5(effectiveDestination),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1644,7 +1659,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                         : null,
                   ),
                   child: Text(
-                    etaResult.delayLabel,
+                    context.driverText(etaResult.delayLabel),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
@@ -1686,7 +1701,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                   color: Colors.white,
                 ),
                 label: Text(
-                  'Assistance',
+                  context.legacyText('Assistance'),
                   style: TextStyle(
                     fontSize: context.hasLargeTargets ? 14 : 12.5,
                     fontWeight: FontWeight.w700,
@@ -1698,7 +1713,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
                       ? const Color(0xFF001F3F)
                       : AppColors.primary,
                   elevation: isHighContrast ? 0 : 1,
-                  minimumSize: Size(0, context.buttonHeight),
+                  minimumSize: Size(context.buttonHeight, context.buttonHeight),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                     side: isHighContrast
@@ -1713,7 +1728,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
 
         const SizedBox(height: 16),
 
-        const Text(StopAlertUnavailable.explanation),
+        Text(context.l10n.sharedStopAlertHelp),
         const SizedBox(height: 12),
 
         // Stops Timeline (LMT Go style!)
@@ -1726,8 +1741,10 @@ class _DraggableJourneySheetContent extends StatelessWidget {
 
         // Accessibility section
         if (liveBus != null)
-          const Text(
-            'Tracking shows the current vehicle location; it does not confirm your scheduled run.',
+          Text(
+            context.legacyText(
+              'Tracking shows the current vehicle location; it does not confirm your scheduled run.',
+            ),
           ),
         LiveAccessibilityPanel(
           telemetry: liveBus,
@@ -1778,7 +1795,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
               color: isHighContrast ? Colors.black : AppColors.primary,
             ),
             title: Text(
-              'Detailed Vehicle Telemetry',
+              context.legacyText('Detailed Vehicle Telemetry'),
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w700,
@@ -1786,7 +1803,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
               ),
             ),
             subtitle: Text(
-              'Speed, GPS signals and raw trip data',
+              context.legacyText('Speed, GPS signals and raw trip data'),
               style: TextStyle(
                 fontSize: 12,
                 color: context.subtextColor,
@@ -1799,7 +1816,8 @@ class _DraggableJourneySheetContent extends StatelessWidget {
               _StatusCard(
                 busName: busName,
                 routeName: routeName,
-                nextStop: liveBus?.nextStop ?? 'Approaching',
+                nextStop:
+                    liveBus?.nextStop ?? context.legacyText('Approaching'),
                 passengerStop: effectiveDestination,
                 isBroadcasting: isBroadcasting,
                 isStale: isStale,
@@ -2120,7 +2138,7 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
     }
 
     final isLiveGps = widget.isBroadcasting && !widget.isStale;
-    final delayText = widget.etaResult.delayLabel;
+    final delayText = context.driverText(widget.etaResult.delayLabel);
     final delayType = widget.etaResult.delayType;
 
     final Color delayBadgeColor;
@@ -2141,8 +2159,7 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
         : (_isExpanded ? 460.0 : 290.0);
 
     return Semantics(
-      label:
-          'Live interactive map showing bus ${widget.busName} heading toward ${widget.origin}',
+      label: context.l10n.legacyFormat6(widget.busName, widget.origin),
       container: true,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
@@ -2206,14 +2223,14 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                       Polyline(
                         points: remainingPoints,
                         strokeWidth: 5.0,
-                        color: AppColors.primary,
+                        color: context.primaryColor,
                       ),
                     // Fallback: full route when no split data
                     if (traveledPoints.length < 2 && remainingPoints.length < 2)
                       Polyline(
                         points: polylinePoints,
                         strokeWidth: 4.5,
-                        color: AppColors.primary,
+                        color: context.primaryColor,
                       ),
                   ],
                 ),
@@ -2403,8 +2420,8 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                                 BoxShadow(color: Colors.black26, blurRadius: 3),
                               ],
                             ),
-                            child: const Text(
-                              'You Board Here',
+                            child: Text(
+                              context.legacyText('You Board Here'),
                               maxLines: 1,
                               style: TextStyle(
                                 color: Colors.white,
@@ -2466,7 +2483,11 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                             ),
                             child: Text(
                               widget.liveBus?.routeNumber.isNotEmpty == true
-                                  ? 'BUS ${widget.liveBus!.routeNumber}'
+                                  ? context.l10n
+                                        .legacyFormat0(
+                                          widget.liveBus!.routeNumber,
+                                        )
+                                        .toUpperCase()
                                   : widget.busName,
                               maxLines: 1,
                               style: const TextStyle(
@@ -2555,7 +2576,9 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                             Row(
                               children: [
                                 Text(
-                                  isLiveGps ? 'LIVE GPS' : 'TIMETABLE',
+                                  isLiveGps
+                                      ? context.legacyText('LIVE GPS')
+                                      : context.legacyText('TIMETABLE'),
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w800,
@@ -2575,21 +2598,21 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                                 ),
                                 Text(
                                   distanceText,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.onSurface,
+                                    color: context.textColor,
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 1),
                             Text(
-                              widget.etaResult.countdownText,
-                              style: const TextStyle(
+                              context.driverCountdown(widget.etaResult),
+                              style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
+                                color: context.primaryColor,
                               ),
                             ),
                           ],
@@ -2670,7 +2693,9 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                       icon: _isExpanded
                           ? Icons.fullscreen_exit_rounded
                           : Icons.fullscreen_rounded,
-                      tooltip: _isExpanded ? 'Collapse map' : 'Expand map',
+                      tooltip: _isExpanded
+                          ? context.legacyText('Collapse map')
+                          : context.legacyText('Expand map'),
                       onTap: () {
                         setState(() {
                           _isExpanded = !_isExpanded;
@@ -2681,25 +2706,25 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                   ],
                   _MapActionButton(
                     icon: Icons.crop_free_rounded,
-                    tooltip: 'Fit journey bounds',
+                    tooltip: context.legacyText('Fit journey bounds'),
                     onTap: () => _fitJourney(busPos!, passengerPos, destPos),
                   ),
                   const SizedBox(height: 6),
                   _MapActionButton(
                     icon: Icons.directions_bus_rounded,
-                    tooltip: 'Focus on bus',
+                    tooltip: context.legacyText('Focus on bus'),
                     onTap: () => _mapController.move(busPos!, 15.0),
                   ),
                   const SizedBox(height: 6),
                   _MapActionButton(
                     icon: Icons.person_pin_circle_rounded,
-                    tooltip: 'Focus on my stop',
+                    tooltip: context.legacyText('Focus on my stop'),
                     onTap: () => _mapController.move(passengerPos, 15.5),
                   ),
                   const SizedBox(height: 6),
                   _MapActionButton(
                     icon: Icons.add_rounded,
-                    tooltip: 'Zoom in',
+                    tooltip: context.legacyText('Zoom in'),
                     onTap: () {
                       final current = _mapController.camera.center;
                       final zoom = (_mapController.camera.zoom + 1.0).clamp(
@@ -2712,7 +2737,7 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                   const SizedBox(height: 6),
                   _MapActionButton(
                     icon: Icons.remove_rounded,
-                    tooltip: 'Zoom out',
+                    tooltip: context.legacyText('Zoom out'),
                     onTap: () {
                       final current = _mapController.camera.center;
                       final zoom = (_mapController.camera.zoom - 1.0).clamp(
@@ -2753,8 +2778,14 @@ class _LiveMapTrackingViewState extends State<_LiveMapTrackingView> {
                       const SizedBox(width: 5),
                       Text(
                         isLiveGps
-                            ? '${widget.liveBus?.speed.toStringAsFixed(0) ?? 0} km/h · Next: ${widget.liveBus?.nextStop ?? 'Approaching'}'
-                            : 'Next Stop: ${widget.liveBus?.nextStop ?? widget.origin}',
+                            ? context.l10n.legacySpeedNext(
+                                '${widget.liveBus?.speed.toStringAsFixed(0) ?? 0}',
+                                widget.liveBus?.nextStop ??
+                                    context.legacyText('Approaching'),
+                              )
+                            : context.l10n.legacyFormat7(
+                                widget.liveBus?.nextStop ?? widget.origin,
+                              ),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
@@ -2801,16 +2832,18 @@ class _MapActionButton extends StatelessWidget {
             width: isHighContrast ? 2.0 : 1.0,
           ),
         ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: onTap,
-          child: SizedBox(
-            width: 38,
-            height: 38,
-            child: Icon(
-              icon,
-              size: 20,
-              color: isHighContrast ? Colors.black : AppColors.primary,
+        child: AccessibleTapTarget(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: onTap,
+            child: SizedBox(
+              width: 38,
+              height: 38,
+              child: Icon(
+                icon,
+                size: 20,
+                color: isHighContrast ? Colors.black : AppColors.primary,
+              ),
             ),
           ),
         ),
@@ -2850,30 +2883,27 @@ class _StatusCard extends StatelessWidget {
   final BusLocationModel? liveBus;
   final BusArrivalEtaResult? arrivalEta;
 
-  String _formatTimestamp(DateTime? timestamp) {
-    if (timestamp == null) return 'No GPS signal';
-    final diff = DateTime.now().difference(timestamp);
-    if (diff.inSeconds < 15) return 'Just now';
-    if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    final hour = timestamp.hour % 12 == 0 ? 12 : timestamp.hour % 12;
-    final min = timestamp.minute.toString().padLeft(2, '0');
-    final period = timestamp.hour >= 12 ? 'PM' : 'AM';
-    return '$hour:$min $period';
+  String _formatTimestamp(BuildContext context, DateTime? timestamp) {
+    if (timestamp == null) return context.legacyText('No GPS signal');
+    return context.homeAge(timestamp);
   }
 
-  String _getBusStatusText(BusStatus? status, bool isStale) {
-    if (isStale) return 'Signal Lost';
+  String _getBusStatusText(
+    BuildContext context,
+    BusStatus? status,
+    bool isStale,
+  ) {
+    if (isStale) return context.legacyText('Signal Lost');
     switch (status) {
       case BusStatus.active:
-        return 'En Route';
+        return context.legacyText('En Route');
       case BusStatus.stopped:
-        return 'Stopped';
+        return context.legacyText('Stopped');
       case BusStatus.completed:
-        return 'Trip Completed';
+        return context.legacyText('Trip Completed');
       case BusStatus.offline:
       case null:
-        return 'Offline';
+        return context.legacyText('Offline');
     }
   }
 
@@ -2896,11 +2926,12 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
     final updatedText = _formatTimestamp(
+      context,
       liveBus?.timestamp ?? liveBus?.lastUpdated,
     );
     final busStatusText = liveBus?.isCached == true
-        ? 'Saved location - updates unavailable'
-        : _getBusStatusText(liveBus?.status, isStale);
+        ? context.legacyText('Saved location - updates unavailable')
+        : _getBusStatusText(context, liveBus?.status, isStale);
     final busStatusIcon = _getBusStatusIcon(liveBus?.status, isStale);
 
     return Container(
@@ -2987,8 +3018,8 @@ class _StatusCard extends StatelessWidget {
               Semantics(
                 liveRegion: true,
                 label: isBroadcasting
-                    ? 'Status: Live GPS updates receiving'
-                    : 'Status: Location unavailable',
+                    ? context.legacyText('Status: Live GPS updates receiving')
+                    : context.legacyText('Status: Location unavailable'),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -3023,7 +3054,9 @@ class _StatusCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        isBroadcasting ? 'LIVE GPS' : 'Unavailable',
+                        isBroadcasting
+                            ? context.legacyText('LIVE GPS')
+                            : context.legacyText('Unavailable'),
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
@@ -3064,8 +3097,12 @@ class _StatusCard extends StatelessWidget {
           // ── Status & Telemetry details grid ────────────────────────────────
           Semantics(
             container: true,
-            label:
-                'Bus status: $busStatusText. Last updated: $updatedText. Next stop: $nextStop. Passenger stop: $passengerStop.',
+            label: context.l10n.legacyFormat8(
+              busStatusText,
+              updatedText,
+              nextStop,
+              passengerStop,
+            ),
             child: Column(
               children: [
                 Row(
@@ -3076,7 +3113,7 @@ class _StatusCard extends StatelessWidget {
                         iconColor: isStale
                             ? AppColors.error
                             : AppColors.primaryContainer,
-                        label: 'Current Status',
+                        label: context.legacyText('Current Status'),
                         value: busStatusText,
                         valueColor: isStale
                             ? AppColors.error
@@ -3089,7 +3126,7 @@ class _StatusCard extends StatelessWidget {
                         iconColor: isStale
                             ? AppColors.error
                             : AppColors.onSurfaceVariant,
-                        label: 'Last Updated',
+                        label: context.legacyText('Last Updated'),
                         value: updatedText,
                         valueColor: isStale
                             ? AppColors.error
@@ -3105,7 +3142,7 @@ class _StatusCard extends StatelessWidget {
                       child: _InfoTile(
                         icon: Icons.place_rounded,
                         iconColor: AppColors.primary,
-                        label: 'Next Stop',
+                        label: context.legacyText('Next Stop'),
                         value: nextStop,
                         valueColor: AppColors.onSurface,
                       ),
@@ -3114,7 +3151,7 @@ class _StatusCard extends StatelessWidget {
                       child: _InfoTile(
                         icon: Icons.flag_rounded,
                         iconColor: AppColors.secondary,
-                        label: 'Your Destination',
+                        label: context.legacyText('Your Destination'),
                         value: passengerStop,
                         valueColor: AppColors.onSurface,
                       ),
@@ -3229,7 +3266,8 @@ class _EtaBannerCard extends StatelessWidget {
 
       return Semantics(
         liveRegion: true,
-        label: '${arrival.countdownText}. ${arrival.delayLabel}',
+        label:
+            '${context.driverCountdown(arrival)}. ${context.driverText(arrival.delayLabel)}',
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
@@ -3276,7 +3314,7 @@ class _EtaBannerCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          arrival.countdownText,
+                          context.driverCountdown(arrival),
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: isHighContrast
@@ -3289,7 +3327,7 @@ class _EtaBannerCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'at $targetStop',
+                          context.l10n.legacyFormat9(targetStop),
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: isHighContrast
@@ -3314,7 +3352,7 @@ class _EtaBannerCard extends StatelessWidget {
                           : null,
                     ),
                     child: Text(
-                      arrival.delayLabel,
+                      context.driverText(arrival.delayLabel),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w900,
@@ -3341,7 +3379,7 @@ class _EtaBannerCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Scheduled: ${arrival.scheduledArrivalStr}',
+                      context.l10n.legacyFormat10(arrival.scheduledArrivalStr),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: isHighContrast
@@ -3351,7 +3389,7 @@ class _EtaBannerCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Expected: ${arrival.estimatedArrivalStr}',
+                      context.l10n.legacyFormat11(arrival.estimatedArrivalStr),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: isHighContrast
@@ -3399,7 +3437,10 @@ class _EtaBannerCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'Driver Notice: ${arrival.delayReason} (+${arrival.addedDelayMinutes} mins)',
+                          context.l10n.legacyFormat12(
+                            context.driverText(arrival.delayReason ?? ''),
+                            '${arrival.addedDelayMinutes}',
+                          ),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -3423,7 +3464,7 @@ class _EtaBannerCard extends StatelessWidget {
 
       return Semantics(
         liveRegion: true,
-        label: '${etaResult.displayText} to $targetStop',
+        label: '${context.legacyEta(etaResult)} · $targetStop',
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
@@ -3467,7 +3508,7 @@ class _EtaBannerCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      etaResult.displayText,
+                      context.legacyEta(etaResult),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: isHighContrast
@@ -3480,7 +3521,7 @@ class _EtaBannerCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Distance: $distanceKm km to $targetStop',
+                      context.l10n.legacyFormat13(distanceKm, targetStop),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: isHighContrast
@@ -3501,7 +3542,7 @@ class _EtaBannerCard extends StatelessWidget {
     // Unreliable / Stale fallback (Do not invent a fake ETA)
     return Semantics(
       liveRegion: true,
-      label: etaResult.displayText,
+      label: context.legacyEta(etaResult),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(12),
@@ -3528,7 +3569,7 @@ class _EtaBannerCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    etaResult.displayText,
+                    context.legacyEta(etaResult),
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: isHighContrast
@@ -3538,7 +3579,7 @@ class _EtaBannerCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    etaResult.reason,
+                    context.l10n.detailsStale,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: isHighContrast
@@ -3568,8 +3609,7 @@ class _TimelineProgress extends StatelessWidget {
     final isHighContrast = context.isHighContrast;
     return Semantics(
       container: true,
-      label:
-          'Journey progress: Bus approaching next stop $nextStop towards destination $destination',
+      label: context.l10n.legacyFormat14(nextStop, destination),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -3595,7 +3635,7 @@ class _TimelineProgress extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        'Next: ',
+                        context.legacyText('Next: '),
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: isHighContrast
@@ -3624,7 +3664,7 @@ class _TimelineProgress extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        'Final: ',
+                        context.legacyText('Final: '),
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: isHighContrast
@@ -3681,7 +3721,9 @@ class _AssistanceSection extends StatelessWidget {
       children: [
         Semantics(
           button: true,
-          label: 'Request boarding or stop assistance from driver',
+          label: context.legacyText(
+            'Request boarding or stop assistance from driver',
+          ),
           child: SizedBox(
             height: 56,
             width: double.infinity,
@@ -3707,13 +3749,13 @@ class _AssistanceSection extends StatelessWidget {
                 ),
               ),
               icon: const Icon(Icons.waving_hand_rounded, size: 24),
-              label: const Text('Request Stop Assistance'),
+              label: Text(context.legacyText('Request Stop Assistance')),
             ),
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Notify driver you need extra time or ramp deployment at $destination.',
+          context.l10n.legacyFormat15(destination),
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
@@ -3744,7 +3786,9 @@ class JourneySafetyActions extends StatelessWidget {
               child: Semantics(
                 button: true,
                 enabled: false,
-                label: 'Emergency calling unavailable. Use your phone to call for help.',
+                label: context.legacyText(
+                  'Emergency calling unavailable. Use your phone to call for help.',
+                ),
                 child: SizedBox(
                   height: context.buttonHeight,
                   child: FilledButton.icon(
@@ -3769,7 +3813,7 @@ class JourneySafetyActions extends StatelessWidget {
                       Icons.emergency_rounded,
                       size: context.tapIconSize,
                     ),
-                    label: const Text('Emergency'),
+                    label: Text(context.legacyText('Emergency')),
                   ),
                 ),
               ),
@@ -3778,7 +3822,9 @@ class JourneySafetyActions extends StatelessWidget {
             Expanded(
               child: Semantics(
                 button: true,
-                label: 'Report accessibility issue or vehicle condition',
+                label: context.legacyText(
+                  'Report accessibility issue or vehicle condition',
+                ),
                 child: SizedBox(
                   height: context.buttonHeight,
                   child: OutlinedButton.icon(
@@ -3806,7 +3852,7 @@ class JourneySafetyActions extends StatelessWidget {
                       Icons.report_problem_outlined,
                       size: context.tapIconSize,
                     ),
-                    label: const Text('Report Issue'),
+                    label: Text(context.legacyText('Report Issue')),
                   ),
                 ),
               ),
@@ -3815,7 +3861,9 @@ class JourneySafetyActions extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Emergency calling is unavailable in this app. Use your phone to call for help.',
+          context.legacyText(
+            'Emergency calling is unavailable in this app. Use your phone to call for help.',
+          ),
           style: TextStyle(color: context.subtextColor),
         ),
       ],
@@ -3828,11 +3876,8 @@ class _LiveStopTimelineCard extends StatelessWidget {
 
   final String busId;
 
-  String _formatTime(DateTime dt) {
-    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-    final minute = dt.minute.toString().padLeft(2, '0');
-    final period = dt.hour >= 12 ? 'PM' : 'AM';
-    return '$hour:$minute $period';
+  String _formatTime(BuildContext context, DateTime dt) {
+    return TimeOfDay.fromDateTime(dt).format(context);
   }
 
   @override
@@ -3854,7 +3899,7 @@ class _LiveStopTimelineCard extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          color: AppColors.surfaceContainerLowest,
+          color: context.cardColor,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -3862,17 +3907,14 @@ class _LiveStopTimelineCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(
-                      Icons.timeline_rounded,
-                      color: AppColors.primary,
-                    ),
+                    Icon(Icons.timeline_rounded, color: context.primaryColor),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Live Per-Stop Timeline',
+                    Text(
+                      context.legacyText('Live Per-Stop Timeline'),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.onSurface,
+                        color: context.textColor,
                       ),
                     ),
                     const Spacer(),
@@ -3887,7 +3929,7 @@ class _LiveStopTimelineCard extends StatelessWidget {
                         border: Border.all(color: Colors.green.shade600),
                       ),
                       child: Text(
-                        'Live Run',
+                        context.legacyText('Live Run'),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -3929,20 +3971,23 @@ class _LiveStopTimelineCard extends StatelessWidget {
                         String subtext = '';
                         if (timing != null) {
                           if (isPassed && timing.actualArrival != null) {
-                            subtext =
-                                'Reached at ${_formatTime(timing.actualArrival!)}';
+                            subtext = context.l10n.legacyFormat16(
+                              _formatTime(context, timing.actualArrival!),
+                            );
                           } else if (isConfirmedCurrent) {
                             final timeStr = timing.actualArrival != null
-                                ? _formatTime(timing.actualArrival!)
-                                : _formatTime(timing.estimatedArrival);
-                            subtext = 'Bus is here now (Confirmed $timeStr)';
+                                ? _formatTime(context, timing.actualArrival!)
+                                : _formatTime(context, timing.estimatedArrival);
+                            subtext = context.l10n.legacyFormat17(timeStr);
                           } else {
                             final diffMins = timing.estimatedArrival
                                 .difference(DateTime.now())
                                 .inMinutes
                                 .clamp(1, 999);
-                            subtext =
-                                'Est. ${_formatTime(timing.estimatedArrival)} (in about $diffMins min)';
+                            subtext = context.l10n.legacyFormat18(
+                              _formatTime(context, timing.estimatedArrival),
+                              '$diffMins',
+                            );
                           }
                         }
 
@@ -3989,7 +4034,7 @@ class _LiveStopTimelineCard extends StatelessWidget {
                                       fontWeight: isConfirmedCurrent
                                           ? FontWeight.bold
                                           : FontWeight.w600,
-                                      color: AppColors.onSurface,
+                                      color: context.textColor,
                                     ),
                                   ),
                                   Text(

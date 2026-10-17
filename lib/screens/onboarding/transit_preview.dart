@@ -1,6 +1,10 @@
+import '../../core/theme/app_theme.dart';
+
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+
+import '../../l10n/localization_context.dart';
 
 import '../../core/theme/app_colors.dart';
 
@@ -23,55 +27,60 @@ class TransitPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 4 / 3,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0A000000),
-              blurRadius: 8,
-              offset: Offset(0, 2),
+    return ExcludeSemantics(
+      child: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1,
+        child: AspectRatio(
+          aspectRatio: 4 / 3,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              CustomPaint(
-                painter: _CityMapPainter(
-                  routeProgress: routeProgress,
-                  drawProgress: drawProgress,
-                  pulse: pulse,
-                ),
-              ),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x00F7F2F8), Color(0xE6F7F2F8)],
-                    stops: [0.42, 1],
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CustomPaint(
+                    painter: _CityMapPainter(
+                      routeProgress: routeProgress,
+                      drawProgress: drawProgress,
+                      pulse: pulse,
+                    ),
                   ),
-                ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x00F7F2F8), Color(0xE6F7F2F8)],
+                        stops: [0.42, 1],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ?busPill,
+                        const SizedBox(height: 8),
+                        ?assistanceCard,
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ?busPill,
-                    const SizedBox(height: 8),
-                    ?assistanceCard,
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -110,14 +119,16 @@ class OnboardingBusPill extends StatelessWidget {
               size: 20,
             ),
             const SizedBox(width: 10),
-            const Text(
-              'Example ETA: 3 min',
-              style: TextStyle(
-                fontSize: 14,
-                height: 20 / 14,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.1,
-                color: AppColors.onPrimary,
+            Flexible(
+              child: Text(
+                context.l10n.onboardingExampleEta,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 20 / 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
+                  color: AppColors.onPrimary,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -183,25 +194,25 @@ class OnboardingAssistanceCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Boarding Help',
+                    context.l10n.onboardingBoardingHelp,
                     style: TextStyle(
                       fontSize: 18,
                       height: 24 / 18,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.onSurface,
+                      color: context.textColor,
                     ),
                   ),
                   Text(
-                    'Example: awaiting reply',
+                    context.l10n.onboardingAwaitingReply,
                     style: TextStyle(
                       fontSize: 14,
                       height: 20 / 14,
-                      color: AppColors.onSurfaceVariant,
+                      color: context.subtextColor,
                     ),
                   ),
                 ],
@@ -209,9 +220,9 @@ class OnboardingAssistanceCard extends StatelessWidget {
             ),
             Transform.scale(
               scale: checkScale,
-              child: const Icon(
+              child: Icon(
                 Icons.hourglass_empty_rounded,
-                color: AppColors.secondary,
+                color: context.secondaryColor,
                 size: 26,
               ),
             ),

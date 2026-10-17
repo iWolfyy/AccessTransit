@@ -1,7 +1,10 @@
+import '../../widgets/accessible_tap_target.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../l10n/localization_context.dart';
+import '../../l10n/registration_presentation.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -15,7 +18,8 @@ import '../preferences/accessibility_preferences_screen.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  const RegisterScreen({super.key, this.authService});
+  final AuthService? authService;
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -28,7 +32,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final AuthService _authService = AuthService();
+  late final AuthService _authService = widget.authService ?? AuthService();
 
   late final AnimationController _entranceController;
   late final AnimationController _buttonScaleController;
@@ -152,24 +156,16 @@ class _RegisterScreenState extends State<RegisterScreen>
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      debugPrint(
-        'RegisterScreen FirebaseAuthException: ${e.code} - ${e.message}',
-      );
+      debugPrint('RegisterScreen FirebaseAuthException: ${e.code}');
       _showMessage(_getAuthErrorMessage(e), isError: true);
     } on FirebaseException catch (e) {
       if (!mounted) return;
-      debugPrint('RegisterScreen FirebaseException: ${e.code} - ${e.message}');
-      _showMessage(
-        e.message ?? 'Registration encountered an error. Please try again.',
-        isError: true,
-      );
+      debugPrint('RegisterScreen FirebaseException: ${e.code}');
+      _showMessage(context.l10n.registrationFailed, isError: true);
     } catch (e) {
       if (!mounted) return;
-      debugPrint('RegisterScreen error: $e');
-      _showMessage(
-        'Registration failed. Please check your connection and try again.',
-        isError: true,
-      );
+      debugPrint('RegisterScreen error: ${e.runtimeType}');
+      _showMessage(context.l10n.registrationFailed, isError: true);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -178,7 +174,9 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
   void _showComingSoon(String feature) {
-    _showMessage('$feature will be available in a future update.');
+    _showMessage(
+      context.l10n.profileComingSoon(context.registrationText(feature)),
+    );
   }
 
   void _showMessage(String message, {bool isError = false}) {
@@ -197,26 +195,8 @@ class _RegisterScreenState extends State<RegisterScreen>
       );
   }
 
-  String _getAuthErrorMessage(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'email-already-in-use':
-        return 'An account already exists with this email.';
-      case 'invalid-email':
-        return 'Please enter a valid email address.';
-      case 'weak-password':
-        return 'Password is too weak. Try a stronger combination.';
-      case 'operation-not-allowed':
-        return 'Email/password authentication is not enabled.';
-      case 'network-request-failed':
-        return 'Network error. Please check your internet connection.';
-      case 'channel-error':
-        return 'Please fill in all required fields properly.';
-      case 'too-many-requests':
-        return 'Too many attempts. Please try again shortly.';
-      default:
-        return e.message ?? 'Unable to create account. Please try again.';
-    }
-  }
+  String _getAuthErrorMessage(FirebaseAuthException e) =>
+      context.registrationFailure(e.code);
 
   @override
   Widget build(BuildContext context) {
@@ -289,8 +269,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           ),
         ),
       ),
-      child: SizedBox(
-        height: 56,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
         child: Row(
           children: [
             IconButton(
@@ -298,11 +278,11 @@ class _RegisterScreenState extends State<RegisterScreen>
               onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
               icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize),
               color: context.textColor,
-              tooltip: 'Go back',
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
             ),
             Expanded(
               child: Text(
-                'Register',
+                context.l10n.registrationTitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 18,
@@ -323,7 +303,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     return Column(
       children: [
         Text(
-          'Join Access Transit',
+          context.l10n.registrationJoin,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 32,
@@ -335,7 +315,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
         const SizedBox(height: 8),
         Text(
-          'Your journey to inclusive travel begins here.',
+          context.l10n.registrationIntro,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 16,
@@ -353,26 +333,26 @@ class _RegisterScreenState extends State<RegisterScreen>
   Widget _buildNameField() {
     return AuthInputField(
       controller: _nameController,
-      label: 'Full Name',
-      hint: 'Enter your full name',
+      label: context.l10n.profileFullName,
+      hint: context.l10n.registrationNameHint,
       prefixIcon: Icons.person_outline_rounded,
       textCapitalization: TextCapitalization.words,
       textInputAction: TextInputAction.next,
       autofillHints: const [AutofillHints.name],
-      validator: Validators.fullName,
+      validator: (v) => context.registrationValidation(Validators.fullName(v)),
     );
   }
 
   Widget _buildEmailField() {
     return AuthInputField(
       controller: _emailController,
-      label: 'Email Address',
-      hint: 'Enter your email',
+      label: context.l10n.recoveryEmail,
+      hint: context.l10n.registrationEmailHint,
       prefixIcon: Icons.mail_outline_rounded,
       keyboardType: TextInputType.emailAddress,
       textInputAction: TextInputAction.next,
       autofillHints: const [AutofillHints.email],
-      validator: Validators.email,
+      validator: (v) => context.registrationValidation(Validators.email(v)),
     );
   }
 
@@ -382,13 +362,14 @@ class _RegisterScreenState extends State<RegisterScreen>
       children: [
         AuthInputField(
           controller: _passwordController,
-          label: 'Password',
-          hint: 'Create a password',
+          label: context.l10n.registrationPassword,
+          hint: context.l10n.registrationPasswordHint,
           prefixIcon: Icons.lock_outline_rounded,
           obscureText: _obscurePassword,
           textInputAction: TextInputAction.next,
           autofillHints: const [AutofillHints.newPassword],
-          validator: Validators.registerPassword,
+          validator: (v) =>
+              context.registrationValidation(Validators.registerPassword(v)),
           suffixIcon: IconButton(
             onPressed: () {
               setState(() => _obscurePassword = !_obscurePassword);
@@ -397,10 +378,12 @@ class _RegisterScreenState extends State<RegisterScreen>
               _obscurePassword
                   ? Icons.visibility_outlined
                   : Icons.visibility_off_outlined,
-              color: AppColors.onSurfaceVariant,
+              color: context.subtextColor,
               size: 20,
             ),
-            tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+            tooltip: _obscurePassword
+                ? context.l10n.recoveryShow
+                : context.l10n.recoveryHide,
           ),
         ),
         PasswordStrengthIndicator(strength: _passwordStrength),
@@ -411,14 +394,15 @@ class _RegisterScreenState extends State<RegisterScreen>
   Widget _buildConfirmPasswordField() {
     return AuthInputField(
       controller: _confirmPasswordController,
-      label: 'Confirm Password',
-      hint: 'Re-enter your password',
+      label: context.l10n.registrationConfirm,
+      hint: context.l10n.registrationConfirmHint,
       prefixIcon: Icons.lock_outline_rounded,
       obscureText: _obscureConfirmPassword,
       textInputAction: TextInputAction.done,
       autofillHints: const [AutofillHints.newPassword],
-      validator: (value) =>
-          Validators.confirmPassword(value, _passwordController.text),
+      validator: (value) => context.registrationValidation(
+        Validators.confirmPassword(value, _passwordController.text),
+      ),
       suffixIcon: IconButton(
         onPressed: () {
           setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
@@ -427,10 +411,12 @@ class _RegisterScreenState extends State<RegisterScreen>
           _obscureConfirmPassword
               ? Icons.visibility_outlined
               : Icons.visibility_off_outlined,
-          color: AppColors.onSurfaceVariant,
+          color: context.subtextColor,
           size: 20,
         ),
-        tooltip: _obscureConfirmPassword ? 'Show password' : 'Hide password',
+        tooltip: _obscureConfirmPassword
+            ? context.l10n.recoveryShow
+            : context.l10n.recoveryHide,
       ),
     );
   }
@@ -438,99 +424,105 @@ class _RegisterScreenState extends State<RegisterScreen>
   Widget _buildAccessibilityCheckbox(bool isHC) {
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: _isLoading
-            ? null
-            : () {
-                setState(() {
-                  _hasAccessibilityNeeds = !_hasAccessibilityNeeds;
-                });
-              },
-        borderRadius: BorderRadius.circular(12),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          decoration: BoxDecoration(
-            color: isHC
-                ? (_hasAccessibilityNeeds
-                      ? const Color(0xFFE6F0FA)
-                      : Colors.white)
-                : (_hasAccessibilityNeeds
-                      ? AppColors.surfaceContainer.withValues(alpha: 0.6)
-                      : Colors.transparent),
-            borderRadius: BorderRadius.circular(12),
-            border: isHC ? Border.all(color: Colors.black, width: 2) : null,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOutCubic,
-                width: 24,
-                height: 24,
-                margin: const EdgeInsets.only(top: 4),
-                decoration: BoxDecoration(
-                  color: isHC
-                      ? (_hasAccessibilityNeeds
-                            ? const Color(0xFF001F3F)
-                            : Colors.white)
-                      : (_hasAccessibilityNeeds
-                            ? AppColors.primary
-                            : Colors.transparent),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
+      child: AccessibleTapTarget(
+        child: InkWell(
+          onTap: _isLoading
+              ? null
+              : () {
+                  setState(() {
+                    _hasAccessibilityNeeds = !_hasAccessibilityNeeds;
+                  });
+                },
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            decoration: BoxDecoration(
+              color: isHC
+                  ? (_hasAccessibilityNeeds
+                        ? const Color(0xFFE6F0FA)
+                        : Colors.white)
+                  : (_hasAccessibilityNeeds
+                        ? AppColors.surfaceContainer.withValues(alpha: 0.6)
+                        : Colors.transparent),
+              borderRadius: BorderRadius.circular(12),
+              border: isHC ? Border.all(color: Colors.black, width: 2) : null,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  width: 24,
+                  height: 24,
+                  margin: const EdgeInsets.only(top: 4),
+                  decoration: BoxDecoration(
                     color: isHC
-                        ? Colors.black
+                        ? (_hasAccessibilityNeeds
+                              ? const Color(0xFF001F3F)
+                              : Colors.white)
                         : (_hasAccessibilityNeeds
                               ? AppColors.primary
-                              : AppColors.outline),
-                    width: 2,
+                              : Colors.transparent),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isHC
+                          ? Colors.black
+                          : (_hasAccessibilityNeeds
+                                ? AppColors.primary
+                                : AppColors.outline),
+                      width: 2,
+                    ),
+                  ),
+                  child: AnimatedScale(
+                    scale: _hasAccessibilityNeeds ? 1 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.elasticOut,
+                    child: const Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-                child: AnimatedScale(
-                  scale: _hasAccessibilityNeeds ? 1 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.elasticOut,
-                  child: const Icon(
-                    Icons.check_rounded,
-                    size: 16,
-                    color: Colors.white,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.l10n.registrationNeeds,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 20 / 14,
+                          fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
+                          letterSpacing: 0.1,
+                          color: context.textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        context.l10n.registrationNeedsExample,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 20 / 14,
+                          fontWeight: isHC
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                          color: isHC
+                              ? Colors.black
+                              : AppColors.onSurfaceVariant.withValues(
+                                  alpha: 0.9,
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'I have specific accessibility needs',
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 20 / 14,
-                        fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
-                        letterSpacing: 0.1,
-                        color: context.textColor,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '(e.g., wheelchair ramp, low floor bus)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 20 / 14,
-                        fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
-                        color: isHC
-                            ? Colors.black
-                            : AppColors.onSurfaceVariant.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -542,7 +534,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Account Type',
+          context.l10n.registrationAccountType,
           style: TextStyle(
             fontSize: 14,
             height: 20 / 14,
@@ -600,62 +592,64 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 
   Widget _buildCreateAccountButton(bool isHC) {
-    return GestureDetector(
-      onTapDown: _isLoading ? null : (_) => _buttonScaleController.forward(),
-      onTapUp: _isLoading ? null : (_) => _buttonScaleController.reverse(),
-      onTapCancel: () => _buttonScaleController.reverse(),
-      child: ScaleTransition(
-        scale: _buttonScale,
-        child: SizedBox(
-          height: context.buttonHeight,
-          child: FilledButton(
-            onPressed: _isLoading ? null : _register,
-            style: FilledButton.styleFrom(
-              backgroundColor: isHC
-                  ? const Color(0xFF001F3F)
-                  : AppColors.primaryContainer,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: isHC
-                  ? const Color(0xFF001F3F).withValues(alpha: 0.6)
-                  : AppColors.primaryContainer.withValues(alpha: 0.6),
-              disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
-                side: isHC
-                    ? const BorderSide(color: Colors.black, width: 2)
-                    : BorderSide.none,
+    return AccessibleTapTarget(
+      child: GestureDetector(
+        onTapDown: _isLoading ? null : (_) => _buttonScaleController.forward(),
+        onTapUp: _isLoading ? null : (_) => _buttonScaleController.reverse(),
+        onTapCancel: () => _buttonScaleController.reverse(),
+        child: ScaleTransition(
+          scale: _buttonScale,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: context.buttonHeight),
+            child: FilledButton(
+              onPressed: _isLoading ? null : _register,
+              style: FilledButton.styleFrom(
+                backgroundColor: isHC
+                    ? const Color(0xFF001F3F)
+                    : AppColors.primaryContainer,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: isHC
+                    ? const Color(0xFF001F3F).withValues(alpha: 0.6)
+                    : AppColors.primaryContainer.withValues(alpha: 0.6),
+                disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  side: isHC
+                      ? const BorderSide(color: Colors.black, width: 2)
+                      : BorderSide.none,
+                ),
+                elevation: isHC ? 0 : 1,
+                shadowColor: isHC
+                    ? null
+                    : AppColors.primary.withValues(alpha: 0.2),
+                textStyle: TextStyle(
+                  fontSize: context.hasLargeTargets ? 15.5 : 14,
+                  height: 20 / 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
+                ),
               ),
-              elevation: isHC ? 0 : 1,
-              shadowColor: isHC
-                  ? null
-                  : AppColors.primary.withValues(alpha: 0.2),
-              textStyle: TextStyle(
-                fontSize: context.hasLargeTargets ? 15.5 : 14,
-                height: 20 / 14,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.1,
-              ),
-            ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('Create Account'),
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        size: context.tapIconSize,
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
                       ),
-                    ],
-                  ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(child: Text(context.l10n.registrationCreate)),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: context.tapIconSize,
+                        ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),
@@ -675,7 +669,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
-            'OR',
+            context.l10n.registrationOr,
             style: TextStyle(
               fontSize: 12,
               height: 16 / 12,
@@ -708,7 +702,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 ? null
                 : () => _showComingSoon('Google sign-up'),
             icon: _GoogleLogo(size: context.tapIconSize),
-            label: const Text('Sign up with Google'),
+            label: Text(context.l10n.registrationGoogle),
             style: OutlinedButton.styleFrom(
               backgroundColor: isHC ? Colors.white : null,
               foregroundColor: isHC ? Colors.black : AppColors.onSurface,
@@ -740,7 +734,7 @@ class _RegisterScreenState extends State<RegisterScreen>
               size: context.tapIconSize,
               color: isHC ? Colors.black : null,
             ),
-            label: const Text('Sign up with Apple'),
+            label: Text(context.l10n.registrationApple),
             style: OutlinedButton.styleFrom(
               backgroundColor: isHC ? Colors.white : null,
               foregroundColor: isHC ? Colors.black : AppColors.onSurface,
@@ -770,7 +764,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text(
-          'Already have an account? ',
+          context.l10n.registrationAlready,
           style: TextStyle(
             fontSize: 16,
             height: 24 / 16,
@@ -791,11 +785,11 @@ class _RegisterScreenState extends State<RegisterScreen>
               horizontal: 6,
               vertical: context.hasLargeTargets ? 10 : 4,
             ),
-            minimumSize: Size(0, context.minTapHeight),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            minimumSize: Size(context.buttonHeight, context.minTapHeight),
+            tapTargetSize: MaterialTapTargetSize.padded,
           ),
           child: Text(
-            'Log in',
+            context.l10n.registrationLogin,
             style: TextStyle(
               fontSize: 16,
               height: 24 / 16,
@@ -847,67 +841,73 @@ class _RoleCard extends StatelessWidget {
             width: isHC ? 2 : (isSelected ? 2 : 1),
           ),
         ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: isHC
-                        ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
-                        : (isSelected
-                              ? AppColors.primaryContainer
-                              : AppColors.surfaceContainer),
-                    shape: BoxShape.circle,
-                    border: isHC
-                        ? Border.all(
-                            color: Colors.black,
-                            width: isSelected ? 2 : 1.5,
-                          )
-                        : null,
+        child: AccessibleTapTarget(
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isHC
+                          ? (isSelected
+                                ? const Color(0xFF001F3F)
+                                : Colors.white)
+                          : (isSelected
+                                ? AppColors.primaryContainer
+                                : AppColors.surfaceContainer),
+                      shape: BoxShape.circle,
+                      border: isHC
+                          ? Border.all(
+                              color: Colors.black,
+                              width: isSelected ? 2 : 1.5,
+                            )
+                          : null,
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 20,
+                      color: isHC
+                          ? (isSelected ? Colors.white : Colors.black)
+                          : (isSelected
+                                ? AppColors.onPrimary
+                                : AppColors.onSurfaceVariant),
+                    ),
                   ),
-                  child: Icon(
-                    icon,
-                    size: 20,
-                    color: isHC
-                        ? (isSelected ? Colors.white : Colors.black)
-                        : (isSelected
-                              ? AppColors.onPrimary
-                              : AppColors.onSurfaceVariant),
+                  const SizedBox(height: 8),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
+                      color: isHC
+                          ? (isSelected
+                                ? const Color(0xFF001F3F)
+                                : Colors.black)
+                          : (isSelected
+                                ? AppColors.primary
+                                : AppColors.onSurface),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
-                    color: isHC
-                        ? (isSelected ? const Color(0xFF001F3F) : Colors.black)
-                        : (isSelected
-                              ? AppColors.primary
-                              : AppColors.onSurface),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 14 / 11,
+                      fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
+                      color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    height: 14 / 11,
-                    fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
-                    color: isHC ? Colors.black : AppColors.onSurfaceVariant,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

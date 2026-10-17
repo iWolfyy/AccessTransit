@@ -1,3 +1,7 @@
+import 'admin_scaffold.dart';
+import '../../core/theme/app_theme.dart';
+import '../../l10n/admin_catalogue_labels.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../models/service_run.dart';
@@ -21,7 +25,9 @@ class ServiceRunsScreen extends StatefulWidget {
 class _ServiceRunsScreenState extends State<ServiceRunsScreen> {
   DateTime _date = ServiceRun.colomboClock(DateTime.now());
   bool _busy = false;
-  String? _error;
+  bool _loading = true;
+  int _loadVersion = 0;
+  Object? _error;
   List<AdminRecord> _runs = [];
   List<AdminRecord> _notes = [];
   late TimeOfDay _departure;
@@ -40,10 +46,15 @@ class _ServiceRunsScreenState extends State<ServiceRunsScreen> {
   }
 
   Future<void> _load() async {
+    final version = ++_loadVersion;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final runs = await widget.service.repository.load('service_runs');
       final notes = await widget.service.repository.load('driver_trip_notes');
-      if (mounted) {
+      if (mounted && version == _loadVersion) {
         setState(() {
           _runs = runs.where((r) => r.text('busId') == widget.bus.id).toList();
           _notes = notes;
@@ -51,11 +62,15 @@ class _ServiceRunsScreenState extends State<ServiceRunsScreen> {
         });
       }
     } catch (_) {
-      if (mounted) {
-        setState(
-          () => _error = 'Could not load dated departures. Retry when online.',
-        );
+      if (mounted && version == _loadVersion) {
+        setState(() {
+          _runs = [];
+          _notes = [];
+          _error = 'Could not load dated departures. Retry when online.';
+        });
       }
+    } finally {
+      if (mounted && version == _loadVersion) setState(() => _loading = false);
     }
   }
 
@@ -65,28 +80,86 @@ class _ServiceRunsScreenState extends State<ServiceRunsScreen> {
       await action();
       await _load();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Dated departure change confirmed.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.l10n.adminRunConfirmed)));
       }
     } catch (e) {
       if (mounted) {
-        setState(
-          () => _error = e is StateError
-              ? e.message
-              : e is FormatException
-              ? e.message
-              : 'Change was not confirmed. Reload and retry.',
-        );
+        setState(() => _error = e);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
+  Future<void> _reschedule(AdminRecord record) async {
+    final form = GlobalKey<FormState>();
+    var reason = '';
+    final l = context.l10n;
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (c) => AdminDialog(
+        title: Text(l.scheduleReschedule),
+        content: SingleChildScrollView(
+          child: Form(
+            key: form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(l.scheduleRescheduleHelp),
+                Text(
+                  l.adminColomboDateTime(
+                    MaterialLocalizations.of(c).formatMediumDate(_date),
+                    _departure.format(c),
+                  ),
+                ),
+                TextFormField(
+                  key: const ValueKey('reschedule-reason'),
+                  maxLength: 300,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: l.schedulePublicReason,
+                  ),
+                  onChanged: (v) => reason = v,
+                  validator: (v) => (v?.trim().length ?? 0) >= 5
+                      ? null
+                      : l.scheduleReasonRequired,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: Text(MaterialLocalizations.of(c).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) {
+                Navigator.pop(c, reason.trim());
+              }
+            },
+            child: Text(l.scheduleReschedule),
+          ),
+        ],
+      ),
+    );
+    if (chosen == null || !mounted) return;
+    await _action(
+      () => widget.service.rescheduleServiceRun(
+        record,
+        _date,
+        departureMinutes: _departure.hour * 60 + _departure.minute,
+        publicReason: chosen,
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Dated departures')),
+  Widget build(BuildContext context) => AdminScaffold(
+    appBar: AppBar(title: Text(context.l10n.adminDatedDepartures)),
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -95,7 +168,7 @@ class _ServiceRunsScreenState extends State<ServiceRunsScreen> {
           style: Theme.of(context).textTheme.titleLarge,
         ),
         TextButton(
-          onPressed: _busy
+          onPressed: _busy || _loading
               ? null
               : () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -108,16 +181,19 @@ class _ServiceRunsScreenState extends State<ServiceRunsScreen> {
           child: Text(context.l10n.calendarTitle),
         ),
         const SizedBox(height: 12),
-        const Text(
-          'Publish this bus timetable for a specific Colombo service date. Starting the run opens boarding; departure is recorded separately.',
-        ),
+        Text(context.l10n.adminRunHelp),
         const SizedBox(height: 12),
         OutlinedButton(
-          onPressed: _busy
+          onPressed: _busy || _loading
               ? null
               : () async {
                   final now = ServiceRun.colomboClock(DateTime.now());
                   final chosen = await showDatePicker(
+                    initialEntryMode:
+                        context.hasLargeTargets &&
+                            MediaQuery.sizeOf(context).width < 420
+                        ? DatePickerEntryMode.inputOnly
+                        : DatePickerEntryMode.calendar,
                     context: context,
                     initialDate: _date,
                     firstDate: DateTime(now.year, now.month, now.day),
@@ -126,14 +202,21 @@ class _ServiceRunsScreenState extends State<ServiceRunsScreen> {
                   if (chosen != null && mounted) setState(() => _date = chosen);
                 },
           child: Text(
-            'Service date: ${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
+            context.l10n.adminServiceDate(
+              MaterialLocalizations.of(context).formatMediumDate(_date),
+            ),
           ),
         ),
         OutlinedButton(
-          onPressed: _busy
+          onPressed: _busy || _loading
               ? null
               : () async {
                   final selected = await showTimePicker(
+                    initialEntryMode:
+                        context.hasLargeTargets &&
+                            MediaQuery.sizeOf(context).width < 420
+                        ? TimePickerEntryMode.inputOnly
+                        : TimePickerEntryMode.dial,
                     context: context,
                     initialTime: _departure,
                   );
@@ -142,18 +225,14 @@ class _ServiceRunsScreenState extends State<ServiceRunsScreen> {
                   }
                 },
           child: Text(
-            'Colombo departure: ${_departure.hour.toString().padLeft(2, '0')}:${_departure.minute.toString().padLeft(2, '0')}',
+            context.l10n.adminColomboDeparture(_departure.format(context)),
           ),
         ),
-        const Text(
-          'To reschedule, cancel the previous scheduled run and publish its replacement. Stop intervals are retained; the bus timetable stays unchanged.',
-        ),
-        const Text(
-          'Start window: 5 minutes before to 30 minutes after departure. Late starts require a reason.',
-        ),
+        Text(context.l10n.adminRunRescheduleHelp),
+        Text(context.l10n.adminRunWindowHelp),
         const SizedBox(height: 12),
         FilledButton(
-          onPressed: _busy
+          onPressed: _busy || _loading
               ? null
               : () => _action(
                   () => widget.service.scheduleServiceRun(
@@ -162,16 +241,23 @@ class _ServiceRunsScreenState extends State<ServiceRunsScreen> {
                     departureMinutes: _departure.hour * 60 + _departure.minute,
                   ),
                 ),
-          child: const Text('Publish dated departure'),
+          child: Text(context.l10n.adminRunPublish),
         ),
+        if (_loading) const LinearProgressIndicator(),
+        if (!_loading && _error == null && _runs.isEmpty)
+          Text(context.l10n.adminRunEmpty),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Text(_error!),
+            child: Text(
+              _error is String
+                  ? context.adminText(_error! as String)
+                  : context.adminFailure(_error!),
+            ),
           ),
         TextButton(
-          onPressed: _busy ? null : _load,
-          child: const Text('Reload departures'),
+          onPressed: _busy || _loading ? null : _load,
+          child: Text(context.l10n.adminRunReload),
         ),
         for (final r in _runs)
           Card(
@@ -180,20 +266,34 @@ class _ServiceRunsScreenState extends State<ServiceRunsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${r.text('serviceDate')} · ${r.text('status')}'),
+                  Text(
+                    '${_civilDate(r.text('serviceDate'))} · ${context.adminRunStatus(r.text('status'))}',
+                  ),
                   if (_notes.any((n) => n.id == r.id))
                     Text(
-                      'Late-start reason: ${_notes.firstWhere((n) => n.id == r.id).text('reason')}',
+                      context.l10n.adminLateReason(
+                        _notes.firstWhere((n) => n.id == r.id).text('reason'),
+                      ),
                     ),
                   Text(_snapshotTimes(r)),
+                  if (['scheduled', 'cancelled'].contains(r.text('status')) &&
+                      r.data['replacementRunId'] == null)
+                    TextButton(
+                      onPressed: _busy || _loading
+                          ? null
+                          : () => _reschedule(r),
+                      child: Text(context.l10n.scheduleReschedule),
+                    ),
+                  if (r.data['replacementRunId'] != null)
+                    Text(context.l10n.scheduleReplacement),
                   if (r.text('status') == 'scheduled')
                     TextButton(
-                      onPressed: _busy
+                      onPressed: _busy || _loading
                           ? null
                           : () => _action(
                               () => widget.service.cancelScheduledRun(r),
                             ),
-                      child: const Text('Cancel scheduled run'),
+                      child: Text(context.l10n.adminRunCancel),
                     ),
                 ],
               ),
@@ -202,15 +302,26 @@ class _ServiceRunsScreenState extends State<ServiceRunsScreen> {
       ],
     ),
   );
+  String _civilDate(String value) {
+    final date = DateTime.tryParse(value);
+    return date == null
+        ? value
+        : MaterialLocalizations.of(context).formatMediumDate(date);
+  }
+
   String _snapshotTimes(AdminRecord record) {
     try {
       final run = ServiceRun.fromMap(record.id, record.data);
-      return 'Published stop times: ${run.stopTimes.values.map((t) {
-        final c = ServiceRun.colomboClock(t);
-        return '${c.month}/${c.day} ${c.hour.toString().padLeft(2, '0')}:${c.minute.toString().padLeft(2, '0')}';
-      }).join(' → ')}';
+      return context.l10n.adminPublishedStopTimes(
+        run.stopTimes.values
+            .map((t) {
+              final c = ServiceRun.colomboClock(t);
+              return '${MaterialLocalizations.of(context).formatMediumDate(c)} ${TimeOfDay(hour: c.hour, minute: c.minute).format(context)}';
+            })
+            .join(' → '),
+      );
     } catch (_) {
-      return 'Stored timetable needs administrator review.';
+      return context.l10n.adminRunReviewTimetable;
     }
   }
 }

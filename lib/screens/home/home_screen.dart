@@ -1,3 +1,7 @@
+import '../../widgets/accessible_tap_target.dart';
+import '../../l10n/home_presentation.dart';
+import '../../l10n/profile_presentation.dart';
+import '../../l10n/localization_context.dart';
 import '../../widgets/evidence_refresh.dart';
 import '../../constants/firestore_constants.dart';
 
@@ -17,7 +21,6 @@ import '../../widgets/logout_confirmation_dialog.dart';
 import '../auth/login_screen.dart';
 import '../journey/journey_search_screen.dart';
 import '../main_shell.dart';
-import '../../core/utils/time_utils.dart';
 import '../../logic/status_logic.dart';
 import '../../models/report.dart';
 import '../../services/firestore_service.dart';
@@ -28,7 +31,15 @@ import '../preferences/accessibility_preferences_screen.dart';
 import '../profile/rewards_contributions_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.initialUser});
+  const HomeScreen({
+    super.key,
+    this.initialUser,
+    this.reports,
+    this.recentJourneys,
+  });
+
+  final Stream<List<Report>>? reports;
+  final Stream<List<JourneyModel>>? recentJourneys;
 
   final UserModel? initialUser;
 
@@ -72,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_user == null) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Unable to load profile: $e')));
+        ).showSnackBar(SnackBar(content: Text(context.l10n.profileLoadFailed)));
       }
     }
   }
@@ -82,19 +93,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final isHighContrast = context.isHighContrast;
 
+    final signedOutMessage = context.l10n.profileSignedOut;
+    final signOutFailure = context.l10n.profileSignOutFailed;
     final confirmed = await showLogoutConfirmationDialog(context);
     if (confirmed != true) return;
 
     try {
       await _authService?.logout();
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Could not clear private drafts or sign out. Please retry.',
-          ),
-        ),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(signOutFailure)));
       return;
     }
     nav.pushAndRemoveUntil(
@@ -102,6 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
       (route) => false,
     );
     showLogoutSuccessSnackBar(
+      message: signedOutMessage,
       messenger: messenger,
       isHighContrast: isHighContrast,
     );
@@ -112,7 +120,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text('$feature will be available in a future update.'),
+          content: Text(
+            context.l10n.profileComingSoon(
+              context.homeText(context.profileText(feature)),
+            ),
+          ),
         ),
       );
   }
@@ -144,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (shell != null) {
       shell.switchToTab(label);
     } else {
-      AppNavigation.handleBottomNav(context, label);
+      AppNavigation.handleBottomNav(context, label, profileUser: _user);
     }
   }
 
@@ -163,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String get _firstName {
     final name = _user?.name.trim() ?? '';
-    if (name.isEmpty) return 'Passenger';
+    if (name.isEmpty) return context.l10n.profilePassenger;
     final parts = name
         .split(RegExp(r'\s+'))
         .where((p) => p.isNotEmpty)
@@ -174,22 +186,22 @@ class _HomeScreenState extends State<HomeScreen> {
   String get _roleLabel {
     switch (_user?.role) {
       case UserRole.contributor:
-        return 'Community Contributor';
+        return context.l10n.profileContributor;
       case UserRole.operator:
-        return 'Transit Bus Operator';
+        return context.l10n.profileOperator;
       case UserRole.admin:
-        return 'System Administrator';
+        return context.l10n.profileAdministrator;
       case UserRole.passenger:
       case null:
-        return 'Inclusive Commuter';
+        return context.l10n.profileCommuter;
     }
   }
 
   String get _greeting {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return context.l10n.homeMorning;
+    if (hour < 17) return context.l10n.homeAfternoon;
+    return context.l10n.homeEvening;
   }
 
   IconData get _greetingIcon {
@@ -301,12 +313,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const SizedBox(height: 24),
                                   _RecentReportsSection(
                                     onSeeAll: () => _onNavTap('Community'),
+                                    reports: widget.reports,
                                   ),
                                   // ── Recent Journey ──
                                   const SizedBox(height: 24),
                                   _RecentJourneyCard(
                                     onReplan: _openJourneySearch,
                                     passengerId: _user?.uid,
+                                    journeys: widget.recentJourneys,
                                   ),
                                 ],
                               ),
@@ -401,18 +415,23 @@ class _HeroHeader extends StatelessWidget {
                       semanticLabel: 'Open menu',
                     ),
                     const Spacer(),
-                    Text(
-                      'Access Transit',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
-                        shadows: isHighContrast
-                            ? null
-                            : const [
-                                Shadow(color: Color(0x40000000), blurRadius: 4),
-                              ],
+                    Expanded(
+                      child: Text(
+                        'Access Transit',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.2,
+                          shadows: isHighContrast
+                              ? null
+                              : const [
+                                  Shadow(
+                                    color: Color(0x40000000),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                        ),
                       ),
                     ),
                     const Spacer(),
@@ -436,7 +455,7 @@ class _HeroHeader extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '$greeting, $firstName',
+                      context.l10n.homeGreeting(greeting, firstName),
                       style: TextStyle(
                         fontSize: hasLargeTargets ? 26 : 22,
                         fontWeight: FontWeight.w700,
@@ -451,7 +470,7 @@ class _HeroHeader extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 36),
                 child: Text(
-                  'Ready to ride?',
+                  context.l10n.homeReady,
                   style: TextStyle(
                     fontSize: hasLargeTargets ? 16 : 14,
                     color: Colors.white.withValues(alpha: 0.85),
@@ -467,82 +486,84 @@ class _HeroHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 elevation: isHighContrast ? 0 : 4,
                 shadowColor: const Color(0x40000000),
-                child: InkWell(
-                  onTap: onSearchTap,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    constraints: BoxConstraints(
-                      minHeight: hasLargeTargets ? 64 : 56,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: isHighContrast
-                          ? Border.all(color: Colors.black, width: 2.0)
-                          : null,
-                    ),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: hasLargeTargets ? 20 : 16,
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: hasLargeTargets ? 44 : 40,
-                          height: hasLargeTargets ? 44 : 40,
-                          decoration: BoxDecoration(
-                            color: isHighContrast
-                                ? const Color(0xFFE5E5E5)
-                                : AppColors.primaryContainer.withValues(
-                                    alpha: 0.10,
-                                  ),
-                            borderRadius: BorderRadius.circular(12),
+                child: AccessibleTapTarget(
+                  child: InkWell(
+                    onTap: onSearchTap,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      constraints: BoxConstraints(
+                        minHeight: hasLargeTargets ? 64 : 56,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: isHighContrast
+                            ? Border.all(color: Colors.black, width: 2.0)
+                            : null,
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: hasLargeTargets ? 20 : 16,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: hasLargeTargets ? 44 : 40,
+                            height: hasLargeTargets ? 44 : 40,
+                            decoration: BoxDecoration(
+                              color: isHighContrast
+                                  ? const Color(0xFFE5E5E5)
+                                  : AppColors.primaryContainer.withValues(
+                                      alpha: 0.10,
+                                    ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.search_rounded,
+                              color: isHighContrast
+                                  ? Colors.black
+                                  : AppColors.primaryContainer,
+                              size: hasLargeTargets ? 26 : 22,
+                            ),
                           ),
-                          child: Icon(
-                            Icons.search_rounded,
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  context.l10n.homeWhere,
+                                  style: TextStyle(
+                                    fontSize: hasLargeTargets ? 18 : 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: isHighContrast
+                                        ? Colors.black
+                                        : AppColors.onSurface,
+                                  ),
+                                ),
+                                Text(
+                                  context.l10n.homePlanHint,
+                                  style: TextStyle(
+                                    fontSize: hasLargeTargets ? 13 : 12,
+                                    color: isHighContrast
+                                        ? const Color(0xFF1A1A1A)
+                                        : AppColors.onSurfaceVariant,
+                                    fontWeight: isHighContrast
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_forward_rounded,
                             color: isHighContrast
                                 ? Colors.black
                                 : AppColors.primaryContainer,
-                            size: hasLargeTargets ? 26 : 22,
+                            size: hasLargeTargets ? 24 : 20,
                           ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Where are you going?',
-                                style: TextStyle(
-                                  fontSize: hasLargeTargets ? 18 : 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: isHighContrast
-                                      ? Colors.black
-                                      : AppColors.onSurface,
-                                ),
-                              ),
-                              Text(
-                                'Tap to plan your journey',
-                                style: TextStyle(
-                                  fontSize: hasLargeTargets ? 13 : 12,
-                                  color: isHighContrast
-                                      ? const Color(0xFF1A1A1A)
-                                      : AppColors.onSurfaceVariant,
-                                  fontWeight: isHighContrast
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.arrow_forward_rounded,
-                          color: isHighContrast
-                              ? Colors.black
-                              : AppColors.primaryContainer,
-                          size: hasLargeTargets ? 24 : 20,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -573,7 +594,9 @@ class _HeaderIconButton extends StatelessWidget {
       height: context.minTapHeight,
       child: IconButton(
         onPressed: onPressed,
-        tooltip: semanticLabel,
+        tooltip: semanticLabel == null
+            ? null
+            : context.homeText(semanticLabel!),
         icon: Icon(icon, color: Colors.white, size: context.tapIconSize),
       ),
     );
@@ -595,7 +618,7 @@ class _HeaderAvatarButton extends StatelessWidget {
       child: IconButton(
         onPressed: onPressed,
         padding: EdgeInsets.zero,
-        tooltip: 'Open profile',
+        tooltip: context.l10n.homeProfileAction,
         icon: Container(
           width: hasLargeTargets ? 38 : 34,
           height: hasLargeTargets ? 38 : 34,
@@ -688,60 +711,62 @@ class _QuickActionCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       elevation: isHighContrast ? 0 : 2,
       shadowColor: const Color(0x14000000),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          constraints: BoxConstraints(minHeight: hasLargeTargets ? 120 : 108),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: isHighContrast
-                ? Border.all(color: Colors.black, width: 2.0)
-                : Border.all(
-                    color: AppColors.outlineVariant.withValues(alpha: 0.3),
+      child: AccessibleTapTarget(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            constraints: BoxConstraints(minHeight: hasLargeTargets ? 120 : 108),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: isHighContrast
+                  ? Border.all(color: Colors.black, width: 2.0)
+                  : Border.all(
+                      color: AppColors.outlineVariant.withValues(alpha: 0.3),
+                    ),
+            ),
+            padding: EdgeInsets.symmetric(
+              vertical: hasLargeTargets ? 16 : 14,
+              horizontal: 8,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: circleSize,
+                  height: circleSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isHighContrast
+                        ? const Color(0xFFE5E5E5)
+                        : AppColors.primaryContainer.withValues(alpha: 0.10),
+                    border: isHighContrast
+                        ? Border.all(color: Colors.black, width: 1.5)
+                        : null,
                   ),
-          ),
-          padding: EdgeInsets.symmetric(
-            vertical: hasLargeTargets ? 16 : 14,
-            horizontal: 8,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: circleSize,
-                height: circleSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isHighContrast
-                      ? const Color(0xFFE5E5E5)
-                      : AppColors.primaryContainer.withValues(alpha: 0.10),
-                  border: isHighContrast
-                      ? Border.all(color: Colors.black, width: 1.5)
-                      : null,
+                  child: Icon(
+                    icon,
+                    size: hasLargeTargets ? 28 : 24,
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.primaryContainer,
+                  ),
                 ),
-                child: Icon(
-                  icon,
-                  size: hasLargeTargets ? 28 : 24,
-                  color: isHighContrast
-                      ? Colors.black
-                      : AppColors.primaryContainer,
+                const SizedBox(height: 8),
+                Text(
+                  context.homeText(label),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: hasLargeTargets ? 14 : 12,
+                    fontWeight: isHighContrast
+                        ? FontWeight.w800
+                        : FontWeight.w600,
+                    color: isHighContrast ? Colors.black : AppColors.onSurface,
+                    height: 1.3,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: hasLargeTargets ? 14 : 12,
-                  fontWeight: isHighContrast
-                      ? FontWeight.w800
-                      : FontWeight.w600,
-                  color: isHighContrast ? Colors.black : AppColors.onSurface,
-                  height: 1.3,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -793,7 +818,8 @@ class _HomeDrawer extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 children: [
                   // Drawer Header
-                  DrawerHeader(
+                  Container(
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: isHighContrast
                           ? const Color(0xFF001F3F)
@@ -830,27 +856,29 @@ class _HomeDrawer extends StatelessWidget {
                               ),
                             ),
                             const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.20),
-                                borderRadius: BorderRadius.circular(12),
-                                border: isHighContrast
-                                    ? Border.all(
-                                        color: Colors.white,
-                                        width: 1.5,
-                                      )
-                                    : null,
-                              ),
-                              child: Text(
-                                roleLabel,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.20),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: isHighContrast
+                                      ? Border.all(
+                                          color: Colors.white,
+                                          width: 1.5,
+                                        )
+                                      : null,
+                                ),
+                                child: Text(
+                                  roleLabel,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
@@ -860,7 +888,7 @@ class _HomeDrawer extends StatelessWidget {
                         Text(
                           user?.name.isNotEmpty == true
                               ? user!.name
-                              : 'Passenger',
+                              : context.l10n.profilePassenger,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: hasLargeTargets ? 20 : 18,
@@ -1044,7 +1072,7 @@ class _HomeDrawer extends StatelessWidget {
           color: effectiveIconColor,
         ),
         title: Text(
-          title,
+          context.homeText(title),
           style: TextStyle(
             fontSize: hasLargeTargets ? 17 : 15,
             fontWeight: selected
@@ -1196,34 +1224,38 @@ class _DesktopNavChip extends StatelessWidget {
       child: Material(
         color: selected ? activeBg : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: (selected && isHighContrast)
-                ? BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.black, width: 2),
-                  )
-                : null,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Icon(icon, size: 22, color: selected ? activeFg : inactiveFg),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 20 / 14,
-                    fontWeight: selected
-                        ? FontWeight.w800
-                        : (isHighContrast ? FontWeight.w700 : FontWeight.w600),
-                    letterSpacing: 0.1,
-                    color: selected ? activeFg : inactiveFg,
+        child: AccessibleTapTarget(
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              decoration: (selected && isHighContrast)
+                  ? BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.black, width: 2),
+                    )
+                  : null,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(icon, size: 22, color: selected ? activeFg : inactiveFg),
+                  const SizedBox(width: 8),
+                  Text(
+                    context.homeText(label),
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 20 / 14,
+                      fontWeight: selected
+                          ? FontWeight.w800
+                          : (isHighContrast
+                                ? FontWeight.w700
+                                : FontWeight.w600),
+                      letterSpacing: 0.1,
+                      color: selected ? activeFg : inactiveFg,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -1318,7 +1350,8 @@ class _AvatarButton extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _RecentReportsSection extends StatelessWidget {
-  const _RecentReportsSection({required this.onSeeAll});
+  const _RecentReportsSection({required this.onSeeAll, this.reports});
+  final Stream<List<Report>>? reports;
 
   final VoidCallback onSeeAll;
 
@@ -1327,36 +1360,33 @@ class _RecentReportsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            Expanded(
-              child: Text(
-                'Recent Community Reports',
-                style: TextStyle(
-                  fontSize: 18,
-                  height: 24 / 18,
-                  fontWeight: FontWeight.w700,
-                  color: context.textColor,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            Text(
+              context.l10n.homeRecentReports,
+              style: TextStyle(
+                fontSize: 18,
+                height: 24 / 18,
+                fontWeight: FontWeight.w700,
+                color: context.textColor,
               ),
             ),
-            const SizedBox(width: 8),
             TextButton(
               onPressed: onSeeAll,
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
-                minimumSize: const Size(0, 0),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: Size(context.buttonHeight, context.buttonHeight),
+                tapTargetSize: MaterialTapTargetSize.padded,
               ),
-              child: const Text(
-                'See All →',
+              child: Text(
+                context.l10n.profileSeeAll,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
+                  color: context.primaryColor,
                 ),
               ),
             ),
@@ -1364,7 +1394,7 @@ class _RecentReportsSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         StreamBuilder<List<Report>>(
-          stream: FirestoreService().streamReports(),
+          stream: reports ?? FirestoreService().streamReports(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
@@ -1375,6 +1405,9 @@ class _RecentReportsSection extends StatelessWidget {
               );
             }
 
+            if (snapshot.hasError) {
+              return Text(context.l10n.homeReportsUnavailable);
+            }
             final reports = snapshot.data ?? [];
             return EvidenceRefresh(
               reports: reports,
@@ -1400,10 +1433,10 @@ class _RecentReportsSection extends StatelessWidget {
                           : null,
                     ),
                     child: Text(
-                      'No recent community reports.',
+                      context.l10n.homeNoReports,
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.onSurfaceVariant,
+                        color: context.subtextColor,
                       ),
                     ),
                   );
@@ -1440,7 +1473,9 @@ class _RecentReportCard extends StatelessWidget {
 
     final title = report.targetName.isNotEmpty
         ? report.targetName
-        : (report.targetId.isNotEmpty ? report.targetId : 'Report');
+        : (report.targetId.isNotEmpty
+              ? report.targetId
+              : context.l10n.homeReport);
 
     return Card(
       margin: EdgeInsets.zero,
@@ -1478,7 +1513,7 @@ class _RecentReportCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              TimeUtils.formatRelativeTime(report.createdAt),
+              context.homeAge(report.createdAt),
               style: TextStyle(
                 fontSize: 12,
                 color: isHighContrast
@@ -1502,19 +1537,27 @@ class _RecentReportCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 _buildFlagChip(
                   icon: Icons.thumb_up_outlined,
-                  label: 'True: ${report.confirmCount}',
-                  color: Colors.green.shade700,
+                  label: context.l10n.homeTrueCount(report.confirmCount),
+                  color: (context.isHighContrast
+                      ? Colors.black
+                      : Colors.green.shade700),
                   isHighContrast: isHighContrast,
                 ),
-                const SizedBox(width: 8),
                 _buildFlagChip(
                   icon: Icons.flag_outlined,
-                  label: 'False: ${report.falseCount}/${report.flagThreshold}',
-                  color: Colors.red.shade700,
+                  label: context.l10n.homeFalseCount(
+                    report.falseCount,
+                    report.flagThreshold,
+                  ),
+                  color: (context.isHighContrast
+                      ? Colors.black
+                      : Colors.red.shade700),
                   isHighContrast: isHighContrast,
                 ),
               ],
@@ -1541,8 +1584,8 @@ class _RecentReportCard extends StatelessWidget {
           color: isHighContrast ? Colors.black : color.withAlpha(76),
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Icon(icon, size: 14, color: isHighContrast ? Colors.black : color),
           const SizedBox(width: 4),
@@ -1565,10 +1608,16 @@ class _RecentReportCard extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _RecentJourneyCard extends StatelessWidget {
-  const _RecentJourneyCard({required this.onReplan, this.passengerId});
+  const _RecentJourneyCard({
+    required this.onReplan,
+    this.passengerId,
+    this.journeys,
+  });
 
   final VoidCallback onReplan;
   final String? passengerId;
+
+  final Stream<List<JourneyModel>>? journeys;
 
   @override
   Widget build(BuildContext context) {
@@ -1580,7 +1629,7 @@ class _RecentJourneyCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Recent Journey',
+          context.l10n.homeRecentJourney,
           style: TextStyle(
             fontSize: 18,
             height: 24 / 18,
@@ -1589,20 +1638,34 @@ class _RecentJourneyCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        if (pid.isEmpty)
+        if (pid.isEmpty && journeys == null)
           _buildCardContent(
             context,
-            title: 'No recorded journey',
-            subtitle: 'Plan a journey to get started',
+            title: context.l10n.homeNoJourney,
+            subtitle: context.l10n.homeStartPlanning,
             isHighContrast: isHighContrast,
             hasLargeTargets: hasLargeTargets,
           )
         else
           StreamBuilder<List<JourneyModel>>(
-            stream: _getJourneysStream(pid),
+            stream: journeys ?? _getJourneysStream(pid),
             builder: (context, snapshot) {
-              String title = 'No recorded journey';
-              String subtitle = 'Plan a journey to get started';
+              if (snapshot.hasError ||
+                  snapshot.connectionState == ConnectionState.waiting) {
+                return _buildCardContent(
+                  context,
+                  title: snapshot.hasError
+                      ? context.l10n.homeJourneysUnavailable
+                      : context.l10n.homeJourneysLoading,
+                  subtitle: snapshot.hasError
+                      ? context.l10n.homeRetryLater
+                      : '',
+                  isHighContrast: isHighContrast,
+                  hasLargeTargets: hasLargeTargets,
+                );
+              }
+              String title = context.l10n.homeNoJourney;
+              String subtitle = context.l10n.homeStartPlanning;
 
               final docs = snapshot.data ?? [];
               if (docs.isNotEmpty) {
@@ -1618,15 +1681,15 @@ class _RecentJourneyCard extends StatelessWidget {
                 final latest = sortedDocs.first;
                 final orig = latest.origin.isNotEmpty
                     ? latest.origin
-                    : 'Origin';
+                    : context.l10n.homeOrigin;
                 final dest = latest.destination.isNotEmpty
                     ? latest.destination
-                    : 'Destination';
-                title = '$orig to $dest';
+                    : context.l10n.homeDestination;
+                title = context.l10n.homeJourneySegment(orig, dest);
                 if (latest.createdAt != null) {
-                  subtitle = TimeUtils.formatRelativeTime(latest.createdAt!);
+                  subtitle = context.homeAge(latest.createdAt!);
                 } else {
-                  subtitle = 'Recent';
+                  subtitle = context.l10n.homeRecent;
                 }
               }
 
@@ -1658,7 +1721,7 @@ class _RecentJourneyCard extends StatelessWidget {
                 .toList();
           });
     } catch (_) {
-      return Stream.value([]);
+      return Stream.error(StateError('Recent journeys unavailable'));
     }
   }
 
@@ -1763,7 +1826,7 @@ class _RecentJourneyCard extends StatelessWidget {
                 ),
               ),
               child: Text(
-                'Re-plan',
+                context.l10n.homeReplan,
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: context.buttonFontSize,
@@ -1817,42 +1880,44 @@ class _AssistanceFab extends StatelessWidget {
       color: isHighContrast ? const Color(0xFF8B0000) : AppColors.error,
       elevation: isHighContrast ? 0 : 6,
       borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          decoration: isHighContrast
-              ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.black, width: 2.0),
-                )
-              : null,
-          padding: EdgeInsets.symmetric(
-            horizontal: hasLargeTargets ? 28 : 24,
-            vertical: hasLargeTargets ? 18 : 14,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.support_agent,
-                color: Colors.white,
-                size: context.tapIconSize,
-              ),
-              if (showLabel) ...[
-                const SizedBox(width: 8),
-                Text(
-                  'Assistance',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: hasLargeTargets ? 17 : 14,
-                    height: 20 / 14,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.1,
-                  ),
+      child: AccessibleTapTarget(
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: isHighContrast
+                ? BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.black, width: 2.0),
+                  )
+                : null,
+            padding: EdgeInsets.symmetric(
+              horizontal: hasLargeTargets ? 28 : 24,
+              vertical: hasLargeTargets ? 18 : 14,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.support_agent,
+                  color: Colors.white,
+                  size: context.tapIconSize,
                 ),
+                if (showLabel) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    context.l10n.homeAssistance,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: hasLargeTargets ? 17 : 14,
+                      height: 20 / 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

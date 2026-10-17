@@ -1,6 +1,11 @@
+import '../../widgets/accessible_tap_target.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../l10n/localization_context.dart';
+import '../../l10n/login_settings_presentation.dart';
 
 import '../../core/routing/app_navigation.dart';
 import '../../core/theme/app_colors.dart';
@@ -78,9 +83,7 @@ class _AccessibilityPreferencesScreenState
         if (mounted &&
             owner == AccessibilityPreferencesService.instance.userId) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Preferences could not be saved. Please retry.'),
-            ),
+            SnackBar(content: Text(context.l10n.settingsSaveFailed)),
           );
         }
       }),
@@ -116,9 +119,7 @@ class _AccessibilityPreferencesScreenState
     } catch (_) {
       if (mounted && owner == service.userId) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Preferences could not be saved. Please retry.'),
-          ),
+          SnackBar(content: Text(context.l10n.settingsSaveFailed)),
         );
       }
       return;
@@ -131,10 +132,10 @@ class _AccessibilityPreferencesScreenState
         SnackBar(
           content: Text(
             owner == null
-                ? 'Device settings saved. Guest travel needs last for this session.'
-                : 'Preferences saved for this account on this device.',
+                ? context.l10n.settingsGuestSaved
+                : context.l10n.settingsAccountSaved,
           ),
-          backgroundColor: AppColors.primary,
+          backgroundColor: context.primaryColor,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -181,10 +182,10 @@ class _AccessibilityPreferencesScreenState
             size: context.tapIconSize,
           ),
           onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: 'Back',
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
         ),
         title: Text(
-          'Accessibility Preferences',
+          context.l10n.profileAccessibility,
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -203,7 +204,7 @@ class _AccessibilityPreferencesScreenState
               size: context.tapIconSize,
             ),
             onPressed: _openProfile,
-            tooltip: 'User profile',
+            tooltip: context.l10n.settingsProfile,
           ),
           const SizedBox(width: 8),
         ],
@@ -254,7 +255,7 @@ class _AccessibilityPreferencesScreenState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Personalized Travel Experience',
+                              context.l10n.settingsPersonalized,
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
@@ -265,7 +266,7 @@ class _AccessibilityPreferencesScreenState
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'High contrast and tap targets apply to this device. Travel needs are saved separately for each signed-in account on this device. Guest needs last for this session. New accounts start with wheelchair access required; review your needs.',
+                              context.l10n.settingsScopeHelp,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isHighContrast
@@ -386,12 +387,16 @@ class _AccessibilityPreferencesScreenState
                                     size: 20,
                                   ),
                                   const SizedBox(width: 10),
-                                  Text(
-                                    v
-                                        ? 'Large tap targets (48dp+) enabled'
-                                        : 'Standard tap targets enabled',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
+                                  Expanded(
+                                    child: Text(
+                                      v
+                                          ? context.l10n.settingsTargetsEnabled
+                                          : context
+                                                .l10n
+                                                .settingsTargetsStandard,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -490,7 +495,7 @@ class _AccessibilityPreferencesScreenState
                   duration: const Duration(milliseconds: 240),
                   curve: Curves.easeOutCubic,
                   width: double.infinity,
-                  height: context.buttonHeight,
+                  constraints: BoxConstraints(minHeight: context.buttonHeight),
                   child: FilledButton.icon(
                     onPressed: _save,
                     style: FilledButton.styleFrom(
@@ -511,7 +516,7 @@ class _AccessibilityPreferencesScreenState
                       size: context.tapIconSize,
                     ),
                     label: Text(
-                      'Save Preferences',
+                      context.l10n.settingsSave,
                       style: TextStyle(
                         fontSize: context.buttonFontSize,
                         fontWeight: FontWeight.w700,
@@ -590,12 +595,16 @@ class _PreferenceCategory extends StatelessWidget {
                   color: isHighContrast ? Colors.black : AppColors.primary,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: hasLargeTargets ? 16.5 : 15.0,
-                    fontWeight: FontWeight.w700,
-                    color: isHighContrast ? Colors.black : AppColors.onSurface,
+                Expanded(
+                  child: Text(
+                    context.loginSettingsText(title),
+                    style: TextStyle(
+                      fontSize: hasLargeTargets ? 16.5 : 15.0,
+                      fontWeight: FontWeight.w700,
+                      color: isHighContrast
+                          ? Colors.black
+                          : AppColors.onSurface,
+                    ),
                   ),
                 ),
               ],
@@ -648,109 +657,115 @@ class _PreferenceToggle extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: enabled ? () => onChanged(!value) : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 240),
-          curve: Curves.easeOutCubic,
-          constraints: BoxConstraints(minHeight: targetMinHeight),
-          padding: EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: verticalPadding,
-          ),
-          child: Row(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 240),
-                curve: Curves.easeOutCubic,
-                width: iconBoxSize,
-                height: iconBoxSize,
-                decoration: BoxDecoration(
-                  color: isHighContrast
-                      ? (value
-                            ? const Color(0xFF001F3F)
-                            : const Color(0xFFE5E5E5))
-                      : (value
-                            ? AppColors.primaryContainer.withValues(alpha: 0.25)
-                            : AppColors.surfaceContainer),
-                  borderRadius: BorderRadius.circular(10),
-                  border: isHighContrast
-                      ? Border.all(color: Colors.black, width: 1.5)
-                      : null,
-                ),
-                child: Icon(
-                  icon,
-                  size: iconSize,
-                  color: isHighContrast
-                      ? (value ? Colors.white : Colors.black)
-                      : (value
-                            ? AppColors.primary
-                            : AppColors.onSurfaceVariant),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: labelFontSize,
-                        fontWeight: isHighContrast
-                            ? FontWeight.w800
-                            : FontWeight.w600,
-                        color: isHighContrast
-                            ? Colors.black
-                            : AppColors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: subtitleFontSize,
-                        color: isHighContrast
-                            ? const Color(0xFF1A1A1A)
-                            : AppColors.onSurfaceVariant,
-                        height: 1.25,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Semantics(
-                label: label,
-                child: AnimatedScale(
-                  scale: hasLargeTargets ? 1.05 : 0.9,
+      child: AccessibleTapTarget(
+        child: InkWell(
+          onTap: enabled ? () => onChanged(!value) : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            constraints: BoxConstraints(minHeight: targetMinHeight),
+            padding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: verticalPadding,
+            ),
+            child: Row(
+              children: [
+                AnimatedContainer(
                   duration: const Duration(milliseconds: 240),
                   curve: Curves.easeOutCubic,
-                  child: Switch(
-                    value: value,
-                    onChanged: enabled ? onChanged : null,
-                    materialTapTargetSize: MaterialTapTargetSize.padded,
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: isHighContrast
-                        ? const Color(0xFF001F3F)
-                        : AppColors.primary,
-                    inactiveThumbColor: isHighContrast
-                        ? Colors.black
-                        : AppColors.onSurfaceVariant,
-                    inactiveTrackColor: isHighContrast
-                        ? const Color(0xFFE5E5E5)
-                        : AppColors.surfaceVariant,
-                    trackOutlineColor: isHighContrast
-                        ? const WidgetStatePropertyAll(Colors.black)
-                        : null,
-                    trackOutlineWidth: isHighContrast
-                        ? const WidgetStatePropertyAll(2.0)
+                  width: iconBoxSize,
+                  height: iconBoxSize,
+                  decoration: BoxDecoration(
+                    color: isHighContrast
+                        ? (value
+                              ? const Color(0xFF001F3F)
+                              : const Color(0xFFE5E5E5))
+                        : (value
+                              ? AppColors.primaryContainer.withValues(
+                                  alpha: 0.25,
+                                )
+                              : AppColors.surfaceContainer),
+                    borderRadius: BorderRadius.circular(10),
+                    border: isHighContrast
+                        ? Border.all(color: Colors.black, width: 1.5)
                         : null,
                   ),
+                  child: Icon(
+                    icon,
+                    size: iconSize,
+                    color: isHighContrast
+                        ? (value ? Colors.white : Colors.black)
+                        : (value
+                              ? AppColors.primary
+                              : AppColors.onSurfaceVariant),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        context.loginSettingsText(label),
+                        style: TextStyle(
+                          fontSize: labelFontSize,
+                          fontWeight: isHighContrast
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          color: isHighContrast
+                              ? Colors.black
+                              : AppColors.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        context.loginSettingsText(subtitle),
+                        style: TextStyle(
+                          fontSize: subtitleFontSize,
+                          color: isHighContrast
+                              ? const Color(0xFF1A1A1A)
+                              : AppColors.onSurfaceVariant,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Semantics(
+                  label: context.loginSettingsText(label),
+                  child: AnimatedScale(
+                    scale: hasLargeTargets ? 1.05 : 0.9,
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutCubic,
+                    child: AccessibleTapTarget(
+                      child: Switch(
+                        value: value,
+                        onChanged: enabled ? onChanged : null,
+                        materialTapTargetSize: MaterialTapTargetSize.padded,
+                        activeThumbColor: Colors.white,
+                        activeTrackColor: isHighContrast
+                            ? const Color(0xFF001F3F)
+                            : AppColors.primary,
+                        inactiveThumbColor: isHighContrast
+                            ? Colors.black
+                            : AppColors.onSurfaceVariant,
+                        inactiveTrackColor: isHighContrast
+                            ? const Color(0xFFE5E5E5)
+                            : AppColors.surfaceVariant,
+                        trackOutlineColor: isHighContrast
+                            ? const WidgetStatePropertyAll(Colors.black)
+                            : null,
+                        trackOutlineWidth: isHighContrast
+                            ? const WidgetStatePropertyAll(2.0)
+                            : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

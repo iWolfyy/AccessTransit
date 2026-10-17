@@ -1,6 +1,10 @@
+import '../../widgets/accessible_dropdown.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../l10n/localization_context.dart';
+import '../../l10n/journey_presentation.dart';
+import '../../l10n/report_form_presentation.dart';
 import '../../logic/status_logic.dart';
 import '../../services/bus_details_repository.dart';
 import '../../services/segment_reports.dart';
@@ -70,10 +74,11 @@ class _SegmentReportsScreenState extends State<SegmentReportsScreen> {
               children: [
                 Text(context.l10n.segmentReportsHelp),
                 DropdownButtonFormField<String>(
+                  itemHeight: null,
                   initialValue: target.key,
                   isExpanded: true,
                   items: [
-                    DropdownMenuItem(
+                    AccessibleDropdownMenuItem(
                       value: 'bus/${widget.busId}',
                       child: Text(
                         widget.busName,
@@ -81,7 +86,7 @@ class _SegmentReportsScreenState extends State<SegmentReportsScreen> {
                       ),
                     ),
                     for (final stop in widget.stops.entries)
-                      DropdownMenuItem(
+                      AccessibleDropdownMenuItem(
                         value: 'station/${stop.key}',
                         child: Text(
                           stop.value,
@@ -113,9 +118,9 @@ class _SegmentReportsScreenState extends State<SegmentReportsScreen> {
                 for (final r in visible)
                   Card(
                     child: ListTile(
-                      title: Text(r.problemType),
+                      title: Text(context.reportFormText(r.problemType)),
                       subtitle: Text(
-                        '${r.targetName}\n${StatusLogic.freshnessLabel(r, currentTime: now)}',
+                        '${r.targetName}\n${context.journeyText(StatusLogic.freshnessLabel(r, currentTime: now))}',
                       ),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(

@@ -1,3 +1,5 @@
+import '../../l10n/assistance_receipt_presentation.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -92,7 +94,7 @@ class _AssistanceRequestStatusScreenState
       elevation: context.isHighContrast ? 0 : 1,
       toolbarHeight: MediaQuery.textScalerOf(context).scale(22) > 33 ? 96 : 56,
       leading: IconButton(
-        tooltip: 'Back',
+        tooltip: MaterialLocalizations.of(context).backButtonTooltip,
         onPressed: () => Navigator.of(context).maybePop(),
         icon: Icon(
           Icons.arrow_back_rounded,
@@ -101,7 +103,7 @@ class _AssistanceRequestStatusScreenState
         ),
       ),
       title: Text(
-        'Assistance request',
+        context.l10n.assistReceiptTitle,
         maxLines: 2,
         softWrap: true,
         style: TextStyle(
@@ -129,7 +131,7 @@ class _AssistanceRequestStatusScreenState
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Sign in with the account that created this request to view its status.',
+                      context.l10n.assistReceiptOwner,
                       style: TextStyle(
                         fontSize: 15,
                         height: 1.4,
@@ -157,8 +159,10 @@ class _AssistanceRequestStatusScreenState
             final request = shared ?? local?.request ?? widget.request;
             final sent = shared != null;
             final delivery = sent
-                ? 'Sent to shared service'
-                : local?.delivery.label ?? 'Request status unknown';
+                ? context.l10n.assistReceiptSent
+                : (local == null
+                      ? context.l10n.assistReceiptUnknown
+                      : context.assistanceReceiptText(local.delivery.label));
             final canRetry =
                 !sent &&
                 local != null &&
@@ -167,9 +171,9 @@ class _AssistanceRequestStatusScreenState
             final failed = local?.delivery == AssistanceDeliveryState.failed;
             final driverWarning = sent && request.status == 'rejected';
             final hint = sent && request.status == 'pending'
-                ? 'Saving the request does not mean the driver has accepted it.'
+                ? context.l10n.assistReceiptPendingHint
                 : sent && request.status == 'acknowledged'
-                ? 'The driver has acknowledged the request. Assistance has not been marked completed.'
+                ? context.l10n.assistReceiptAcceptedHint
                 : null;
             return ListView(
               padding: const EdgeInsets.all(16),
@@ -181,7 +185,7 @@ class _AssistanceRequestStatusScreenState
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _statusCard(
-                          'Request delivery',
+                          context.l10n.assistReceiptDelivery,
                           delivery,
                           sent
                               ? Icons.cloud_done_outlined
@@ -195,12 +199,16 @@ class _AssistanceRequestStatusScreenState
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _heading('Your assistance request'),
+                              _heading(context.l10n.assistReceiptOwn),
                               const SizedBox(height: 12),
                               Wrap(
                                 children: [
                                   Chip(
-                                    label: Text('Route ${request.routeNo}'),
+                                    label: Text(
+                                      context.l10n.assistReceiptRoute(
+                                        request.routeNo,
+                                      ),
+                                    ),
                                     avatar: Icon(
                                       Icons.directions_bus_outlined,
                                       size: 18,
@@ -221,7 +229,13 @@ class _AssistanceRequestStatusScreenState
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
-                                      '${request.purpose == 'alighting' ? 'Getting off' : 'Boarding'} at ${request.stopName}',
+                                      request.purpose == 'alighting'
+                                          ? context.l10n.assistFormAlightAt(
+                                              request.stopName,
+                                            )
+                                          : context.l10n.assistFormBoardAt(
+                                              request.stopName,
+                                            ),
                                       style: TextStyle(
                                         fontSize: 16,
                                         height: 1.4,
@@ -234,7 +248,7 @@ class _AssistanceRequestStatusScreenState
                               ),
                               const Divider(height: 28),
                               Text(
-                                'Support requested',
+                                context.l10n.assistReceiptSupport,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: context.subtextColor,
@@ -243,7 +257,7 @@ class _AssistanceRequestStatusScreenState
                               const SizedBox(height: 8),
                               if (request.assistanceTypes.isEmpty)
                                 Text(
-                                  'Not specified',
+                                  context.l10n.assistReceiptUnspecified,
                                   style: TextStyle(color: context.subtextColor),
                                 )
                               else
@@ -254,9 +268,7 @@ class _AssistanceRequestStatusScreenState
                                       .map(
                                         (type) => Chip(
                                           label: Text(
-                                            request.policyVersion == 2
-                                                ? assistanceType(context, type)
-                                                : type,
+                                            assistanceType(context, type),
                                           ),
                                         ),
                                       )
@@ -267,10 +279,10 @@ class _AssistanceRequestStatusScreenState
                         ),
                         const SizedBox(height: 16),
                         _statusCard(
-                          'Driver response',
+                          context.l10n.assistReceiptDriver,
                           sent
                               ? assistanceStatus(context, request)
-                              : 'Driver acknowledgement is not confirmed.',
+                              : context.l10n.assistReceiptUnconfirmed,
                           !sent
                               ? Icons.hourglass_empty_rounded
                               : switch (request.status) {
@@ -304,23 +316,30 @@ class _AssistanceRequestStatusScreenState
                         ],
                         if (!sent && local?.error != null) ...[
                           const SizedBox(height: 16),
-                          _notice(local!.error!, warning: true),
+                          _notice(
+                            context.assistanceReceiptText(local!.error!),
+                            warning: true,
+                          ),
                         ],
                         if (snapshot.hasError || (sent && remote == null)) ...[
                           const SizedBox(height: 16),
-                          _notice(
-                            'Live status updates are unavailable. Displayed driver status is the last received status.',
-                          ),
+                          _notice(context.l10n.assistReceiptStale),
                         ],
                         if (service.loadError != null) ...[
                           const SizedBox(height: 16),
-                          _notice(service.loadError!, warning: true),
+                          _notice(
+                            context.assistanceReceiptText(service.loadError!),
+                            warning: true,
+                          ),
                         ],
                         if (actionError != null) ...[
                           const SizedBox(height: 16),
                           Semantics(
                             liveRegion: true,
-                            child: _notice(actionError!, warning: true),
+                            child: _notice(
+                              context.assistanceReceiptText(actionError!),
+                              warning: true,
+                            ),
                           ),
                         ],
                         const SizedBox(height: 20),
@@ -332,7 +351,10 @@ class _AssistanceRequestStatusScreenState
                             style: FilledButton.styleFrom(
                               backgroundColor: context.primaryColor,
                               foregroundColor: Colors.white,
-                              minimumSize: Size(48, context.buttonHeight),
+                              minimumSize: Size(
+                                context.buttonHeight,
+                                context.buttonHeight,
+                              ),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 20,
                                 vertical: 14,
@@ -343,8 +365,8 @@ class _AssistanceRequestStatusScreenState
                             ),
                             child: Text(
                               service.isUploading(request.id)
-                                  ? 'Sending?'
-                                  : 'Retry upload',
+                                  ? context.l10n.assistReceiptSending
+                                  : context.l10n.assistReceiptRetry,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 fontSize: 16,
@@ -361,7 +383,10 @@ class _AssistanceRequestStatusScreenState
                             onPressed: cancelling ? null : _cancel,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: context.primaryColor,
-                              minimumSize: Size(48, context.buttonHeight),
+                              minimumSize: Size(
+                                context.buttonHeight,
+                                context.buttonHeight,
+                              ),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 20,
                                 vertical: 14,
@@ -371,14 +396,18 @@ class _AssistanceRequestStatusScreenState
                               ),
                             ),
                             child: Text(
-                              cancelling ? 'Cancelling?' : 'Cancel request',
+                              cancelling
+                                  ? context.l10n.assistReceiptCancelling
+                                  : context.l10n.assistReceiptCancel,
                               textAlign: TextAlign.center,
                             ),
                           ),
                         const SizedBox(height: 8),
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Back'),
+                          child: Text(
+                            MaterialLocalizations.of(context).backButtonTooltip,
+                          ),
                         ),
                       ],
                     ),

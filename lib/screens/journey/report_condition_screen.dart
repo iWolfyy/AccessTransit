@@ -1,3 +1,6 @@
+import '../../widgets/accessible_tap_target.dart';
+import '../../widgets/accessible_dropdown.dart';
+import '../../l10n/report_form_presentation.dart';
 import '../../l10n/localization_context.dart';
 import '../../services/transit_catalogue.dart';
 
@@ -102,11 +105,17 @@ class ReportConditionScreen extends StatefulWidget {
     this.targetType = 'station',
     this.targetId = '',
     this.initialLocation = '',
+    this.currentUserId,
+    this.submissionService,
+    this.imagePicker,
   });
 
   final String targetType;
   final String targetId;
   final String initialLocation;
+  final String? Function()? currentUserId;
+  final ReportSubmissionService? submissionService;
+  final ImagePicker? imagePicker;
 
   @override
   State<ReportConditionScreen> createState() => _ReportConditionScreenState();
@@ -117,7 +126,17 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
   final FirestoreService _firestoreService = FirestoreService();
   final TextEditingController _noteController = TextEditingController();
-  final ImagePicker _picker = ImagePicker();
+  late final ImagePicker _picker = widget.imagePicker ?? ImagePicker();
+  ReportSubmissionService get _submission =>
+      widget.submissionService ?? ReportSubmissionService.instance;
+  String? _actor() {
+    if (widget.currentUserId != null) return widget.currentUserId!();
+    try {
+      return FirebaseAuth.instance.currentUser?.uid;
+    } catch (_) {
+      return null;
+    }
+  }
 
   // Data loaded from Firestore / SeedData
   List<BusRoute> _allRoutes = [];
@@ -158,7 +177,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
   // ── BUS CATEGORIES & SUB-CARDS ─────────────────────────────────────────────
   static final List<ReportCategoryDef> _busCategories = [
-    const ReportCategoryDef(
+    ReportCategoryDef(
       id: 'ramp_bay',
       title: 'Ramp & Bay',
       icon: Icons.accessible_rounded,
@@ -201,7 +220,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         ),
       ],
     ),
-    const ReportCategoryDef(
+    ReportCategoryDef(
       id: 'priority_seats',
       title: 'Seats',
       icon: Icons.airline_seat_recline_normal_rounded,
@@ -235,7 +254,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         ),
       ],
     ),
-    const ReportCategoryDef(
+    ReportCategoryDef(
       id: 'safety_clean',
       title: 'Safety & Clean',
       icon: Icons.security_rounded,
@@ -282,7 +301,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
   // ── STATION / STOP CATEGORIES & SUB-CARDS ──────────────────────────────────
   static final List<ReportCategoryDef> _stationCategories = [
-    const ReportCategoryDef(
+    ReportCategoryDef(
       id: 'elevator_lift',
       title: 'Elevator',
       icon: Icons.elevator_rounded,
@@ -316,7 +335,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         ),
       ],
     ),
-    const ReportCategoryDef(
+    ReportCategoryDef(
       id: 'ramp_pathway',
       title: 'Ramp & Path',
       icon: Icons.accessible_rounded,
@@ -350,7 +369,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         ),
       ],
     ),
-    const ReportCategoryDef(
+    ReportCategoryDef(
       id: 'tactile_platform',
       title: 'Tactile Tiles',
       icon: Icons.blind_rounded,
@@ -384,7 +403,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         ),
       ],
     ),
-    const ReportCategoryDef(
+    ReportCategoryDef(
       id: 'shelter_lighting',
       title: 'Shelter & Light',
       icon: Icons.roofing_rounded,
@@ -543,9 +562,9 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   }
 
   String _getOrCreateUserId() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null && user.uid.isNotEmpty) {
-      return user.uid;
+    final userId = _actor();
+    if (userId != null && userId.isNotEmpty) {
+      return userId;
     }
     throw StateError('Please sign in before publishing a report.');
   }
@@ -558,6 +577,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
+    final actor = _actor();
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
@@ -565,14 +585,16 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
+      if (!mounted || actor != _actor()) return;
       if (image != null) {
         setState(() {
           _pickedImage = File(image.path);
         });
-        _showSnack('Photo attached successfully!');
+        _showSnack(context.l10n.formPhotoAttachedSuccessfully);
       }
     } catch (e) {
-      _showSnack('Unable to attach image: $e');
+      if (!mounted || actor != _actor()) return;
+      _showSnack(context.l10n.formPhotoFailed);
     }
   }
 
@@ -585,27 +607,24 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       ),
       builder: (ctx) {
         return SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Attach Evidence Photo',
+                Text(
+                  context.l10n.formAttachEvidencePhoto,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                    color: context.textColor,
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'Help verify condition for commuters with disabilities',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.onSurfaceVariant,
-                  ),
+                Text(
+                  context.l10n.formHelpVerifyConditionForCommuters,
+                  style: TextStyle(fontSize: 13, color: context.subtextColor),
                 ),
                 const SizedBox(height: 20),
                 Row(
@@ -621,17 +640,17 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          side: const BorderSide(
-                            color: AppColors.primary,
+                          side: BorderSide(
+                            color: context.primaryColor,
                             width: 1.5,
                           ),
                         ),
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.camera_alt_rounded,
-                          color: AppColors.primary,
+                          color: context.primaryColor,
                         ),
-                        label: const Text(
-                          'Take Photo',
+                        label: Text(
+                          context.l10n.formTakePhoto,
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),
@@ -652,12 +671,12 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                             color: AppColors.outlineVariant,
                           ),
                         ),
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.photo_library_rounded,
-                          color: AppColors.onSurface,
+                          color: context.textColor,
                         ),
-                        label: const Text(
-                          'From Gallery',
+                        label: Text(
+                          context.l10n.formFromGallery,
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),
@@ -674,17 +693,18 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   }
 
   Future<void> _submitReport() async {
+    if (_isSubmitting) return;
     final isBus = _targetType == ReportTargetType.bus;
     if ((isBus && _selectedBus == null) ||
         (!isBus && _selectedStation == null)) {
-      _showSnack('Select the exact bus or stop you observed.');
+      _showSnack(context.l10n.formSelectTheExactBusOr);
       return;
     }
     if (!_conditionChosen || (isBus && !_crowdingChosen)) {
       _showSnack(
         isBus
-            ? 'Choose the condition and crowding level you observed.'
-            : 'Choose the condition you observed.',
+            ? context.l10n.formChooseTheConditionAndCrowding
+            : context.l10n.formChooseTheConditionYouObserved,
       );
       return;
     }
@@ -700,48 +720,127 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     final crowding = _selectedCrowding;
     final note = _noteController.text.trim();
     final photo = _pickedImage;
+    final actor = _actor();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirm your observation'),
+        backgroundColor: context.cardColor,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          context.l10n.formConfirmYourObservation,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(context.l10n.reportCooldownNotice),
-              const SizedBox(height: 12),
-              Text('Location / Vehicle: $targetName'),
-              Text('Condition: ${option.title}'),
-              if (isBus) Text('Crowding: ${crowding.label}'),
-              if (note.isNotEmpty) Text('Note: $note'),
-              if (photo != null) const Text('Evidence: 1 photo attached'),
-              const SizedBox(height: 12),
-              const Text(
-                'Your observation, note and attached photo will be public after publication. Avoid faces, identifying details and sensitive personal information. Submit only photos you have permission to share.',
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: context.isHighContrast
+                      ? Colors.white
+                      : AppColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                  border: context.isHighContrast
+                      ? Border.all(color: Colors.black, width: 2)
+                      : null,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(context.l10n.formReviewTarget(targetName)),
+                    Text(
+                      context.l10n.formReviewCondition(
+                        context.reportFormText(option.title),
+                      ),
+                    ),
+                    if (isBus)
+                      Text(
+                        context.l10n.formReviewCrowding(
+                          context.reportFormText(crowding.label),
+                        ),
+                      ),
+                    if (note.isNotEmpty)
+                      Text(context.l10n.formReviewNote(note)),
+                    if (photo != null)
+                      Text(context.l10n.formEvidence1PhotoAttached),
+                  ],
+                ),
               ),
-              const Text(
-                'Pending drafts stay on this device for up to 7 days and are removed on sign-out/account change. You can remove them from Your uploads. Removing a draft cannot recall a request already sent or delete a public report/photo.',
+              const SizedBox(height: 16),
+              Text(
+                context.l10n.formReviewPublicNotice,
+                style: TextStyle(height: 1.5, color: context.textColor),
               ),
-              const Text(
-                'Android drafts use encrypted private storage. On other platforms drafts last only for this app session.',
+              const SizedBox(height: 12),
+              Text(
+                context.l10n.formReviewCooldownShort,
+                style: TextStyle(height: 1.5, color: context.subtextColor),
+              ),
+              const SizedBox(height: 8),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 12),
+                title: Text(
+                  context.l10n.formReviewDetails,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                children: [
+                  const SizedBox(height: 12),
+                  Text(context.l10n.formYourObservationNoteAndAttached),
+                  const SizedBox(height: 12),
+                  Text(context.l10n.formPendingDraftsStayOnThis),
+                  const SizedBox(height: 12),
+                  Text(context.l10n.formAndroidDraftsUseEncryptedPrivate),
+                ],
               ),
             ],
           ),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Edit report'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Confirm and submit'),
+          SizedBox(
+            width: double.infinity,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(
+                    context.l10n.formConfirmAndSubmit,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(
+                    context.l10n.formEditReport,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
     if (!mounted || confirmed != true) return;
+    if (actor != _actor()) {
+      _showSnack(context.l10n.formAccountChanged);
+      return;
+    }
+    if (actor == null || actor.isEmpty) {
+      _showSnack(context.l10n.formSignIn);
+      return;
+    }
     setState(() => _isSubmitting = true);
 
     try {
@@ -777,24 +876,25 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         flaggedBy: const [],
       );
 
-      final submission = await ReportSubmissionService.instance.submit(
+      final submission = await _submission.submit(
         report,
         photoBytes: await photo?.readAsBytes(),
       );
 
-      if (mounted) {
+      if (mounted && actor == _actor()) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => ReportSubmittedScreen(
               report: submission.report,
               targetName: targetName,
+              submissionService: widget.submissionService,
             ),
           ),
         );
       }
     } catch (e) {
-      if (mounted) {
-        _showSnack('Unable to submit report: ${e.toString()}');
+      if (mounted && actor == _actor()) {
+        _showSnack(context.l10n.formSubmitFailed);
       }
     } finally {
       if (mounted) {
@@ -824,13 +924,13 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             color: context.textColor,
           ),
           onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: 'Back',
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Community Report',
+              context.l10n.formCommunityReport,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -838,7 +938,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               ),
             ),
             Text(
-              'Help accessible transit commuters in real-time',
+              context.l10n.formHelpAccessibleTransitCommutersIn,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.normal,
@@ -863,9 +963,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       // Step 1: Select Route
                       _buildSectionHeader(
                         step: '1',
-                        title: 'Select Bus Route',
-                        subtitle:
-                            'Which route are you traveling on or waiting for?',
+                        title: context.l10n.formSelectBusRoute,
+                        subtitle: context.l10n.formWhichRouteAreYouTraveling,
                       ),
                       const SizedBox(height: 12),
                       _buildRouteSelector(),
@@ -874,8 +973,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       // Step 2: Target Type (Bus vs Bus Stop)
                       _buildSectionHeader(
                         step: '2',
-                        title: 'Where is the Issue?',
-                        subtitle: 'Choose whether you are inside a vehicle or at a station',
+                        title: context.l10n.formWhereIsTheIssue,
+                        subtitle: context.l10n.formChooseWhetherYouAreInside,
                       ),
                       const SizedBox(height: 12),
                       _buildTargetTypeCards(),
@@ -887,11 +986,11 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       _buildSectionHeader(
                         step: '3',
                         title: _targetType == ReportTargetType.bus
-                            ? 'Vehicle Accessibility Condition'
-                            : 'Station Accessibility Condition',
+                            ? context.l10n.formVehicleAccessibilityCondition
+                            : context.l10n.formStationAccessibilityCondition,
                         subtitle: _targetType == ReportTargetType.bus
-                            ? 'Report crowding level and wheelchair access inside the bus'
-                            : 'Report elevator, ramp, and platform conditions at the stop',
+                            ? context.l10n.formReportCrowdingLevelAndWheelchair
+                            : context.l10n.formReportElevatorRampAndPlatform,
                       ),
                       const SizedBox(height: 16),
 
@@ -911,8 +1010,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       // Step 4: Optional Evidence Photo (Camera / Gallery)
                       _buildSectionHeader(
                         step: '4',
-                        title: 'Evidence Photo (Optional)',
-                        subtitle: 'Take a photo or upload from gallery to verify status',
+                        title: context.l10n.formEvidencePhotoOptional,
+                        subtitle: context.l10n.formTakeAPhotoOrUpload,
                       ),
                       const SizedBox(height: 12),
                       _buildPhotoUploadSection(),
@@ -921,16 +1020,16 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       // Step 5: Optional Short Note
                       _buildSectionHeader(
                         step: '5',
-                        title: 'Additional Note (Optional)',
-                        subtitle: 'Add helpful details for fellow wheelchair or elderly riders',
+                        title: context.l10n.formAdditionalNoteOptional,
+                        subtitle: context.l10n.formAddHelpfulDetailsForFellow,
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: _noteController,
-                        maxLines: 2,
+
                         style: TextStyle(color: context.textColor),
                         decoration: InputDecoration(
-                          hintText: 'e.g. Ramp was lowered but driver needed bystander help',
+                          hintText: context.l10n.formEGRampWasLowered,
                           hintStyle: TextStyle(
                             color: isHC
                                 ? Colors.black54
@@ -975,8 +1074,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       const SizedBox(height: 28),
 
                       // Step 6: Large Accessible Submit Button
-                      SizedBox(
-                        height: context.hasLargeTargets ? 64 : 56,
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: context.hasLargeTargets ? 64 : 56,
+                        ),
                         child: FilledButton.icon(
                           onPressed: _isSubmitting || TransitCatalogue.demo
                               ? null
@@ -1012,8 +1113,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                                 ),
                           label: Text(
                             _isSubmitting
-                                ? 'Submitting Report…'
-                                : 'Review and submit report',
+                                ? context.l10n.formSubmittingReport
+                                : context.l10n.formReviewAndSubmitReport,
                             style: TextStyle(
                               fontSize: context.hasLargeTargets ? 17.5 : 16,
                               fontWeight: FontWeight.w700,
@@ -1065,7 +1166,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                title,
+                context.reportFormText(title),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -1074,7 +1175,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                subtitle,
+                context.reportFormText(subtitle),
                 style: TextStyle(fontSize: 13, color: context.subtextColor),
               ),
             ],
@@ -1098,7 +1199,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<BusRoute>(
-          hint: const Text('Select a route (optional)'),
+          itemHeight: null,
+          hint: Text(context.l10n.formSelectARouteOptional),
           isExpanded: true,
           value: _selectedRoute,
           icon: Icon(
@@ -1107,7 +1209,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             size: 30,
           ),
           items: _allRoutes.map((r) {
-            return DropdownMenuItem<BusRoute>(
+            return AccessibleDropdownMenuItem<BusRoute>(
               value: r,
               child: Row(
                 children: [
@@ -1126,7 +1228,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                           : null,
                     ),
                     child: Text(
-                      'Bus ${r.routeNo}',
+                      context.l10n.formBusRoute(r.routeNo),
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: isHC
@@ -1140,7 +1242,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                   Expanded(
                     child: Text(
                       r.routeName,
-                      overflow: TextOverflow.ellipsis,
+
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
@@ -1172,8 +1274,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       children: [
         Expanded(
           child: _TargetChoiceCard(
-            title: 'On a Bus',
-            subtitle: 'Inside the vehicle',
+            title: context.l10n.formOnABus,
+            subtitle: context.l10n.formInsideTheVehicle,
             icon: Icons.directions_bus_rounded,
             isSelected: isBus,
             onTap: () {
@@ -1192,8 +1294,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: _TargetChoiceCard(
-            title: 'At a Bus Stop',
-            subtitle: 'Station & platform',
+            title: context.l10n.formAtABusStop,
+            subtitle: context.l10n.formStationPlatform,
             icon: Icons.store_mall_directory_rounded,
             isSelected: !isBus,
             onTap: () {
@@ -1230,14 +1332,15 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<Bus>(
+            itemHeight: null,
             isExpanded: true,
             hint: Text(
-              'Select Specific Bus / License Plate',
+              context.l10n.formSelectSpecificBusLicensePlate,
               style: TextStyle(color: context.subtextColor),
             ),
             value: buses.contains(_selectedBus) ? _selectedBus : null,
             items: buses.map((b) {
-              return DropdownMenuItem<Bus>(
+              return AccessibleDropdownMenuItem<Bus>(
                 value: b,
                 child: Row(
                   children: [
@@ -1247,12 +1350,16 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                       color: isHC ? Colors.black : AppColors.primary,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      '${b.busNo} ${b.hasRamp ? "♿ (Ramp)" : ""}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: context.textColor,
+                    Flexible(
+                      child: Text(
+                        b.hasRamp
+                            ? context.l10n.formBusRamp(b.displayBusNo)
+                            : b.displayBusNo,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: context.textColor,
+                        ),
                       ),
                     ),
                   ],
@@ -1283,16 +1390,17 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<Station>(
+            itemHeight: null,
             isExpanded: true,
             hint: Text(
-              'Select Stop along this route',
+              context.l10n.formSelectStopAlongThisRoute,
               style: TextStyle(color: context.subtextColor),
             ),
             value: stations.contains(_selectedStation)
                 ? _selectedStation
                 : null,
             items: stations.map((s) {
-              return DropdownMenuItem<Station>(
+              return AccessibleDropdownMenuItem<Station>(
                 value: s,
                 child: Row(
                   children: [
@@ -1305,7 +1413,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                     Expanded(
                       child: Text(
                         '${s.name} ${s.hasElevator ? "🛗" : ""} ${s.hasRamp ? "♿" : ""}',
-                        overflow: TextOverflow.ellipsis,
+
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -1338,7 +1446,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Crowding Level',
+          context.l10n.formCrowdingLevel,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -1358,64 +1466,65 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             return Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: InkWell(
-                  onTap: () => setState(() {
-                    _selectedCrowding = lvl;
-                    _crowdingChosen = true;
-                  }),
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 74),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isHC
-                          ? (isSelected ? hcColor : Colors.white)
-                          : (isSelected
-                                ? lvl.color.withValues(alpha: 0.15)
-                                : AppColors.surfaceContainerLowest),
-                      borderRadius: BorderRadius.circular(14),
-                      border: isHC
-                          ? Border.all(
-                              color: Colors.black,
-                              width: isSelected ? 3 : 2,
-                            )
-                          : Border.all(
-                              color: isSelected
-                                  ? lvl.color
-                                  : AppColors.outlineVariant,
-                              width: isSelected ? 2 : 1,
-                            ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          lvl.icon,
-                          color: isHC
-                              ? (isSelected ? Colors.white : Colors.black)
-                              : lvl.color,
-                          size: 24,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          lvl.label,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                child: AccessibleTapTarget(
+                  child: InkWell(
+                    onTap: () => setState(() {
+                      _selectedCrowding = lvl;
+                      _crowdingChosen = true;
+                    }),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 74),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isHC
+                            ? (isSelected ? hcColor : Colors.white)
+                            : (isSelected
+                                  ? lvl.color.withValues(alpha: 0.15)
+                                  : AppColors.surfaceContainerLowest),
+                        borderRadius: BorderRadius.circular(14),
+                        border: isHC
+                            ? Border.all(
+                                color: Colors.black,
+                                width: isSelected ? 3 : 2,
+                              )
+                            : Border.all(
+                                color: isSelected
+                                    ? lvl.color
+                                    : AppColors.outlineVariant,
+                                width: isSelected ? 2 : 1,
+                              ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            lvl.icon,
                             color: isHC
                                 ? (isSelected ? Colors.white : Colors.black)
-                                : (isSelected
-                                      ? lvl.color
-                                      : AppColors.onSurface),
+                                : lvl.color,
+                            size: 24,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            context.reportFormText(lvl.label),
+                            textAlign: TextAlign.center,
+
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isHC
+                                  ? (isSelected ? Colors.white : Colors.black)
+                                  : (isSelected
+                                        ? lvl.color
+                                        : AppColors.onSurface),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1427,8 +1536,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
           padding: const EdgeInsets.only(top: 8, left: 4),
           child: Text(
             _crowdingChosen
-                ? _selectedCrowding.subtitle
-                : 'Choose the crowding level you observed.',
+                ? context.reportFormText(_selectedCrowding.subtitle)
+                : context.l10n.formChooseTheCrowdingLevelYou,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -1455,7 +1564,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Accessibility Issue Category',
+          context.l10n.formAccessibilityIssueCategory,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -1475,69 +1584,70 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                 padding: EdgeInsets.only(
                   right: idx < _busCategories.length - 1 ? 6 : 0,
                 ),
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _activeBusCategoryIndex = idx;
-                      _selectedOption = cat.options[0];
-                      _conditionChosen = false;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isHC
-                          ? (isSelected
-                                ? const Color(0xFF001F3F)
-                                : Colors.white)
-                          : (isSelected
-                                ? AppColors.primary
-                                : AppColors.surfaceContainerLowest),
-                      borderRadius: BorderRadius.circular(12),
-                      border: isHC
-                          ? Border.all(
-                              color: Colors.black,
-                              width: isSelected ? 3 : 2,
-                            )
-                          : Border.all(
-                              color: isSelected
+                child: AccessibleTapTarget(
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _activeBusCategoryIndex = idx;
+                        _selectedOption = cat.options[0];
+                        _conditionChosen = false;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isHC
+                            ? (isSelected
+                                  ? const Color(0xFF001F3F)
+                                  : Colors.white)
+                            : (isSelected
                                   ? AppColors.primary
-                                  : AppColors.outlineVariant,
-                            ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          cat.icon,
-                          size: 20,
-                          color: isHC
-                              ? (isSelected ? Colors.white : Colors.black)
-                              : (isSelected
-                                    ? AppColors.onPrimary
-                                    : AppColors.primary),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          cat.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                                  : AppColors.surfaceContainerLowest),
+                        borderRadius: BorderRadius.circular(12),
+                        border: isHC
+                            ? Border.all(
+                                color: Colors.black,
+                                width: isSelected ? 3 : 2,
+                              )
+                            : Border.all(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : AppColors.outlineVariant,
+                              ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            cat.icon,
+                            size: 20,
                             color: isHC
                                 ? (isSelected ? Colors.white : Colors.black)
                                 : (isSelected
                                       ? AppColors.onPrimary
-                                      : AppColors.onSurface),
+                                      : AppColors.primary),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            context.reportFormText(cat.title),
+
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isHC
+                                  ? (isSelected ? Colors.white : Colors.black)
+                                  : (isSelected
+                                        ? AppColors.onPrimary
+                                        : AppColors.onSurface),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1561,7 +1671,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Station Facility Category',
+          context.l10n.formStationFacilityCategory,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -1570,78 +1680,73 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
         ),
         const SizedBox(height: 10),
 
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 2.8,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
+        _ReportFormGrid(
           children: List.generate(_stationCategories.length, (idx) {
             final cat = _stationCategories[idx];
             final isSelected = idx == _activeStationCategoryIndex;
 
-            return InkWell(
-              onTap: () {
-                setState(() {
-                  _activeStationCategoryIndex = idx;
-                  _selectedOption = cat.options[0];
-                  _conditionChosen = false;
-                });
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: isHC
-                      ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
-                      : (isSelected
-                            ? AppColors.primary
-                            : AppColors.surfaceContainerLowest),
-                  borderRadius: BorderRadius.circular(12),
-                  border: isHC
-                      ? Border.all(
-                          color: Colors.black,
-                          width: isSelected ? 3 : 2,
-                        )
-                      : Border.all(
-                          color: isSelected
+            return AccessibleTapTarget(
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _activeStationCategoryIndex = idx;
+                    _selectedOption = cat.options[0];
+                    _conditionChosen = false;
+                  });
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isHC
+                        ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
+                        : (isSelected
                               ? AppColors.primary
-                              : AppColors.outlineVariant,
-                        ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      cat.icon,
-                      size: 20,
-                      color: isHC
-                          ? (isSelected ? Colors.white : Colors.black)
-                          : (isSelected
-                                ? AppColors.onPrimary
-                                : AppColors.primary),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        cat.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: isHC
-                              ? (isSelected ? Colors.white : Colors.black)
-                              : (isSelected
-                                    ? AppColors.onPrimary
-                                    : AppColors.onSurface),
+                              : AppColors.surfaceContainerLowest),
+                    borderRadius: BorderRadius.circular(12),
+                    border: isHC
+                        ? Border.all(
+                            color: Colors.black,
+                            width: isSelected ? 3 : 2,
+                          )
+                        : Border.all(
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.outlineVariant,
+                          ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        cat.icon,
+                        size: 20,
+                        color: isHC
+                            ? (isSelected ? Colors.white : Colors.black)
+                            : (isSelected
+                                  ? AppColors.onPrimary
+                                  : AppColors.primary),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          context.reportFormText(cat.title),
+
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isHC
+                                ? (isSelected ? Colors.white : Colors.black)
+                                : (isSelected
+                                      ? AppColors.onPrimary
+                                      : AppColors.onSurface),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
@@ -1657,17 +1762,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
   Widget _buildSubCardsGrid(List<ReportIssueOption> options) {
     final isHC = context.isHighContrast;
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: options.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 1.35,
-      ),
-      itemBuilder: (context, optIdx) {
+    return _ReportFormGrid(
+      children: List.generate(options.length, (optIdx) {
         final opt = options[optIdx];
         final isOptSelected = _conditionChosen && _selectedOption.id == opt.id;
         final hcColor = opt.severity == 'major'
@@ -1676,107 +1772,105 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                   ? const Color(0xFF8B4500)
                   : const Color(0xFF003833));
 
-        return InkWell(
-          onTap: () => setState(() {
-            _selectedOption = opt;
-            _conditionChosen = true;
-          }),
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isHC
-                  ? Colors.white
-                  : (isOptSelected
-                        ? opt.color.withValues(alpha: 0.12)
-                        : AppColors.surfaceContainerLowest),
-              borderRadius: BorderRadius.circular(14),
-              border: isHC
-                  ? Border.all(
-                      color: Colors.black,
-                      width: isOptSelected ? 3 : 2,
-                    )
-                  : Border.all(
-                      color: isOptSelected
-                          ? opt.color
-                          : AppColors.outlineVariant,
-                      width: isOptSelected ? 2 : 1,
-                    ),
-              boxShadow: isHC
-                  ? null
-                  : (isOptSelected
-                        ? [
-                            BoxShadow(
-                              color: opt.color.withValues(alpha: 0.15),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      opt.icon,
+        return AccessibleTapTarget(
+          child: InkWell(
+            onTap: () => setState(() {
+              _selectedOption = opt;
+              _conditionChosen = true;
+            }),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isHC
+                    ? Colors.white
+                    : (isOptSelected
+                          ? opt.color.withValues(alpha: 0.12)
+                          : AppColors.surfaceContainerLowest),
+                borderRadius: BorderRadius.circular(14),
+                border: isHC
+                    ? Border.all(
+                        color: Colors.black,
+                        width: isOptSelected ? 3 : 2,
+                      )
+                    : Border.all(
+                        color: isOptSelected
+                            ? opt.color
+                            : AppColors.outlineVariant,
+                        width: isOptSelected ? 2 : 1,
+                      ),
+                boxShadow: isHC
+                    ? null
+                    : (isOptSelected
+                          ? [
+                              BoxShadow(
+                                color: opt.color.withValues(alpha: 0.15),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        opt.icon,
+                        color: isHC
+                            ? (isOptSelected ? hcColor : Colors.black)
+                            : opt.color,
+                        size: 22,
+                      ),
+                      const Spacer(),
+                      if (isOptSelected)
+                        Icon(
+                          Icons.check_circle_rounded,
+                          color: isHC ? hcColor : opt.color,
+                          size: 16,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    context.reportFormText(opt.title),
+
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isOptSelected
+                          ? FontWeight.w800
+                          : FontWeight.w700,
                       color: isHC
                           ? (isOptSelected ? hcColor : Colors.black)
-                          : opt.color,
-                      size: 22,
+                          : (isOptSelected ? opt.color : AppColors.onSurface),
                     ),
-                    const Spacer(),
-                    if (isOptSelected)
-                      Icon(
-                        Icons.check_circle_rounded,
-                        color: isHC ? hcColor : opt.color,
-                        size: 16,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  opt.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isOptSelected
-                        ? FontWeight.w800
-                        : FontWeight.w700,
-                    color: isHC
-                        ? (isOptSelected ? hcColor : Colors.black)
-                        : (isOptSelected ? opt.color : AppColors.onSurface),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  opt.subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isHC ? Colors.black : AppColors.onSurfaceVariant,
-                    height: 1.2,
+                  const SizedBox(height: 2),
+                  Text(
+                    context.reportFormText(opt.subtitle),
+
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+                      height: 1.2,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
-      },
+      }),
     );
   }
 
   Widget _buildPhotoUploadSection() {
     if (!ReportPhotoStorage.configured.isConfigured) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
-        child: Text(
-          'Photo uploads are currently unavailable. You can submit your report without a photo.',
-        ),
+        child: Text(context.l10n.formPhotoUploadsAreCurrentlyUnavailable),
       );
     }
     final isHC = context.isHighContrast;
@@ -1808,7 +1902,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Photo Attached',
+                    context.l10n.formPhotoAttached,
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
@@ -1817,7 +1911,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Will be uploaded with report',
+                    context.l10n.formWillBeUploadedWithReport,
                     style: TextStyle(fontSize: 12, color: context.subtextColor),
                   ),
                 ],
@@ -1829,74 +1923,79 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                 Icons.cancel_rounded,
                 color: isHC ? const Color(0xFF8B0000) : AppColors.error,
               ),
-              tooltip: 'Remove photo',
+              tooltip: context.l10n.formRemovePhoto,
             ),
           ],
         ),
       );
     }
 
-    return InkWell(
-      onTap: TransitCatalogue.demo ? null : _showPhotoOptionsModal,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        height: 72,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: context.cardColor,
-          borderRadius: BorderRadius.circular(14),
-          border: isHC
-              ? Border.all(color: Colors.black, width: 2)
-              : Border.all(
-                  color: AppColors.outlineVariant,
-                  style: BorderStyle.solid,
+    return AccessibleTapTarget(
+      child: InkWell(
+        onTap: TransitCatalogue.demo ? null : _showPhotoOptionsModal,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 72),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: context.cardColor,
+            borderRadius: BorderRadius.circular(14),
+            border: isHC
+                ? Border.all(color: Colors.black, width: 2)
+                : Border.all(
+                    color: AppColors.outlineVariant,
+                    style: BorderStyle.solid,
+                  ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isHC ? Colors.white : AppColors.primaryFixed,
+                  border: isHC
+                      ? Border.all(color: Colors.black, width: 1.5)
+                      : null,
                 ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isHC ? Colors.white : AppColors.primaryContainer,
-                border: isHC
-                    ? Border.all(color: Colors.black, width: 1.5)
-                    : null,
+                child: Icon(
+                  Icons.add_a_photo_rounded,
+                  size: 20,
+                  color: isHC ? Colors.black : AppColors.primary,
+                ),
               ),
-              child: Icon(
-                Icons.add_a_photo_rounded,
-                size: 20,
-                color: isHC ? Colors.black : AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Add Photo',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: context.textColor,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      context.l10n.formAddPhoto,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: context.textColor,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Tap to take photo or choose from device',
-                    style: TextStyle(fontSize: 12, color: context.subtextColor),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      context.l10n.formTapToTakePhotoOr,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.subtextColor,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: isHC ? Colors.black : AppColors.onSurfaceVariant,
-            ),
-          ],
+              Icon(
+                Icons.chevron_right_rounded,
+                color: isHC ? Colors.black : AppColors.onSurfaceVariant,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1907,9 +2006,12 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
     final isBus = _targetType == ReportTargetType.bus;
     final targetTitle = isBus
         ? (_selectedBus != null
-              ? '${_selectedBus!.displayBusNo} (Route ${_selectedBus!.routeNo})'
-              : 'Not selected')
-        : (_selectedStation?.name ?? 'Not selected');
+              ? context.l10n.formVehicleRoute(
+                  _selectedBus!.displayBusNo,
+                  _selectedBus!.routeNo,
+                )
+              : context.l10n.formNotSelected)
+        : (_selectedStation?.name ?? context.l10n.formNotSelected);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1940,12 +2042,14 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
                 color: isHC ? Colors.black : AppColors.primary,
               ),
               const SizedBox(width: 8),
-              Text(
-                'Report Summary',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: context.textColor,
+              Flexible(
+                child: Text(
+                  context.l10n.formReportSummary,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: context.textColor,
+                  ),
                 ),
               ),
             ],
@@ -1953,7 +2057,7 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
           Divider(height: 20, color: isHC ? Colors.black : null),
           _buildSummaryRow(
             icon: isBus ? Icons.directions_bus_rounded : Icons.place_rounded,
-            label: 'Location / Vehicle',
+            label: context.l10n.formLocationVehicle,
             value: targetTitle,
             color: isHC ? const Color(0xFF001F3F) : AppColors.primary,
           ),
@@ -1961,10 +2065,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             const SizedBox(height: 8),
             _buildSummaryRow(
               icon: _selectedCrowding.icon,
-              label: 'Crowding Level',
+              label: context.l10n.formCrowdingLevel,
               value: _crowdingChosen
-                  ? '${_selectedCrowding.label} — ${_selectedCrowding.subtitle}'
-                  : 'Not selected',
+                  ? '${context.reportFormText(_selectedCrowding.label)} — ${context.reportFormText(_selectedCrowding.subtitle)}'
+                  : context.l10n.formNotSelected,
               color: isHC
                   ? (_selectedCrowding == CrowdingLevel.low
                         ? const Color(0xFF003833)
@@ -1977,10 +2081,10 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
           const SizedBox(height: 8),
           _buildSummaryRow(
             icon: _selectedOption.icon,
-            label: 'Accessibility Status',
+            label: context.l10n.formAccessibilityStatus,
             value: _conditionChosen
-                ? '${_selectedOption.title} — ${_selectedOption.subtitle}'
-                : 'Not selected',
+                ? '${context.reportFormText(_selectedOption.title)} — ${context.reportFormText(_selectedOption.subtitle)}'
+                : context.l10n.formNotSelected,
             color: isHC
                 ? (_selectedOption.severity == 'major'
                       ? const Color(0xFF8B0000)
@@ -1993,8 +2097,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             const SizedBox(height: 8),
             _buildSummaryRow(
               icon: Icons.camera_alt_rounded,
-              label: 'Photo Evidence',
-              value: '1 photo attached',
+              label: context.l10n.formPhotoEvidence,
+              value: context.l10n.form1PhotoAttached,
               color: isHC ? const Color(0xFF003833) : AppColors.success,
             ),
           ],
@@ -2063,97 +2167,125 @@ class _TargetChoiceCard extends StatelessWidget {
     final isHC = context.isHighContrast;
     final hasLargeTargets = context.hasLargeTargets;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        constraints: BoxConstraints(minHeight: hasLargeTargets ? 108 : 96),
-        padding: EdgeInsets.symmetric(
-          horizontal: hasLargeTargets ? 16 : 14,
-          vertical: hasLargeTargets ? 16 : 12,
-        ),
-        decoration: BoxDecoration(
-          color: isHC
-              ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
-              : (isSelected
-                    ? AppColors.primaryContainer
-                    : AppColors.surfaceContainerLowest),
-          borderRadius: BorderRadius.circular(16),
-          border: isHC
-              ? Border.all(color: Colors.black, width: isSelected ? 3 : 2)
-              : Border.all(
-                  color: isSelected
-                      ? AppColors.primary
-                      : AppColors.outlineVariant,
-                  width: isSelected ? 2 : 1,
-                ),
-          boxShadow: isHC
-              ? null
-              : (isSelected
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ]
-                    : null),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  icon,
-                  size: hasLargeTargets ? 28 : 24,
+    return AccessibleTapTarget(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          constraints: BoxConstraints(minHeight: hasLargeTargets ? 108 : 96),
+          padding: EdgeInsets.symmetric(
+            horizontal: hasLargeTargets ? 16 : 14,
+            vertical: hasLargeTargets ? 16 : 12,
+          ),
+          decoration: BoxDecoration(
+            color: isHC
+                ? (isSelected ? const Color(0xFF001F3F) : Colors.white)
+                : (isSelected
+                      ? AppColors.primaryContainer
+                      : AppColors.surfaceContainerLowest),
+            borderRadius: BorderRadius.circular(16),
+            border: isHC
+                ? Border.all(color: Colors.black, width: isSelected ? 3 : 2)
+                : Border.all(
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.outlineVariant,
+                    width: isSelected ? 2 : 1,
+                  ),
+            boxShadow: isHC
+                ? null
+                : (isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ]
+                      : null),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    icon,
+                    size: hasLargeTargets ? 28 : 24,
+                    color: isHC
+                        ? (isSelected ? Colors.white : Colors.black)
+                        : (isSelected
+                              ? AppColors.onPrimary
+                              : AppColors.primary),
+                  ),
+                  const Spacer(),
+                  if (isSelected)
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: hasLargeTargets ? 22 : 18,
+                      color: isHC ? Colors.white : AppColors.onPrimary,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                context.reportFormText(title),
+
+                style: TextStyle(
+                  fontSize: hasLargeTargets ? 16 : 14,
+                  fontWeight: FontWeight.w700,
                   color: isHC
                       ? (isSelected ? Colors.white : Colors.black)
-                      : (isSelected ? AppColors.onPrimary : AppColors.primary),
+                      : (isSelected
+                            ? AppColors.onPrimary
+                            : AppColors.onSurface),
                 ),
-                const Spacer(),
-                if (isSelected)
-                  Icon(
-                    Icons.check_circle_rounded,
-                    size: hasLargeTargets ? 22 : 18,
-                    color: isHC ? Colors.white : AppColors.onPrimary,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: hasLargeTargets ? 16 : 14,
-                fontWeight: FontWeight.w700,
-                color: isHC
-                    ? (isSelected ? Colors.white : Colors.black)
-                    : (isSelected ? AppColors.onPrimary : AppColors.onSurface),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: hasLargeTargets ? 12.5 : 11,
-                fontWeight: isHC && isSelected
-                    ? FontWeight.w600
-                    : FontWeight.normal,
-                color: isHC
-                    ? (isSelected ? Colors.white : Colors.black)
-                    : (isSelected
-                          ? AppColors.primaryFixed
-                          : AppColors.onSurfaceVariant),
+              const SizedBox(height: 2),
+              Text(
+                context.reportFormText(subtitle),
+
+                style: TextStyle(
+                  fontSize: hasLargeTargets ? 12.5 : 11,
+                  fontWeight: isHC && isSelected
+                      ? FontWeight.w600
+                      : FontWeight.normal,
+                  color: isHC
+                      ? (isSelected ? Colors.white : Colors.black)
+                      : (isSelected
+                            ? AppColors.primaryFixed
+                            : AppColors.onSurfaceVariant),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _ReportFormGrid extends StatelessWidget {
+  const _ReportFormGrid({required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, size) {
+      final single =
+          size.maxWidth < 400 &&
+          MediaQuery.textScalerOf(context).scale(16) > 24;
+      return Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (final child in children)
+            SizedBox(
+              width: single ? size.maxWidth : (size.maxWidth - 10) / 2,
+              child: child,
+            ),
+        ],
+      );
+    },
+  );
 }

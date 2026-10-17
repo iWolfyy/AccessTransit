@@ -23,7 +23,7 @@ class AssistanceOperatorActions extends StatefulWidget {
 class _AssistanceOperatorActionsState extends State<AssistanceOperatorActions> {
   late BoardingRequest request;
   bool saving = false;
-  String? error;
+  bool failed = false;
   @override
   void initState() {
     super.initState();
@@ -40,7 +40,7 @@ class _AssistanceOperatorActionsState extends State<AssistanceOperatorActions> {
     if (saving) return;
     setState(() {
       saving = true;
-      error = null;
+      failed = false;
     });
     try {
       final saved = await widget.repository
@@ -49,11 +49,7 @@ class _AssistanceOperatorActionsState extends State<AssistanceOperatorActions> {
       if (mounted) setState(() => request = saved);
     } catch (_) {
       if (mounted) {
-        setState(
-          () => error = request.policyVersion == 2
-              ? context.l10n.assistanceUnavailable
-              : 'Status update was not confirmed. Check your connection, operator approval and bus assignment, then retry.',
-        );
+        setState(() => failed = true);
       }
     } finally {
       if (mounted) setState(() => saving = false);
@@ -65,7 +61,12 @@ class _AssistanceOperatorActionsState extends State<AssistanceOperatorActions> {
     crossAxisAlignment: CrossAxisAlignment.end,
     children: [
       Text(assistanceStatus(context, request)),
-      if (error != null) Text(error!),
+      if (failed)
+        Text(
+          request.policyVersion == 2
+              ? context.l10n.assistanceUnavailable
+              : context.l10n.sharedOperatorStatusError,
+        ),
       Wrap(
         spacing: 8,
         children: [
@@ -73,38 +74,26 @@ class _AssistanceOperatorActionsState extends State<AssistanceOperatorActions> {
             OutlinedButton(
               onPressed: saving ? null : () => change('acknowledged'),
               style: OutlinedButton.styleFrom(
-                minimumSize: Size(0, context.minTapHeight),
+                minimumSize: Size(context.buttonHeight, context.minTapHeight),
               ),
-              child: Text(
-                request.policyVersion == 2
-                    ? context.l10n.assistanceAcknowledge
-                    : 'Acknowledge',
-              ),
+              child: Text(context.l10n.assistanceAcknowledge),
             ),
             TextButton(
               onPressed: saving ? null : () => change('rejected'),
-              child: Text(
-                request.policyVersion == 2
-                    ? context.l10n.assistanceDecline
-                    : 'Decline',
-              ),
+              child: Text(context.l10n.assistanceDecline),
             ),
           ],
           if (request.status == 'acknowledged')
             FilledButton(
               onPressed: saving ? null : () => change('completed'),
               style: FilledButton.styleFrom(
-                minimumSize: Size(0, context.minTapHeight),
+                minimumSize: Size(context.buttonHeight, context.minTapHeight),
               ),
-              child: Text(
-                request.policyVersion == 2
-                    ? context.l10n.assistanceComplete
-                    : 'Complete',
-              ),
+              child: Text(context.l10n.assistanceComplete),
             ),
         ],
       ),
-      if (saving) const Text('Saving status…'),
+      if (saving) Text(context.l10n.sharedSavingStatus),
     ],
   );
 }

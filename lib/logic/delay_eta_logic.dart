@@ -126,16 +126,17 @@ class DelayEtaCalculator {
     final todayBase = DateTime(now.year, now.month, now.day);
 
     // 1. Resolve target stop index in the bus stops list
+    final resolvedStations = bus.resolveStations(stationsMap ?? const {});
     final cleanTarget = targetStopIdOrName.trim();
     int targetIndex = bus.stops.indexWhere(
       (s) => s.toLowerCase() == cleanTarget.toLowerCase(),
     );
 
     // Fallback: match by station display name in stationsMap
-    if (targetIndex == -1 && stationsMap != null) {
+    if (targetIndex == -1) {
       for (int i = 0; i < bus.stops.length; i++) {
         final stopId = bus.stops[i];
-        final station = stationsMap[stopId];
+        final station = resolvedStations[stopId];
         if (station != null &&
             station.name.trim().toLowerCase() == cleanTarget.toLowerCase()) {
           targetIndex = i;
@@ -152,7 +153,7 @@ class DelayEtaCalculator {
     final targetStopId = bus.stops.isNotEmpty
         ? bus.stops[targetIndex]
         : cleanTarget;
-    final targetStopName = stationsMap?[targetStopId]?.name ?? targetStopId;
+    final targetStopName = resolvedStations[targetStopId]?.name ?? targetStopId;
 
     // 2. Check live driver broadcasting status
     final observedAt = liveBusLocation?.timestamp;
@@ -253,7 +254,7 @@ class DelayEtaCalculator {
       final nextStopIndex = bus.stops.indexWhere(
         (s) =>
             s.toLowerCase() == nextStop.toLowerCase() ||
-            (stationsMap?[s]?.name.toLowerCase() == nextStop.toLowerCase()),
+            (resolvedStations[s]?.name.toLowerCase() == nextStop.toLowerCase()),
       );
 
       final currentBusIndex = nextStopIndex != -1 ? nextStopIndex : 0;
@@ -352,7 +353,7 @@ class DelayEtaCalculator {
 
     for (int i = 0; i < bus.stops.length; i++) {
       final stopId = bus.stops[i];
-      final stopName = stationsMap?[stopId]?.name ?? stopId;
+      final stopName = resolvedStations[stopId]?.name ?? stopId;
       final stopScheduledTime = ordered.times[i];
       final hasStopTimetable = hasScheduledTime(i);
       final stopScheduledStr = hasStopTimetable

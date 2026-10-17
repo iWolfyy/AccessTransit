@@ -1,3 +1,8 @@
+import 'admin_scaffold.dart';
+import '../../core/theme/app_theme.dart';
+import '../../widgets/accessible_tap_target.dart';
+import '../../l10n/admin_catalogue_labels.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -24,6 +29,7 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
   TimeOfDay _time = const TimeOfDay(hour: 8, minute: 0);
   List<AdminRecord> _calendars = [];
   bool _busy = true, _failed = false;
+  Object? _failure;
   @override
   void initState() {
     super.initState();
@@ -39,12 +45,14 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
               .where((r) => r.text('busId') == widget.bus.id)
               .toList();
           _failed = false;
+          _failure = null;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           _failed = true;
+          _failure = e;
           _calendars = [];
         });
       }
@@ -64,8 +72,13 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
       await _reload();
-    } catch (_) {
-      if (mounted) setState(() => _failed = true);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _failed = true;
+          _failure = e;
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -76,7 +89,7 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return Scaffold(
+    return AdminScaffold(
       appBar: AppBar(title: Text(l.calendarTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -93,6 +106,11 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
                     final now = ServiceRun.colomboClock(DateTime.now());
                     final today = DateTime(now.year, now.month, now.day);
                     final value = await showDateRangePicker(
+                      initialEntryMode:
+                          context.hasLargeTargets &&
+                              MediaQuery.sizeOf(context).width < 420
+                          ? DatePickerEntryMode.inputOnly
+                          : DatePickerEntryMode.calendar,
                       context: context,
                       firstDate: today,
                       lastDate: today.add(const Duration(days: 365)),
@@ -113,6 +131,11 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
                 ? null
                 : () async {
                     final value = await showTimePicker(
+                      initialEntryMode:
+                          context.hasLargeTargets &&
+                              MediaQuery.sizeOf(context).width < 420
+                          ? TimePickerEntryMode.inputOnly
+                          : TimePickerEntryMode.dial,
                       context: context,
                       initialTime: _time,
                     );
@@ -124,21 +147,24 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
             spacing: 8,
             children: [
               for (var day = 1; day <= 7; day++)
-                FilterChip(
-                  label: Text(
-                    DateFormat.EEEE(Localizations.localeOf(context).toString())
-                        .format(DateTime(2026, 10, 19 + day - 1)),
+                AccessibleTapTarget(
+                  child: FilterChip(
+                    label: Text(
+                      DateFormat.EEEE(
+                        Localizations.localeOf(context).toString(),
+                      ).format(DateTime(2026, 10, 19 + day - 1)),
+                    ),
+                    selected: _weekdays.contains(day),
+                    onSelected: _busy
+                        ? null
+                        : (selected) => setState(() {
+                            if (selected) {
+                              _weekdays.add(day);
+                            } else {
+                              _weekdays.remove(day);
+                            }
+                          }),
                   ),
-                  selected: _weekdays.contains(day),
-                  onSelected: _busy
-                      ? null
-                      : (selected) => setState(() {
-                          if (selected) {
-                            _weekdays.add(day);
-                          } else {
-                            _weekdays.remove(day);
-                          }
-                        }),
                 ),
             ],
           ),
@@ -158,7 +184,10 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
             child: Text(l.calendarPublish),
           ),
           if (_busy) const Center(child: CircularProgressIndicator()),
-          if (_failed) Text(l.calendarFailed),
+          if (_failed) ...[
+            Text(l.calendarFailed),
+            if (_failure != null) Text(context.adminFailure(_failure!)),
+          ],
           TextButton(
             onPressed: _busy
                 ? null
@@ -179,7 +208,9 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
                     Text(
                       c.text('state') == 'published'
                           ? l.calendarPublished
-                          : l.calendarRetired,
+                          : c.text('state') == 'retired'
+                          ? l.calendarRetired
+                          : l.adminRunUnknown,
                     ),
                     Text(
                       '${_date((c.data['from'] as Timestamp).toDate().toUtc())} – ${_date((c.data['until'] as Timestamp).toDate().toUtc())}',

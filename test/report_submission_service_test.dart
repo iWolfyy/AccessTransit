@@ -9,6 +9,7 @@ import 'package:access_transit/models/report.dart';
 import 'package:access_transit/services/firestore_service.dart';
 import 'package:access_transit/services/report_submission_service.dart';
 import 'package:access_transit/services/report_photo_storage.dart';
+import 'package:access_transit/services/moderation_client.dart';
 import 'package:access_transit/screens/journey/report_submitted_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +27,42 @@ void main() {
     userId: 'owner',
   );
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  test(
+    'v2 publication failures retain safe codes and retry the same draft',
+    () async {
+      for (final code in [
+        'service-unavailable',
+        'backend-not-configured',
+        'report-ineligible',
+        'authentication-required',
+      ]) {
+        var unavailable = true;
+        final service = ReportSubmissionService(
+          publisher: (_) async {
+            if (unavailable) throw ModerationException(code);
+          },
+        );
+        final entry = await service.submit(report());
+        expect(entry.error, 'publication:$code');
+        expect(
+          entry.report.publicationState,
+          code == 'service-unavailable'
+              ? ReportPublicationState.pendingUpload
+              : ReportPublicationState.failed,
+        );
+        expect(entry.report.isPublic, isFalse);
+        unavailable = false;
+        final retried = await service.retry(entry.report.id);
+        expect(retried.report.id, entry.report.id);
+        expect(
+          retried.report.publicationState,
+          ReportPublicationState.published,
+        );
+        service.dispose();
+      }
+    },
+  );
 
   test('cooldown denial preserves draft identity and deadline until a successful retry', () async {
     final deadline = DateTime.utc(2026, 10, 16, 12);

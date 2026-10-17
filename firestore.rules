@@ -1,9 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
+    function authenticated() { return request.auth != null; }
+    function sessionPermitted(state) {
+      return state.get('authDisabled', false) != true && state.get('accountDeleted', false) != true
+        && request.auth.token.get('auth_time', 0) >= state.get('sessionsValidAfterSeconds', 0);
+    }
+    function signedIn() {
+      return authenticated() && (!exists(/databases/$(database)/documents/account_access/$(request.auth.uid))
+        || sessionPermitted(get(/databases/$(database)/documents/account_access/$(request.auth.uid)).data));
+    }
     function accessPermitsWrites(state) {
-      return state.get('permanent', false) != true && state.get('communityPermanent', false) != true && state.get('manualSuspended', false) != true
+      return sessionPermitted(state) && state.get('permanent', false) != true && state.get('communityPermanent', false) != true && state.get('manualSuspended', false) != true
         && (state.get('communitySuspendedUntil', null) == null || state.communitySuspendedUntil <= request.time)
         && (state.get('manualSuspendedUntil', null) == null || state.manualSuspendedUntil <= request.time);
     }
@@ -16,7 +24,7 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/moderation_config/active).data.get('enabled', false) == true;
     }
     match /moderation_config/{id} { allow get: if signedIn(); allow list, write: if false; }
-    match /account_access/{uid} { allow get: if owner(uid); allow list, write: if false; }
+    match /account_access/{uid} { allow get: if authenticated() && request.auth.uid == uid; allow list, write: if false; }
     match /contribution_summaries/{uid} { allow get: if owner(uid); allow list, write: if false; }
     function owner(uid) { return signedIn() && request.auth.uid == uid; }
     function admin() { return signedIn() && request.auth.token.get('admin', false) == true; }
@@ -150,12 +158,13 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['journeyId', 'passengerId', 'routeId', 'routeNumber',
           'routeTitle', 'busId', 'origin', 'destination', 'status', 'createdAt', 'fromStationId', 'toStationId',
           'selectedDate', 'selectedTimeMinutes', 'departureAt', 'durationMinutes', 'estimatedFareLkr', 'busNo',
-          'wheelchairAccessRequired', 'stepFreeOnly', 'serviceRunId','fareQuote'])
+          'wheelchairAccessRequired', 'stepFreeOnly', 'serviceRunId','fareQuote','scheduleSnapshot'])
         && request.resource.data.journeyId == id && request.resource.data.createdAt == request.time
         && request.resource.data.status in ['confirmed', 'active']
         && realCatalogue('buses', request.resource.data.busId)
         && nonempty(request.resource.data.origin, 200) && nonempty(request.resource.data.destination, 200)
         && validJourneySelection(request.resource.data)
+        && validSavedTimetable(request.resource.data)
         && (!request.resource.data.keys().hasAny(['fareQuote']) || validFareSnapshot(request.resource.data))
         && (!request.resource.data.keys().hasAny(['serviceRunId']) || (
           request.resource.data.serviceRunId is string
@@ -165,14 +174,28 @@ service cloud.firestore {
         && resource.data.status in ['confirmed', 'active'] && request.resource.data.status in ['completed', 'cancelled']));
       allow delete: if activeAccount() && (owner(resource.data.passengerId) || admin());
     }
+    function validSavedTimetable(d) {
+      let s=d.get('scheduleSnapshot',null);
+      return s==null || (s is map && s.keys().hasOnly(['schemaVersion','stops','stationIds','names','times','runVersion'])
+        && s.schemaVersion==1 && s.stops is list && s.stops.size()>=2 && s.stops.size()<=300
+        && s.stops.toSet().size()==s.stops.size()
+        && s.stops[0]==d.fromStationId && s.stops[s.stops.size()-1]==d.toStationId
+        && get(/databases/$(database)/documents/buses/$(d.busId)).data.stops.hasAll(s.stops)
+        && s.stationIds is map && s.names is map && s.times is map
+        && s.stationIds.keys().hasAll(s.stops) && s.names.keys().hasAll(s.stops) && s.times.keys().hasAll(s.stops)
+        && s.times[d.fromStationId]==d.departureAt
+        && s.times[d.toStationId]==d.departureAt + duration.value(d.durationMinutes,'m')
+        && (!s.keys().hasAny(['runVersion']) || (s.runVersion is int && s.runVersion>=1
+          && s.runVersion==get(/databases/$(database)/documents/service_runs/$(d.serviceRunId)).data.get('scheduleVersion',1))));
+    }
     function validJourneySelection(d) {
       // Older schemas remain readable/creatable; any new selection fields require a complete selection.
       return !d.keys().hasAny(['fromStationId', 'toStationId', 'selectedDate', 'departureAt']) || (
         d.fromStationId in get(/databases/$(database)/documents/buses/$(d.busId)).data.stops
         && d.toStationId in get(/databases/$(database)/documents/buses/$(d.busId)).data.stops
         && d.fromStationId != d.toStationId
-        && exists(/databases/$(database)/documents/stations/$(d.fromStationId))
-        && exists(/databases/$(database)/documents/stations/$(d.toStationId))
+        && exists(/databases/$(database)/documents/stations/$(get(/databases/$(database)/documents/buses/$(d.busId)).data.get('stopStationIds', {}).get(d.fromStationId, d.fromStationId)))
+        && exists(/databases/$(database)/documents/stations/$(get(/databases/$(database)/documents/buses/$(d.busId)).data.get('stopStationIds', {}).get(d.toStationId, d.toStationId)))
         && d.selectedDate is timestamp && d.departureAt is timestamp
         && (d.get('selectedTimeMinutes', null) == null || (d.selectedTimeMinutes is int && d.selectedTimeMinutes >= 0 && d.selectedTimeMinutes < 1440))
         && d.durationMinutes is int && d.durationMinutes > 0
@@ -277,6 +300,14 @@ service cloud.firestore {
           && (d.currentStopIndex == 0 || d.actualDepartureTime != null))
           || (d.status in ['completed','cancelled'] && r.status == d.status && lock.active == false && live.isBroadcasting == false
             && (d.status == 'cancelled' || d.actualDepartureTime != null)));
+    }
+    match /service_run_changes/{id} {
+      allow read: if true;
+      allow create: if activeAccount() && admin()
+        && request.resource.data.previousRunId==id
+        && request.resource.data.updatedBy==request.auth.uid
+        && request.resource.data.updatedAt==request.time;
+      allow update, delete: if false;
     }
     match /service_schedules/{id} {
       allow read: if admin();
@@ -511,9 +542,17 @@ service cloud.firestore {
     // BEGIN GENERATED SAMPLE TEST POLICY
     // Source: root policy above; regenerate with test/security/generate-sample-rules.mjs.
     match /sample_test/shared {
-      function signedIn() { return request.auth != null && exists(/databases/$(database)/documents/sample_test/shared/users/$(request.auth.uid)); }
+      function authenticated() { return request.auth != null && exists(/databases/$(database)/documents/sample_test/shared/users/$(request.auth.uid)) && (!exists(/databases/$(database)/documents/account_access/$(request.auth.uid)) || sessionPermitted(get(/databases/$(database)/documents/account_access/$(request.auth.uid)).data)); }
+      function sessionPermitted(state) {
+        return state.get('authDisabled', false) != true && state.get('accountDeleted', false) != true
+          && request.auth.token.get('auth_time', 0) >= state.get('sessionsValidAfterSeconds', 0);
+      }
+      function signedIn() {
+        return authenticated() && (!exists(/databases/$(database)/documents/sample_test/shared/account_access/$(request.auth.uid))
+          || sessionPermitted(get(/databases/$(database)/documents/sample_test/shared/account_access/$(request.auth.uid)).data));
+      }
       function accessPermitsWrites(state) {
-        return state.get('permanent', false) != true && state.get('communityPermanent', false) != true && state.get('manualSuspended', false) != true
+        return sessionPermitted(state) && state.get('permanent', false) != true && state.get('communityPermanent', false) != true && state.get('manualSuspended', false) != true
           && (state.get('communitySuspendedUntil', null) == null || state.communitySuspendedUntil <= request.time)
           && (state.get('manualSuspendedUntil', null) == null || state.manualSuspendedUntil <= request.time);
       }
@@ -526,7 +565,7 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/sample_test/shared/moderation_config/active).data.get('enabled', false) == true;
       }
       match /moderation_config/{id} { allow get: if signedIn(); allow list, write: if false; }
-      match /account_access/{uid} { allow get: if owner(uid); allow list, write: if false; }
+      match /account_access/{uid} { allow get: if authenticated() && request.auth.uid == uid; allow list, write: if false; }
       match /contribution_summaries/{uid} { allow get: if owner(uid); allow list, write: if false; }
       function owner(uid) { return signedIn() && request.auth.uid == uid; }
       function admin() { return signedIn() && request.auth.token.get('admin', false) == true; }
@@ -660,12 +699,13 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['journeyId', 'passengerId', 'routeId', 'routeNumber',
             'routeTitle', 'busId', 'origin', 'destination', 'status', 'createdAt', 'fromStationId', 'toStationId',
             'selectedDate', 'selectedTimeMinutes', 'departureAt', 'durationMinutes', 'estimatedFareLkr', 'busNo',
-            'wheelchairAccessRequired', 'stepFreeOnly', 'serviceRunId','fareQuote'])
+            'wheelchairAccessRequired', 'stepFreeOnly', 'serviceRunId','fareQuote','scheduleSnapshot'])
           && request.resource.data.journeyId == id && request.resource.data.createdAt == request.time
           && request.resource.data.status in ['confirmed', 'active']
           && realCatalogue('buses', request.resource.data.busId)
           && nonempty(request.resource.data.origin, 200) && nonempty(request.resource.data.destination, 200)
           && validJourneySelection(request.resource.data)
+          && validSavedTimetable(request.resource.data)
           && (!request.resource.data.keys().hasAny(['fareQuote']) || validFareSnapshot(request.resource.data))
           && (!request.resource.data.keys().hasAny(['serviceRunId']) || (
             request.resource.data.serviceRunId is string
@@ -675,14 +715,28 @@ service cloud.firestore {
           && resource.data.status in ['confirmed', 'active'] && request.resource.data.status in ['completed', 'cancelled']));
         allow delete: if activeAccount() && (owner(resource.data.passengerId) || admin());
       }
+      function validSavedTimetable(d) {
+        let s=d.get('scheduleSnapshot',null);
+        return s==null || (s is map && s.keys().hasOnly(['schemaVersion','stops','stationIds','names','times','runVersion'])
+          && s.schemaVersion==1 && s.stops is list && s.stops.size()>=2 && s.stops.size()<=300
+          && s.stops.toSet().size()==s.stops.size()
+          && s.stops[0]==d.fromStationId && s.stops[s.stops.size()-1]==d.toStationId
+          && get(/databases/$(database)/documents/sample_test/shared/buses/$(d.busId)).data.stops.hasAll(s.stops)
+          && s.stationIds is map && s.names is map && s.times is map
+          && s.stationIds.keys().hasAll(s.stops) && s.names.keys().hasAll(s.stops) && s.times.keys().hasAll(s.stops)
+          && s.times[d.fromStationId]==d.departureAt
+          && s.times[d.toStationId]==d.departureAt + duration.value(d.durationMinutes,'m')
+          && (!s.keys().hasAny(['runVersion']) || (s.runVersion is int && s.runVersion>=1
+            && s.runVersion==get(/databases/$(database)/documents/sample_test/shared/service_runs/$(d.serviceRunId)).data.get('scheduleVersion',1))));
+      }
       function validJourneySelection(d) {
         // Older schemas remain readable/creatable; any new selection fields require a complete selection.
         return !d.keys().hasAny(['fromStationId', 'toStationId', 'selectedDate', 'departureAt']) || (
           d.fromStationId in get(/databases/$(database)/documents/sample_test/shared/buses/$(d.busId)).data.stops
           && d.toStationId in get(/databases/$(database)/documents/sample_test/shared/buses/$(d.busId)).data.stops
           && d.fromStationId != d.toStationId
-          && exists(/databases/$(database)/documents/sample_test/shared/stations/$(d.fromStationId))
-          && exists(/databases/$(database)/documents/sample_test/shared/stations/$(d.toStationId))
+          && exists(/databases/$(database)/documents/sample_test/shared/stations/$(get(/databases/$(database)/documents/sample_test/shared/buses/$(d.busId)).data.get('stopStationIds', {}).get(d.fromStationId, d.fromStationId)))
+          && exists(/databases/$(database)/documents/sample_test/shared/stations/$(get(/databases/$(database)/documents/sample_test/shared/buses/$(d.busId)).data.get('stopStationIds', {}).get(d.toStationId, d.toStationId)))
           && d.selectedDate is timestamp && d.departureAt is timestamp
           && (d.get('selectedTimeMinutes', null) == null || (d.selectedTimeMinutes is int && d.selectedTimeMinutes >= 0 && d.selectedTimeMinutes < 1440))
           && d.durationMinutes is int && d.durationMinutes > 0
@@ -787,6 +841,14 @@ service cloud.firestore {
             && (d.currentStopIndex == 0 || d.actualDepartureTime != null))
             || (d.status in ['completed','cancelled'] && r.status == d.status && lock.active == false && live.isBroadcasting == false
               && (d.status == 'cancelled' || d.actualDepartureTime != null)));
+      }
+      match /service_run_changes/{id} {
+        allow read: if true;
+        allow create: if activeAccount() && admin()
+          && request.resource.data.previousRunId==id
+          && request.resource.data.updatedBy==request.auth.uid
+          && request.resource.data.updatedAt==request.time;
+        allow update, delete: if false;
       }
       match /service_schedules/{id} {
         allow read: if admin();

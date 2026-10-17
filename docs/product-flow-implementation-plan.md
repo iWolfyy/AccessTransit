@@ -2,6 +2,28 @@
 
 Prepared 2026-10-16, Asia/Colombo. Status: implementation started; the requirements below are the target behavior, not a deployment or completed-feature claim. See the implementation checkpoint at the end.
 
+Workflow revision confirmed 2026-10-17: implement directly in the main application
+against its existing real Firebase project. Do not build/install a separate Local
+Test APK or generate intermediate APKs; build the main APK at final delivery.
+Automated tests and isolated emulator checks remain verification tools, without
+requiring a second installed application. Preserve real records; do not seed
+fictional test data into the real catalogue or reset the database. Real Firestore
+access and deploying the trusted moderation/Auth server are distinct operations;
+backend hosting/billing configuration must be established before activating those
+server-dependent features. Historical local checkpoints below remain evidence
+of earlier work and do not override this workflow revision.
+
+Latest development setup agreed 2026-10-17: main app on the Android emulator,
+real Firebase Auth/Firestore, and trusted server code running on the development
+computer. Defer hosted deployment and billing changes. The emulator reaches the
+computer through `10.0.2.2`; permit that endpoint only in an explicit main-app
+debug configuration, with HTTPS still required for release. This setup is now
+implemented in checkpoint 44 with the real-project server on loopback port 8788
+and `LOCAL_API=true` for the main debug app. The old demo launcher stays on port
+8787 and its native APK flag remains retired. Do not redirect synthetic seed/
+reset tooling to the real project. See checkpoint 44 for actual activation,
+verification limits and the current remaining work.
+
 Latest reward revision: v2 awards points only to report authors; True/False voters receive no points. Historical v1 balances require a reviewed migration.
 
 Latest user revision: five distinct other users' false votes trigger automatic hiding/deduction; authors cannot vote True or False on their own reports; permanent bans require admin review. The passenger journey is Search -> Results -> Bus Details, with optional Save Trip on the details screen. These decisions supersede earlier four-vote and confirmation/live-screen proposals.
@@ -300,7 +322,20 @@ Also confirmed: relevant bus/stop reports appear unobtrusively immediately above
 
 Recommended remaining defaults: +10 report points and -20 penalty for that award; cumulative strikes; one 72-hour suspension on crossing five; no extra suspension solely while permanent-ban review is pending; shared passenger/reporter privileges; one active route grant per driver; one login with three dashboard destinations.
 
-Still requiring a product/deployment decision: hosted trusted backend/billing choice for automatic moderation; verified tariff mappings and physical bus ownership; and human Sinhala/Tamil translation reviewers. These do not prevent preparatory schemas, tests, localization scaffolding and local-emulator implementation. Mandatory admin review, the five-False-vote threshold and the 30-minute reason-required late-start limit are settled requirements, not open questions.
+Firebase Functions is the future hosted deployment choice (2026-10-17); the
+latest decision defers deployment and uses a localhost trusted server during
+development against real Auth/Firestore. A
+read-only billing check found no linked billing account and billing disabled for
+the existing project; Cloud Functions API is also disabled. No upgrade, account
+link, API enablement or deployment has been performed. Billing setup and a
+reviewed Functions rollout remain required for eventual hosted deployment.
+The development setup instead requires the scoped localhost connection,
+trusted server authentication and coherent real-project rules/migration before
+shared v2 activation. Other outstanding decisions/data include verified tariff mappings,
+physical bus ownership and human Sinhala/Tamil translation reviewers. These do
+not prevent main-app source implementation and automated verification. Mandatory
+admin review, the five-False-vote threshold and the 30-minute reason-required
+late-start limit are settled requirements, not open questions.
 
 The original planning work made no application source or live Firebase changes. The prior automatic approval rejection for shared admin rules remains a separate rollout issue; this document does not imply that deployment occurred.
 
@@ -1353,3 +1388,1525 @@ this smoke does not claim a native calendar walkthrough. Manifest-checked
 startup log contained no fatal/unhandled Flutter error
 (`phase24-local-launch-confirmed.log`, `phase24-local-startup.log`). Normal app
 installation/data were preserved.
+
+## 39. Implementation checkpoint: repeated-stop occurrences and loop journeys
+
+Implemented locally on 2026-10-17:
+
+- Route editing can add the same physical station again, assigning a new unique
+  visit ID without renumbering existing visits. Bus editing selects exact route
+  visits and preserves separate/reorderable time controls. `stopStationIds`
+  resolves ordered unique `stops` to physical stations. Legacy identity mappings
+  remain compatible; no existing shared record was converted or reset.
+- Admin validation checks physical references, exact route visit order/bindings
+  and prevents rebinding an existing bus visit to another physical station.
+  Dated runs copy the mapping; recurring calendars guard it in their timetable
+  snapshot. Catalogue dependency checks retain physical references.
+- Search enumerates ordered visit pairs for physical endpoints. A loop's first
+  and return boarding opportunities have their own times/segments; active
+  progress can exclude the first while retaining the second. Results carry the
+  exact chosen IDs and show route positions for repeated patterns. Details and
+  bookmarks preserve them; distinct visit choices have distinct bookmark IDs.
+- Details, endpoint accessibility, compact reports and the scoped report browser
+  resolve physical stations. Observations about a physical stop remain relevant
+  when the passenger uses its later visit; occurrence aliases are not reporting
+  targets. Names/coordinates resolve correctly for driver progress and maps.
+- Trusted v2 assistance validates visit order and the mapped physical target,
+  retains server boarding/alighting indexes and expires only after the selected
+  visit is passed. Driver request/push details expose route stop positions.
+  Legacy v1 assistance is not claimed to have this trusted run/visit contract.
+- Geometry review resolves occurrence vertices to physical stations. Existing
+  current-leg projection, timetable maps and fare-stage mappings keep unique
+  occurrence keys; no first-visit fare or GPS is substituted for a return visit.
+  Production transaction callbacks were exercised through separate return-stop
+  arrival and actual final-stop completion/lock release.
+- Corrected the preceding calendar's Sinhala/Tamil UTF-8 strings after validation
+  exposed replacement question marks. Unicode regression checks cover every
+  calendar string and new occurrence wording. Human translation review remains.
+
+Validation: **708 full Flutter tests passed** (`phase25-full-final.log`), **38
+focused local-v2 tests passed** (`phase25-local.log`), **121 isolated rules/backend
+tests passed** (`test/security/phase25-rules-backend.log`, `demo-phase25-loops`,
+port 8088), and analyzer **No issues found** (`phase25-analyze-final.log`). Tests
+include 320dp/200% route editing, both normal/Sample assistance scopes, physical
+report relevance, saved visit identity, midnight schedules and return-leg ETA.
+
+Local Auth/Firestore emulators had stopped; they were restarted on 9099/8087 and
+the updated loopback API was started on 8787. The local-token loop smoke passed
+(`phase25-local-smoke.log`): later-visit bookmark, exact driver acknowledgement,
+physical station validation and passed-visit expiry. Its operation progress is
+trusted synthetic fixture data, not measured GPS. Named synthetic fixtures/admin
+were initialized only because the restarted Auth emulator was empty. No shared
+rules deployment, real data migration, billing change or real FCM test occurred.
+
+This does not claim automatic migration of old duplicate-ID records, complete
+schedule-version history, arbitrary subpattern geometry matching, same-physical-
+endpoint full-circuit search, or a native GPS/TalkBack walkthrough. Review real
+catalogue occurrence IDs before any rollout. See [stop occurrence behavior](stop-occurrences.md).
+
+The final Local Test APK built successfully (`phase25-local-build.log`), its
+manifest was checked as `.validation` (`phase25-apk-manifest.log`) and installation
+succeeded (`phase25-local-install.log`). The normal installed package was not
+replaced. Startup confirmation is separate from a manual native loop journey.
+
+Repeat launch returned Status ok (`phase25-local-launch-confirmed.log`); no fatal
+or unhandled Flutter error was found in the inspected process startup log
+(`phase25-local-startup.log`). The smoke's optional bootstrap additionally checks
+that functional demo collections are empty before seeding named fixtures.
+
+## 40. Implementation checkpoint: dated replacements and saved timetable snapshots
+
+Implemented locally on 2026-10-17:
+
+- Admin Dated departures offers Publish replacement with a reviewed Colombo
+  date/time and a clearly public reason. One audited transaction cancels the
+  original, creates its linked replacement with the next run schedule version,
+  and appends immutable `service_run_changes` history. Original departure/stop
+  timings remain unchanged. Concurrent starts, stale edits, failed commits and
+  occupied replacement slots cannot partly cancel the source; predecessors
+  cannot fork. Active operations retain the separate reconciliation workflow.
+- New saved trips capture the selected visit IDs, physical station mappings,
+  names, available intermediate times and acknowledged run version. Unknown
+  intermediate times remain unknown. Retries return the first acknowledged
+  snapshot instead of overwriting it with later catalogue labels. Existing fare
+  and accessibility-needs snapshots remain separate and unchanged.
+- Bus Details watches the original run and explains cancellation, public reason,
+  published replacement and timetable/version mismatch without switching the
+  saved selection. GPS still requires exact run/timetable matching. If the
+  catalogue bus/route/segment changes or disappears, the same destination shows
+  the original saved timetable record, timeline, saved fare where available and
+  optional removal; it does not certify live GPS/current accessibility or offer
+  assistance for an unavailable selection. Shared run subscriptions retain their
+  last receipt across presentation changes and are disposed with the screen.
+- Rules validate new snapshot shape/times/version, keep snapshots owner-scoped
+  and immutable, and restrict append-only public change history to active trusted
+  administrators. Root policy is mirrored into Sample/Test. Old clients without
+  the new field remain accepted; shared rules must precede release of new clients.
+- Admin dated/calendar/replacement publication uses timezone-neutral civil-clock
+  arithmetic before explicit Colombo-to-UTC conversion, avoiding host DST clock
+  normalization. Overnight rollover and the authoritative −5/+30 start gate are
+  retained. New messages have English/Sinhala/Tamil resources; fluent review and
+  native accessibility checks remain pending.
+
+Validation: **715 full Flutter tests passed** (`phase26-full-final.log`), **42
+local-v2 focused tests passed** (`phase26-local.log`), **73 isolated rules tests
+passed** (`test/security/phase26-rules.log`, `demo-phase26-history`, port 8088),
+and clean analyzer (`phase26-analyze-final.log`). Coverage includes version chains,
+rollback/start races, snapshot retry idempotency, catalogue loss, truthful static
+history at 320dp/200% text, loop regressions and nominal clocks/overnight rollover.
+Actual local admin/rider tokens verified both scopes' snapshots, linked atomic
+replacement/history and denied rewrites (`phase26-local-smoke.log`); this smoke
+tests the rules contract while Flutter exercises the production Dart callbacks.
+
+This is per-dated-run history and new-bookmark snapshot capture, not a complete
+calendar-template migration/history or historical backfill. Legacy bookmarks
+without snapshots retain the existing restore/retry/replan behavior; missing old
+intermediate history is not invented. No shared rules deployment, production
+data change, database reset, billing upgrade or real FCM test occurred. See
+[schedule history behavior](schedule-history.md).
+
+The final Local Test APK built successfully (`phase26-local-build-final.log`),
+was manifest-checked as `.validation` (`phase26-apk-manifest-final.log`), and
+installed successfully (`phase26-local-install-final.log`). Launch returned
+Status ok (`phase26-local-launch-final.log`); no fatal/unhandled Flutter error
+was found in the inspected process startup window (`phase26-local-startup-final.log`).
+The normal installed package/data were preserved. This is startup evidence,
+not a native reschedule/TalkBack walkthrough.
+
+## 41. Implementation checkpoint: scoped manual account suspension/restoration
+
+Implemented locally on 2026-10-17:
+
+- Local-v2 Admin -> Users -> Account access now loads an acknowledged restriction
+  snapshot and supports a reasoned 72-hour suspension or an explicit restriction
+  until admin restoration. Restore requires a reason and clears only the manual
+  restriction. Community deadlines/permanent decisions, points, strikes, driver
+  approvals and route grants remain independent. Deadline presentation uses
+  Asia/Colombo; the owner account-status response includes the effective manual
+  reason. English/Sinhala/Tamil resources are present, pending fluent review.
+- New trusted `accounts/detail` and `accounts/change` endpoints derive actor and
+  admin authority from verified Firebase claims, recheck current account access
+  and protect self-action and all trusted admin accounts. Public profile roles
+  cannot grant this permission. The scope is server-allowlisted; point lookups
+  and transactions require no new query index or client-write permission.
+- A manual revision and immutable operation ID guard each atomic access,
+  decision, activity audit and suspension outbox commit. Concurrent distinct
+  decisions have one revision winner. Exact retries return the first receipt;
+  changed payloads conflict, and replaying an old suspension after restoration
+  never reapplies it. The UI preserves ambiguous request payloads for retry,
+  reloads after stale decisions and blocks captured controls on account change.
+- Existing access rules immediately deny suspended operational mutations. The
+  existing worker reconciles a matching active driver trip, cancels its run,
+  ends broadcasting, releases its lock and reconciles assistance. It preserves
+  newer conflicting operations for review. Restoration does not restart a
+  cancelled trip or release unrelated community restrictions. At exactly 72
+  hours, the server expires a temporary manual restriction without relying on
+  phone time or scheduled Auth re-enabling.
+- Normal and Sample/Test policy state, revisions and decisions remain isolated.
+  The running local API retains its existing normal-only scope allowlist.
+  Neither path writes Firebase Auth disable/revocation state. Direct client
+  access/decision writes remain denied under existing root and Sample rules.
+
+Validation: **721 full Flutter tests passed** (`phase27-full-final.log`), **29
+local-v2 UI/client/admin gate tests passed** (`phase27-local-tests.log`), **142
+isolated rules/backend/API/provider tests passed**
+(`test/security/phase27-final.log`, `demo-phase27-accounts-final`, port 8088),
+and full analyzer **No issues found** (`phase27-analyze-clean.log`). Coverage
+includes exact expiry, scoped indefinite restriction, rollback, idempotent
+concurrent decisions, preserved community sanctions, actor/admin protection,
+account switching and all three locales at 320dp/200% text.
+
+Actual loopback API admin/driver tokens verified concurrent revision rejection,
+retry receipt, manual reason, worker trip/GPS/lock cancellation and restoration
+that preserves a separate community ban (`phase27-local-smoke-final.log`). The
+smoke created uniquely named fictional accounts/records, preserved Sample scope
+and left Auth enabled; it did not reset the emulators. Local API was restarted
+on its existing loopback port with the new endpoints.
+
+The Local Test APK built (`phase27-local-build.log`), was manifest-checked as
+`.validation` (`phase27-apk-manifest.log`), installed successfully and launched
+with Status ok (`phase27-local-install.log`, `phase27-local-launch.log`). No
+fatal/unhandled Flutter error appeared in the inspected process startup log
+(`phase27-local-startup.log`). This is automated/startup evidence, not a native
+manual-suspension/TalkBack walkthrough. Normal installed app/data were preserved.
+
+This completes the scoped manual application-access slice, not all account
+administration. Auth disable/enable, refresh-token revocation, reviewed deletion
+and a dedicated manual-restriction appeal submission remain separate work; the
+existing report-dispute appeals are unchanged. No production/shared deployment,
+claim change, real FCM test, billing upgrade or database reset occurred. See
+[manual account controls](manual-account-controls.md). Remaining release gates
+also include real fare/geometry data, measured ETA accuracy, fluent/native QA and
+reviewed hosted-backend/migration rollout; real push testing stays deferred.
+
+## 42. Implementation checkpoint: main-app workflow and HTTPS activation
+
+Implemented on 2026-10-17 following the user's workflow correction:
+
+- Future implementation targets the existing main application and its real
+  Firebase project. No separate Local Test APK or intermediate APK is to be
+  built/installed; the main APK is deferred to final delivery. Automated tests
+  remain available without a second installed app. Earlier validation records
+  are retained as historical evidence.
+- Main-app moderation v2 now accepts the configured trusted HTTPS origin in
+  debug or release without requiring `LOCAL_VALIDATION`. The shared client no
+  longer chooses emulator HTTP merely because v2 is enabled. Missing/invalid
+  origins fail explicit activation; main activation cannot grant the HTTP
+  emulator exception. Existing publication/voting, account gates and admin
+  workflows consume this configuration. This does not invent a hosted URL or
+  change Firebase project IDs, seed data or administrator claims.
+- Android's separate `.validation` suffix/label branch was retired. Native
+  `LOCAL_VALIDATION=true` is rejected before assembly, preventing an old test
+  command from overwriting the main app with a synthetic backend. The main
+  package keeps real Google Services configuration and cleartext disabled.
+- Firebase Functions is the confirmed hosting choice. A read-only check of
+  `accesstransit-b615b` returned no linked billing account and billing disabled
+  (`phase28-billing-preflight.log`). Functions inventory returned 403
+  `SERVICE_DISABLED`. No billing upgrade/link or API enablement occurred.
+  The new guarded billing-read script prints only sanitized status, not tokens
+  or billing account identifiers. Shared Functions/rules migration and an actual
+  HTTPS endpoint are still required for v2 server operations to run live.
+
+Validation: **725 Flutter tests passed**, with **2 main-activation tests skipped**
+under the ordinary unconfigured build (`phase28-full.log`); those tests were
+executed with main v2 HTTPS defines and mocked transport as part of **27 passing
+main-backend/client/account-control tests** (`phase28-main-backend-tests.log`).
+An additional focused configuration/client run passed **19 tests**
+(`phase28-targeted.log`). Full analyzer **No issues found** (`phase28-analyze.log`).
+Coverage includes release-compatible activation, actual main-client origin
+selection, authenticated normal scope and rejected emulator HTTP in main mode.
+These are mocked HTTP tests, not a claim of real hosted operation.
+
+Android Gradle `help --offline` accepted the main configuration
+(`phase28-gradle-config.log`) and rejected the retired native test flag for the
+intended reason (`phase28-retired-apk-guard.log`). Neither task assembled an APK.
+No APK build/install/uninstall, production user/catalogue write, database reset,
+billing change, shared rules/function deployment or real push test occurred.
+See [main app and backend workflow](main-app-backend.md). Next deployment work
+is preparing the Firebase Functions package and coherent rollout; account Auth
+lifecycle controls remain implementation work, not an activated feature claim.
+
+## 43. Current remaining work and development setup decision
+
+Updated 2026-10-17. This section records the latest agreement and outstanding
+work; it does not claim a new implemented or deployed connection.
+
+Use the main app on the Android emulator with real Firebase Auth/Firestore and
+trusted server code on localhost. Defer hosted deployment, billing upgrades and
+APK generation until needed/final delivery. Automated tests do not require a
+second installed app. Firebase Functions remains a future hosting option.
+
+Priority order for the remaining work:
+
+1. **Wire the agreed development connection (completed in checkpoint 44).** Add explicit main-app debug-only
+   localhost transport (`10.0.2.2`), a real-project server launcher with trusted
+   server credentials and matching token verification, and operation/outbox
+   workers. Keep keys out of Flutter, release HTTPS-only and synthetic tools
+   locked to demo projects. Handle an unavailable localhost service truthfully.
+   This was not yet implemented by checkpoint 42; checkpoint 44 supplies it.
+2. **Verify real-project activation coherently (advanced in checkpoint 44).** Inspect deployed rules/indexes,
+   admin access, driver grants and required catalogue/run data; prepare backups
+   and any legacy reward/schema baseline before switching v2 writes. Align the
+   real server, rules and main-app configuration, without resetting data or
+   retroactively banning accounts. Existing local tests do not prove this gate.
+3. **Finish account/admin management.** Add trusted Auth disable/enable,
+   refresh-token revocation, reviewed deletion retaining necessary audit/history,
+   and dedicated manual-restriction appeals. Complete remaining admin query
+   pagination. Existing manual suspension/restoration and report-dispute appeals
+   are already implemented; they are not the same as Auth lifecycle controls.
+4. **Supply and validate real fare/route/ETA data.** Review/import applicable
+   official tariff and stop-stage mappings, reviewed geometry and real vehicle
+   information; measure predictions against actual journeys and tune ETA from
+   sufficient samples. Editors and baseline algorithms exist; real data coverage
+   and measured accuracy are still outstanding.
+5. **Finish language and device QA.** Translate remaining existing-screen text,
+   obtain fluent Sinhala/Tamil review, and check TalkBack, large text, physical
+   background GPS, screen lock/process loss, offline/reconnect and two-device
+   assistance/handover behavior.
+6. **Real push delivery tests (explicitly deferred).** Configure the intended FCM
+   project/provider and verify actual notification receipt, tap routing and token
+   lifecycle. Simulated provider tests are not real device delivery evidence.
+7. **Final migration/release.** Complete required calendar-template lineage and
+   reviewed legacy-data handling (without inventing missing saved history), run
+   backup/migration/rollback exercises and final end-to-end checks. Build the
+   main APK at final delivery. Hosted Functions/billing and production release
+   are later decisions, not prerequisites for all remaining source work.
+
+These are work areas, not seven equally sized implementation tasks. Next action
+is item 1; the accepted mixed backend setup still needs code and verification.
+No app source, rules, production records, billing or APK was changed by this
+planning update.
+
+## 44. Implementation checkpoint: main app + real Firebase + localhost runtime
+
+Implemented/verified on 2026-10-17, Asia/Colombo:
+
+- Added explicit `LOCAL_API=true` + `MODERATION_V2=true` main-app debug routing
+  to the computer through `http://10.0.2.2:8788`. Real Firebase options remain
+  unchanged. The synthetic demo backend stays separately guarded on 8787.
+  Arbitrary HTTP origins and mixing real-localhost/synthetic modes are rejected;
+  release/profile cannot use localhost. Android network security enables
+  cleartext only for the emulator alias in that debug configuration, with the
+  main application ID retained and release HTTPS-only.
+- Added `.vscode/launch.json` for the main emulator application and a dedicated
+  loopback-only real-project launcher. Existing trusted Firebase CLI credentials
+  stay in the server process; no key is generated or embedded in Flutter. The
+  launcher rejects emulator/other-project overrides, checks real Admin Auth
+  access, verifies ID tokens with revocation checking and exposes normal scope
+  only. The service remains running on `127.0.0.1:8788` at this checkpoint.
+- Added readiness guards for exact reviewed deployed rules, READY composite/
+  collection-group indexes and acknowledged v2 config/effective time. Unknown,
+  missing, stale or unavailable readiness blocks API operations and workers.
+  Policy-date changes require restart. Bounded cursors reconcile handovers,
+  assistance and suspended operations, pass unrelated pending jobs and exclude
+  Sample paths; no real/simulated push provider is enabled for real accounts.
+- Real-project read-only preflight backed up rules/index/config metadata and
+  prepared a private reward-baseline proposal. It initially found 8 profiles,
+  zero legacy reward counters, no v2 summaries, missing indexes, no dated runs
+  and no trusted claim on the requested admin account. No fixture data/reset
+  was used to fill those gaps. Route grants and actual timetable/run publishing
+  remain administrator data tasks requiring legitimate operating information.
+- Granted and read-back verified the previously requested existing account's
+  trusted admin claim, preserving its other claims/profile. The user then
+  explicitly authorized the Firestore rules/index update. Applied only that
+  Firestore deployment: the reviewed rules, 15 composite indexes and one
+  collection-group field index. No Functions or billing change was made.
+  Deployed rules match the tested source; indexes reached READY before activation.
+- Prepared/verified an activation plan, then transactionally enabled normal-scope
+  v2 moderation/assistance with an authoritative server policy timestamp, audit
+  and rollback metadata. All 8 profiles' zero legacy counters/no existing v2
+  summaries were freshly checked. No profile, balance, strike, UID or historical
+  report was reset or rewritten. Nonzero/invalid/existing migrated baselines
+  require separate review; automatic retroactive bans are not introduced.
+  Retrying activation returned duplicate with the original timestamp unchanged.
+
+Validation: **726 full Flutter tests passed**, **4 build-mode-specific tests
+skipped in the ordinary build** (`phase29-full.log`). Explicit real-Firebase
+localhost defines executed the applicable transport/config/client/admin UI tests:
+**28 passed** (`phase29-main-localhost-tests.log`); ordinary focused run **20
+passed** (`phase29-targeted.log`). Full analyzer **No issues found**
+(`phase29-analyze.log`). Final isolated rules/backend/API/provider/readiness/
+activation suite: **152 passed** (`test/security/phase29-final.log`,
+`demo-phase29-localhost-final`, port 8088); final standalone focused backend run
+**24 passed** (`phase29-backend-final.log`). Test resets only targeted that
+separate demo project, never the real project.
+
+A verification-only Gradle task checked the main ID and debug/release transport
+policies (`phase29-gradle-localhost.log`); XML parsed with debug cleartext limited
+to `10.0.2.2`. No APK was assembled. Real read-back and a non-mutating loopback
+probe returned `ready:true`, the expected project and 401 rejection for missing/
+invalid Firebase tokens (`phase29-shared-final-preflight.log`,
+`phase29-shared-final-verify.log`). Actual Admin SDK read/write credentials were
+exercised by the real config transaction; no actual passenger report, vote or
+assistance was fabricated for a positive UI test. No native walkthrough was run.
+
+Evidence/recovery: `phase29-shared-rules-index-deploy.log`,
+`phase29-shared-rules-verify.log`, `phase29-admin-claim-applied.log`,
+`phase29-activation-applied.log` and `phase29-activation-retry.log`. Private
+before/after records are under `.private/shared-v2-preflight/`,
+`.private/shared-v2-activation/` and `.private/admin-setup/`. See
+[main app with real Firebase and localhost](localhost-real-firebase.md) for
+startup, launch profile and recovery guidance. Old direct v1 report/assistance
+writes are now blocked deliberately; use the main v2 localhost configuration
+with the server running. Refresh login to receive the new administrator claim.
+
+No APK build/install/uninstall, Functions deployment, billing upgrade, real FCM
+send, synthetic real-project seed or database reset occurred. Shared changes
+were limited to the requested admin claim, approved rules/indexes and audited v2
+activation metadata; existing user balances/history were preserved.
+
+### Next remaining work after checkpoint 44
+
+1. Auth disable/enable, refresh-token revocation and reviewed deletion progressed
+   in checkpoint 45 below. Dedicated manual-restriction appeals and remaining
+   admin pagination remain.
+2. Admin-reviewed real route grants/physical bus information/dated services;
+   official fare-stage imports, geometry coverage and measured ETA calibration.
+3. Remaining screen translations, fluent Sinhala/Tamil review, native TalkBack,
+   background GPS/offline/process-loss and two-device end-to-end validation.
+4. Real FCM/device delivery remains deferred. Complete the remaining calendar/
+   legacy-history review and final backup/migration/rollback exercises; build
+   the main APK at final delivery. Hosted Functions/billing stays deferred.
+
+## 45. Implementation checkpoint: Auth lifecycle and reviewed deletion
+
+Implemented 2026-10-17 in the main app and real-Firebase localhost backend:
+
+- Admin account controls now offer reasoned disable/enable, session revocation,
+  deletion request/rejection and reviewed deletion. Self and trusted admin
+  targets are protected; Sample/Test cannot mutate shared Auth identities.
+- Durable transactional requests, revisions, operation IDs and audit receipts
+  distinguish pending/review-required from completed. Pending jobs resume in
+  the localhost worker. Failed/ambiguous effects retain access gates; explicit
+  reconciliation reuses the same operation and avoids repeating acknowledged
+  effects. Unproven processing jobs remain blocked for inspection.
+- Disabling immediately blocks authenticated operations before the Auth effect.
+  API and Firestore enforce server-owned session cutoffs, including root session
+  restrictions in Sample/Test. Enabling preserves manual/community bans and
+  requires a new sign-in for revoked sessions. Existing operation reconciliation
+  handles suspended drivers, GPS, locks and assistance.
+- Deletion requires a pending review, disabled Auth, no active operation lock,
+  exact UID and final UI confirmation. Auth deletion anonymizes the private
+  profile and deactivates driver access; shared reports/trips/ledger/audit and
+  their references are retained. This does not claim complete historical
+  content/photo/private-evidence erasure. See
+  [Auth lifecycle and recovery](auth-account-lifecycle.md).
+- English/Sinhala/Tamil controls use the existing theme. Automated coverage
+  checks reason/confirmation, ambiguous retries, account changes and 320dp/200%
+  text. Fluent translation and native device review remain outstanding.
+
+Validation: **733 Flutter tests passed, 4 skipped** (`phase30-full-tests.log`);
+**15 main-configuration tests passed, 2 skipped** (`phase30-main-mode-tests.log`);
+analyzer **No issues found** (`phase30-analyze.log`). **161 isolated backend/rules
+tests passed**, followed by actual Admin Auth SDK disable/enable/revoke/delete
+and real emulator ID-token verification using synthetic guarded demo accounts
+(`test/security/phase30-integration.log`). This includes failed-effect/receipt
+recovery, concurrency, protected actors, direct-write/session rejection and
+retained history. No real user was used for destructive validation.
+
+Authorized shared rules were backed up and deployed; read-back matched the
+tested source, SHA-256
+`17d0d8bf9be6301f29cd3ed4a81128d8e6f8a71befa640ee4d78554752c0bdaa`
+(`phase30-rules-backup.log`, `phase30-rules-deploy.log`,
+`phase30-rules-verify.log`). Indexes and policy effective timestamp were unchanged.
+The verified loopback backend was restarted with the lifecycle worker;
+non-mutating verification returned ready and rejected missing/invalid tokens
+(`phase30-shared-runtime.log`). An initial transient cloud preflight returned
+503; subsequent readiness verification passed without weakening the guard.
+
+No actual shared Auth disable/enable/revoke/delete, APK build/install, Functions
+deployment, billing change, real push send, database reset or synthetic shared
+seed occurred. Dedicated manual-restriction appeals and admin pagination remain
+the next account-management work; real catalogue/fare/geometry and native QA
+gates listed above remain pending.
+
+## 46. Implementation checkpoint: manual appeals and admin user/activity pages
+
+Implemented 2026-10-17 in the main application and localhost trusted service:
+
+- Restricted users can submit a manual-restriction appeal without reopening
+  operations, and can read history from Profile. A deterministic author/revision
+  key makes retries idempotent and prevents duplicate appeals for one decision.
+  Submission itself never restores access. Invalid/revoked Auth is still denied.
+- Admin has a private paginated pending queue. Reasoned restore/uphold reviews
+  are transactional and audited; self-review/non-admin/restricted reviewers fail.
+  Restoration requires the appealed manual revision still to be current. Older
+  appeals may be closed without modifying newer access. Accepted appeals clear
+  only manual fields, preserving Auth restrictions, community bans and history.
+- Admin Users/Activity now read 20-record pages with a 21st lookahead. Users use
+  ID cursors; Activity has stable descending timestamp/ID ordering. Driver review
+  filters loaded user pages. Counts and search disclose their loaded-page scope;
+  empty filtered pages still offer Load more. Failed page loads preserve records,
+  refresh/live first-page changes reset extra pages and old requests are ignored.
+  Existing catalogue/approval/grant reference listeners remain; this does not
+  claim every catalogue dependency read is paginated.
+- New controls use existing styling and English/Sinhala/Tamil resources.
+  Sinhala/Tamil encoding was corrected before final locale checks; fluent review
+  and native accessibility checks remain pending. See
+  [manual appeals and admin pages](manual-restriction-appeals.md).
+
+Validation: **741 Flutter tests passed, 4 skipped** (`phase31-full-tests.log`),
+analyzer **No issues found** (`phase31-final-analyze.log`), **35 targeted tests
+passed** (`phase31-targeted-tests.log`). After final locale regeneration,
+**15 main-configuration regressions passed** (`phase31-main-final-tests.log`).
+The final isolated backend/rules run passed **166 of 167**, with one existing
+unknown-collection denial test failing because the emulator client went offline,
+not because access was granted (`test/security/phase31-integration.log`). That
+test, the actual manual-appeal privacy/transaction test and all **7** new policy
+tests then passed in a focused emulator recheck
+(`test/security/phase31-focused-recheck.log`). Earlier full run also passed all
+167 before the final queue/older-appeal closure refinement.
+
+The verified real-Firebase loopback process was restarted with the new routes;
+readiness and missing/invalid-token rejection passed without user-data writes
+(`phase31-shared-runtime.log`). Existing rules already deny direct access to the
+new private collection; no shared rules/index/config update was needed. No real
+restriction/appeal/Auth mutation, seed/reset, APK build/install, Functions
+deployment, billing change or real push send occurred.
+
+Remaining work includes catalogue/dependency scale and wider admin localization,
+reviewed real route grants/vehicles/dated services, official fare-stage imports,
+geometry coverage/measured ETA calibration, translation review, native/device QA
+and final migration/rollback exercises. Real FCM and hosted Functions remain
+deferred; build the main APK only at final delivery.
+
+## 47. Implementation checkpoint: catalogue pages and admin language resources
+
+Implemented locally on 2026-10-17 in the main Flutter application:
+
+- Buses, Routes and Bus stops now join Users/Activity in the existing 20-record
+  paging flow. First-page listeners are bounded to 21 documents for lookahead;
+  catalogue continuation queries use stable document IDs. Loaded-page search,
+  retry, deduplication and refresh/in-flight invalidation are retained. Overview
+  catalogue counts now disclose that they cover loaded pages.
+- Catalogue editors collect complete reference pages for stops/routes/users,
+  approval and route-grant selectors. Driver route assignment also reloads all
+  eligible route pages. An assigned route outside the visible catalogue page
+  displays its ID instead of falsely claiming no assignment. An incomplete
+  editor reference load disables Save. Real Firestore reference collection
+  rejects account/scope switches and repeated cursors.
+- Reference selectors still collect their complete set in memory on demand;
+  page reads are bounded, total selector reads/memory are not constant. Existing
+  approval/grant listeners and catalogue commit dependency scans remain complete
+  reads. Further scaling can replace large selectors with targeted server queries;
+  no catalogue references were silently truncated to page one.
+- Added **105** English/Sinhala/Tamil entries for navigation, common forms/actions,
+  driver review, source review, catalogue fields and parameterized titles. A
+  presentation adapter leaves backend enums/IDs and authored catalogue data
+  unchanged. Remaining advanced explanatory text, some summaries/validation
+  errors and separate admin tools still need localization; this is not a claim
+  of fully translated dashboards. Unicode retention and 320dp/200% text checks
+  passed; fluent review and native font/TalkBack review remain outstanding.
+
+Validation: **750 Flutter tests passed, 4 skipped** (`phase32-full-tests.log`),
+analyzer **No issues found** (`phase32-final-analyze.log`). The earlier focused
+run passed **33 tests** (`phase32-targeted-tests.log`); the final full suite also
+includes the added beyond-page route-assignment regression. New tests cover
+later bus/route/stop pages through an empty search, complete unique references,
+the existing route grant outside page one, disabled Save after reference failure
+and all three locales at 320dp/200% text. Existing audited admin CRUD, approval,
+route assignment and offline regressions passed. See
+[catalogue pages and language controls](admin-catalogue-pages.md).
+
+No APK build/install, shared Firebase data/config/rules/index mutation, backend
+deployment, billing change or real push send occurred. No rules/index change
+was required for these existing document-ID queries. Native admin walkthrough,
+remaining translations, real catalogue/fare/geometry provisioning, measured ETA,
+device QA and final backup/rollback/release gates remain as described above.
+
+## 48. Implementation checkpoint: advanced admin guidance and validation
+
+Implemented locally on 2026-10-17 in the main app:
+
+- Added **49** English/Sinhala/Tamil resources for advanced catalogue guidance,
+  capability versus observed condition, timetable limitations, stop-order tools,
+  driver assignment/review guidance, save/load failures and catalogue/profile/
+  driver validation. Main-workspace bus/timetable summaries, audit attribution
+  and ordered-stop counts now use typed localization; English counts use plurals.
+- Required-field and coordinate errors carry presentation codes and field/limit
+  metadata through a FormatException subtype, retaining existing diagnostic
+  messages. Dependency failures retain StateError compatibility with a typed
+  referenced kind. The UI formats known parameters using localized labels rather
+  than parsing English. Validation, approval, dependency and authorization rules
+  are unchanged. User-authored names/review notes and stable IDs remain original.
+- Catalogue editor retains the error object for locale-aware rendering.
+  Workspace actions translate known failures and server verification/loading
+  states. Existing source/condition warnings remain explicit. Separate admin
+  tools, some raw audit/role identifiers and legacy wording still need their
+  localization pass; this is not a full-app translation-completion claim.
+
+Validation: **757 Flutter tests passed, 4 skipped** (`phase33-full-tests.log`);
+analyzer **No issues found** (`phase33-final-analyze.log`);
+the focused run passed **39 tests** (`phase33-targeted-tests.log`). Seven new
+tests cover metadata produced by actual validation, unchanged diagnostics,
+localized field/limit/dependency values and advanced guidance/stop controls in
+all three languages at 320dp/200% text. Sinhala/Tamil Unicode checks passed.
+Existing catalogue CRUD/dependencies, route assignment, pagination and account
+regressions passed. Fluent translation and native font/TalkBack review remain
+pending. See [advanced catalogue guidance and validation](admin-advanced-localization.md).
+
+No APK build/install, shared Firebase mutation, rules/index change, server
+deployment, billing change or push send occurred. Real catalogue provisioning,
+official fare data/geometry, measured ETA and native/device release gates remain.
+
+## 49. Implementation checkpoint: scheduling tools localization and load states
+
+Implemented locally on 2026-10-17 in the main app:
+
+- Added **37** English/Sinhala/Tamil scheduling resources. Dated-departure
+  publication/cancellation, start-window/reschedule guidance, service date,
+  Colombo departure, run status, late-start label and stop-time snapshot are
+  localized. Locale formatting retains Colombo civil fields and overnight dates;
+  original driver/public reasons and persisted schedule identities stay unchanged.
+- Known scheduling/calendar policy failures now use the shared presentation
+  adapter. Calendar action failures retain and display their translated specific
+  reason alongside recovery guidance. Unknown run/calendar states do not claim
+  scheduled/completed/retired status. Existing calendar weekday/date limits,
+  idempotent materialization, replacement snapshots and start boundaries remain
+  unchanged; opening a screen does not create runs.
+- Dated departures distinguish loading, empty and unavailable. Actions wait for
+  the load to settle, failed reloads clear old run/note rows, and late older
+  reload results cannot overwrite a newer request. Confirmed writes still rely
+  on the existing service acknowledgement.
+
+Validation: **767 Flutter tests passed, 4 skipped** (`phase34-full-tests.log`);
+analyzer **No issues found** (`phase34-final-analyze.log`);
+**25 targeted scheduling tests passed** (`phase34-targeted-tests.log`). Ten new
+tests cover three locales at 320dp/200%, unchanged driver reason text, unknown
+states, stale-calendar rejection without generated runs and loading failure
+versus empty presentation. Existing dated publish/cancel, recurring generation/
+retirement, overnight, idempotency and saved replacement regressions passed.
+Sinhala/Tamil resources retained Unicode; fluent terminology/native font and
+TalkBack review remain pending. See
+[admin scheduling language and loading states](admin-scheduling-localization.md).
+
+No APK build/install, shared Firebase data/rules/index/config mutation, backend
+deployment, billing change or real push send occurred. Fare/geometry tools and
+remaining admin/operational localization are separate follow-up work; reviewed
+real data, measured ETA, device QA and final release gates remain outstanding.
+
+## 50. Implementation checkpoint: fare/geometry admin language and failures
+
+Implemented locally on 2026-10-17 in the main app:
+
+- Added **45** English/Sinhala/Tamil resources for fare/geometry imports,
+  preview metadata, publication status and known validation/review failures.
+  Fare previews label route/class, mapping dates, source, versions, buses and
+  directed stage amounts. Geometry previews label route/version, source and
+  ordered stop/distance information. Locale date/currency/distance formatting
+  changes presentation only; stored IDs, amounts, mappings and coordinates stay
+  unchanged. Unknown fare states do not claim published/archived status.
+- Both tools retain failures for locale-aware rendering. Known service/parser
+  reasons accompany generic recovery guidance; arbitrary raw JSON diagnostics
+  are not echoed as error text. Geometry errors now follow locale changes, with
+  geometry-specific recovery text instead of captured fare wording. Failed fare
+  list loading no longer also claims a confirmed empty catalogue.
+- Review/reason gates, immutable fare IDs, explicit bus mappings, data-mode
+  isolation, route/stop consistency and geometry version requirements remain
+  enforced by the existing services. Failed publish/withdraw requests retain
+  their draft and do not show successful acknowledgement. This work imports no
+  official tariffs or actual road geometry and makes no new ETA accuracy claim.
+
+Validation: **775 Flutter tests passed, 4 skipped** (`phase35-full-tests.log`),
+analyzer **No issues found** (`phase35-final-analyze.log`), **34 targeted tests
+passed** (`phase35-targeted-tests.log`). Eight new tests cover invalid minor-unit
+fare rejection and duplicate geometry version rejection in all three languages,
+no writes on failure, unknown/unavailable catalogue state, locale changes after
+an error and hidden raw parser diagnostics. Existing reviewed publication,
+archive/withdraw/retry, passenger fare/geometry and 320dp/200% preview checks pass.
+Sinhala/Tamil Unicode checks passed; fluent terminology and native font/TalkBack
+review remain pending. See
+[fare and geometry admin language pass](admin-fare-geometry-localization.md).
+
+No APK build/install, shared Firebase mutation, rules/index/config change,
+backend deployment, billing upgrade or real push send occurred. Remaining
+operational/admin wording, reviewed real data imports, measured ETA, native/
+device QA and final backup/rollback/release gates remain separate work.
+
+## 51. Implementation checkpoint: review and trip-handover presentation
+
+Implemented locally on 2026-10-17 in the main app:
+
+- Added **13** English/Sinhala/Tamil resources for specific administrative
+  review/access/session rejection messages and run/driver/evidence identifiers.
+  Community vote evidence uses existing localized True/False labels, preserving
+  original IDs, backend vote values and authored reasons. Community votes still
+  do not establish objective factual truth.
+- Known permanent-ban/report review states have explicit presentation mappings.
+  Unknown states show status unavailable rather than pending/unreviewed. Report
+  decision controls open only for supported pending/unreviewed states; permanent
+  bans still require an explicit pending-case review. These client guards do
+  not replace or modify trusted backend authorization/decision transactions.
+- Known rejection codes now distinguish self-review, missing authority,
+  invalid/changed sessions, restrictions, already decided/unavailable reviews
+  and request conflicts. Existing stale-evidence/pending-appeal/protected-admin
+  messages retain priority. Failed operations loading no longer also claims an
+  empty active-trip list. Reason/revision gates and immutable handover retries
+  remain unchanged.
+
+Validation: **783 Flutter tests passed, 4 skipped** (`phase36-full-tests.log`);
+analyzer **No issues found** (`phase36-final-analyze.log`);
+**26 targeted tests passed** (`phase36-targeted-tests.log`). Eight new tests
+cover localized community evidence, specific review wording and unknown-ban
+states in three locales at 320dp/200%, unknown report state without decision
+controls and failed operations load without a false empty state. Existing
+report appeal, mandatory permanent-ban approval/pending-appeal gates, revision
+rechecks and acknowledged/retried handover regressions pass. Sinhala/Tamil
+Unicode checks passed; fluent terminology/native font/TalkBack review remains
+pending. See [review and trip-handover presentation](admin-review-presentation.md).
+
+No actual moderation/appeal/handover/Auth mutation, shared Firebase write,
+rules/index update, backend deployment, billing change, real push send or APK
+build/install occurred. Remaining profile/operational wording and native/device
+QA are separate work, alongside reviewed real data, measured ETA and final
+backup/rollback/release gates.
+
+## 52. Implementation checkpoint: Profile and shared sign-out localization
+
+Implemented locally on 2026-10-17:
+
+- Profile roles, personal-information labels, settings/support links,
+  contribution summaries and edit-sheet labels/validation now use generated
+  English/Sinhala/Tamil resources (45 resources per locale). Profile values,
+  stored role enums and signed contribution totals remain unchanged.
+- Unacknowledged profile saves show a localized retry message without exposing
+  internal exceptions or claiming success. Unsupported links retain a localized
+  future-update message. Profile self-service deletion explicitly says it is
+  unavailable here; administrator-reviewed deletion is a separate workflow.
+- The shared sign-out confirmation localizes draft/photo cleanup disclosure,
+  cancellation and confirmation. Home, Profile and Driver capture outcome
+  wording before sign-out changes the account locale. Existing draft cleanup,
+  Auth and trip behavior is unchanged.
+- Profile edit/header/email, sign-out and badge layouts wrap at narrow widths
+  and large text. The fabricated fixed “9 more badges” label is replaced with
+  a badge-details label. Existing theme and high-contrast styling are retained.
+
+Validation: **792 Flutter tests passed, 4 skipped** (`phase37-full-tests.log`);
+analyzer **No issues found** (`phase37-final-analyze.log`);
+**25 targeted tests passed** (`phase37-targeted-tests.log`). Nine new tests cover
+all three locales at 320dp/200%, high contrast, untouched profile values,
+negative points, unavailable deletion, required names, failed saves and both
+sign-out decisions. Sinhala/Tamil resource Unicode checks passed. See
+[Profile and shared sign-out presentation](profile-localization.md).
+
+No shared profile/Auth/deletion mutation, backend deployment, rules/index
+update, billing change, real push send or APK build/install occurred.
+Remaining dashboard/operational wording, fluent Sinhala/Tamil review and native
+font/TalkBack/device QA remain separate work, alongside reviewed real data,
+measured ETA and final backup/rollback/release gates.
+
+## 53. Implementation checkpoint: driver operational localization
+
+Implemented locally on 2026-10-17:
+
+- Driver approval/route gates and dashboard wording now use generated
+  English/Sinhala/Tamil resources (180 additions per locale), including dated
+  departures, late reasons, start/stop/departure controls, GPS publication,
+  vehicle observations, route progress, timetable/ETA labels, delay sheets and
+  legacy assistance summaries. The foreground tracking notification captures
+  the locale used when tracking starts.
+- The main dashboard uses reusable presentation widgets for dated runs, trip
+  controls, GPS/vehicle status, late reasons and delay notices. Existing service
+  authorization, acknowledged writes, operation epochs, route grants, start
+  boundaries and GPS subscriptions remain in their existing operational paths.
+  No alternative app or test APK was introduced.
+- Local/pending/stale GPS and acknowledged shared data retain distinct wording.
+  Failed writes use localized retry messages without exposing raw exceptions.
+  Unknown run/countdown states show unavailable wording. Driver/rider names,
+  stop/route data, IDs, boolean observations, occupancy values and published
+  delay reasons retain their original backend values. Delay selections survive
+  changing the UI locale while the sheet is open.
+- ETA presentation retains the existing calculator's estimates and evidence
+  distinctions; no accuracy/traffic improvement is claimed. Time-of-day uses
+  Material localization and other-day arrivals keep explicit dates. Legacy
+  assistance rows use explicit Colombo creation timestamps and existing
+  assistance type/status translations.
+
+Validation: **819 Flutter tests passed, 4 skipped** (`phase38-full-tests.log`);
+analyzer **No issues found** (`phase38-final-analyze.log`);
+**71 targeted tests passed** (`phase38-targeted-tests.log`). Twenty-seven new
+tests cover all three locales, 320dp/200% core controls, exact -5/+30-minute
+boundaries, busy/read-only states, stable values, unavailable vs empty runs,
+unknown contracts, stale GPS, late-reason cancellation and locale changes in
+the delay sheet. Existing approval/route withdrawal, transactional delivery,
+run lifecycle and delay regressions pass. All 180 resource entries passed
+Unicode checks. See [driver operational presentation](driver-localization.md).
+
+No actual bus operation, shared Firebase/Auth mutation, backend deployment,
+rules/index update, billing change, real push send or APK build/install
+occurred. Fluent Sinhala/Tamil review and full native dashboard/font/TalkBack,
+keyboard and background-GPS testing remain release work. Other screens such
+as the shared Add Station editor retain their own localization scope; this
+checkpoint does not claim whole-app translation completion. Reviewed real
+data, measured ETA, deferred push/device checks and final backup/rollback/
+release gates remain outstanding.
+
+## 54. Implementation checkpoint: password recovery localization
+
+Implemented locally on 2026-10-17:
+
+- Forgot Password, Reset Password and Password Updated use generated
+  English/Sinhala/Tamil resources (47 additions per locale), including form
+  instructions, validation, visibility tooltips, strength feedback, reset-link
+  failures and provider-code outcomes. Unknown provider errors use a localized
+  retry message instead of raw server text. Password strength feedback is also
+  localized in other hosts of the shared indicator.
+- The existing validators, reset-code verification and password-confirmation
+  sequence remain unchanged. Missing codes never contact Auth; success is
+  shown only after confirmation returns. The production service remains the
+  default, with optional service injection for isolated UI fixtures.
+- Reset-email acknowledgement retains the actual submitted address even if
+  the field changes while delivery is pending. Resend retains its existing
+  return-to-form flow and retry behavior. Headers/actions/security notes wrap,
+  shared auth validation errors allow multiple lines, and the final success
+  card scrolls at large text sizes.
+
+Validation: **834 Flutter tests passed, 4 skipped** (`phase39-full-tests.log`);
+analyzer **No issues found** (`phase39-final-analyze.log`);
+**29 targeted tests passed** (`phase39-targeted-tests.log`). Fifteen new tests
+cover all three locales at 320dp/200% text, high-contrast missing-link handling,
+required/mismatched fields, original submitted email, resend/retry, delayed
+acknowledgement, failed confirmation without success and safe error fallbacks.
+Existing reset-link parsing and shared touch-target regressions pass. All 47
+resource entries passed Sinhala/Tamil Unicode checks. Fluent review and actual
+email delivery are not inferred from these tests.
+
+No real email, password/Auth mutation, shared data write, deployment, billing
+change or APK build/install occurred. Fluent Sinhala/Tamil review and native
+font/TalkBack/keyboard and actual reset-email/deep-link delivery checks remain
+release work. Other untranslated screens, reviewed real data, measured ETA,
+deferred push/device checks and final backup/rollback gates remain separate.
+See [password recovery presentation](password-recovery-localization.md).
+
+## 55. Implementation checkpoint: passenger Home localization
+
+Implemented locally on 2026-10-17:
+
+- Passenger Home greetings, quick actions, drawer/desktop navigation, report
+  previews and recent-journey wording use generated English/Sinhala/Tamil
+  resources (44 additions per locale), reusing existing shared role/settings
+  labels. Navigation retains stable internal keys. Names, report descriptions
+  and saved endpoint text remain original data.
+- Report/journey age labels use localized plurals. Hidden/disputed reports
+  still pass through the existing visibility/freshness filter and disappear
+  on streamed updates. Delivered report errors and recent-journey waiting,
+  failed and empty snapshots have distinct wording. Repository offline/cache
+  fallbacks are unchanged; an upstream emitted empty fallback is not claimed
+  to carry provenance the widget does not receive.
+- Header branding, drawer role/header and report headings/vote summaries wrap
+  at narrow widths and large text. Standalone Home's Profile tab now passes
+  the same profile snapshot as its avatar entry. The main app uses its existing
+  repositories; optional stream arguments support isolated widget fixtures.
+
+Validation: **852 Flutter tests passed, 4 skipped** (`phase40-full-tests.log`);
+analyzer **No issues found** (`phase40-final-analyze.log`);
+**30 targeted tests passed** (`phase40-targeted-tests.log`). Eighteen new tests
+cover all three locales, 320dp/200% text and high contrast, desktop Profile
+navigation, locale changes with preserved saved endpoints, original report
+text, live five-False hiding, unavailable-to-empty stream recovery and relative
+age boundaries. Existing Home/accessibility regressions pass. All 44 resource
+entries passed Sinhala/Tamil Unicode checks.
+
+No real report/journey/profile mutation, shared Firebase write, deployment,
+billing change, push send or APK build/install occurred. Fluent Sinhala/Tamil
+review and native font/TalkBack/device QA remain outstanding, as do remaining
+screen translations, reviewed real data, measured ETA and final backup/rollback
+gates. Nested saved/assistance panels retain their separate localization scope.
+See [Passenger Home presentation](home-localization.md).
+
+## 56. Implementation checkpoint: registration and onboarding localization
+
+Implemented locally on 2026-10-17:
+
+- Registration labels, validation, social-provider placeholders/errors and all
+  three onboarding pages now use generated English/Sinhala/Tamil resources
+  (43 additions per locale), reusing shared recovery/profile wording. Unknown
+  provider errors show localized retry guidance; diagnostics retain codes or
+  exception types rather than raw provider messages.
+- Registration still submits the existing passenger/contributor/operator
+  values and navigates only after the existing AuthService result, using its
+  returned role. Driver approval and backend authorization are unchanged.
+  Google/Apple sign-up remain future-update placeholders. Optional service
+  injection supports isolated UI tests without creating real accounts.
+- Onboarding explanations/headings scale and scroll. Decorative illustration
+  text is bounded and excluded from semantics; scalable page copy retains the
+  example/preview, unavailable voice guidance, operator-response and
+  acknowledged-publication disclosures. No new live data is invented.
+- Reduced-motion Next uses an immediate page jump instead of a zero-duration
+  animation that triggered a framework assertion. Normal Next, Skip and
+  Get Started keep their destinations. Small large-text wrapping fixes were
+  also applied to the destination Login password/help/divider and Preferences
+  section heading; those screens retain their broader translation scope.
+
+Validation: **867 Flutter tests passed, 4 skipped** (`phase41-full-tests.log`);
+analyzer **No issues found** (`phase41-final-analyze.log`);
+**32 targeted tests passed** (`phase41-targeted-tests.log`). Fifteen new tests
+cover all three locales, 320dp/200% text, high-contrast 320x800 Skip, all three
+onboarding pages, reduced-motion Next/Get Started, required fields, failed
+registration without routing, reporter acknowledgement/routing and social
+placeholders without account creation. Existing registration/profile
+preservation and touch-target regressions pass. All 43 resource entries passed
+Sinhala/Tamil Unicode checks.
+
+No real registration/Auth mutation, shared Firebase write, backend deployment,
+billing change or APK build/install occurred. Existing validation rules are
+unchanged, including the legacy Latin-letter full-name pattern: Unicode name
+acceptance remains a separate change. Fluent Sinhala/Tamil review, native
+font/TalkBack/device QA, remaining screen translations, reviewed real data,
+measured ETA and final backup/rollback/release gates remain outstanding.
+See [registration and onboarding presentation](registration-onboarding-localization.md).
+
+## 57. Implementation checkpoint: Unicode personal-name validation
+
+Implemented locally on 2026-10-17:
+
+- Registration accepts Unicode letters and combining marks, including Sinhala
+  and Tamil names and Indic joiners used in conjuncts. Spaces, apostrophes,
+  periods and hyphens remain supported, including common typographic variants.
+  The minimum is two visible grapheme clusters with at least one letter.
+- Punctuation-only names, orphan combining marks, digits, emoji and embedded
+  control/unsupported format characters are rejected. The existing outer trim
+  remains; no transliteration, normalization or rewriting is applied to names.
+  This does not claim identity verification or detection of similar names.
+- The already-locked `characters` 1.4.1 package is now a direct dependency for
+  grapheme counting. Name validation guidance in all three locales describes
+  the supported punctuation. Existing profiles, passwords, emails, role values
+  and backend rules remain unchanged. This supersedes checkpoint 56's
+  Latin-letter-only name limitation.
+
+Validation: **873 Flutter tests passed, 4 skipped** (`phase42-full-tests.log`);
+analyzer **No issues found** (`phase42-final-analyze.log`);
+**27 targeted tests passed** (`phase42-targeted-tests.log`). Six new tests cover
+Sinhala/Tamil names and conjuncts, decomposed accents, typographic punctuation,
+grapheme-based minimum length, invalid controls/marks/digits/emoji and unchanged
+name submission from the registration form in all three locales. Existing role,
+registration acknowledgement, profile-preservation and onboarding tests pass.
+The dependency change resolved offline from the existing package cache
+(`phase42-pub-get.log`); localized validation-message Unicode checks passed.
+
+No real registration/profile/Auth mutation, shared Firebase write, deployment,
+billing change or APK build/install occurred. Fluent name/terminology review,
+native fonts/TalkBack/device QA, remaining Login/Settings translations,
+reviewed real data, measured ETA and final backup/rollback/release gates remain
+outstanding. See the updated [registration presentation](registration-onboarding-localization.md).
+
+## 58. Implementation checkpoint: Login and accessibility Settings localization
+
+Implemented locally on 2026-10-17:
+
+- Login and Accessibility Preferences now use English/Sinhala/Tamil resources
+  for their remaining fixed labels, validation, provider failures, tooltips,
+  switch semantics and save feedback. Added 46 entries per locale, reusing
+  existing shared resources. Unknown login failures use localized retry
+  guidance without exposing raw provider messages.
+- Login retains the existing trusted admin-claim check and role routing,
+  navigating only after its authentication/profile checks finish. Optional
+  AuthService injection supports isolated fixtures; production uses its
+  existing service. Biometric/Google buttons remain future-update placeholders.
+- Settings keeps account/device/guest scope explicit. Existing supported
+  toggle setters and Save persistence are unchanged; Save feedback/navigation
+  waits for acknowledgement and is suppressed after an account change.
+  Failed saves retain the screen with retry guidance. Temporary search drafts
+  remain separate. Unsupported controls stay disabled with localized reasons.
+- Category headings, password/forgot-password controls, buttons and target-size
+  feedback accommodate wrapped translations and 200% text using the existing
+  theme and minimum touch sizes.
+
+Validation: **889 Flutter tests passed, 4 skipped** (`phase43-full-tests.log`);
+analyzer **No issues found** (`phase43-final-analyze.log`). **26 focused tests
+passed** (`phase43-targeted-tests.log`), including 16 new tests covering all
+three locales at 320dp/200% text, login validation/acknowledgement/errors,
+disabled controls, delayed/failed Settings writes and account switching during
+a save. Final target-size feedback wrapping was checked in the focused suite
+after the full run. New-resource Unicode and fixed Settings label mapping
+checks passed.
+
+No real Auth/profile/Firestore mutation, deployment, provider activation,
+billing change or APK build/install occurred. This does not claim every app
+screen is localized. Fluent Sinhala/Tamil review, native font/TalkBack/device
+QA, remaining screen translations, reviewed real data, measured ETA and final
+backup/rollback/release gates remain outstanding. See
+[Login and Settings presentation](login-settings-localization.md).
+
+## 59. Implementation checkpoint: passenger Search localization
+
+Implemented locally on 2026-10-17:
+
+- Passenger Search, stop selection, time/date options and temporary-needs
+  controls use English/Sinhala/Tamil resources (64 additions per locale).
+  Selected-stop/time/date messages have typed parameters, active needs use
+  plurals, and displayed dates use Material localization. Original catalogue
+  names, stable IDs and matching/filter keys remain unchanged.
+- Trusted-time synchronization, the rolling boarding window, dated/active-run
+  matching and Results navigation retain their existing behavior. Needs edits
+  and reset remain temporary and never persist to Settings. My Location still
+  offers nearby stops and waits for explicit selection; no additional location
+  collection or tracking was added.
+- The existing microphone-labelled action only offered manual suggestions.
+  Its icon/wording now describe suggested stops and explain that voice
+  recognition is unavailable. A chosen stop is acknowledged as Selected,
+  without the previous fabricated Listening/Recognized wording. No speech
+  provider was enabled. The refresh tooltip describes fetching catalogue data.
+- Controls and headings wrap at large text sizes; needs/time sheets scroll,
+  and action buttons retain minimum heights while accommodating translations.
+  Switch tiles have a Material surface for visible feedback. Existing theme
+  styling and navigation destinations are retained.
+
+Validation: **898 Flutter tests passed, 4 skipped** (`phase44-full-tests.log`);
+analyzer **No issues found** (`phase44-final-analyze.log`). Nine new widget
+tests cover all three locales at 320dp/200% text, high-contrast needs editing,
+original stop names, explicit nearby-stop choice, temporary needs/reset,
+time-window wording and truthful manual suggestions. Existing boarding-window,
+dated-search, nearby-stop and account/draft tests also pass. New-resource
+Sinhala/Tamil script and Unicode checks passed.
+The final focused Search/draft/nearby/dated-run suite passed **30 tests**
+(`phase44-search-regressions.log`).
+
+No real GPS/Auth/Firestore mutation, deployment, provider activation, billing
+change or APK build/install occurred. Fluent translation review and native
+font/TalkBack/device QA remain required. Results, Bus Details and other nested
+journey/report panels retain their remaining localization scope; this does
+not claim complete translation of the passenger journey. Reviewed real data,
+measured ETA and final backup/rollback/release gates also remain outstanding.
+See [Search presentation](search-localization.md).
+
+## 60. Implementation checkpoint: Results and Bus Details presentation
+
+Implemented locally on 2026-10-17:
+
+- The main Results/Bus Details screens use English/Sinhala/Tamil resources
+  for timetable/run states, requirement review, empty/loading/retry guidance,
+  selected-segment stops/duration, capability/crowding badges and report
+  freshness. Added 94 entries per locale with typed parameters and plural
+  counts, reusing shared fare, geometry ETA, save and preference resources.
+- Displayed dates use Material localization. Stable IDs, backend run/crowd
+  states, original bus/stop/route names and user-authored report text remain
+  data. Known boarding-estimate sources are translated at presentation without
+  changing source/confidence keys. Report ages reuse the localized age helper;
+  freshness continues to use the existing evidence policy.
+- Results invites opening bus details without implying that selection starts
+  tracking. Requirement review still edits only the current search draft.
+  Run matching, GPS freshness, selected timetable/fare segment and optional
+  owner-scoped saving retain their existing behavior.
+- Standard-size Results rows retain their layout. Narrow large-text layouts
+  stack full labels and wrap badges, with existing theme styles and navigation.
+  The schedule-summary test now expects Material's locale-aware date format
+  instead of the former hard-coded English formatter.
+
+Validation: **904 Flutter tests passed, 4 skipped** (`phase45-full-tests.log`);
+analyzer **No issues found** (`phase45-final-analyze.log`). Six new widget tests
+cover all three locales at 320dp/200% text, high-contrast Details, timetable
+identity, temporary requirement review, scheduled/active/completed run states,
+matching GPS, segment-scoped reports, five-False hiding and reports above
+optional Save Trip. Opening/inspecting Details performs zero journey writes.
+Existing save/retry, fare, ETA, boarding-window and account tests pass. All 94
+new keys have Sinhala/Tamil resources and passed Unicode/script checks.
+
+No real GPS/Auth/Firestore mutation, deployment, provider activation, billing
+change or APK build/install occurred. Remaining nested evidence explanations,
+map/progress panels and report detail/actions require further localization;
+this does not claim complete translation of every child widget. Fluent
+Sinhala/Tamil review, native font/TalkBack/device QA, reviewed real data,
+measured ETA and final backup/rollback/release gates remain outstanding.
+See [Results and Details presentation](results-details-localization.md).
+
+## 61. Implementation checkpoint: nested evidence, ramp and map presentation
+
+Implemented locally on 2026-10-17:
+
+- Accessibility Evidence, Vehicle Ramp, Selected Segment Map and the published
+  timetable notice use English/Sinhala/Tamil resources for their remaining
+  fixed labels. Added 48 entries per locale with typed attribution, source and
+  timestamp parameters and plural confirmation counts. Existing unknown,
+  localized relative-age and geometry ETA resources are reused.
+- Capability, positive/negative observations, expired checks and unresolved
+  barriers retain their existing distinctions and freshness policy. Visibility,
+  exact target matching and five-False hiding are unchanged. Evidence section
+  storage keys stay stable; actual names and user-authored report text remain
+  original. Missing names use localized presentation fallbacks, without storing
+  those fallbacks as profile names or displaying private UIDs.
+- Map messages explain missing coordinates/road geometry and tile failures;
+  current-bus semantics and update wording are localized. Original stop names
+  and OpenStreetMap attribution remain intact. Selected-run/GPS validation
+  remains in the enclosing Details state. The timetable notice still discloses
+  an unassigned vehicle, unknown conditions and unavailable driver assistance.
+- Existing numeric recorded timestamps/device-local conversion and operational
+  timing rules are unchanged. Existing theme, scalable evidence layout and
+  navigation are retained. This pass does not introduce speech, location
+  tracking or new verified-accessibility claims.
+
+Validation: **916 Flutter tests passed, 4 skipped** (`phase46-full-tests.log`);
+analyzer **No issues found** (`phase46-final-analyze.log`). **31 focused tests
+passed** (`phase46-targeted-tests.log`), including 12 new tests for all three
+locales at 320dp/200% text and high contrast: unresolved/conflicting evidence,
+real-name preservation, plural attribution, expired positive versus unresolved
+broken ramp checks, static/current marker semantics, map attribution,
+published-source disclosures and ETA target preservation. The full run also
+checks the localized tile-failure retry label. All 48 resource entries passed
+locale completeness and Sinhala/Tamil Unicode/script checks.
+
+No real GPS/Auth/Firestore mutation, deployment, billing change, push send or
+APK build/install occurred. Test user lookups use the in-memory fallback with
+no Firebase app initialized; map requests receive test responses. Report
+detail/publication/voting and other existing screens retain their remaining
+translation scope. Fluent review, native font/TalkBack/device QA, reviewed real
+data, measured ETA and final backup/rollback/release gates remain outstanding.
+See [Evidence and map presentation](evidence-map-localization.md).
+
+## 62. Implementation checkpoint: Report Details and publication delivery
+
+Implemented locally on 2026-10-17:
+
+- Report Details and the delivery/retry view use English/Sinhala/Tamil resources
+  for fixed labels, condition/status wording, legacy mutation receipts, delivery
+  states and errors. Added 100 entries per locale with typed count/time/share
+  parameters. Original report titles, rider notes, target names and stored
+  category/severity keys remain data; known category labels are translated only
+  in the view. The existing localized v2 voting controls are reused.
+- Hidden-report wording reads the report's policy threshold: v2 five, historical
+  v1 three. It explicitly avoids treating a community dispute as proof of false
+  conditions. Resolved wording describes the author's observation rather than
+  a verified repair; active/expired wording no longer invents live telemetry or
+  an archive operation. Backend moderation/reward policies are unchanged.
+- Pending/failed/local drafts remain distinct from acknowledged publication.
+  Known delivery failures are translated; valid cooldown deadlines retain their
+  UTC timestamp. Unknown error text uses generic retry guidance. Draft storage,
+  retention, retry identity and account ownership checks are unchanged.
+- Share copies localized alert text containing the original condition/target,
+  waits for clipboard acknowledgement and handles failure. It no longer claims
+  a link was copied. Status/target/category/note/photo labels wrap at large text;
+  legacy action buttons retain minimum heights and accommodate their text.
+
+Validation: **934 Flutter tests passed, 4 skipped** (`phase47-full-tests.log`).
+After the final photo heading/badge wrapping edits, **49 focused tests passed**
+(`phase47-targeted-tests.log`), including 21 new tests across all three locales
+at 320dp/200% text and high contrast. Coverage includes original report text,
+author vote exclusion, five-vote hiding wording, False-reason validation,
+delayed voting/publication receipts, draft account changes, cooldown/error
+presentation, delayed clipboard receipts and failed photo previews. Existing
+v2, legacy mutation and delivery-layout regressions pass. Analyzer **No issues
+found** (`phase47-final-analyze.log`); all 100 resources passed locale
+completeness and Sinhala/Tamil Unicode/script checks.
+
+No real Auth/Firestore mutation, live vote/publication, actual clipboard change,
+deployment, billing change, push send or APK build/install occurred. Tests use
+in-memory storage/streams and mocked HTTP/clipboard responses. The report-entry
+form's condition/category catalogue, camera/gallery controls and review dialog
+remain the next translation slice. Fluent review, native font/TalkBack/device
+QA, reviewed real data, measured ETA and final release gates remain outstanding.
+See [Report views presentation](report-views-localization.md).
+
+## 63. Implementation checkpoint: report-entry form localization
+
+Implemented locally on 2026-10-17:
+
+- Report-entry condition/category and crowding choices, photo controls,
+  validation, review/summary and failure messages use English/Sinhala/Tamil
+  resources (125 additions per locale). Stored option IDs, category, severity,
+  subcategory and crowding values remain unchanged. Original catalogue names
+  and user-written notes stay data; only their surrounding labels translate.
+- Review displays the effective translated choices, original target/note,
+  cooldown and public-photo/draft-retention guidance. Editing returns to the
+  current form. Submission still uses the existing outbox/acknowledgement flow
+  and delivery destination; inspection/review alone never publishes.
+- Optional identity/submission/image-picker injection supports isolated tests,
+  while production defaults to Firebase Auth, the existing submission singleton
+  and ImagePicker. Account changes across review prevent submission and require
+  a fresh review; late photo results from another account are discarded. Missing
+  sign-in and unknown submission/photo errors use localized guidance. An already
+  active submission cannot be launched twice from the same form action.
+- Option cards have natural heights, two columns at ordinary sizes and one
+  column on narrow large-text layouts. Full labels wrap, photo choices scroll,
+  submit/add-photo controls retain minimum heights, and summary/dropdown labels
+  fit the existing theme. No camera/gallery or upload provider was activated.
+
+Validation: **955 Flutter tests passed, 4 skipped** (`phase48-full-tests.log`);
+analyzer **No issues found** (`phase48-final-analyze.log`). **46 focused tests
+passed** (`phase48-targeted-tests.log`), including 18 new tests across all three
+locales at 320dp/200% text/high contrast. They cover bus/station payload values,
+translated review preserving original notes, validation, delayed publication,
+account change during review, every category tab, and mocked camera/gallery
+cancel/failure behavior. Existing exact-target and condition/evidence tests
+pass. All 125 resources passed locale completeness and Sinhala/Tamil
+Unicode/script checks.
+
+No live publication, real Auth/Firestore mutation, camera capture, gallery read,
+photo upload, deployment, billing change or APK build/install occurred. Tests
+use in-memory catalogue/outbox data and injected publisher/identity/picker
+fixtures. Fluent translation review, native fonts/TalkBack/device QA and the
+remaining community/outbox/help text still need work, alongside reviewed real
+data, measured ETA and final release gates.
+See [Report form presentation](report-form-localization.md).
+
+## 64. Implementation checkpoint: Community feed and upload outbox localization
+
+Implemented locally on 2026-10-17:
+
+- Community headings, tabs, actions, target fallbacks, contribution summaries,
+  freshness/age and vote/status labels use English/Sinhala/Tamil resources
+  (30 additions per locale). Original target names, issues and descriptions
+  remain data. Community confirmation is labelled as such rather than Verified;
+  report-specific vote thresholds and stored values are unchanged.
+- Read failures have explicit unavailable/retry guidance. Empty reports no
+  longer imply an accessible or safe corridor. Guests receive sign-in guidance
+  in My Reports. Shared cards exclude hidden/disputed/unpublished entries;
+  My Reports filters retained snapshots against the current account. Existing
+  author review/appeal access remains separate.
+- The owner-scoped upload section translates status and retention/retry/removal
+  guidance and opens the existing delivery screen with the same submission
+  service. Opening an upload never publishes it. Main-app service defaults
+  remain in place; optional injection supports isolated tests.
+- Tabs and vote/photo/status labels wrap, large-text card headers stack, and
+  legacy vote controls retain minimum heights. The existing theme is retained.
+  The evidence-clock regression now injects its feed instead of depending on
+  an unavailable Firebase fallback.
+
+Validation: **970 Flutter tests passed, 4 skipped** (`phase49-full-tests.log`);
+analyzer **No issues found** (`phase49-final-analyze.log`). **44 focused tests
+passed** (`phase49-targeted-tests.log`), including 15 new Community/outbox tests
+across all three locales at 320dp/200% text and normal/high contrast feed
+layouts. They cover failed-versus-empty reads, recovery, original text,
+fifth-False hiding, guest guidance, stale account snapshots, private upload
+navigation and account cleanup. Existing delivery retry/acknowledgement and
+voting regressions pass. All 31 Community/outbox-prefixed resources (including
+one pre-existing entry) passed completeness, Unicode and script checks.
+
+No real Firebase/Auth mutation, report publication, deployment, billing change
+or APK build/install occurred. Fluent translation review, native fonts/TalkBack
+and device QA remain required. Remaining untranslated support/help text,
+reviewed real data, measured ETA and final release gates are separate work.
+See [Community and outbox presentation](community-outbox-localization.md).
+
+## 65. Implementation checkpoint: localized in-app Help Center
+
+Implemented locally on 2026-10-17:
+
+- Profile -> Support -> Help Center now opens a guide instead of its Coming
+  soon message. Eight expandable topics explain search/defaults, optional
+  saving, nearby stops, timetable/live position, drafts/publication, community
+  voting/disputes, assistance and account review. This adds 17 resources per
+  locale and reuses the existing translated Help Center title.
+- Guidance distinguishes saving from seat booking, submitted assistance from
+  acceptance, local drafts from published reports and community disputes from
+  proven false reports. It explains current limitations without claiming a
+  support inbox, self-service account deletion or a verified walking route.
+- The guide follows existing theme/high-contrast colors, scrolls and wraps
+  expanded text. Opening it reads no private account/location/backend data.
+  Existing unavailable Profile actions retain their prior status.
+
+Validation: **979 Flutter tests passed, 4 skipped** (`phase50-full-tests.log`);
+analyzer **No issues found** (`phase50-analyze.log`). **18 focused tests passed**
+(`phase50-targeted-tests.log`), including nine new tests expanding/collapsing
+all eight topics in English/Sinhala/Tamil at 320dp/200% text with normal/high
+contrast, and navigating from Profile into Help and back. Existing profile,
+failed-save and sign-out regressions pass. All 17 added resources passed
+Unicode/script checks.
+
+No real Firebase/Auth mutation, report publication, backend deployment, billing
+change or APK build/install occurred. Fluent translation review, native font/
+TalkBack/device QA, remaining untranslated text, reviewed real catalogue/tariff
+data, measured ETA accuracy and final release gates remain separate work.
+See [In-app Help Center](help-center.md).
+
+## 66. Implementation checkpoint: rewards and membership localization
+
+Implemented locally on 2026-10-17:
+
+- Rewards & Contributions and Digital Membership Card headings, stats,
+  tier/points/identity labels, settings guidance and availability disclosures
+  use English/Sinhala/Tamil resources (28 additions per locale). Known tier
+  labels translate at presentation; internal tier derivation and stored values
+  are unchanged. Unknown custom tiers, member IDs and role labels stay data.
+- Negative balances remain signed. The legacy +5 confirmation explanation is
+  explicitly historical and confined to its existing legacy branch. The v2
+  author-only reward notice and balance refresh behavior remain in place.
+  Membership wording refers to the recorded policy rather than implying every
+  policy needs manual reconciliation. Redemption remains disabled; no cash,
+  voucher, priority support or guaranteed access is promised.
+- Headers/buttons use minimum heights, full titles wrap, chips wrap, and
+  narrow/large-text membership headers stack. Existing theme and ordinary
+  48dp/large-target 60dp button behavior are retained.
+
+Validation: **988 Flutter tests passed, 4 skipped** (`phase51-full-tests.log`);
+analyzer **No issues found** (`phase51-analyze.log`). **10 focused tests passed**
+(`phase51-targeted-tests.log`), including nine new tests across all three locales
+at 320dp/200% text with normal/high contrast. Tests cover signed balances,
+translated Bronze/Gold labels, custom identity/tier values, card navigation and
+return, and disabled redemption. Existing reward availability and touch-target
+tests pass. All 28 added resources passed completeness/Unicode/script checks.
+
+An Android emulator was detected, but no new APK was built/installed and no
+native walkthrough of these source changes is claimed. No real Firebase/Auth
+or balance mutation, backend deployment or billing change occurred. Fluent
+Sinhala/Tamil review and physical-device/font/TalkBack QA remain required;
+remaining untranslated text, reviewed real data, measured ETA and release
+gates remain separate work.
+See [Rewards and membership presentation](rewards-presentation.md).
+
+## 67. Implementation checkpoint: boarding/alighting assistance form localization
+
+Implemented locally on 2026-10-17:
+
+- Assistance selection labels, target confirmation, validation/failure messages,
+  boarding/alighting context and unknown/estimated-arrival wording use generated
+  English/Sinhala/Tamil resources (23 additions per locale). Existing translated
+  assistance labels are reused in review. Original catalogue names remain data;
+  submitted assistance IDs and exact bus/run/stop identifiers are unchanged.
+- Identity is captured before target lookup/review and checked before enqueue.
+  An account change during review requires another review; guests retain the
+  sign-in message. Editing review retains selection without sending. Confirmed
+  submissions use the existing acknowledged submission/status destination.
+- Selection tiles, actions and header use minimum heights, labels wrap and
+  narrow/large-text arriving-bus panels stack. Unknown arrival remains unknown;
+  estimates are labelled. Driver acknowledgement is still distinguished from
+  merely sending the request.
+
+Validation: **997 Flutter tests passed, 4 skipped** (`phase52-full-tests.log`);
+analyzer **No issues found** (`phase52-analyze.log`). **14 focused tests passed**
+(`phase52-targeted-tests.log`), including nine new tests across all three locales
+at 320dp/200% text and normal/high contrast. They cover required selection,
+review/edit, stable payloads, exact alighting targets, unknown/estimated arrival
+and changed-account rejection. Existing guest, invalid-stop and missing-run
+regressions pass. All 23 resources passed Unicode/script checks.
+
+No real Firebase/Auth mutation, assistance request, backend deployment, billing
+change or APK build/install occurred. Tests use injected identity, catalogue
+and publisher fixtures. Request-status and saved-receipt panel localization
+remains a separate next slice. Fluent translation review and physical-device/
+font/TalkBack QA, reviewed data, measured ETA and release gates remain required.
+See [Assistance form presentation](assistance-form-localization.md).
+
+## 68. Implementation checkpoint: shared navigation and assistance receipts
+
+Implemented locally on 2026-10-17:
+
+- The shared Home/Plan/Community/Profile bottom bar now displays existing
+  English/Sinhala/Tamil translations. Canonical tab IDs remain routing keys;
+  callbacks, deep links and selected-tab state do not change with language.
+  Full labels wrap in a minimum-height/content-sized bar, and the selected
+  tab exposes selected button semantics. Theme and icons are retained.
+- Assistance request-status and saved-receipt panels use 33 new resources per
+  locale for delivery, driver response, retry/cancel, errors and typed route/
+  stop summaries. Existing assistance type/state translations also cover
+  legacy receipts. Original names and custom assistance types remain data;
+  stored IDs, enums and backend policy are unchanged.
+- Delivery, driver acceptance and completion remain distinct. Failed retry or
+  cancellation cannot claim success; unavailable live streams retain explicit
+  last-received wording. Known service messages translate at presentation and
+  unknown provider/storage errors use localized generic guidance. Account
+  changes hide another owner's receipt details and stale history snapshots.
+
+Validation: **1,012 Flutter tests passed, 4 skipped** (`phase53-full-tests.log`);
+analyzer **No issues found** (`phase53-analyze.log`). **24 focused tests passed**
+(`phase53-targeted-tests.log`), including 15 new tests across all three locales
+at 320dp/200% text with normal/high contrast. Tests cover translated navigation,
+canonical callbacks, selected semantics, locale changes preserving selection,
+failed/delayed/retried delivery, acceptance/completion, failed cancellation,
+saved-receipt errors, original/custom data and account changes. Existing touch-
+target and assistance delivery/layout tests pass. All 33 resources passed
+Unicode/script checks; Sinhala/Tamil tab labels differ from the English labels.
+
+No real Firebase/Auth mutation, assistance publication, deployment, billing
+change or APK build/install occurred. These automated layout/semantics checks
+do not replace fluent Sinhala/Tamil review or native font/TalkBack/device QA.
+Remaining untranslated text, reviewed real data, measured ETA and final release
+gates remain separate work.
+See [Navigation and assistance receipts](navigation-assistance-receipts-localization.md).
+
+## 69. Implementation checkpoint: shared language and accessibility coverage
+
+Implemented locally in the main app source on 2026-10-17:
+
+- The remaining catalogue saved/offline/empty/refresh messages, administrator
+  access gate, Add Stop dialog, saved-trip controls/recovery, assistance actions,
+  live accessibility observations, stop-alert availability and splash wording
+  use English/Sinhala/Tamil resources. Retained journey screens also translate
+  their fixed labels, dynamic ETA/delay wording and date/time presentation.
+  An old unassigned-bus message no longer claims a confirmed seat booking.
+  The required Search -> Results -> Bus Details path remains unchanged.
+- The app root now uses one effective preference theme. Material buttons,
+  icon buttons, app-bar leading controls, inputs, list tiles, chips and dialog
+  controls inherit normal 48dp / large-target 60dp minimums. Explicit button
+  overrides follow those same minimums. Custom tap regions, switches and chips
+  use a shared minimum-size wrapper; navigation labels still wrap and retain
+  their canonical routing keys.
+- Dropdown rows across admin, driver, report, language and segment selectors
+  have variable heights and minimum targets so long translations can wrap.
+  Narrow-screen date/time pickers open in localized input mode when large
+  targets are enabled. Existing selection bounds, search horizon, saved needs
+  and backend IDs/policies are not changed by presentation preferences.
+- High contrast is applied to shared controls/cards and remaining custom
+  foregrounds, driver delay/status controls, auth inputs and map controls.
+  Selected chips retain readable text/checkmarks. Original map tiles and
+  evidence photos are retained, with the existing stop-list alternatives.
+- Catalogue notices fit in a bounded scrollable region on small screens.
+  Failed refreshes expose localized retry guidance. Assistance failures render
+  in the current language even if language changes while the error is visible.
+  Unknown save/provider errors use localized guidance rather than raw details;
+  failed saves/removals still retain the previous acknowledged state and ID.
+- Added 198 shared/retained presentation resources per locale. All 1,716 keys
+  are present in every locale; the additions passed Unicode/script/placeholder
+  checks. Direct fixed-UI-literal inventory retains only intentional brand,
+  language-name, ID/example and map-attribution exceptions. Original catalogue
+  names, authored/custom descriptions, stable enums and technical identifiers
+  remain data, rather than being rewritten or automatically translated.
+
+Validation: **1,033 Flutter tests passed, 4 skipped** (`phase54-full-tests.log`);
+full analyzer **No issues found** (`phase54-analyze.log`). **21 new shared UI
+tests passed** (`phase54-shared-tests.log`), covering all three locales at 320dp,
+200% text, normal/high contrast, reactive 60dp/48dp sizing, inputs/chips/app-bar
+controls, stable dropdown selection, dialog targets, catalogue failures/retry,
+admin denial, stop-alert semantics, driver acknowledgements, language changes
+during failure and dynamic/custom delay reasons. The focused broader run passed
+**64 tests** (`phase54-targeted-tests.log`); final Settings/save/shared-control
+regressions passed **40 tests** (`phase54-final-regressions.log`). Existing
+Settings scrolling and save-failure assertions now cover the enlarged layout
+and localized generic errors while preserving their authorization/retry checks.
+After the final retained stop-alert text change, **29 shared/legacy UI checks
+passed** (`phase54-ui-final-tests.log`). Existing map hosts still emit mocked
+tile failures; the full suite passed.
+
+No APK build/install, real Firebase/Auth/report/assistance/catalogue mutation,
+shared deployment or billing change occurred. This completes the identified
+source-level shared-control localization/accessibility gaps; it is not a claim
+of native accessibility certification or completed human translation review.
+Fluent Sinhala/Tamil review and physical-device font, TalkBack, focus, picker/
+keyboard and screen-size QA remain release gates, alongside the existing real
+data, ETA measurement and rollout work.
+See [Shared language, contrast and touch preferences](shared-accessibility-localization.md).
+
+
+## 70. UI corrections from screenshot review
+
+Implemented locally on 2026-10-17:
+
+- Search travel time keeps its icon beside the label/time and a compact trailing Change affordance. Boarding selection shows the station before a readable My Location action.
+- Community Report Issue now occupies a reserved bottom action area instead of overlapping empty-state text.
+- Profile Edit aligns to the trailing edge. Language selection uses separate selected-value widgets and a non-dense field to avoid clipping padded menu rows.
+- Photo upload uses a light icon background with a readable foreground. Report review uses the existing card surface, consistent rounded corners, paragraph spacing and action padding; all disclosure content remains available in the scrollable dialog.
+
+Validation: **72 focused Flutter tests passed** across search, profile, community, report form and shared accessibility/localization (`phase55-ui-tests.log`); analyzer **No issues found** (`phase55-analyze.log`). These are widget checks, not a new physical-device visual walkthrough. No APK build/install or deployment occurred.
+
+
+## 71. Settings cards and clearer report review
+
+Implemented locally on 2026-10-17:
+
+- Profile Language and Admin console entries match the existing rounded settings cards, circular icons, spacing and typography. Language persistence and admin authorization remain unchanged.
+- Report review leads with a selected-target/condition/note summary card. Short public-visibility and same-issue cooldown reminders remain visible. Full privacy, photo consent and draft-storage disclosures are available under an expandable section. Confirm and submit and Edit report use separate full-width actions. Added English/Sinhala/Tamil copy for the shorter reminders and disclosure heading.
+
+Validation: **46 settings/profile/shared tests passed** (`phase56-settings-tests.log`), **18 report-form tests passed** including disclosure expansion in all three locales (`phase57-review-tests.log`); analyzer **No issues found** (`phase56-analyze.log`, `phase57-analyze.log`). Native visual/font review remains pending. No APK build/install, deployment or shared data changes occurred.
+
+
+## 72. Publication failure diagnosis and actionable retry states
+
+Implemented locally on 2026-10-17:
+
+- Outbox retains stable v2 failure codes and translates service connectivity/configuration, sign-in, permission, account restriction, invalid request and catalogue eligibility failures instead of collapsing all into a generic Failed message. Raw provider messages and report contents remain hidden. Debug output includes only an error code/type.
+- V2 service-unavailable failures now remain pending and participate in existing retries. Draft identity, owner isolation and acknowledged publication behavior are preserved.
+- Read-only diagnostics found localhost health ready for the intended project and Kankesanthurai stop `ncg_kankesanthurai` marked operator_catalogue/non-demo. No report was submitted or changed to diagnose the screenshot. The older generic failure cannot identify its historical cause; a retry with the updated client is still needed to establish it.
+
+Validation: **43 publication, privacy and localized report-view tests passed** (`phase58-publication-tests.log`), including same-ID recovery from v2 failures. No APK build/install, backend deployment, rules relaxation or shared data mutation occurred.
+
+
+## 73. Realistic fictional data for main-app walkthroughs
+
+Applied on 2026-10-17 to `sample_test/shared/` in the existing Firebase project:
+
+- Batch `walkthrough_20261017T1200` atomically wrote and read-back verified **470 records**: 14 directions, 22 stops, 42 fictional physical buses, 258 dated runs, 42 reports/publication ledger events, 14 synthetic fare publications, 14 synthetic geometries, five saved trips, four assistance requests and two matched active-trip/GPS/lock scenarios (fresh/stale). Includes working/faulty/unknown equipment and completed/cancelled runs.
+- Added an explicit Sample launch option for the same application package. Localhost server was restarted with opt-in `--sample`, preserving normal access. Both scopes are ready. Existing sample-account roles are reused; no new Auth accounts or passwords were created. Eight missing v2 sample summaries received explicit legacy sample baselines, preserving existing summaries and avoiding retroactive strikes.
+- Seed tools default to read-only, restrict every write to the Sample prefix, back up target rows, use one atomic fixture commit, preserve activity/operation locks, reject batch replay, and compare normal catalogue/profile/access/config fingerprints. These normal records were unchanged. New synthetic coordinates are approximate anchors, never reviewed stop locations. GPS snapshots age naturally; no guessed animation/heartbeat was added.
+
+Validation: **29 scenario/runtime/API tests passed** (`phase59-backend-tests.log`). A Flutter model/search contract parsed the complete prepared dataset and confirmed Badulla -> Bandarawela also passes wheelchair/step-free filtering (`phase59-model-tests.log`). An attempted emulator moderation suite lacked its Firestore emulator and is excluded from passing counts. No APK build/install, hosted deployment, rules relaxation, billing or normal-record update occurred. The normal launch mode intentionally does not show fictional vehicles; select the labelled Sample profile to inspect them. Real FCM, native device QA and destructive Auth tests are not implied complete.
+
+See [Realistic sample data](realistic-sample-data.md) for launch, scenarios, limitations and repeatable refresh commands.
+
+
+## 74. Recover the running main app's failed publication
+
+Diagnosed and recovered on 2026-10-17:
+
+- The actual main-app runtime had v2 publication disabled while shared policy denies retired direct writes. Earlier source-only fixes had not changed that installed session's configuration. The encrypted normal outbox still existed, while the separate Sample outbox was empty. No draft files were cleared or merged across scopes.
+- Attached specifically to `com.accesstransit.access_transit` (the emulator also has an older validation package), and hot-restarted the existing app with `MODERATION_V2=true` and `LOCAL_API=true`. No APK was built/installed. Verified v2 and localhost flags are true and one owner-visible failed normal-mode draft was loaded.
+- Retried that same user-created draft through `ReportSubmissionService.retry`, preserving its ID and owner validation. The app acknowledged publication. Read-back of the corresponding normal Firestore report confirmed policyVersion 2, publicationState published, status active and +10 awarded points. Its removal from the outbox followed acknowledgment, not a reset. Private ID-only receipt is in `.private/publication-recovery/` (ignored). No additional fictional normal report was created.
+- Added a source guard: if server policy v2 is active, an unconfigured legacy launch now fails with backend-not-configured before attempting retired direct writes. Its existing localized guidance retains the draft. Normal and Sample drafts remain separate; successful publications leave the draft list and appear in Community. Older drafts already removed under existing sign-out/account-change/expiry policy are not claimed recovered.
+
+Validation: **66 publication/transaction/privacy/localized-view tests passed** (`phase60-publication-recovery-tests.log`), including the v2-active/legacy-client guard with no report/cooldown writes. Full and targeted analyzers found no issues (`phase60-analyze.log`, `phase60-targeted-analyze.log`). This step includes an actual user-requested report retry/read-back, not just a simulated test. The data-preserving hot restart does not update the APK's bundled source; future debug runs should use **AccessTransit: main app, real Firebase + localhost**, or explicitly select the Sample profile for fictional walkthroughs. No rules relaxation, deployment, billing change or new APK occurred.
+
+
+## 75. Permanent publication startup fix and restore expired live rules
+
+Implemented/verified on 2026-10-17:
+
+- Ordinary main Android debug startup now initializes the agreed real-Firebase localhost v2 connection when no explicit flags/origin were supplied. Explicit configurations, isolated emulator tests, other platforms and release/profile behavior remain separate. The main launch profile is listed first; Sample remains an explicit alternative.
+- Shared moderation clients no longer capture an empty endpoint before initialization; unpinned clients resolve the current configured origin per request. Added regressions for an already-constructed client, two successive NEW reports (distinct IDs), photo URL publication and acknowledged outbox removal. The earlier one-draft native retry did not establish this fresh-start behavior.
+- Live inspection found a separate rules regression: the deployed release updated at 2026-10-17 16:43:45 UTC contained the 19-line default rules expiring on 2026-09-18. It denied all current client reads/writes and made localhost readiness fail with rules-review-required. This explains an additional active backend failure; it was not repaired by changing client flags.
+- Backed up that expired release under `.private/admin-setup/`, confirmed the workspace rules exactly matched the previously verified source, and restored only Firestore rules to `accesstransit-b615b`. Read-back matches the reviewed 1,086-line project source; localhost health is again ready with no reasons. No allow-all permission, index/data/Auth/billing change was introduced.
+
+Validation: **1,037 full Flutter tests passed, 4 skipped** (`phase61-full-tests.log`); **128 isolated Firestore rules/v2 transaction tests passed** (`phase61-rules-tests.log`, demo-phase61-publication on port 8088); analyzer **No issues found** (`phase61-analyze.log`). The initial emulator launch selected Java 8 and stopped before tests; the passing run used installed Android Studio JBR.
+
+Installed-main-app update remains pending the user's reply: an explicit question was sent because their earlier instruction deferred APK builds/installs until final delivery. A same-package debug update with account/drafts preserved was proposed; no separate test package or release APK. No native fresh-photo success is claimed for this step until that update and walkthrough are completed. A hot restart cannot replace old bundled source for future app launches.
+
+## 76. Deploy current rules and update the installed main app
+
+Completed on 2026-10-17 following the user's explicit request to update Firestore and run the app:
+
+- Backed up the live rules and deployed the current workspace `firestore.rules` to `accesstransit-b615b`. Read-back exactly matches local SHA-256 `17d0d8bf9be6301f29cd3ed4a81128d8e6f8a71befa640ee4d78554752c0bdaa`. Localhost real-Firebase health returns ready with no blocking reasons. No Functions, billing or data reset was involved.
+- Built and updated the same main debug package using `adb install -r`, with no uninstall/data clear. Cold startup, without extra runtime flags or hot restart, confirms v2 and localhost API are enabled and Firebase sign-in is retained. This completes the installed-main update left pending in checkpoint 75.
+- Native verification exposed a repeated account-check/navigation reset. Pending trusted checks now block interaction while retaining the existing Navigator and unsaved screen state. Confirmed restrictions, failed checks and account changes still dispose the protected workspace. Temporary cached Firestore events trigger trusted API verification. The blocked UI has its own Overlay for review/appeal controls.
+- The updated app reaches the signed-in Admin console and loads its normal Firestore catalogue. The actual main outbox currently contains no pending drafts; no fabricated normal report or fresh-photo publication was submitted during this verification.
+
+Validation: **1,040 Flutter tests passed, 4 skipped** (`phase62-full-tests.log`), including three new Navigator/state-preservation regressions; **15 focused gate/review tests passed** (`phase62-gate-verified.log`). Debug build succeeded (`phase62-final-debug-build.log`), same-package installation returned Success, and native runtime/account/backend checks passed. Rules source is unchanged from the preceding 128-test isolated authorization run. Analyzer **No issues found** (`phase62-analyze.log`). Real push, release rollout and native fresh-photo publication remain separate validation work.
+
+## 77. Keep verified navigation visible during account rechecks
+
+Implemented on 2026-10-17 after the user reported the account-check page appearing between screens:
+
+- Checkpoint 76 preserved Navigator state but still hid the entire screen on every account revalidation, including lifecycle/Firestore metadata events. For an already verified active account, revalidation now runs in the background without replacing the current screen. Initial verification and account switches remain blocked until verified; a confirmed restriction or failed verification still removes the protected workspace. Backend access checks continue to enforce mutations independently.
+- Regression tests now exercise resume plus repeated change events with a pending response, preserving the visible selected route and unsaved input; active, suspended, unavailable and account-switch outcomes remain covered.
+
+Validation: **15 focused tests passed** (`phase63-gate-tests.log`); analyzer **No issues found** (`phase63-analyze.log`); main debug build succeeded (`phase63-debug-build.log`). Updated the same main package with `adb install -r` and cold launched it. Native debug inspection confirms an active account remains ready while an explicit recheck is pending, with no failed state; localhost health remains ready. This is a client navigation correction; Firestore rules and backend permissions were unchanged.
+
+## 78. Match admin screens to the app theme
+
+Implemented on 2026-10-17:
+
+- Added a shared admin scaffold to all ten admin screen files: dashboard, catalogue editor, dated departures, calendars, fare publications, geometry, active operations, ban reviews and account/Auth controls. Uses the existing app palette, navy headings, white rounded cards, outlined fields, consistent button corners and a bounded layout on wider screens.
+- Dashboard tabs use a navy selected state; overview and record cards have matching icon containers, clearer navigation arrows, quieter outlines and no raised default Material shadow. Existing localization and accessibility sizing are inherited, including high-contrast borders and large controls.
+- No catalogue, authorization or operational policy changes were made.
+
+Validation: **42 admin UI/localization tests passed** (`phase64-admin-tests.log`), covering small layouts, 200% text, high contrast, catalogue edits and scheduling/import/account views; analyzer **No issues found** (`phase64-analyze.log`). Main debug build succeeded (`phase64-debug-build.log`). Widget captures use the test font and are layout evidence only; native rendering is checked on the main emulator installation.
+
+## 79. Finish admin form and dialog presentation
+
+Implemented on 2026-10-17 following screenshots of clipped capability selectors and inconsistent editors:
+
+- Admin dropdown fields now use non-dense selected-value layout, allowing the accessible menu item's actual height instead of clipping its text. This covers catalogue type, route/driver assignment, capability and stop selectors, including admin dialogs.
+- Catalogue editors now group identity, accessibility, ordered stops and source review with themed headings/icons. Source explanations wrap, review confirmation uses a padded leading checkbox card, and stop reorder/remove controls use separated outlined buttons. Scheduled time fields include a clock icon. Added an accessibility-section label in English/Sinhala/Tamil.
+- All admin dialogs use the shared admin presentation. The admin variants of community report reviews and manual appeals now also use the admin scaffold; their passenger variants retain their existing presentation.
+- Added a rendered selected-value bounds assertion at normal/200% text and high contrast. Test scrolling now reaches lazily built fields in the taller accessible form.
+
+Validation: **55 focused admin/review/appeal UI tests passed** (`phase65-ui-tests.log`), plus **6 readable-font capture tests** (`phase65-capture-tests.log`). Inspected normal and large stop-editor previews for selected text and source wrapping. The initial test attempts exposed test scroll assumptions and one incorrect test filename; those runs are not counted as passing. See `phase65-analyze.log` and `phase65-debug-build.log` for final analysis/build. No operational policy or Firestore rules changes.
+
+## 80. Stop transient startup/cache failures flashing as errors
+
+Implemented on 2026-10-17:
+
+- Root cause: admin listeners treated Firestore's initial cached/pending snapshot as an exception, showing a multi-collection error before the subsequent server snapshot automatically cleared it. Added a shared server-snapshot stream that withholds unverified data while synchronizing, reports a 15-second synchronization timeout, preserves actual listener errors, and recovers when server data arrives. Idle verified streams do not time out. Cancellation clears timers.
+- Account verification starts directly on authentication instead of relying on a metadata event. Concurrent account checks are coalesced. Transient service/authentication-service failures receive up to two short retries (300ms/600ms), without flashing an error page between attempts. Auth/account denials are not retried as connectivity failures. An initial account remains blocked until verified; sustained failure still removes the protected workspace, and verified accounts retain navigation while rechecking.
+- Updated the main debug package using data-preserving `adb install -r`; cold launch reaches Admin console with loaded catalogue, an active verified account and a ready localhost backend. No rules/data/billing update occurred.
+
+Validation: **41 focused stream/account/admin/review tests passed** (`phase66-targeted-tests.log`), including cached-to-server startup, offline deadline, permission denial, recovery, cancellation, retry/coalescing and sustained failure. Analyzer **No issues found** (`phase66-analyze.log`); debug build succeeded (`phase66-debug-build.log`). Full suite initially recorded **1,039 passed, 4 skipped, 4 failed** (`phase66-full-tests.log`). Three fare UI failures were scroll-settle assumptions exposed by the preceding theme work; adding the missing settle made them pass in the additional run. That run has **24 passed, 1 failed** (`phase66-additional-tests.log`): the pre-existing normal result-selection fixture still has no matching Route 138 widget. Its attempted fixture reset did not solve it and was removed; this unrelated journey test remains unresolved and the full suite is not claimed clean.
+
+## 81. Diagnose empty search results and restore explicit timetable recovery
+
+Implemented on 2026-10-17:
+
+- Read-only inspection of the normal Firebase catalogue found 36 published timetables and no dated physical runs. Those timetables have no supported wheelchair access, so the account's default wheelchair requirement correctly excludes them. The normal Badulla itinerary is Badulla -> Ella -> Wellawaya -> Mattala -> Makumbura; Bandarawela is not on this stored route. No invented normal run, GPS, accessibility claim or stop was added.
+- Empty results now disclose when dated/timetable candidates exist outside the current accessibility requirements and offer an explicit, localized Show without accessibility filters action. It updates only the current draft, clears wheelchair/step-free overrides and opens the All view; Settings remain unchanged. Returned services retain their actual accessibility/evidence status.
+- Results keeps stable bus/report stream subscriptions across rebuilds, avoiding repeated listener resets and temporarily empty evidence. Dated-run search now waits for verified server snapshots with the bounded cache-to-server handling used by admin loading.
+- The previously failing navigation test inherited a wheelchair requirement while its positive evidence used wall-clock observation times against a fixed earlier search clock. It now explicitly requests an unfiltered selection, matching its navigation/persistence purpose. A separate deterministic regression verifies unknown-access services can be explicitly inspected, both draft needs reach Bus Details as false, and saved preferences remain true.
+
+Validation: **41 focused search/journey tests passed** (`phase67-targeted-tests.log`); **5 empty-state recovery tests passed** (`phase67-recovery-tests.log`). Existing recovery tap helpers now wait for scrolling to settle. A read-only snapshot of the actual normal timetable data matched **36 upcoming timetable opportunities**, including **2 Badulla -> Ella** options (`phase67-normal-catalogue-test.log`); an initial Bandarawela probe correctly returned zero because that stop pair is absent. Analyzer **No issues found** (`phase67-analyze.log`), main debug build succeeded (`phase67-debug-build.log`) and same-package update/install returned Success. Final full-suite results are in `phase67-final-full-tests.log`; the earlier run still included two scroll-helper failures before their correction.
+
+Final checkpoint 81 verification: **1,044 full Flutter tests passed, 4 skipped** (`phase67-final-full-tests.log`). This clears the previously recorded journey-selection and fare/scroll test failures. Normal published timetable matching was verified read-only; no catalogue records were changed. Main package was updated with sign-in/data retained and localhost health is ready.

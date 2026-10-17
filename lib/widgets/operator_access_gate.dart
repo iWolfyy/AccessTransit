@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/localization_context.dart';
+
 import '../services/operator_access_service.dart';
 import '../services/auth_service.dart';
 import '../screens/auth/login_screen.dart';
@@ -99,51 +101,51 @@ class _OperatorAccessGateState extends State<OperatorAccessGate>
       return KeyedSubtree(key: ValueKey(_uid), child: widget.builder(context));
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Operator access')),
+      appBar: AppBar(title: Text(context.l10n.driverAccess)),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _checking
-                    ? 'Checking operator approval...'
-                    : _uid == null
-                    ? 'Sign in to check operator approval.'
-                    : 'Operator approval required. Ask the project administrator to review your account. '
-                          'Selecting Operator at registration does not grant approval. '
-                          'A live connection is required to verify access.',
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () {
-                  _watch(null);
-                  _start();
-                },
-                child: const Text('Check again'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  try {
-                    if (_uid != null) await AuthService().logout();
-                    if (!context.mounted) return;
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      (_) => false,
-                    );
-                  } catch (_) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Could not sign out. Please retry.'),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Return to sign in'),
-              ),
-            ],
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _checking
+                      ? context.l10n.driverChecking
+                      : _uid == null
+                      ? context.l10n.driverSignInApproval
+                      : context.l10n.driverApprovalRequired,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () {
+                    _watch(null);
+                    _start();
+                  },
+                  child: Text(context.l10n.driverCheckAgain),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    try {
+                      if (_uid != null) await AuthService().logout();
+                      if (!context.mounted) return;
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (_) => false,
+                      );
+                    } catch (_) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(context.l10n.driverSignOutFailed),
+                        ),
+                      );
+                    }
+                  },
+                  child: Text(context.l10n.driverReturnSignIn),
+                ),
+              ],
+            ),
           ),
         ),
       ),

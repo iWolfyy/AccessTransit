@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/localization_context.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import 'community_preview.dart';
@@ -86,93 +88,106 @@ class _CommunityReportingPageState extends State<CommunityReportingPage>
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 400;
 
-    return Column(
-      children: [
-        Expanded(
-          child: Center(
-            child: AnimatedBuilder(
-              animation: Listenable.merge([
-                _entranceController,
-                _floatController,
-                _pulseController,
-              ]),
-              builder: (context, _) {
-                return FittedBox(
-                  fit: BoxFit.contain,
-                  child: SizedBox(
-                    width: 320,
-                    height: 320,
-                    child: FadeTransition(
-                      opacity: CurvedAnimation(
-                        parent: _entranceController,
-                        curve: const Interval(0, 0.35, curve: Curves.easeOut),
-                      ),
-                      child: CommunityPreview(
-                        entrance: _entranceController.value,
-                        float: _floatController.value,
-                        pulse: _pulseController.value,
-                        reduceMotion: widget.reduceMotion,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        FadeTransition(
-          opacity: CurvedAnimation(
-            parent: _entranceController,
-            curve: const Interval(0.35, 0.8, curve: Curves.easeOut),
-          ),
-          child: SlideTransition(
-            position:
-                Tween<Offset>(
-                  begin: const Offset(0, 0.12),
-                  end: Offset.zero,
-                ).animate(
-                  CurvedAnimation(
-                    parent: _entranceController,
-                    curve: const Interval(
-                      0.35,
-                      0.8,
-                      curve: Curves.easeOutCubic,
-                    ),
-                  ),
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: IntrinsicHeight(
             child: Column(
               children: [
-                Text(
-                  'Be the Eyes of the Community',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: wide ? 24 : 22,
-                    height: wide ? 32 / 24 : 28 / 22,
-                    fontWeight: FontWeight.w700,
-                    color: context.textColor,
+                Expanded(
+                  child: Center(
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _entranceController,
+                        _floatController,
+                        _pulseController,
+                      ]),
+                      builder: (context, _) {
+                        return FittedBox(
+                          fit: BoxFit.contain,
+                          child: SizedBox(
+                            width: 320,
+                            height: 320,
+                            child: FadeTransition(
+                              opacity: CurvedAnimation(
+                                parent: _entranceController,
+                                curve: const Interval(
+                                  0,
+                                  0.35,
+                                  curve: Curves.easeOut,
+                                ),
+                              ),
+                              child: CommunityPreview(
+                                entrance: _entranceController.value,
+                                float: _floatController.value,
+                                pulse: _pulseController.value,
+                                reduceMotion: widget.reduceMotion,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Share ramp and elevator observations. Reports are public after upload acknowledgement; rewards need review.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 24 / 16,
-                    fontWeight: context.isHighContrast
-                        ? FontWeight.w600
-                        : FontWeight.normal,
-                    color: context.isHighContrast
-                        ? Colors.black
-                        : AppColors.onSurfaceVariant,
+                const SizedBox(height: 24),
+                FadeTransition(
+                  opacity: CurvedAnimation(
+                    parent: _entranceController,
+                    curve: const Interval(0.35, 0.8, curve: Curves.easeOut),
+                  ),
+                  child: SlideTransition(
+                    position:
+                        Tween<Offset>(
+                          begin: const Offset(0, 0.12),
+                          end: Offset.zero,
+                        ).animate(
+                          CurvedAnimation(
+                            parent: _entranceController,
+                            curve: const Interval(
+                              0.35,
+                              0.8,
+                              curve: Curves.easeOutCubic,
+                            ),
+                          ),
+                        ),
+                    child: Column(
+                      children: [
+                        Text(
+                          context.l10n.onboardingCommunity,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: wide ? 24 : 22,
+                            height: wide ? 32 / 24 : 28 / 22,
+                            fontWeight: FontWeight.w700,
+                            color: context.textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          context.l10n.onboardingReportsHelp,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            height: 24 / 16,
+                            fontWeight: context.isHighContrast
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: context.isHighContrast
+                                ? Colors.black
+                                : AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }

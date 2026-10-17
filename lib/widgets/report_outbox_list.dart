@@ -1,3 +1,6 @@
+import '../l10n/localization_context.dart';
+import '../l10n/report_view_presentation.dart';
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
@@ -35,7 +38,7 @@ class ReportOutboxList extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Your uploads',
+              context.l10n.outboxTitle,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -44,7 +47,7 @@ class ReportOutboxList extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Drafts expire after 7 days. Open an upload to retry or remove it. Sign-out removes local drafts.',
+              context.l10n.outboxHelp,
               style: TextStyle(
                 fontSize: 14,
                 height: 1.4,
@@ -80,7 +83,11 @@ class ReportOutboxList extends StatelessWidget {
                       color: context.primaryColor,
                     ),
                     title: Text(entry.report.problemType),
-                    subtitle: Text(entry.report.publicationState.label),
+                    subtitle: Text(
+                      context.reportViewText(
+                        entry.report.publicationState.label,
+                      ),
+                    ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(

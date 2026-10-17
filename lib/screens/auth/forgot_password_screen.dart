@@ -1,5 +1,10 @@
+import '../../widgets/accessible_tap_target.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import '../../l10n/localization_context.dart';
+import '../../l10n/recovery_presentation.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -9,9 +14,10 @@ import '../../widgets/auth/auth_input_field.dart';
 import 'login_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key, this.initialEmail});
+  const ForgotPasswordScreen({super.key, this.initialEmail, this.authService});
 
   final String? initialEmail;
+  final AuthService? authService;
 
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
@@ -21,7 +27,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final AuthService _authService = AuthService();
+  late final AuthService _authService = widget.authService ?? AuthService();
 
   late final AnimationController _entranceController;
   late final AnimationController _buttonScaleController;
@@ -31,6 +37,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
   bool _isLoading = false;
   bool _emailSent = false;
+  String? _sentToEmail;
   bool _autoValidate = false;
 
   static const _staggerDelay = 0.1;
@@ -59,10 +66,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     );
 
     _buttonScale = Tween<double>(begin: 1, end: 0.98).animate(
-      CurvedAnimation(
-        parent: _buttonScaleController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _buttonScaleController, curve: Curves.easeInOut),
     );
 
     _successScale = CurvedAnimation(
@@ -102,10 +106,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   Widget _staggered(int index, Widget child) {
     return FadeTransition(
       opacity: _fade(index),
-      child: SlideTransition(
-        position: _slide(index),
-        child: child,
-      ),
+      child: SlideTransition(position: _slide(index), child: child),
     );
   }
 
@@ -113,20 +114,22 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     FocusScope.of(context).unfocus();
     setState(() => _autoValidate = true);
 
-    if (!_formKey.currentState!.validate()) {
+    if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
 
+    final email = _emailController.text.trim();
     setState(() => _isLoading = true);
 
     try {
-      await _authService.sendPasswordResetEmail(_emailController.text.trim());
+      await _authService.sendPasswordResetEmail(email);
 
       if (!mounted) return;
 
       setState(() {
         _isLoading = false;
         _emailSent = true;
+        _sentToEmail = email;
       });
       _successController.forward(from: 0);
     } on FirebaseAuthException catch (e) {
@@ -145,9 +148,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
-          backgroundColor:
-              isError ? AppColors.error : AppColors.primaryContainer,
+          content: Text(context.recoveryText(message)),
+          backgroundColor: isError
+              ? AppColors.error
+              : AppColors.primaryContainer,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           margin: const EdgeInsets.all(16),
@@ -155,27 +159,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       );
   }
 
-  String _getErrorMessage(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'invalid-email':
-        return 'Please enter a valid email address.';
-      case 'user-not-found':
-        return 'No account was found with this email address.';
-      case 'user-disabled':
-        return 'This account has been disabled.';
-      case 'too-many-requests':
-        return 'Too many requests. Please try again later.';
-      case 'network-request-failed':
-        return 'Network error. Please check your internet connection.';
-      default:
-        return e.message ?? 'Unable to send password reset email.';
-    }
-  }
+  String _getErrorMessage(FirebaseAuthException e) =>
+      context.recoveryFailure(e.code, reset: false);
 
   void _goToLogin() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   @override
@@ -213,8 +203,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                         );
                       },
                       child: _emailSent
-                          ? _buildSuccessContent(isHC, key: const ValueKey('success'))
-                          : _buildFormContent(isHC, key: const ValueKey('form')),
+                          ? _buildSuccessContent(
+                              isHC,
+                              key: const ValueKey('success'),
+                            )
+                          : _buildFormContent(
+                              isHC,
+                              key: const ValueKey('form'),
+                            ),
                     ),
                   ),
                 ),
@@ -246,8 +242,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 ),
               ],
       ),
-      child: SizedBox(
-        height: 56,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
         child: Row(
           children: [
             IconButton(
@@ -255,16 +251,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
               onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
               icon: Icon(Icons.arrow_back_rounded, size: context.tapIconSize),
               color: isHC ? Colors.black : AppColors.primary,
-              tooltip: 'Go back',
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
             ),
-            Text(
-              'Reset Password',
-              style: TextStyle(
-                fontSize: 22,
-                height: 28 / 22,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.2,
-                color: isHC ? Colors.black : AppColors.primary,
+            Expanded(
+              child: Text(
+                context.l10n.recoveryTitle,
+                style: TextStyle(
+                  fontSize: 22,
+                  height: 28 / 22,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                  color: isHC ? Colors.black : AppColors.primary,
+                ),
               ),
             ),
           ],
@@ -321,7 +319,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
           ),
         ),
         Text(
-          'Check your email',
+          context.l10n.recoveryCheckEmail,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 32,
@@ -333,18 +331,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         ),
         const SizedBox(height: 8),
         Text(
-          'We sent password reset instructions to\n${_emailController.text.trim()}',
+          context.l10n.recoveryInstructionsSent(_sentToEmail ?? ''),
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 16,
             height: 24 / 16,
             fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
-            color: isHC ? Colors.black : AppColors.onSurfaceVariant.withValues(alpha: 0.95),
+            color: isHC
+                ? Colors.black
+                : AppColors.onSurfaceVariant.withValues(alpha: 0.95),
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Please check your inbox and follow the link to create a new password.',
+          context.l10n.recoveryInboxHelp,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
@@ -353,16 +353,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
           ),
         ),
         const SizedBox(height: 32),
-        SizedBox(
-          height: context.buttonHeight,
+        ConstrainedBox(
+          constraints: BoxConstraints(minHeight: context.buttonHeight),
           child: FilledButton(
             onPressed: _goToLogin,
             style: FilledButton.styleFrom(
-              backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+              backgroundColor: isHC
+                  ? const Color(0xFF001F3F)
+                  : AppColors.primaryContainer,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+                side: isHC
+                    ? const BorderSide(color: Colors.black, width: 2)
+                    : BorderSide.none,
               ),
               textStyle: TextStyle(
                 fontSize: context.hasLargeTargets ? 15.5 : 14,
@@ -371,7 +375,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 letterSpacing: 0.1,
               ),
             ),
-            child: const Text('Back to Login'),
+            child: Text(context.l10n.recoveryBackLogin),
           ),
         ),
         const SizedBox(height: 12),
@@ -384,10 +388,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 },
           style: TextButton.styleFrom(
             foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
-            minimumSize: Size(48, context.minTapHeight),
+            minimumSize: Size(context.buttonHeight, context.minTapHeight),
           ),
           child: Text(
-            'Resend email',
+            context.l10n.recoveryResend,
             style: TextStyle(
               fontSize: context.hasLargeTargets ? 15.5 : 14,
               fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
@@ -421,7 +425,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     return Column(
       children: [
         Text(
-          'Forgot your password?',
+          context.l10n.recoveryForgot,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 32,
@@ -433,13 +437,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         ),
         const SizedBox(height: 8),
         Text(
-          'Enter the email address associated with your account and we\'ll send you instructions to reset your password.',
+          context.l10n.recoveryEmailHelp,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 16,
             height: 24 / 16,
             fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
-            color: isHC ? Colors.black : AppColors.onSurfaceVariant.withValues(alpha: 0.95),
+            color: isHC
+                ? Colors.black
+                : AppColors.onSurfaceVariant.withValues(alpha: 0.95),
           ),
         ),
       ],
@@ -452,13 +458,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       children: [
         AuthInputField(
           controller: _emailController,
-          label: 'Email Address',
-          hint: 'e.g., name@example.com',
+          label: context.l10n.recoveryEmail,
+          hint: context.l10n.recoveryEmailHint,
           prefixIcon: Icons.mail_outline_rounded,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.done,
           autofillHints: const [AutofillHints.email],
-          validator: Validators.email,
+          validator: (v) => context.recoveryValidation(Validators.email(v)),
           onFieldSubmitted: (_) {
             if (!_isLoading) _sendResetEmail();
           },
@@ -467,12 +473,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         Padding(
           padding: const EdgeInsets.only(left: 4),
           child: Text(
-            'We will never share your email.',
+            context.l10n.recoveryPrivacy,
             style: TextStyle(
               fontSize: 14,
               height: 20 / 14,
               fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
-              color: isHC ? Colors.black : AppColors.onSurfaceVariant.withValues(alpha: 0.85),
+              color: isHC
+                  ? Colors.black
+                  : AppColors.onSurfaceVariant.withValues(alpha: 0.85),
             ),
           ),
         ),
@@ -481,45 +489,51 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   Widget _buildSendButton(bool isHC) {
-    return GestureDetector(
-      onTapDown: _isLoading ? null : (_) => _buttonScaleController.forward(),
-      onTapUp: _isLoading ? null : (_) => _buttonScaleController.reverse(),
-      onTapCancel: () => _buttonScaleController.reverse(),
-      child: ScaleTransition(
-        scale: _buttonScale,
-        child: SizedBox(
-          height: context.buttonHeight,
-          child: FilledButton(
-            onPressed: _isLoading ? null : _sendResetEmail,
-            style: FilledButton.styleFrom(
-              backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: isHC
-                  ? const Color(0xFF001F3F).withValues(alpha: 0.6)
-                  : AppColors.primaryContainer.withValues(alpha: 0.6),
-              disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+    return AccessibleTapTarget(
+      child: GestureDetector(
+        onTapDown: _isLoading ? null : (_) => _buttonScaleController.forward(),
+        onTapUp: _isLoading ? null : (_) => _buttonScaleController.reverse(),
+        onTapCancel: () => _buttonScaleController.reverse(),
+        child: ScaleTransition(
+          scale: _buttonScale,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: context.buttonHeight),
+            child: FilledButton(
+              onPressed: _isLoading ? null : _sendResetEmail,
+              style: FilledButton.styleFrom(
+                backgroundColor: isHC
+                    ? const Color(0xFF001F3F)
+                    : AppColors.primaryContainer,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: isHC
+                    ? const Color(0xFF001F3F).withValues(alpha: 0.6)
+                    : AppColors.primaryContainer.withValues(alpha: 0.6),
+                disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: isHC
+                      ? const BorderSide(color: Colors.black, width: 2)
+                      : BorderSide.none,
+                ),
+                elevation: 0,
+                textStyle: TextStyle(
+                  fontSize: context.hasLargeTargets ? 15.5 : 14,
+                  height: 20 / 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
+                ),
               ),
-              elevation: 0,
-              textStyle: TextStyle(
-                fontSize: context.hasLargeTargets ? 15.5 : 14,
-                height: 20 / 14,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.1,
-              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(context.l10n.recoverySend),
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Send Reset Link'),
           ),
         ),
       ),
@@ -532,7 +546,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         onPressed: _isLoading ? null : _goToLogin,
         style: TextButton.styleFrom(
           foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
-          minimumSize: Size(48, context.minTapHeight),
+          minimumSize: Size(context.buttonHeight, context.minTapHeight),
           padding: EdgeInsets.symmetric(
             horizontal: 16,
             vertical: context.hasLargeTargets ? 12 : 8,
@@ -542,7 +556,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
           ),
         ),
         child: Text(
-          'Back to Login',
+          context.l10n.recoveryBackLogin,
           style: TextStyle(
             fontSize: context.hasLargeTargets ? 15.5 : 14,
             height: 20 / 14,

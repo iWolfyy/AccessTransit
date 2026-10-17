@@ -1,3 +1,4 @@
+import '../../l10n/reward_presentation.dart';
 import '../../l10n/localization_context.dart';
 import '../../services/moderation_mode.dart';
 import '../../services/moderation_client.dart';
@@ -115,7 +116,7 @@ class _RewardsContributionsScreenState
           _TopBar(
             onBack: () => Navigator.of(context).maybePop(),
             onSettings: () =>
-                _showSnack(context, 'Settings will be available soon.'),
+                _showSnack(context, context.l10n.rewardsSettingsSoon),
           ),
           Expanded(
             child: _isLoading
@@ -128,7 +129,7 @@ class _RewardsContributionsScreenState
                     padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
                     children: [
                       Text(
-                        'My Contributions',
+                        context.l10n.rewardsMine,
                         style: TextStyle(
                           fontSize: 22,
                           height: 28 / 22,
@@ -138,7 +139,9 @@ class _RewardsContributionsScreenState
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        ModerationMode.enabled ? context.l10n.v2PointsNotice : 'Points update after administrator review and may take time. Published report: 10 points; unique confirmation: 5 points. Removed votes and hidden/deleted reports reverse credits. Points do not verify accessibility and have no cash value.',
+                        ModerationMode.enabled
+                            ? context.l10n.v2PointsNotice
+                            : context.l10n.rewardsLegacyNotice,
                       ),
                       const SizedBox(height: 16),
                       if (ModerationMode.enabled &&
@@ -158,7 +161,7 @@ class _RewardsContributionsScreenState
                               iconBg: AppColors.primaryFixed,
                               iconColor: AppColors.primaryContainer,
                               value: '$reports',
-                              label: 'Reports Submitted',
+                              label: context.l10n.rewardsReports,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -168,14 +171,16 @@ class _RewardsContributionsScreenState
                               iconBg: AppColors.secondaryContainer,
                               iconColor: AppColors.onSecondaryContainer,
                               value: '$verified',
-                              label: 'Recorded Confirmations',
+                              label: context.l10n.rewardsConfirmations,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 32),
-                      SizedBox(
-                        height: context.buttonHeight,
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: context.buttonHeight,
+                        ),
                         child: FilledButton.icon(
                           onPressed: () {
                             Navigator.of(context).push(
@@ -217,7 +222,7 @@ class _RewardsContributionsScreenState
                             Icons.badge_outlined,
                             size: context.tapIconSize,
                           ),
-                          label: const Text('View Membership Card'),
+                          label: Text(context.l10n.rewardsViewCard),
                         ),
                       ),
                     ],
@@ -249,15 +254,15 @@ class _TopBar extends StatelessWidget {
           : null,
       child: SafeArea(
         bottom: false,
-        child: SizedBox(
-          height: 64,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 64),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
                 IconButton(
                   onPressed: onBack,
-                  tooltip: 'Go back',
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                   constraints: BoxConstraints(
                     minWidth: context.minTapHeight,
                     minHeight: context.minTapHeight,
@@ -270,7 +275,7 @@ class _TopBar extends StatelessWidget {
                 ),
                 Expanded(
                   child: Text(
-                    'Rewards & Contributions',
+                    context.l10n.rewardsTitle,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
@@ -282,7 +287,7 @@ class _TopBar extends StatelessWidget {
                 ),
                 IconButton(
                   onPressed: onSettings,
-                  tooltip: 'Settings',
+                  tooltip: context.l10n.profileSettings,
                   constraints: BoxConstraints(
                     minWidth: context.minTapHeight,
                     minHeight: context.minTapHeight,
@@ -361,8 +366,8 @@ class _PointsHeroCard extends StatelessWidget {
                       ? Border.all(color: Colors.black, width: 1.5)
                       : null,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Icon(
                       Icons.stars,
@@ -373,7 +378,7 @@ class _PointsHeroCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Level: $levelLabel',
+                      context.l10n.rewardsLevel(context.rewardTier(levelLabel)),
                       style: TextStyle(
                         fontSize: 14,
                         height: 20 / 14,
@@ -400,7 +405,7 @@ class _PointsHeroCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Total Points',
+                context.l10n.rewardsTotal,
                 style: TextStyle(
                   fontSize: 18,
                   height: 24 / 18,

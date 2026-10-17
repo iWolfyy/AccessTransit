@@ -1,3 +1,6 @@
+import '../../l10n/driver_presentation.dart';
+import '../../l10n/localization_context.dart';
+import '../../l10n/legacy_journey_presentation.dart';
 import '../../widgets/fare_estimate_text.dart';
 import '../../widgets/published_timetable_notice.dart';
 import '../../widgets/evidence_refresh.dart';
@@ -50,9 +53,13 @@ class RouteDetailsScreen extends StatelessWidget {
     final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
     final effectiveBusId = bus?.id ?? route?.busId ?? '';
     if (effectiveBusId.isEmpty) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
-          child: Text('Service unavailable. Select a shared service first.'),
+          child: Text(
+            context.legacyText(
+              'Service unavailable. Select a shared service first.',
+            ),
+          ),
         ),
       );
     }
@@ -73,9 +80,11 @@ class RouteDetailsScreen extends StatelessWidget {
                     : busSnapshot.data;
                 if (busSnapshot.connectionState != ConnectionState.waiting &&
                     liveBus == null) {
-                  return const Center(
+                  return Center(
                     child: Text(
-                      'This service is unavailable. Return to search.',
+                      context.legacyText(
+                        'This service is unavailable. Return to search.',
+                      ),
                     ),
                   );
                 }
@@ -113,15 +122,16 @@ class RouteDetailsScreen extends StatelessWidget {
                               )
                             : statusResult;
 
-                        String liveCrowdLevel = route?.crowdLevel ?? 'Low';
+                        String liveCrowdLevel =
+                            route?.crowdLevel ?? context.legacyText('Low');
                         if (liveBus != null) {
                           if (liveBus.occupancy.toLowerCase() == 'medium') {
-                            liveCrowdLevel = 'Medium';
+                            liveCrowdLevel = context.legacyText('Medium');
                           } else if (liveBus.occupancy.toLowerCase() ==
                               'high') {
-                            liveCrowdLevel = 'High';
+                            liveCrowdLevel = context.legacyText('High');
                           } else if (liveBus.occupancy.toLowerCase() == 'low') {
-                            liveCrowdLevel = 'Low';
+                            liveCrowdLevel = context.legacyText('Low');
                           }
                         }
 
@@ -144,11 +154,15 @@ class RouteDetailsScreen extends StatelessWidget {
                                   children: [
                                     if (route?.nextDepartureDateTime != null)
                                       Text(
-                                        'Selected timetable departure: ${route!.nextDepartureDateTime} — current GPS does not confirm this scheduled run.',
+                                        context.l10n.legacyFormat19(
+                                          '${route!.nextDepartureDateTime}',
+                                        ),
                                       ),
                                     if (route?.usesEstimatedTimes == true)
-                                      const Text(
-                                        'Some timetable intervals are missing. Times include model estimates; confirm them with the operator.',
+                                      Text(
+                                        context.legacyText(
+                                          'Some timetable intervals are missing. Times include model estimates; confirm them with the operator.',
+                                        ),
                                       ),
                                     // SECTION 1: Departure Details & Stop Schedule
                                     _DepartureAndStopsCard(
@@ -279,11 +293,11 @@ class _TopBar extends StatelessWidget {
                   onPressed: onBack,
                   icon: const Icon(Icons.arrow_back_rounded, size: 28),
                   color: isHC ? Colors.black : AppColors.primary,
-                  tooltip: 'Back',
+                  tooltip: context.legacyText('Back'),
                 ),
                 Expanded(
                   child: Text(
-                    'Departure & Route Details',
+                    context.legacyText('Departure & Route Details'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
@@ -322,9 +336,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final effectiveBus =
         bus ??
-        const Bus(
+        Bus(
           id: '',
-          routeNo: 'Unknown',
+          routeNo: context.legacyText('Unknown'),
           hasRamp: false,
           lowFloor: false,
           rampOk: null,
@@ -392,8 +406,10 @@ class _DepartureAndStopsCard extends StatelessWidget {
                     children: [
                       PublishedTimetableNotice(bus: effectiveBus),
                       if (liveLocation?.isCached == true)
-                        const Text(
-                          'Saved location - live updates unavailable. This is not current bus movement.',
+                        Text(
+                          context.legacyText(
+                            'Saved location - live updates unavailable. This is not current bus movement.',
+                          ),
                         ),
                       // 1. ROUTE PILL & LIVE TELEMETRY STATUS
                       Row(
@@ -413,7 +429,7 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                   : null,
                             ),
                             child: Text(
-                              'Route $busNumber',
+                              context.l10n.legacyFormat1(busNumber),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -501,7 +517,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 5),
                                 Text(
-                                  etaResult.isLive ? 'LIVE GPS' : 'SCHEDULE',
+                                  etaResult.isLive
+                                      ? context.legacyText('LIVE GPS')
+                                      : context.legacyText('SCHEDULE'),
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
@@ -605,7 +623,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                           : null,
                                     ),
                                     child: Text(
-                                      '+${etaResult.delayMinutes} min late',
+                                      context.l10n.legacyFormat20(
+                                        '${etaResult.delayMinutes}',
+                                      ),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -650,7 +670,12 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
-                                        'Driver Alert: ${etaResult.delayReason} (+${etaResult.addedDelayMinutes}m)',
+                                        context.l10n.legacyFormat21(
+                                          context.driverText(
+                                            etaResult.delayReason ?? '',
+                                          ),
+                                          '${etaResult.addedDelayMinutes}',
+                                        ),
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700,
@@ -708,7 +733,7 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        etaResult.countdownText,
+                                        context.driverCountdown(etaResult),
                                         style: TextStyle(
                                           fontSize: 22,
                                           fontWeight: FontWeight.w800,
@@ -723,7 +748,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        'at ${etaResult.targetStopName}',
+                                        context.l10n.legacyFormat22(
+                                          etaResult.targetStopName,
+                                        ),
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w600,
@@ -755,7 +782,7 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'SCHEDULED',
+                                        context.legacyText('SCHEDULED'),
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
@@ -792,7 +819,7 @@ class _DepartureAndStopsCard extends StatelessWidget {
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
                                       Text(
-                                        'EXPECTED ARRIVAL',
+                                        context.legacyText('EXPECTED ARRIVAL'),
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
@@ -873,8 +900,12 @@ class _DepartureAndStopsCard extends StatelessWidget {
                         icon: const Icon(Icons.assist_walker_rounded, size: 20),
                         label: Text(
                           effectiveBus.isPublishedTimetable
-                              ? 'Driver assistance unavailable'
-                              : 'Request Boarding Assistance',
+                              ? context.legacyText(
+                                  'Driver assistance unavailable',
+                                )
+                              : context.legacyText(
+                                  'Request Boarding Assistance',
+                                ),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -889,7 +920,9 @@ class _DepartureAndStopsCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Route Stops Schedule & Live Progress',
+                            context.legacyText(
+                              'Route Stops Schedule & Live Progress',
+                            ),
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -1000,7 +1033,7 @@ class _DepartureAndStopsCard extends StatelessWidget {
           const SizedBox(width: 6),
           Flexible(
             child: Text(
-              eta.delayLabel,
+              context.driverText(eta.delayLabel),
               style: TextStyle(
                 color: text,
                 fontWeight: FontWeight.bold,
@@ -1070,10 +1103,10 @@ class _DepartureAndStopsCard extends StatelessWidget {
         nodeColor = AppColors.surfaceVariant;
         nodeIcon = Text(
           '${stop.stopIndex + 1}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: AppColors.onSurface,
+            color: context.textColor,
           ),
         );
       }
@@ -1154,8 +1187,8 @@ class _DepartureAndStopsCard extends StatelessWidget {
                               ? Border.all(color: Colors.black, width: 1)
                               : null,
                         ),
-                        child: const Text(
-                          'YOUR BOARDING STOP',
+                        child: Text(
+                          context.legacyText('YOUR BOARDING STOP'),
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -1179,8 +1212,8 @@ class _DepartureAndStopsCard extends StatelessWidget {
                               ? Border.all(color: Colors.black, width: 1)
                               : null,
                         ),
-                        child: const Text(
-                          'BUS IS HERE NOW',
+                        child: Text(
+                          context.legacyText('BUS IS HERE NOW'),
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -1211,8 +1244,11 @@ class _DepartureAndStopsCard extends StatelessWidget {
                   children: [
                     Text(
                       stop.isPassed
-                          ? 'Passed at ${stop.estimatedTimeStr}'
-                          : 'Sched: ${stop.scheduledTimeStr} · Exp: ${stop.estimatedTimeStr}',
+                          ? context.l10n.legacyFormat23(stop.estimatedTimeStr)
+                          : context.l10n.legacyFormat24(
+                              stop.scheduledTimeStr,
+                              stop.estimatedTimeStr,
+                            ),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -1227,7 +1263,7 @@ class _DepartureAndStopsCard extends StatelessWidget {
                         stop.delayType == DelayType.delayed) ...[
                       const SizedBox(width: 6),
                       Text(
-                        '(+${stop.delayMinutes} min late)',
+                        context.l10n.legacyFormat25('${stop.delayMinutes}'),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -1302,7 +1338,7 @@ class _TicketPriceCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Estimated fare',
+                  context.legacyText('Estimated fare'),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -1320,7 +1356,9 @@ class _TicketPriceCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Selected segment estimate; payment options unverified.',
+                  context.legacyText(
+                    'Selected segment estimate; payment options unverified.',
+                  ),
                   style: TextStyle(fontSize: 13, color: context.subtextColor),
                 ),
               ],
@@ -1353,7 +1391,10 @@ class _SafetyAndAccessibilityCard extends StatelessWidget {
         AccessibilityStatus.unknown;
     final reasons =
         statusResult?.reasons ??
-        [route?.summary ?? 'Unknown — no condition evidence available.'];
+        [
+          route?.summary ??
+              context.legacyText('Unknown — no condition evidence available.'),
+        ];
 
     Color headerColor;
     Color bgColor;
@@ -1366,25 +1407,25 @@ class _SafetyAndAccessibilityCard extends StatelessWidget {
           headerColor = const Color(0xFF003833);
           bgColor = Colors.white;
           statusIcon = Icons.check_circle_rounded;
-          statusTitle = 'ACCESSIBLE VEHICLE FEATURES';
+          statusTitle = context.legacyText('ACCESSIBLE VEHICLE FEATURES');
           break;
         case AccessibilityStatus.partial:
           headerColor = const Color(0xFF8B4500);
           bgColor = Colors.white;
           statusIcon = Icons.warning_rounded;
-          statusTitle = 'ACCESSIBILITY WARNING';
+          statusTitle = context.legacyText('ACCESSIBILITY WARNING');
           break;
         case AccessibilityStatus.notAccessible:
           headerColor = const Color(0xFF8B0000);
           bgColor = Colors.white;
           statusIcon = Icons.cancel_rounded;
-          statusTitle = 'NOT ACCESSIBLE NOTICE';
+          statusTitle = context.legacyText('NOT ACCESSIBLE NOTICE');
           break;
         case AccessibilityStatus.unknown:
           headerColor = Colors.black;
           bgColor = Colors.white;
           statusIcon = Icons.help_outline;
-          statusTitle = 'CONDITION UNKNOWN';
+          statusTitle = context.legacyText('CONDITION UNKNOWN');
           break;
       }
     } else {
@@ -1393,25 +1434,25 @@ class _SafetyAndAccessibilityCard extends StatelessWidget {
           headerColor = Colors.green.shade800;
           bgColor = Colors.green.shade50;
           statusIcon = Icons.check_circle_rounded;
-          statusTitle = 'ACCESSIBLE VEHICLE FEATURES';
+          statusTitle = context.legacyText('ACCESSIBLE VEHICLE FEATURES');
           break;
         case AccessibilityStatus.partial:
           headerColor = Colors.amber.shade900;
           bgColor = Colors.amber.shade50;
           statusIcon = Icons.warning_rounded;
-          statusTitle = 'ACCESSIBILITY WARNING';
+          statusTitle = context.legacyText('ACCESSIBILITY WARNING');
           break;
         case AccessibilityStatus.notAccessible:
           headerColor = AppColors.error;
           bgColor = AppColors.error.withValues(alpha: 0.08);
           statusIcon = Icons.cancel_rounded;
-          statusTitle = 'NOT ACCESSIBLE NOTICE';
+          statusTitle = context.legacyText('NOT ACCESSIBLE NOTICE');
           break;
         case AccessibilityStatus.unknown:
           headerColor = AppColors.onSurfaceVariant;
           bgColor = AppColors.surfaceContainer;
           statusIcon = Icons.help_outline;
-          statusTitle = 'CONDITION UNKNOWN';
+          statusTitle = context.legacyText('CONDITION UNKNOWN');
           break;
       }
     }
@@ -1464,7 +1505,7 @@ class _SafetyAndAccessibilityCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Safety & Ride Conditions',
+            context.legacyText('Safety & Ride Conditions'),
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.bold,
@@ -1474,17 +1515,21 @@ class _SafetyAndAccessibilityCard extends StatelessWidget {
           const SizedBox(height: 12),
           _SafetyBulletItem(
             icon: Icons.groups_rounded,
-            title: 'Bus Crowd Level',
-            subtitle: '$crowdLevel crowding',
+            title: context.legacyText('Bus Crowd Level'),
+            subtitle: context.l10n.legacyFormat26(
+              context.driverText(crowdLevel),
+            ),
             iconColor: isHC ? Colors.black : AppColors.secondary,
           ),
           const SizedBox(height: 12),
           _SafetyBulletItem(
             icon: Icons.verified_user_rounded,
-            title: 'Community Safety Reports',
+            title: context.legacyText('Community Safety Reports'),
             subtitle: reasons.isNotEmpty
                 ? reasons.join(' · ')
-                : 'Unknown — no condition evidence available.',
+                : context.legacyText(
+                    'Unknown — no condition evidence available.',
+                  ),
             iconColor: isHC ? Colors.black : Colors.blue.shade700,
           ),
         ],
@@ -1578,7 +1623,7 @@ class _ActionButtons extends StatelessWidget {
               ),
             ),
             icon: Icon(Icons.map_rounded, size: context.tapIconSize),
-            label: const Text('Review and confirm journey'),
+            label: Text(context.legacyText('Review and confirm journey')),
           ),
         ),
         const SizedBox(height: 12),
@@ -1602,7 +1647,7 @@ class _ActionButtons extends StatelessWidget {
               ),
             ),
             icon: Icon(Icons.bookmark_add_outlined, size: context.tapIconSize),
-            label: const Text('Save to Trip Plan'),
+            label: Text(context.legacyText('Save to Trip Plan')),
           ),
         ),
         const SizedBox(height: 12),
@@ -1634,7 +1679,7 @@ class _ActionButtons extends StatelessWidget {
               Icons.report_problem_outlined,
               size: context.tapIconSize,
             ),
-            label: const Text('Report Accessibility Condition'),
+            label: Text(context.legacyText('Report Accessibility Condition')),
           ),
         ),
       ],

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../l10n/localization_context.dart';
+
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -37,10 +40,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       duration: const Duration(milliseconds: 120),
     );
     _buttonScale = Tween<double>(begin: 1, end: 0.95).animate(
-      CurvedAnimation(
-        parent: _buttonScaleController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _buttonScaleController, curve: Curves.easeInOut),
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -60,16 +60,23 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         },
         transitionDuration: const Duration(milliseconds: 450),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          final fade = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+          final fade = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOut,
+          );
           return FadeTransition(
             opacity: fade,
             child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.04, 0),
-                end: Offset.zero,
-              ).animate(
-                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-              ),
+              position:
+                  Tween<Offset>(
+                    begin: const Offset(0.04, 0),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
               child: child,
             ),
           );
@@ -80,10 +87,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   Future<void> _onNext() async {
     if (_index < OnboardingScreen.pageCount - 1) {
+      if (_prefersReducedMotion) {
+        _pageController.jumpToPage(_index + 1);
+        return;
+      }
       await _pageController.nextPage(
-        duration: _prefersReducedMotion
-            ? Duration.zero
-            : const Duration(milliseconds: 420),
+        duration: const Duration(milliseconds: 420),
         curve: Curves.easeOutCubic,
       );
       return;
@@ -162,8 +171,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Widget _buildHeader(bool isHC) {
-    return SizedBox(
-      height: context.minTapHeight,
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: context.minTapHeight),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
@@ -174,33 +183,42 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               size: context.tapIconSize,
             ),
             const SizedBox(width: 4),
-            Text(
-              'Access Transit',
-              style: TextStyle(
-                fontSize: 18,
-                height: 24 / 18,
-                fontWeight: FontWeight.w700,
-                color: isHC ? Colors.black : AppColors.primary,
+            Expanded(
+              child: Text(
+                'Access Transit',
+                style: TextStyle(
+                  fontSize: 18,
+                  height: 24 / 18,
+                  fontWeight: FontWeight.w700,
+                  color: isHC ? Colors.black : AppColors.primary,
+                ),
               ),
             ),
-            const Spacer(),
-            Tooltip(
-              message: 'Skip onboarding',
-              child: TextButton(
-                onPressed: _finish,
-                style: TextButton.styleFrom(
-                  foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
-                  minimumSize: Size(context.minTapHeight, context.minTapHeight),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  shape: const StadiumBorder(),
-                  textStyle: TextStyle(
-                    fontSize: context.buttonFontSize,
-                    height: 20 / 14,
-                    fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
-                    letterSpacing: 0.1,
+            const SizedBox(width: 8),
+            Flexible(
+              child: Tooltip(
+                message: context.l10n.onboardingSkipTooltip,
+                child: TextButton(
+                  onPressed: _finish,
+                  style: TextButton.styleFrom(
+                    foregroundColor: isHC
+                        ? const Color(0xFF001F3F)
+                        : AppColors.primary,
+                    minimumSize: Size(
+                      context.minTapHeight,
+                      context.minTapHeight,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    shape: const StadiumBorder(),
+                    textStyle: TextStyle(
+                      fontSize: context.buttonFontSize,
+                      height: 20 / 14,
+                      fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
+                      letterSpacing: 0.1,
+                    ),
                   ),
+                  child: Text(context.l10n.onboardingSkip),
                 ),
-                child: const Text('Skip'),
               ),
             ),
           ],
@@ -239,9 +257,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget _buildNextButton(bool isHC) {
     return ScaleTransition(
       scale: _buttonScale,
-      child: SizedBox(
-        width: double.infinity,
-        height: context.buttonHeight,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minWidth: double.infinity,
+          minHeight: context.buttonHeight,
+        ),
         child: Listener(
           onPointerDown: (_) => _buttonScaleController.forward(),
           onPointerUp: (_) => _buttonScaleController.reverse(),
@@ -249,11 +269,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           child: FilledButton(
             onPressed: _onNext,
             style: FilledButton.styleFrom(
-              backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+              backgroundColor: isHC
+                  ? const Color(0xFF001F3F)
+                  : AppColors.primaryContainer,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+                side: isHC
+                    ? const BorderSide(color: Colors.black, width: 2)
+                    : BorderSide.none,
               ),
               elevation: 0,
               textStyle: TextStyle(
@@ -269,8 +293,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   : const Duration(milliseconds: 220),
               child: Text(
                 _index == OnboardingScreen.pageCount - 1
-                    ? 'Get Started'
-                    : 'Next',
+                    ? context.l10n.onboardingStart
+                    : context.l10n.onboardingNext,
                 key: ValueKey(_index == OnboardingScreen.pageCount - 1),
               ),
             ),

@@ -10,6 +10,7 @@
     <application
         android:label="${appLabel}"
         android:usesCleartextTraffic="${localHttp}"
+        android:networkSecurityConfig="${networkSecurity}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <!-- Explicit opt-in; local/demo builds never register with FCM. -->

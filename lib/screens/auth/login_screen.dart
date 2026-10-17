@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../l10n/localization_context.dart';
+import '../../l10n/login_settings_presentation.dart';
 import '../../widgets/language_selector.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -17,7 +18,8 @@ import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.authService});
+  final AuthService? authService;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -27,7 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final AuthService _authService = AuthService();
+  late final AuthService _authService = widget.authService ?? AuthService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -85,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _showMessage(_getAuthErrorMessage(e), isError: true);
     } catch (e) {
       if (!mounted) return;
-      _showMessage('Login failed. Please try again.', isError: true);
+      _showMessage(context.l10n.loginFailed, isError: true);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -94,7 +96,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showComingSoon(String feature) {
-    _showMessage('$feature will be available in a future update.');
+    _showMessage(
+      context.l10n.profileComingSoon(context.loginSettingsText(feature)),
+    );
   }
 
   void _showMessage(String message, {bool isError = false}) {
@@ -113,24 +117,8 @@ class _LoginScreenState extends State<LoginScreen> {
       );
   }
 
-  String _getAuthErrorMessage(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'invalid-credential':
-      case 'wrong-password':
-      case 'user-not-found':
-        return 'Invalid email or password. Please check your details and try again.';
-      case 'invalid-email':
-        return 'Please enter a valid email address.';
-      case 'user-disabled':
-        return 'This account has been disabled. Please contact support.';
-      case 'too-many-requests':
-        return 'Too many login attempts. Please wait a moment and try again.';
-      case 'network-request-failed':
-        return 'Network error. Please check your connection and try again.';
-      default:
-        return e.message ?? 'Unable to sign in. Please try again.';
-    }
-  }
+  String _getAuthErrorMessage(FirebaseAuthException e) =>
+      context.loginFailure(e.code);
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +170,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
                           autofillHints: const [AutofillHints.email],
-                          validator: Validators.email,
+                          validator: (v) =>
+                              context.loginValidation(Validators.email(v)),
                         ),
                         const SizedBox(height: 16),
                         _buildPasswordField(isHC),
@@ -268,18 +257,18 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          spacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Expanded(
-              child: Text(
-                'Password',
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 20 / 14,
-                  fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
-                  letterSpacing: 0.1,
-                  color: context.textColor,
-                ),
+            Text(
+              context.l10n.registrationPassword,
+              style: TextStyle(
+                fontSize: 14,
+                height: 20 / 14,
+                fontWeight: isHC ? FontWeight.w700 : FontWeight.w600,
+                letterSpacing: 0.1,
+                color: context.textColor,
               ),
             ),
             TextButton(
@@ -299,14 +288,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   horizontal: 6,
                   vertical: context.hasLargeTargets ? 8 : 4,
                 ),
-                minimumSize: Size(0, context.minTapHeight),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: Size(context.buttonHeight, context.minTapHeight),
+                tapTargetSize: MaterialTapTargetSize.padded,
                 foregroundColor: isHC
                     ? const Color(0xFF001F3F)
                     : AppColors.primary,
               ),
               child: Text(
-                'Forgot Password?',
+                context.l10n.loginForgot,
                 style: TextStyle(
                   fontSize: 12,
                   height: 16 / 12,
@@ -319,12 +308,12 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 4),
         AuthInputField(
           controller: _passwordController,
-          hint: 'Enter your password',
+          hint: context.l10n.loginPasswordHint,
           prefixIcon: Icons.lock_outline_rounded,
           obscureText: _obscurePassword,
           textInputAction: TextInputAction.done,
           autofillHints: const [AutofillHints.password],
-          validator: Validators.password,
+          validator: (v) => context.loginValidation(Validators.password(v)),
           onFieldSubmitted: (_) => _isLoading ? null : _login(),
           suffixIcon: IconButton(
             onPressed: () {
@@ -336,7 +325,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   : Icons.visibility_outlined,
               color: isHC ? Colors.black : AppColors.onSurfaceVariant,
             ),
-            tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+            tooltip: _obscurePassword
+                ? context.l10n.recoveryShow
+                : context.l10n.recoveryHide,
           ),
         ),
       ],
@@ -344,8 +335,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildSignInButton(bool isHC) {
-    return SizedBox(
-      height: context.buttonHeight,
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: context.buttonHeight),
       child: FilledButton(
         onPressed: _isLoading ? null : _login,
         style: FilledButton.styleFrom(
@@ -393,17 +384,19 @@ class _LoginScreenState extends State<LoginScreen> {
             height: 1,
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'Or continue with',
-            style: TextStyle(
-              fontSize: 12,
-              height: 16 / 12,
-              fontWeight: isHC ? FontWeight.w700 : FontWeight.w500,
-              color: isHC
-                  ? Colors.black
-                  : AppColors.onSurfaceVariant.withValues(alpha: 0.9),
+        Flexible(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              context.l10n.loginOrContinue,
+              style: TextStyle(
+                fontSize: 12,
+                height: 16 / 12,
+                fontWeight: isHC ? FontWeight.w700 : FontWeight.w500,
+                color: isHC
+                    ? Colors.black
+                    : AppColors.onSurfaceVariant.withValues(alpha: 0.9),
+              ),
             ),
           ),
         ),
@@ -419,14 +412,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildBiometricButton(bool isHC) {
-    return SizedBox(
-      height: context.buttonHeight,
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: context.buttonHeight),
       child: OutlinedButton.icon(
         onPressed: _isLoading
             ? null
             : () => _showComingSoon('Biometric sign-in'),
         icon: Icon(Icons.fingerprint_rounded, size: context.tapIconSize),
-        label: const Text('Sign in with Biometrics'),
+        label: Text(context.l10n.loginBiometrics),
         style: OutlinedButton.styleFrom(
           backgroundColor: isHC ? Colors.white : null,
           foregroundColor: isHC ? Colors.black : AppColors.primaryContainer,
@@ -447,12 +440,12 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildGoogleButton(bool isHC) {
-    return SizedBox(
-      height: context.buttonHeight,
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: context.buttonHeight),
       child: OutlinedButton.icon(
         onPressed: _isLoading ? null : () => _showComingSoon('Google sign-in'),
         icon: _GoogleLogo(size: context.tapIconSize),
-        label: const Text('Sign in with Google'),
+        label: Text(context.l10n.loginGoogle),
         style: OutlinedButton.styleFrom(
           backgroundColor: isHC ? Colors.white : null,
           foregroundColor: isHC ? Colors.black : AppColors.onSurface,
@@ -478,7 +471,7 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text(
-          'Don\'t have an account?',
+          context.l10n.loginNoAccount,
           style: TextStyle(
             fontSize: context.hasLargeTargets ? 15 : 14,
             height: 20 / 14,
@@ -499,11 +492,11 @@ class _LoginScreenState extends State<LoginScreen> {
               horizontal: 6,
               vertical: context.hasLargeTargets ? 10 : 4,
             ),
-            minimumSize: Size(0, context.minTapHeight),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            minimumSize: Size(context.buttonHeight, context.minTapHeight),
+            tapTargetSize: MaterialTapTargetSize.padded,
           ),
           child: Text(
-            'Sign up',
+            context.l10n.loginSignUp,
             style: TextStyle(
               fontSize: 14,
               height: 20 / 14,

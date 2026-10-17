@@ -1,3 +1,5 @@
+import '../l10n/evidence_presentation.dart';
+import '../l10n/localization_context.dart';
 import 'evidence_refresh.dart';
 
 import 'package:flutter/material.dart';
@@ -25,15 +27,15 @@ class BusRampObservation extends StatelessWidget {
         : null;
     final condition = bus?.rampCondition(currentTime: now);
     final label = condition == true
-        ? 'Working observed'
+        ? context.l10n.rampWorkingObserved
         : condition == false
-        ? 'Broken reported - unresolved warning'
-        : 'Unknown - a new check is required';
+        ? context.l10n.rampBrokenUnresolved
+        : context.l10n.rampNewCheck;
     final capability = bus == null
-        ? 'Unknown'
+        ? context.l10n.resultsUnknown
         : bus!.hasRamp
-        ? 'Equipped'
-        : 'Not listed';
+        ? context.l10n.rampEquipped
+        : context.l10n.rampNotListed;
     final hasSource = bus?.rampCheckedBy?.trim().isNotEmpty == true;
     final stateColor = context.isHighContrast
         ? Colors.black
@@ -72,7 +74,7 @@ class BusRampObservation extends StatelessWidget {
               color: stateColor,
             ),
             title: Text(
-              'Vehicle ramp',
+              context.l10n.rampTitle,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -95,11 +97,13 @@ class BusRampObservation extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Ramp capability: $capability',
+                    context.l10n.rampCapability(capability),
                     style: TextStyle(fontSize: 12, color: context.subtextColor),
                   ),
                   Text(
-                    'Ramp last checked: ${TimeUtils.formatRelativeTime(displayCheck, clock: now)}',
+                    context.l10n.rampCheckedAge(
+                      context.evidenceAge(displayCheck, now),
+                    ),
                     style: TextStyle(fontSize: 12, color: context.subtextColor),
                   ),
                 ],
@@ -109,12 +113,20 @@ class BusRampObservation extends StatelessWidget {
               const Divider(height: 1),
               const SizedBox(height: 12),
               Text(
-                'Ramp observation source: ${hasSource ? 'Operator observation' : 'Unknown'}',
+                context.l10n.rampSource(
+                  hasSource
+                      ? context.l10n.rampOperatorSource
+                      : context.l10n.resultsUnknown,
+                ),
                 style: TextStyle(fontSize: 14, color: context.textColor),
               ),
               const SizedBox(height: 8),
               Text(
-                'Check recorded: ${displayCheck == null ? 'Unknown' : _formatCheck(displayCheck)}',
+                context.l10n.rampRecordedAt(
+                  displayCheck == null
+                      ? context.l10n.resultsUnknown
+                      : _formatCheck(displayCheck),
+                ),
                 style: TextStyle(fontSize: 14, color: context.subtextColor),
               ),
             ],
@@ -122,7 +134,7 @@ class BusRampObservation extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Text(
-              'A working observation does not resolve existing community barriers.',
+              context.l10n.rampBarrierDisclosure,
               style: TextStyle(
                 fontSize: 12,
                 height: 1.4,

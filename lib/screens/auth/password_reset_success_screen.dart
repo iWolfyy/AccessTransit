@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/localization_context.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import 'login_screen.dart';
@@ -27,10 +29,7 @@ class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen>
       duration: const Duration(milliseconds: 700),
     );
 
-    _scale = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.elasticOut,
-    );
+    _scale = CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
 
     _fade = CurvedAnimation(
       parent: _controller,
@@ -53,110 +52,131 @@ class _PasswordResetSuccessScreenState extends State<PasswordResetSuccessScreen>
       backgroundColor: context.surfaceColor,
       body: SafeArea(
         child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 448),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: context.cardColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: isHC ? Border.all(color: Colors.black, width: 2) : null,
-                  boxShadow: isHC
-                      ? null
-                      : [
-                          BoxShadow(
-                            color: AppColors.onSurface.withValues(alpha: 0.08),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ScaleTransition(
-                        scale: _scale,
-                        child: Container(
-                          width: 96,
-                          height: 96,
-                          decoration: BoxDecoration(
-                            color: isHC
-                                ? const Color(0xFF003833)
-                                : AppColors.primaryFixed,
-                            shape: BoxShape.circle,
-                            border: isHC ? Border.all(color: Colors.black, width: 2) : null,
-                          ),
-                          child: Icon(
-                            Icons.check_circle_rounded,
-                            size: 52,
-                            color: isHC ? Colors.white : AppColors.secondary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      FadeTransition(
-                        opacity: _fade,
-                        child: Column(
-                          children: [
-                            Text(
-                              'Password Updated',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 28,
-                                height: 36 / 28,
-                                fontWeight: FontWeight.w700,
-                                color: context.textColor,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 448),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: context.cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: isHC
+                        ? Border.all(color: Colors.black, width: 2)
+                        : null,
+                    boxShadow: isHC
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: AppColors.onSurface.withValues(
+                                alpha: 0.08,
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Your password has been reset successfully. You can now sign in with your new password.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16,
-                                height: 24 / 16,
-                                fontWeight: isHC ? FontWeight.w600 : FontWeight.normal,
-                                color: isHC ? Colors.black : AppColors.onSurfaceVariant,
-                              ),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
                           ],
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      FadeTransition(
-                        opacity: _fade,
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: context.buttonHeight,
-                          child: FilledButton(
-                            onPressed: () {
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(
-                                  builder: (_) => const LoginScreen(),
-                                ),
-                                (route) => false,
-                              );
-                            },
-                            style: FilledButton.styleFrom(
-                              backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(999),
-                                side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
-                              ),
-                              textStyle: TextStyle(
-                                fontSize: context.hasLargeTargets ? 15.5 : 14,
-                                fontWeight: FontWeight.w600,
-                              ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ScaleTransition(
+                          scale: _scale,
+                          child: Container(
+                            width: 96,
+                            height: 96,
+                            decoration: BoxDecoration(
+                              color: isHC
+                                  ? const Color(0xFF003833)
+                                  : AppColors.primaryFixed,
+                              shape: BoxShape.circle,
+                              border: isHC
+                                  ? Border.all(color: Colors.black, width: 2)
+                                  : null,
                             ),
-                            child: const Text('Go to Login'),
+                            child: Icon(
+                              Icons.check_circle_rounded,
+                              size: 52,
+                              color: isHC ? Colors.white : AppColors.secondary,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 24),
+                        FadeTransition(
+                          opacity: _fade,
+                          child: Column(
+                            children: [
+                              Text(
+                                context.l10n.recoveryUpdated,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  height: 36 / 28,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.textColor,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                context.l10n.recoverySuccess,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  height: 24 / 16,
+                                  fontWeight: isHC
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  color: isHC
+                                      ? Colors.black
+                                      : AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        FadeTransition(
+                          opacity: _fade,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: context.buttonHeight,
+                              minWidth: double.infinity,
+                            ),
+                            child: FilledButton(
+                              onPressed: () {
+                                Navigator.of(context).pushAndRemoveUntil(
+                                  MaterialPageRoute(
+                                    builder: (_) => const LoginScreen(),
+                                  ),
+                                  (route) => false,
+                                );
+                              },
+                              style: FilledButton.styleFrom(
+                                backgroundColor: isHC
+                                    ? const Color(0xFF001F3F)
+                                    : AppColors.primaryContainer,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(999),
+                                  side: isHC
+                                      ? const BorderSide(
+                                          color: Colors.black,
+                                          width: 2,
+                                        )
+                                      : BorderSide.none,
+                                ),
+                                textStyle: TextStyle(
+                                  fontSize: context.hasLargeTargets ? 15.5 : 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              child: Text(context.l10n.recoveryGoLogin),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

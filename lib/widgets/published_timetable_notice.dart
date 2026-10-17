@@ -1,3 +1,5 @@
+import '../l10n/localization_context.dart';
+
 import 'package:flutter/material.dart';
 
 import '../models/bus.dart';
@@ -13,16 +15,14 @@ class PublishedTimetableNotice extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Published timetable • vehicle unassigned',
+          Text(
+            context.l10n.timetableUnassigned,
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          const Text(
-            'Times may change. Vehicle registration, accessibility and live location are unknown. Driver assistance is unavailable until an authorized vehicle is connected.',
-          ),
+          Text(context.l10n.timetableUnknownDisclosure),
           if (bus.sourceUrl?.isNotEmpty == true)
             Text(
-              'Source: ${bus.sourceUrl}',
+              context.l10n.timetableSource(bus.sourceUrl!),
               style: const TextStyle(fontSize: 12),
             ),
         ],

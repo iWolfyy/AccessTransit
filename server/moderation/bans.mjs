@@ -5,7 +5,7 @@ const valid=v=>typeof v==='string'&&v.length>0&&v.length<=128&&!v.includes('/')&
 const date=v=>v instanceof Date?v:v?.toDate?.();
 const revision=s=>s?.moderationRevision??0;
 const active=(s,time)=>{
-  if(s?.permanent||s?.communityPermanent||s?.manualSuspended||date(s?.communitySuspendedUntil)>time||date(s?.manualSuspendedUntil)>time)fail('account-suspended');
+  if(s?.authDisabled||s?.accountDeleted||s?.permanent||s?.communityPermanent||s?.manualSuspended||date(s?.communitySuspendedUntil)>time||date(s?.manualSuspendedUntil)>time)fail('account-suspended');
 };
 
 /** Trusted claim adapter supplies actorAdmin; accountAdmin checks Admin Auth. */

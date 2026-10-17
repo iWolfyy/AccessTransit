@@ -4,6 +4,7 @@ import 'package:access_transit/services/user_service.dart';
 import 'package:access_transit/services/journey_service.dart';
 import 'package:access_transit/models/journey_model.dart';
 import 'package:access_transit/models/service_run.dart';
+import 'package:access_transit/models/saved_schedule_snapshot.dart';
 import 'package:access_transit/services/service_run_service.dart';
 
 // Firestore interfaces are faked to exercise the production transaction callbacks.
@@ -14,10 +15,40 @@ import 'package:access_transit/models/bus_location_model.dart';
 import 'package:access_transit/services/live_bus_service.dart';
 import 'package:access_transit/services/trip_service.dart';
 import 'package:access_transit/services/firestore_service.dart';
+import 'package:access_transit/services/moderation_client.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('retired publication path explains missing v2 configuration without writing', () async {
+    final db = _Firestore();
+    db.documents['moderation_config/active'] = {
+      'enabled': true,
+      'policyVersion': 2,
+    };
+    final service = FirestoreService(firestore: db, v2Publication: false);
+    await expectLater(
+      service.createReport(
+        Report(
+          id: 'preserved-draft',
+          targetType: 'station',
+          targetId: 'station',
+          problemType: 'Ramp broken',
+          status: 'active',
+          createdAt: DateTime.now(),
+          userId: 'author',
+        ),
+      ),
+      throwsA(
+        isA<ModerationException>().having(
+          (e) => e.code,
+          'code',
+          'backend-not-configured',
+        ),
+      ),
+    );
+    expect(db.documents.keys, ['moderation_config/active']);
+  });
   test('report publication commits cooldown with report; retry preserves its first receipt', () async {
     final db = _Firestore();
     final service = FirestoreService(firestore: db);
@@ -107,6 +138,51 @@ void main() {
     latitude: 7,
     longitude: 80,
   );
+
+  test('loop progress records return visit separately and releases operation on actual final stop', () async {
+    final db = _Firestore();
+    final planned = DateTime.now().toUtc().add(const Duration(minutes: 1));
+    seedRun(db, 'loop', 'loop-bus', planned);
+    const stops = ['a', 'b', 'a-return', 'c'];
+    db.documents['service_runs/loop']!.addAll({
+      'stops': stops,
+      'stopStationIds': {'a': 'a', 'b': 'b', 'a-return': 'a', 'c': 'c'},
+      'initialStopTimes': {
+        for (var i = 0; i < stops.length; i++)
+          stops[i]: {
+            'estimatedArrival': Timestamp.fromDate(
+              planned.add(Duration(minutes: i * 10)),
+            ),
+            'actualArrival': null,
+          },
+      },
+    });
+    final service = ServiceRunService(firestore: db);
+    await service.startRun(
+      runId: 'loop',
+      driverId: 'driver',
+      gps: fix('loop-bus'),
+    );
+    await service.recordDeparture('loop', 'driver');
+    final progress = TripService(firestore: db);
+    await progress.confirmNextStopArrival('loop-bus', expectedTripId: 'loop');
+    final returned = await progress.confirmNextStopArrival(
+      'loop-bus',
+      expectedTripId: 'loop',
+    );
+    expect(returned!.currentStopIndex, 2);
+    expect(returned.stopTimes['a-return']!.actualArrival, isNotNull);
+    expect(returned.stopTimes['a']!.actualArrival, isNull);
+    expect(db.documents['service_runs/loop']!['status'], 'in_progress');
+    final ended = await progress.confirmNextStopArrival(
+      'loop-bus',
+      expectedTripId: 'loop',
+    );
+    expect(ended!.currentStopIndex, 3);
+    expect(ended.status, 'completed');
+    expect(db.documents['operation_locks/driver']!['active'], isFalse);
+    expect(db.documents['live_locations/loop-bus']!['isBroadcasting'], isFalse);
+  });
 
   test('dated start is boarding, retries preserve one run and departure is acknowledged separately', () async {
     final db = _Firestore();
@@ -703,6 +779,15 @@ void main() {
       currentPassengerId: () => 'rider',
     );
     final journey = JourneyModel(
+      scheduleSnapshot: SavedScheduleSnapshot(
+        stops: ['a', 'b'],
+        stationIds: {'a': 'a', 'b': 'b'},
+        names: {'a': 'Original boarding', 'b': 'Original destination'},
+        times: {
+          'a': DateTime(2026, 10, 25, 10),
+          'b': DateTime(2026, 10, 25, 10, 15),
+        },
+      ),
       journeyId: 'passenger25',
       passengerId: 'rider',
       routeId: 'route25',
@@ -725,6 +810,20 @@ void main() {
     await service.createJourney(
       journey,
     ); // Same passenger selection is idempotent.
+    final refreshed = JourneyModel.fromMap({
+      ...journey.toMap(),
+      'scheduleSnapshot': {
+        ...journey.scheduleSnapshot!.toMap(),
+        'names': {'a': 'New catalogue label', 'b': 'New destination label'},
+      },
+    });
+    final retried = await service.createJourney(refreshed);
+    expect(retried.scheduleSnapshot!.names['a'], 'Original boarding');
+    expect(
+      (db.documents['journeys/passenger25']!['scheduleSnapshot']
+          as Map)['names']['a'],
+      'Original boarding',
+    );
     expect(saved.status, JourneyStatus.confirmed);
     expect(db.documents.length, before.length + 1);
     expect(db.documents.containsKey('journeys/passenger25'), isTrue);

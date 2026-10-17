@@ -1,4 +1,48 @@
 {
+  "authControlsTitle": "Firebase account controls",
+  "authControlsExplanation": "Manage sign-in and sessions. Enabling sign-in preserves separate manual and community restrictions. Auth changes require a server receipt.",
+  "authDeleteExplanation": "Delete the Firebase sign-in account and anonymize its private profile. Shared reports, trips and audit references are retained. Disable sign-in and finish active-trip reconciliation first. This cannot be undone.",
+  "authCancel": "Cancel",
+  "authConfirmRequired": "Type the exact account UID to confirm deletion.",
+  "authDisableFirst": "Disable sign-in before approving deletion.",
+  "authActiveTrip": "An active operation must be reconciled before deletion.",
+  "authPending": "Operation pending or requires review. Reload its receipt before another decision.",
+  "authNormalScope": "Firebase Auth controls are available only in the normal account scope.",
+  "authReload": "Reload account status",
+  "authDeleted": "Account deleted; retained history remains available to authorized reviewers.",
+  "authDisabled": "Firebase sign-in is disabled",
+  "authEnabled": "Firebase sign-in is enabled",
+  "authCompleted": "Last operation completed",
+  "authReconcile": "Review and retry the same operation",
+  "authConfirmLabel": "Account UID for deletion confirmation",
+  "authEnable": "Enable sign-in",
+  "authDisable": "Disable sign-in",
+  "authRevoke": "Revoke existing sessions",
+  "authDeleteRequest": "Request deletion review",
+  "authDeleteReject": "Reject deletion",
+  "authDeleteApprove": "Approve account deletion",
+  "accountControlsUntil": "Until {when} (Asia/Colombo)",
+  "@accountControlsUntil": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "accountControlsTitle": "Account access",
+  "accountControlsExplanation": "Manage application access in this scope. Restoring manual access preserves community restrictions. Active driver operations are reconciled by the server.",
+  "accountControlsReasonRequired": "Enter a reason between 5 and 2,000 characters.",
+  "accountControlsStale": "Account access changed. Reload before deciding.",
+  "accountControlsProtected": "Your account and administrator accounts are protected.",
+  "accountControlsUnavailable": "Access could not be confirmed. Retry or reload.",
+  "accountControlsRestricted": "Manual restriction is active",
+  "accountControlsClear": "No active manual restriction",
+  "accountControlsCommunity": "A separate community restriction remains in effect.",
+  "accountControlsIndefinite": "Until an administrator restores access",
+  "accountControlsDuration": "Otherwise suspend for 72 hours from server time.",
+  "accountControlsSuspend": "Suspend access",
+  "accountControlsRestore": "Restore manual access",
+  "accountControlsRetry": "Retry",
   "busDetails": "Bus Details",
   "communityReports": "Community reports",
   "saveTrip": "Save Trip",
@@ -367,5 +411,3141 @@
         "type": "int"
       }
     }
+  },
+  "loopStopHelp": "Add stops in order. The same physical stop may appear again; each visit keeps its own timetable and identity. Reordering moves that visit’s scheduled time with it.",
+  "journeyVisitPositions": "Board at route stop {boarding}; alight at route stop {alighting}.",
+  "@journeyVisitPositions": {
+    "placeholders": {
+      "boarding": {
+        "type": "int"
+      },
+      "alighting": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduleReschedule": "Publish replacement",
+  "scheduleRescheduleHelp": "Cancel the old departure and publish a linked replacement at the selected Colombo date/time. Existing saved trips keep their original selection. The reason below is public.",
+  "schedulePublicReason": "Public change reason",
+  "scheduleReasonRequired": "Enter at least five characters.",
+  "scheduleStatusUnavailable": "Current run status unavailable. Saved times do not confirm that the bus will operate.",
+  "scheduleCancelled": "This departure was cancelled. Your saved selection has not been moved to another trip.",
+  "scheduleChanged": "The current timetable differs from the saved selection. Original saved times are shown; search again to review current options.",
+  "scheduleReplacement": "A linked replacement was published. Search again to review its current availability.",
+  "scheduleReplacementAt": "A replacement was published for {time}. Search again to review its current availability.",
+  "scheduleSavedRecord": "Original saved timetable. The current vehicle or route is unavailable or changed. This record does not establish live location or current accessibility.",
+  "scheduleTimeUnknown": "Saved intermediate time unavailable",
+  "scheduleSavedFare": "Saved fare: {fare}",
+  "@scheduleReplacementAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@scheduleSavedFare": {
+    "placeholders": {
+      "fare": {
+        "type": "String"
+      }
+    }
+  },
+  "manualAppealsTitle": "Restriction appeals",
+  "manualAppealsExplanation": "Appeal a manual account restriction. Submitting an appeal does not restore access. An accepted appeal changes only that manual restriction.",
+  "manualAppealReason": "Explain your appeal",
+  "manualAppealSubmit": "Submit appeal",
+  "manualAppealNoNew": "No new appeal is available for the current restriction.",
+  "manualAppealRestore": "Restore manual access",
+  "manualAppealUphold": "Uphold restriction",
+  "manualAppealClose": "Close review",
+  "manualAppealPending": "Pending review",
+  "manualAppealAccepted": "Appeal accepted",
+  "manualAppealRejected": "Appeal rejected",
+  "manualAppealReview": "Review appeal",
+  "manualAppealEmpty": "No restriction appeals.",
+  "manualAppealFailed": "Could not confirm this request. Reload the current restriction before a new decision. Retry an unconfirmed request with the same details.",
+  "adminLoadMore": "Load more",
+  "adminSearchLoaded": "Search loaded records",
+  "adminLoadedPages": "Counts and search cover loaded pages. Load more to check additional records.",
+  "manualAppealRevision": "Restriction revision {revision}",
+  "@manualAppealRevision": {
+    "placeholders": {
+      "revision": {
+        "type": "int"
+      }
+    }
+  },
+  "adminConsole": "Admin console",
+  "adminOverview": "Overview",
+  "adminBuses": "Buses",
+  "adminRoutes": "Routes",
+  "adminStops": "Bus stops",
+  "adminUsers": "Users",
+  "adminDrivers": "Drivers",
+  "adminActivity": "Activity",
+  "adminRefresh": "Refresh server data",
+  "adminSignOut": "Sign out",
+  "adminSampleCatalogue": "Sample/Test catalogue administration",
+  "adminUnavailable": "Server data unavailable.",
+  "adminLoading": "Loading verified server records...",
+  "adminNoMatches": "No matching records.",
+  "adminReviewAccess": "Review access",
+  "adminAssignRoute": "Assign route",
+  "adminEditProfile": "Edit profile",
+  "adminReviewDriver": "Review driver",
+  "adminDatedDepartures": "Dated departures",
+  "adminRestore": "Restore",
+  "adminEdit": "Edit",
+  "adminDelete": "Delete",
+  "adminFinishDeletion": "Finish deletion",
+  "adminCancel": "Cancel",
+  "adminDeleteRecord": "Delete record",
+  "adminEditUser": "Edit user profile",
+  "adminName": "Name",
+  "adminPhone": "Phone",
+  "adminSaveProfile": "Save profile",
+  "adminAssignedRoute": "Assigned route",
+  "adminNoRoute": "No route / remove assignment",
+  "adminAssignmentReason": "Assignment reason (at least 10 characters)",
+  "adminSaveAssignment": "Save assignment",
+  "adminDecision": "Decision",
+  "adminApprove": "Approve",
+  "adminReject": "Reject",
+  "adminRevoke": "Revoke access",
+  "adminReviewReason": "Review evidence / reason",
+  "adminConfirmDecision": "Confirm decision",
+  "adminApproved": "Approved",
+  "adminRejected": "Rejected",
+  "adminRevoked": "Revoked",
+  "adminPending": "Pending review",
+  "adminUnassigned": "Unassigned",
+  "adminAdd": "Add",
+  "adminBusStop": "bus stop",
+  "adminBusTimetable": "bus / timetable",
+  "adminRoute": "route",
+  "adminRecordId": "Record ID",
+  "adminStopName": "Stop name",
+  "adminSourceUrl": "Source URL",
+  "adminUnknown": "Unknown / not assessed",
+  "adminEquipped": "Equipped",
+  "adminNotEquipped": "Not equipped",
+  "adminYesAssessed": "Yes - assessed",
+  "adminNoAssessed": "No - assessed",
+  "adminCatalogueType": "Catalogue record type",
+  "adminPhysicalVehicle": "Physical vehicle",
+  "adminPublishedTimetable": "Published timetable",
+  "adminRouteField": "Route",
+  "adminDriverField": "Assigned driver",
+  "adminScheduledTime": "Scheduled time (HH:mm)",
+  "adminAddStop": "Add a stop",
+  "adminSaving": "Saving...",
+  "adminSaveCatalogue": "Save catalogue record",
+  "adminReloadReferences": "Reload reference data",
+  "adminOpenPassenger": "Open passenger app",
+  "adminTransit": "Transit administration",
+  "adminChangeConfirmed": "Change confirmed by the server.",
+  "adminSourceChecked": "I reviewed the source and the entered catalogue details.",
+  "adminDeleteHelp": "This removes the catalogue record. Referenced records and active buses cannot be deleted. This action cannot be undone.",
+  "adminDriverChecked": "I checked this driver's identity and operating authority.",
+  "adminSourceLoadError": "Could not load server records. Check your connection/access and retry.",
+  "adminLatitude": "Latitude",
+  "adminLongitude": "Longitude",
+  "adminRamp": "Ramp capability",
+  "adminElevator": "Elevator capability",
+  "adminStepFree": "Assessed step-free path",
+  "adminRouteNumber": "Route number",
+  "adminRouteName": "Route name",
+  "adminDescription": "Description",
+  "adminVehicleRegistration": "Vehicle registration number",
+  "adminLowFloor": "Low-floor capability",
+  "adminStableId": "Stable identifier. Cannot be changed after creation.",
+  "adminSourceHelp": "Authoritative timetable, stop or operator source. This is not a live-service verification.",
+  "adminOverviewHelp": "Maintain sourced catalogue records and review operator access. All changes require server acknowledgement.",
+  "adminRegistrationHelp": "Driver registration is an application for access. Review identity and operating authority before approval. Approval does not verify equipment or guarantee a service.",
+  "adminBusCountLabel": "Buses & timetables (loaded)",
+  "adminRouteCountLabel": "Routes (loaded)",
+  "adminStopCountLabel": "Bus stops (loaded)",
+  "adminUserCountLabel": "Users (loaded)",
+  "adminDriverCountLabel": "Drivers awaiting review (loaded)",
+  "adminReferencesError": "Reference records could not be loaded completely. Reload before saving.",
+  "adminRouteFor": "Route for {name}",
+  "@adminRouteFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminReviewFor": "Review {name}",
+  "@adminReviewFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminDeleteFor": "Delete {name}?",
+  "@adminDeleteFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminAssignedRouteFor": "Assigned route: {name}",
+  "@adminAssignedRouteFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminCurrentAccessFor": "Current access: {name}",
+  "@adminCurrentAccessFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminPreviousReviewFor": "Previous review: {name}",
+  "@adminPreviousReviewFor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminNoActiveRoute": "No active route assignment",
+  "adminRequired": "Required",
+  "adminReviewSource": "Review the source before saving.",
+  "adminRouteFirst": "Assign an approved driver to this route first, or release the previous assignment.",
+  "adminAuthProfileHelp": "Login email, passwords and Auth account deletion are managed in Firebase Authentication.",
+  "adminReferenceWithdrawHelp": "Access will be withdrawn and bus assignments released. Active trip/telemetry records remain for reconciliation; they are not marked completed.",
+  "adminCapabilityHelp": "Capability is separate from a working-equipment observation. Operational checks are recorded by the assigned driver.",
+  "adminTimetableHelp": "A published timetable has no verified physical vehicle, driver or equipment status.",
+  "adminOrderedStops": "Stops in travel order",
+  "adminMoveUp": "Move stop up",
+  "adminMoveDown": "Move stop down",
+  "adminRemoveStop": "Remove stop",
+  "adminChooseRoute": "Choose a route",
+  "adminTimeFormat": "Use 24-hour HH:mm",
+  "adminAssignmentHelp": "Approval is separate from route assignment. End any active trip before changing or removing a route.",
+  "adminReviewChecksHelp": "Record the identity and operating-authority checks or decision reason.",
+  "adminChangeUnconfirmed": "Change was not confirmed. Check access/connection and reload before retrying.",
+  "adminSaveUnconfirmed": "Save was not confirmed. Check connection/access and reload before retrying.",
+  "adminCursorChanged": "Page cursor changed. Reload.",
+  "adminAccountReferenceChanged": "Account changed. Reload references.",
+  "adminAccessRequired": "Administrator access is required.",
+  "adminAccountSignInChanged": "Account changed. Sign in again.",
+  "adminConnectionRequired": "A server connection is required. Retry when online.",
+  "adminRecordChanged": "This record changed. Reload it before saving.",
+  "adminTwoStops": "Select at least two distinct stops in travel order.",
+  "adminOccurrenceStation": "Every stop occurrence requires an unambiguous physical station.",
+  "adminSourceInvalid": "Enter the catalogue source URL.",
+  "adminVehicleTypeInvalid": "Choose vehicle or published timetable.",
+  "adminNoTimetableDriver": "A timetable cannot have a driver assignment.",
+  "adminTimePerStop": "Enter one HH:mm (24-hour) time per stop. Overnight times may roll over.",
+  "adminRecordIdInvalid": "Use letters, numbers, underscores or hyphens for the record ID.",
+  "adminRestoreFirst": "Restore this record before editing it.",
+  "adminReferenceDeleting": "A referenced record is pending deletion. Restore it or choose another record.",
+  "adminStopMissing": "A selected stop no longer exists. Reload the form.",
+  "adminDependentBuses": "Update dependent buses before changing the route number or removing/reordering their stops.",
+  "adminOccurrenceRebind": "Existing stop occurrences cannot be rebound to another station. Use new occurrence IDs.",
+  "adminRouteMismatch": "Choose an existing route with the same route number.",
+  "adminStopOrderInvalid": "Vehicle stops must follow the selected route order.",
+  "adminApprovedOnly": "Only an approved operator may be assigned.",
+  "adminGrantFirst": "Assign the approved driver to this route first.",
+  "adminBusActive": "This bus has an active trip or broadcast. End it before changing assignment, route or stops.",
+  "adminNotDeleting": "This record is not pending deletion.",
+  "adminReviewInputInvalid": "Select an operator and enter a review/reason of 10-2000 characters.",
+  "adminGrantInputInvalid": "Select a driver and enter a reason of 10-2000 characters.",
+  "adminApproveFirst": "Approve the driver before assigning a route.",
+  "adminReviewedRoute": "Choose an available reviewed route.",
+  "adminProfileInputInvalid": "Enter a name (up to 100 characters) and phone (up to 40).",
+  "adminFieldRequired": "{field} is required (maximum {maximum} characters).",
+  "@adminFieldRequired": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "maximum": {
+        "type": "int"
+      }
+    }
+  },
+  "adminCoordinateInvalid": "Enter valid {field} coordinates.",
+  "@adminCoordinateInvalid": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "adminDependencyDelete": "Cannot delete: this record is referenced by {kind}. Remove the dependency or retain it for history.",
+  "@adminDependencyDelete": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "adminLoadKindsFailed": "Could not verify {kinds} from the server. Actions are disabled. Use Refresh to retry.",
+  "@adminLoadKindsFailed": {
+    "placeholders": {
+      "kinds": {
+        "type": "String"
+      }
+    }
+  },
+  "adminBusSummary": "Route {route} | {kind}\nDriver: {driver}",
+  "@adminBusSummary": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      },
+      "kind": {
+        "type": "String"
+      },
+      "driver": {
+        "type": "String"
+      }
+    }
+  },
+  "adminStopCount": "{count, plural, =1{1 ordered stop} other{{count} ordered stops}}",
+  "@adminStopCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminAuditBy": "By {actor}",
+  "@adminAuditBy": {
+    "placeholders": {
+      "actor": {
+        "type": "String"
+      }
+    }
+  },
+  "adminTimetableFor": "Route {route} timetable",
+  "@adminTimetableFor": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      }
+    }
+  },
+  "adminRunHelp": "Publish this bus timetable for a specific Colombo service date. Starting the run opens boarding; departure is recorded separately.",
+  "adminRunRescheduleHelp": "To reschedule, cancel the previous scheduled run and publish its replacement. Stop intervals are retained; the bus timetable stays unchanged.",
+  "adminRunWindowHelp": "Start window: 5 minutes before to 30 minutes after departure. Late starts require a reason.",
+  "adminRunPublish": "Publish dated departure",
+  "adminRunReload": "Reload departures",
+  "adminRunCancel": "Cancel scheduled run",
+  "adminRunConfirmed": "Dated departure change confirmed.",
+  "adminRunLoadFailed": "Could not load dated departures. Retry when online.",
+  "adminRunChangeFailed": "Change was not confirmed. Reload and retry.",
+  "adminRunReviewTimetable": "Stored timetable needs administrator review.",
+  "adminRunEmpty": "No dated departures for this bus.",
+  "adminRunScheduled": "Scheduled",
+  "adminRunBoarding": "Boarding",
+  "adminRunInProgress": "In progress",
+  "adminRunCompleted": "Completed",
+  "adminRunCancelled": "Cancelled",
+  "adminRunUnknown": "Status unavailable",
+  "adminCalendarDatesInvalid": "Choose weekdays and a date range of at most 31 days.",
+  "adminCalendarReload": "Reload the published calendar.",
+  "adminCalendarPublishedOnly": "Only a published calendar can generate departures.",
+  "adminCalendarInvalid": "Invalid calendar. Publish a reviewed replacement.",
+  "adminCalendarBusChanged": "The bus timetable changed. Publish a reviewed replacement calendar.",
+  "adminColomboTimeInvalid": "Choose a valid Colombo departure time.",
+  "adminPhysicalBusRequired": "Choose an available physical bus.",
+  "adminCompleteTimetableRequired": "A complete reviewed timetable is required for a dated run.",
+  "adminRouteUnavailable": "Route unavailable.",
+  "adminRescheduleInputInvalid": "Choose an unreplaced, not-started run and a public reason (5–300 characters).",
+  "adminReviewBusTimetable": "Review the current physical bus timetable first.",
+  "adminDifferentDeparture": "Choose a different departure time.",
+  "adminReviewScheduleVersion": "Review the original schedule version.",
+  "adminReconcileFirst": "Reconcile the active operation first.",
+  "adminCancelNotStartedOnly": "Only a not-started run can be cancelled here.",
+  "adminServiceDate": "Service date: {date}",
+  "@adminServiceDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "adminColomboDeparture": "Colombo departure: {time}",
+  "@adminColomboDeparture": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "adminLateReason": "Late-start reason: {reason}",
+  "@adminLateReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "adminPublishedStopTimes": "Published stop times: {times}",
+  "@adminPublishedStopTimes": {
+    "placeholders": {
+      "times": {
+        "type": "String"
+      }
+    }
+  },
+  "adminColomboDateTime": "{date} {time} (Asia/Colombo)",
+  "@adminColomboDateTime": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "adminGeometryRouteId": "Route ID",
+  "adminGeometryImportJson": "Reviewed road geometry JSON",
+  "adminGeometryActionFailed": "Geometry change was not confirmed. Check access, review reason and current route/stop data before retrying.",
+  "adminFareLoadFailed": "Fare publications could not be loaded. Reload when connected; no empty catalogue has been confirmed.",
+  "adminFarePublished": "Published",
+  "adminFareArchived": "Archived",
+  "adminFarePublicationInvalid": "Invalid fare publication",
+  "adminFareBusesRequired": "Select reviewed buses",
+  "adminFareSplitRequired": "Split this publication into smaller reviewed records",
+  "adminFareApplicabilityMismatch": "Tariff/mapping applicability mismatch",
+  "adminFareReviewRequired": "Review source, stages, class and effective dates; enter a review reason.",
+  "adminFareRouteUnavailable": "Route is unavailable",
+  "adminFareItineraryMismatch": "A bus itinerary or route does not match the reviewed mapping",
+  "adminFareArchiveReasonRequired": "Enter an archive reason",
+  "adminFareTextInvalid": "Invalid fare catalogue text",
+  "adminFareDateInvalid": "Invalid fare effective date",
+  "adminFareSourceInvalid": "Invalid tariff source",
+  "adminFareUnreviewed": "Unreviewed or unsupported fare table",
+  "adminFareTableInvalid": "Invalid fare table",
+  "adminFareMatrixInvalid": "Invalid fare matrix",
+  "adminFareMinorInvalid": "Invalid minor-unit fare",
+  "adminFareMappingInvalid": "Unreviewed or invalid fare mapping",
+  "adminFareOccurrencesInvalid": "Invalid fare occurrences",
+  "adminGeometryReviewRequired": "Review the geometry and enter a reason",
+  "adminGeometryRouteChanged": "Review the current directed route itinerary",
+  "adminGeometryModeMismatch": "Geometry belongs to another data mode",
+  "adminGeometryVersionRequired": "Use a new reviewed version",
+  "adminGeometryStopMismatch": "Review each stop coordinate and its road vertex",
+  "adminGeometryReasonRequired": "Enter a review reason",
+  "adminGeometryMissing": "No geometry to withdraw",
+  "adminGeometryDataInvalid": "Invalid reviewed route geometry",
+  "adminGeometryStopsInvalid": "Invalid ordered geometry stops",
+  "adminGeometryCoordinatesInvalid": "Invalid coordinates",
+  "adminGeometryVerticesInvalid": "Stop vertices must increase",
+  "adminGeometryResolutionInvalid": "Review road path resolution",
+  "adminGeometryTooLong": "Route too long",
+  "adminFarePreviewRoute": "Route: {route} · service class: {serviceClass}",
+  "@adminFarePreviewRoute": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      },
+      "serviceClass": {
+        "type": "String"
+      }
+    }
+  },
+  "adminFarePreviewDates": "Effective dates: {from} – {until}",
+  "@adminFarePreviewDates": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "until": {
+        "type": "String"
+      }
+    }
+  },
+  "adminImportSource": "Source: {source}",
+  "@adminImportSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "adminFareVersions": "Fare version: {table} · mapping version: {mapping}",
+  "@adminFareVersions": {
+    "placeholders": {
+      "table": {
+        "type": "String"
+      },
+      "mapping": {
+        "type": "String"
+      }
+    }
+  },
+  "adminFareBuses": "Buses: {buses}",
+  "@adminFareBuses": {
+    "placeholders": {
+      "buses": {
+        "type": "String"
+      }
+    }
+  },
+  "adminFareCell": "{from} → {to}: {amount}",
+  "@adminFareCell": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "adminGeometryVersion": "Route: {route} · version: {version}",
+  "@adminGeometryVersion": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "adminGeometryDistance": "{stops} · {distance} km",
+  "@adminGeometryDistance": {
+    "placeholders": {
+      "stops": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "adminFareRowStatus": "{status} · version: {version}",
+  "@adminFareRowStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewAccessRequired": "Administrator access is required to review this case.",
+  "reviewSelfForbidden": "You cannot review a case concerning your own account.",
+  "reviewSignInRequired": "Your session is no longer valid. Sign in again before continuing.",
+  "reviewAccountChanged": "The signed-in account changed. Reopen this screen from the current account.",
+  "reviewRestricted": "This account cannot perform administrative actions while restricted.",
+  "reviewAlreadyDecided": "This review already has a decision. Refresh to inspect the recorded outcome.",
+  "reviewUnavailable": "This review is unavailable. Refresh before taking another action.",
+  "reviewOperationUnavailable": "This trip is no longer available for this operation. Refresh its current state.",
+  "reviewRetryConflict": "This request conflicts with a recorded request. Refresh and inspect the outcome before a new action.",
+  "reviewVoteUnknown": "Vote unavailable",
+  "reviewRunDriver": "Run: {run}\nDriver: {driver}",
+  "@reviewRunDriver": {
+    "placeholders": {
+      "run": {
+        "type": "String"
+      },
+      "driver": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewDriverId": "Driver: {driver}",
+  "@reviewDriverId": {
+    "placeholders": {
+      "driver": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewVoteEvidence": "{user} · {vote}",
+  "@reviewVoteEvidence": {
+    "placeholders": {
+      "user": {
+        "type": "String"
+      },
+      "vote": {
+        "type": "String"
+      }
+    }
+  },
+  "profileMissing": "No profile found. Please sign in again.",
+  "profileLoadFailed": "Unable to load profile from the database.",
+  "profileUnavailable": "Profile unavailable.",
+  "profilePassenger": "Passenger",
+  "profileContributor": "Community Contributor",
+  "profileOperator": "Transit Bus Operator",
+  "profileAdministrator": "System Administrator",
+  "profileCommuter": "Inclusive Commuter",
+  "profileEdit": "Edit",
+  "profileEditTitle": "Edit Profile",
+  "profileFullName": "Full Name",
+  "profileEmail": "Email Address",
+  "profilePhone": "Phone Number",
+  "profileNameRequired": "Please enter your name",
+  "profileSave": "Save Changes",
+  "profileSaved": "Profile updated successfully!",
+  "profileSaveFailed": "Profile changes could not be confirmed. Please retry.",
+  "profileSignOutFailed": "Could not clear private drafts or sign out. Please retry.",
+  "profileSignedOut": "You have been signed out successfully.",
+  "profileSignOut": "Sign Out",
+  "profileCancel": "Cancel",
+  "profileRetry": "Retry",
+  "profileLogoutQuestion": "Sign out and remove pending report drafts and photos from this device? Requests already sent may still complete. Published reports remain available after signing back in.",
+  "profileSettings": "SETTINGS",
+  "profileSupport": "SUPPORT",
+  "profilePersonalInfo": "PERSONAL INFORMATION",
+  "profileAdminConsole": "Admin console",
+  "profileAccessibility": "Accessibility Preferences",
+  "profilePush": "Push Notifications",
+  "profilePassword": "Change Password",
+  "profilePlaces": "Saved Places",
+  "profileRate": "Rate Us",
+  "profileHelp": "Help Center",
+  "profileUpdates": "Check for Updates",
+  "profileNotSet": "Not set",
+  "profileReports": "Reports",
+  "profileVerifications": "Verifications",
+  "profileBadges": "Badges",
+  "profileImpact": "Community Impact Score",
+  "profileSeeAll": "See All →",
+  "profileBadgeDetails": "View earned badges",
+  "profileDelete": "Delete Account",
+  "profileDeleteUnavailable": "Self-service deletion is not available here yet",
+  "profileComingSoon": "{feature} will be available in a future update.",
+  "@profileComingSoon": {
+    "placeholders": {
+      "feature": {
+        "type": "String"
+      }
+    }
+  },
+  "profileContributionSummary": "{points} Points • {reports} reports • {badges} badges",
+  "@profileContributionSummary": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      },
+      "reports": {
+        "type": "int"
+      },
+      "badges": {
+        "type": "int"
+      }
+    }
+  },
+  "driverDashboard": "Operator Dashboard",
+  "driverFallback": "Operator",
+  "driverAddStop": "Add Station to Route",
+  "driverNoBuses": "No physical buses are available on your assigned route. Ask the administrator to add or review a bus.",
+  "driverNoGps": "No shared GPS update",
+  "driverBusUnavailable": "Selected bus unavailable; broadcasting stopped locally",
+  "driverAssignmentUnavailable": "Bus assignment unavailable; broadcasting stopped locally",
+  "driverVerifyRuns": "Connect to verify dated departures.",
+  "driverSignInFirst": "Sign in as an approved operator first.",
+  "driverAssignedOnly": "Only the assigned driver can update this bus.",
+  "driverClaimFailed": "Bus assignment was not confirmed. Refresh and retry.",
+  "driverRampWorkingSaved": "Ramp working observation saved",
+  "driverRampBrokenSaved": "Ramp broken observation saved",
+  "driverRampFailed": "Could not confirm all ramp updates. Refresh and retry.",
+  "driverOccupancyFailed": "Could not confirm all occupancy updates. Refresh and retry.",
+  "driverClaimFirst": "Claim this bus before starting a trip.",
+  "driverSelectRun": "Select an administrator-published dated departure.",
+  "driverLateTitle": "Late start reason",
+  "driverLateHelp": "At least 5 characters. Latest start is 30 minutes after departure.",
+  "driverContinue": "Continue",
+  "driverLateRequired": "Enter a late-start reason of at least 5 characters.",
+  "driverGpsAcknowledged": "Shared GPS acknowledged",
+  "driverTrackingTitle": "AccessTransit Live Bus Tracking",
+  "driverGpsUnavailable": "GPS unavailable; last shared fix may be stale",
+  "driverGpsStreamError": "GPS updates unavailable. Check location access and retry.",
+  "driverBoardingStarted": "Boarding session started. Record actual departure when leaving.",
+  "driverRunResumed": "Active dated trip resumed. GPS broadcasting acknowledged.",
+  "driverStartFailed": "Trip start was not confirmed. Refresh and retry.",
+  "driverGpsPending": "Pending GPS upload; coordinates are local",
+  "driverGpsRetry": "GPS upload failed/offline; next fix retries",
+  "driverBoardingEnded": "Boarding cancelled; broadcast ended",
+  "driverCompletionAcknowledged": "Shared trip completion acknowledged",
+  "driverBoardingCancelled": "Boarding cancelled. Broadcasting ended.",
+  "driverTripCompleted": "Trip completion saved. Broadcasting ended.",
+  "driverStopPending": "GPS stopped locally; shared completion failed. Retry Stop.",
+  "driverStopFailed": "Shared trip completion was not confirmed. Retry Stop.",
+  "driverDatedDeparture": "Dated departure",
+  "driverNoRuns": "No dated departures published. Ask the administrator to schedule this bus.",
+  "driverColomboDeparture": "Colombo service departure",
+  "driverBoardingHelp": "Starting opens boarding. Record actual departure separately; late starts require a reason.",
+  "driverDepartureSaved": "Actual departure confirmed by the server.",
+  "driverDepartureFailed": "Departure was not confirmed. Refresh and retry.",
+  "driverRecordDeparture": "Record actual departure",
+  "driverActive": "TRIP IN PROGRESS",
+  "driverInactive": "TRIP INACTIVE",
+  "driverStart": "Start Trip",
+  "driverStop": "Stop Trip",
+  "driverTelemetry": "Live Telemetry Data",
+  "driverGpsInactive": "GPS inactive. Press Start Trip to acquire live GPS location.",
+  "driverLatitude": "Latitude:",
+  "driverLongitude": "Longitude:",
+  "driverSpeed": "Speed:",
+  "driverHeading": "Heading:",
+  "driverLocalFix": "Local GPS fix:",
+  "driverAccessibility": "Vehicle Accessibility Status",
+  "driverReadOnly": "Read-only (Not assigned)",
+  "driverRampObservation": "Wheelchair ramp observation",
+  "driverUnknownRamp": "Unknown - check before selecting",
+  "driverWorkingObserved": "Working observed",
+  "driverBrokenObserved": "Broken observed",
+  "driverLift": "Low-Floor Elevator / Lift Working",
+  "driverStopLiftHelp": "Stop lift observations are reported separately",
+  "driverOccupancy": "Occupancy Level:",
+  "driverLow": "Low",
+  "driverMedium": "Medium",
+  "driverHigh": "High",
+  "driverAccess": "Operator access",
+  "driverChecking": "Checking operator approval...",
+  "driverSignInApproval": "Sign in to check operator approval.",
+  "driverApprovalRequired": "Operator approval required. Ask the project administrator to review your account. Selecting Operator at registration does not grant approval. A live connection is required to verify access.",
+  "driverCheckAgain": "Check again",
+  "driverReturnSignIn": "Return to sign in",
+  "driverSignOutFailed": "Could not sign out. Please retry.",
+  "driverRouteAssignment": "Driver route assignment",
+  "driverRouteRequired": "An administrator must assign an available route before you can operate a bus. A live connection is required to verify the assignment.",
+  "driverCheckAssignment": "Check assignment",
+  "driverScheduled": "Scheduled",
+  "driverBoarding": "Boarding",
+  "driverInProgress": "In Progress",
+  "driverCompleted": "Completed",
+  "driverCancelled": "Cancelled",
+  "driverUnknownState": "State unavailable",
+  "driverName": "Operator: {name}",
+  "@driverName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "driverBusAssigned": "Bus {bus} is now assigned to you!",
+  "@driverBusAssigned": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      }
+    }
+  },
+  "driverOccupancySaved": "Occupancy updated to {level}",
+  "@driverOccupancySaved": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "driverTrackingBody": "GPS tracking for Bus {bus}; shared delivery shown in app",
+  "@driverTrackingBody": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      }
+    }
+  },
+  "driverRunWindow": "Start window: {earliest} to {latest}",
+  "@driverRunWindow": {
+    "placeholders": {
+      "earliest": {
+        "type": "String"
+      },
+      "latest": {
+        "type": "String"
+      }
+    }
+  },
+  "driverRunOption": "{time} · {status}",
+  "@driverRunOption": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "driverActiveSummary": "{status}\nDuration: {duration}",
+  "@driverActiveSummary": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      },
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "driverStartHelp": "Press Start Trip to activate background GPS tracking for Bus {bus}.",
+  "@driverStartHelp": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      }
+    }
+  },
+  "driverGpsStale": "Shared GPS stale; {status}",
+  "@driverGpsStale": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "driverLastReceipt": "Last shared receipt: {time}",
+  "@driverLastReceipt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverProgress": "Trip Route Progress",
+  "driverNoActive": "No Active Trip",
+  "driverNoActiveHelp": "No active run. Select a dated departure and start boarding above; record actual departure separately when leaving.",
+  "driverFinalDestination": "Final Destination Reached",
+  "driverFinalAcknowledged": "Final arrival and trip completion acknowledged",
+  "driverArrivalFailed": "Arrival was not confirmed. Refresh and retry.",
+  "driverNextReached": "Next Stop Reached",
+  "driverFinalReached": "Final Stop Reached",
+  "driverEnd": "End Trip",
+  "driverUnknown": "Unknown",
+  "driverNotRecorded": "Not recorded",
+  "driverEtaHelp": "ETAs follow actual departure and recorded arrivals. Missing timetable intervals use a 6-minute estimate; confirm timing with the operator.",
+  "driverScheduledArrival": "SCHEDULED ARRIVAL",
+  "driverTimetableTarget": "Timetable Target",
+  "driverCurrentEta": "CURRENT ETA",
+  "driverDelayCleared": "Delay notice removal saved.",
+  "driverDelayClearFailed": "Delay removal was not confirmed. Retry.",
+  "driverClear": "Clear",
+  "driverUpdateDelay": "Update Delay / Traffic Reason",
+  "driverReportDelay": "Report Traffic / Delay (+5m, +10m)",
+  "driverTraffic": "Traffic Congestion",
+  "driverRain": "Heavy Rain / Flooding",
+  "driverAccident": "Accident Ahead",
+  "driverRoadworks": "Road Construction",
+  "driverBreakdown": "Mechanical Breakdown",
+  "driverDelayTitle": "Report Delay / Incident",
+  "driverDelayHelp": "Alerts all passenger screens and updates live ETAs.",
+  "driverDelayTime": "Estimated Delay Time",
+  "driverDelayReason": "Delay Reason",
+  "driverDelayFailed": "Delay upload was not confirmed. Retry.",
+  "driverDepartsNow": "On Time (Departs Now)",
+  "driverOrigin": "Origin",
+  "driverPreTrip": "Pre-Trip Schedule Check",
+  "driverOnTimeMinute": "On Time (±1 min)",
+  "driverEarly": "Running Early",
+  "driverOnTimeTarget": "On Time Target",
+  "driverDelayed": "Delayed",
+  "driverMinusFive": "-5m",
+  "driverZeroSchedule": "0 (On Schedule)",
+  "driverPlusFifteen": "+15m",
+  "driverZeroMinutes": "0 min",
+  "driverSelectBus": "Select Bus Run",
+  "driverAssigned": "Assigned to You",
+  "driverAssignMe": "Assign to Me",
+  "driverAssignedOther": "Assigned to another operator",
+  "driverUpcoming": "Upcoming",
+  "driverDeparted": "Departed",
+  "driverAssistanceUnavailable": "Shared request updates are unavailable. Displayed requests may be out of date.",
+  "driverAssistanceTitle": "Boarding Assistance Requests",
+  "driverAssistanceEmpty": "No active assistance requests for this bus.",
+  "driverBoardingAt": "Boarding",
+  "driverAlightingAt": "Getting off",
+  "driverStopPosition": "Current Position: Stop {index} of {total}",
+  "@driverStopPosition": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "driverNextStop": "Next Stop: {stop}",
+  "@driverNextStop": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverArrivalSaved": "Arrival saved at {stop}. Next: {next}",
+  "@driverArrivalSaved": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      },
+      "next": {
+        "type": "String"
+      }
+    }
+  },
+  "driverFinalSaved": "Final arrival saved at {stop}. Trip completed.",
+  "@driverFinalSaved": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverTarget": "Target: {stop}",
+  "@driverTarget": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverDestination": "Destination: {stop}",
+  "@driverDestination": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverPlannedDeparture": "Planned departure (Colombo): {time}",
+  "@driverPlannedDeparture": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverActualDeparture": "Actual departure (Colombo): {time}",
+  "@driverActualDeparture": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverBroadcastReason": "Broadcasted to Riders: {reason}",
+  "@driverBroadcastReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "driverAddedMinutes": "+{minutes} mins added to passenger arrival ETAs",
+  "@driverAddedMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverMinuteOption": "+{minutes} mins",
+  "@driverMinuteOption": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverDelaySaved": "Delay notice saved: {reason} (+{minutes} mins)",
+  "@driverDelaySaved": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverBroadcastDelay": "Broadcast Delay (+{minutes} mins)",
+  "@driverBroadcastDelay": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverDepartsIn": "Departs in {minutes} mins",
+  "@driverDepartsIn": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverLateMinutes": "{minutes, plural, =1{Delayed by 1 min} other{Delayed by {minutes} mins}}",
+  "@driverLateMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverScheduledDep": "Scheduled Dep: {time} ({stop})",
+  "@driverScheduledDep": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverEarlyMinutes": "{minutes, plural, =1{Running Early (1 min)} other{Running Early ({minutes} mins)}}",
+  "@driverEarlyMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverLateShort": "+{minutes} min late",
+  "@driverLateShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverEarlyShort": "{minutes} min early",
+  "@driverEarlyShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverBusOption": "Bus {bus} (Dep: {time}){endpoints}{assigned}",
+  "@driverBusOption": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "endpoints": {
+        "type": "String"
+      },
+      "assigned": {
+        "type": "String"
+      }
+    }
+  },
+  "driverRouteName": "Route {route}",
+  "@driverRouteName": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      }
+    }
+  },
+  "driverDepartureTime": "Departure: {time}",
+  "@driverDepartureTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverStopCount": "{count, plural, =1{1 stop} other{{count} stops}}",
+  "@driverStopCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "driverActiveRequests": "{count} Active",
+  "@driverActiveRequests": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "driverClosedRequests": "Closed requests ({count})",
+  "@driverClosedRequests": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "driverRequestSummary": "{rider} at {stop} ({types})",
+  "@driverRequestSummary": {
+    "placeholders": {
+      "rider": {
+        "type": "String"
+      },
+      "stop": {
+        "type": "String"
+      },
+      "types": {
+        "type": "String"
+      }
+    }
+  },
+  "driverAssistanceStop": "{purpose} at: {stop}",
+  "@driverAssistanceStop": {
+    "placeholders": {
+      "purpose": {
+        "type": "String"
+      },
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "driverEtaUnavailable": "ETA unavailable",
+  "driverSchedulePassed": "Scheduled time passed",
+  "driverArrivingNow": "Arriving now",
+  "driverScheduledFor": "Scheduled for {time}",
+  "@driverScheduledFor": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverTomorrowAt": "Tomorrow at {time}",
+  "@driverTomorrowAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverTomorrowIn": "Tomorrow at {time} (in {hours}h {minutes}m)",
+  "@driverTomorrowIn": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverDepartedAgo": "Departed {minutes} mins ago",
+  "@driverDepartedAgo": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverArrivingMinutes": "Arriving in {minutes} mins",
+  "@driverArrivingMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "driverArrivingHours": "Arriving in {hours}h {minutes}m",
+  "@driverArrivingHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "recoveryTitle": "Reset Password",
+  "recoveryCheckEmail": "Check your email",
+  "recoveryInboxHelp": "Please check your inbox and follow the link to create a new password.",
+  "recoveryBackLogin": "Back to Login",
+  "recoveryResend": "Resend email",
+  "recoveryForgot": "Forgot your password?",
+  "recoveryEmailHelp": "Enter the email address associated with your account and we'll send you instructions to reset your password.",
+  "recoveryEmail": "Email Address",
+  "recoveryEmailHint": "e.g., name@example.com",
+  "recoveryPrivacy": "We will never share your email.",
+  "recoverySend": "Send Reset Link",
+  "recoveryCreate": "Create New Password",
+  "recoveryPasswordHelp": "Please choose a strong password that you haven't used before.",
+  "recoveryNewPassword": "New Password",
+  "recoveryPasswordHint": "Enter your new password",
+  "recoveryConfirm": "Confirm New Password",
+  "recoveryConfirmHint": "Re-enter your new password",
+  "recoveryShow": "Show password",
+  "recoveryHide": "Hide password",
+  "recoverySecurity": "Your security is our priority.",
+  "recoveryUpdated": "Password Updated",
+  "recoverySuccess": "Your password has been reset successfully. You can now sign in with your new password.",
+  "recoveryGoLogin": "Go to Login",
+  "recoveryEmailRequired": "Please enter your email address.",
+  "recoveryEmailInvalid": "Please enter a valid email address.",
+  "recoveryAccountMissing": "No account was found with this email address.",
+  "recoveryDisabled": "This account has been disabled.",
+  "recoveryTooMany": "Too many requests. Please try again later.",
+  "recoveryNetwork": "Network error. Please check your internet connection.",
+  "recoverySendFailed": "Unable to send password reset email.",
+  "recoveryResetFailed": "Unable to reset password. Please try again.",
+  "recoveryLinkUnavailable": "This reset link is invalid or has expired. Please request a new one.",
+  "recoveryExpired": "This reset link has expired. Please request a new one.",
+  "recoveryInvalid": "This reset link is invalid. Please request a new one.",
+  "recoveryWeak": "Password is too weak. Please choose a stronger password.",
+  "recoveryCreateRequired": "Please create a password.",
+  "recoveryEightCharacters": "Password must be at least 8 characters.",
+  "recoveryLetterRequired": "Password must include at least one letter.",
+  "recoveryNumberRequired": "Password must include at least one number.",
+  "recoveryConfirmRequired": "Please confirm your password.",
+  "recoveryMismatch": "Passwords do not match.",
+  "recoveryStrength": "Password strength",
+  "recoveryStrengthWeak": "Weak — add more characters",
+  "recoveryStrengthFair": "Fair — try adding numbers or symbols",
+  "recoveryStrengthGood": "Good strength",
+  "recoveryStrengthStrong": "Strong password",
+  "recoveryInstructionsSent": "We sent password reset instructions to\n{email}",
+  "@recoveryInstructionsSent": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMorning": "Good Morning",
+  "homeAfternoon": "Good Afternoon",
+  "homeEvening": "Good Evening",
+  "homeReady": "Ready to ride?",
+  "homeWhere": "Where are you going?",
+  "homePlanHint": "Tap to plan your journey",
+  "homeMenu": "Open menu",
+  "homeProfileAction": "Open profile",
+  "homeTrack": "Track\nBus",
+  "homePlanAction": "Plan\nJourney",
+  "homePreferencesAction": "Access\nPrefs",
+  "homeHome": "Home",
+  "homePlan": "Plan",
+  "homePlanJourney": "Plan Journey",
+  "homeCommunity": "Community",
+  "homeProfile": "Profile",
+  "homeRewards": "Rewards & Contributions",
+  "homeHelp": "Help & Support",
+  "homeLogout": "Log out",
+  "homeRecentReports": "Recent Community Reports",
+  "homeNoReports": "No recent community reports.",
+  "homeReportsUnavailable": "Community reports are unavailable. Try again later.",
+  "homeReport": "Report",
+  "homeRecentJourney": "Recent Journey",
+  "homeNoJourney": "No recorded journey",
+  "homeStartPlanning": "Plan a journey to get started",
+  "homeJourneysLoading": "Loading recent journey…",
+  "homeJourneysUnavailable": "Recent journey unavailable",
+  "homeRetryLater": "Try again later",
+  "homeOrigin": "Origin",
+  "homeDestination": "Destination",
+  "homeRecent": "Recent",
+  "homeReplan": "Re-plan",
+  "homeAssistance": "Assistance",
+  "homeJustNow": "Just now",
+  "homeUnknownAge": "Observation time unavailable",
+  "homeGreeting": "{greeting}, {name}",
+  "@homeGreeting": {
+    "placeholders": {
+      "greeting": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeTrueCount": "True: {count}",
+  "@homeTrueCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeFalseCount": "False: {count}/{threshold}",
+  "@homeFalseCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "homeJourneySegment": "{origin} to {destination}",
+  "@homeJourneySegment": {
+    "placeholders": {
+      "origin": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMinutesAgo": "{count, plural, =1{1 min ago} other{{count} mins ago}}",
+  "@homeMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeHoursAgo": "{count, plural, =1{1 hour ago} other{{count} hours ago}}",
+  "@homeHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeDaysAgo": "{count, plural, =1{1 day ago} other{{count} days ago}}",
+  "@homeDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeMonthsAgo": "{count, plural, =1{1 month ago} other{{count} months ago}}",
+  "@homeMonthsAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "registrationTitle": "Register",
+  "registrationJoin": "Join Access Transit",
+  "registrationIntro": "Your journey to inclusive travel begins here.",
+  "registrationNameHint": "Enter your full name",
+  "registrationEmailHint": "Enter your email",
+  "registrationPassword": "Password",
+  "registrationPasswordHint": "Create a password",
+  "registrationConfirm": "Confirm Password",
+  "registrationConfirmHint": "Re-enter your password",
+  "registrationNeeds": "I have specific accessibility needs",
+  "registrationNeedsExample": "(e.g., wheelchair ramp, low floor bus)",
+  "registrationAccountType": "Account Type",
+  "registrationCreate": "Create Account",
+  "registrationOr": "OR",
+  "registrationGoogle": "Sign up with Google",
+  "registrationApple": "Sign up with Apple",
+  "registrationGoogleFeature": "Google sign-up",
+  "registrationAppleFeature": "Apple sign-up",
+  "registrationAlready": "Already have an account? ",
+  "registrationLogin": "Log in",
+  "registrationExists": "An account already exists with this email.",
+  "registrationNotEnabled": "Email/password authentication is not enabled.",
+  "registrationRequiredFields": "Please fill in all required fields properly.",
+  "registrationFailed": "Registration failed. Please check your connection and try again.",
+  "registrationNameRequired": "Please enter your full name.",
+  "registrationNameShort": "Name must be at least 2 characters.",
+  "registrationNameLetters": "Use letters, spaces, apostrophes, periods or hyphens in your name.",
+  "onboardingSkipTooltip": "Skip onboarding",
+  "onboardingSkip": "Skip",
+  "onboardingStart": "Get Started",
+  "onboardingNext": "Next",
+  "onboardingTailored": "Tailored for You",
+  "onboardingNeedsHelp": "Choose wheelchair and step-free needs, then review current evidence. Voice guidance is unavailable.",
+  "onboardingNavigate": "Navigate with Confidence",
+  "onboardingLiveHelp": "Preview only. Check shared GPS when available; assistance needs an operator response.",
+  "onboardingCommunity": "Be the Eyes of the Community",
+  "onboardingReportsHelp": "Share ramp and elevator observations. Reports are public after upload acknowledgement; rewards need review.",
+  "onboardingReportIssue": "Report Issue",
+  "onboardingRamps": "Ramps",
+  "onboardingLowFloor": "Low-floor",
+  "onboardingExampleEta": "Example ETA: 3 min",
+  "onboardingBoardingHelp": "Boarding Help",
+  "onboardingAwaitingReply": "Example: awaiting reply",
+  "loginFailed": "Login failed. Please try again.",
+  "loginInvalidCredentials": "Invalid email or password. Please check your details and try again.",
+  "loginDisabled": "This account has been disabled. Please contact support.",
+  "loginTooMany": "Too many login attempts. Please wait a moment and try again.",
+  "loginNetwork": "Network error. Please check your connection and try again.",
+  "loginForgot": "Forgot Password?",
+  "loginPasswordHint": "Enter your password",
+  "loginPasswordRequired": "Please enter your password.",
+  "loginPasswordShort": "Password must be at least 6 characters.",
+  "loginOrContinue": "Or continue with",
+  "loginBiometrics": "Sign in with Biometrics",
+  "loginBiometricFeature": "Biometric sign-in",
+  "loginGoogle": "Sign in with Google",
+  "loginGoogleFeature": "Google sign-in",
+  "loginNoAccount": "Don't have an account?",
+  "loginSignUp": "Sign up",
+  "settingsSaveFailed": "Preferences could not be saved. Please retry.",
+  "settingsGuestSaved": "Device settings saved. Guest travel needs last for this session.",
+  "settingsAccountSaved": "Preferences saved for this account on this device.",
+  "settingsProfile": "User profile",
+  "settingsPersonalized": "Personalized Travel Experience",
+  "settingsScopeHelp": "High contrast and tap targets apply to this device. Travel needs are saved separately for each signed-in account on this device. Guest needs last for this session. New accounts start with wheelchair access required; review your needs.",
+  "settingsMobility": "Mobility & Physical Access",
+  "settingsWheelchair": "Wheelchair access required",
+  "settingsRampHelp": "Require current ramp evidence for matching buses",
+  "settingsStepFree": "Step-free routes only",
+  "settingsStepFreeHelp": "Avoid stops and terminals requiring stairs",
+  "settingsWalking": "Minimize walking distance",
+  "settingsWalkingUnavailable": "Not available yet — walking paths and distances have not been measured",
+  "settingsSensory": "Sensory & Vision",
+  "settingsContrast": "High contrast mode",
+  "settingsContrastHelp": "Enhance text clarity and strong border lines (WCAG AAA)",
+  "settingsLargeTargets": "Large tap targets (48dp+)",
+  "settingsTargetsHelp": "Enforce minimum 48dp touch targets across buttons & controls",
+  "settingsTargetsEnabled": "Large tap targets (48dp+) enabled",
+  "settingsTargetsStandard": "Standard tap targets enabled",
+  "settingsVoice": "Voice guidance for navigation",
+  "settingsVoiceUnavailable": "Not available yet — use your phone screen reader for spoken interface labels",
+  "settingsHaptics": "Haptic alerts for stops",
+  "settingsHapticsUnavailable": "Not available yet — automatic vibration alerts are not supported",
+  "settingsAssistance": "Assistance & Environment",
+  "settingsBoarding": "Boarding assistance required",
+  "settingsBoardingUnavailable": "Automatic requests are not available yet — request assistance from the journey screen",
+  "settingsQuiet": "Show quiet routes",
+  "settingsQuietUnavailable": "Not available yet — noise levels are unknown",
+  "settingsSave": "Save Preferences",
+  "searchSwapped": "⇄ Boarding stop and Destination swapped",
+  "searchSelectBoarding": "Select Boarding Point",
+  "searchSelectDestination": "Select Destination Stop",
+  "searchTravelChoice": "Choose Travel Time",
+  "searchLeaveNow": "Leave Now",
+  "searchSpecificTime": "Set Specific Time",
+  "searchChooseTime": "Choose departure time",
+  "searchChangeDate": "Change Travel Date",
+  "searchNeedsTitle": "Accessibility Needs",
+  "searchTemporaryHelp": "Customize for this trip only. Your permanent Accessibility Preferences in settings will not be affected.",
+  "searchWheelchairChip": "♿ Wheelchair",
+  "searchStepFreeChip": "Step-free",
+  "searchResetHelp": "Reset to saved accessibility preferences",
+  "searchReset": "Reset",
+  "searchRamp": "Wheelchair Ramp",
+  "searchRampHelp": "Ensure buses have working motorized or fold-out ramps",
+  "searchStepFree": "Step-Free Station Access",
+  "searchStepFreeHelp": "Only board and exit at stations with elevators or flat paths",
+  "searchMinWalking": "Minimize Walking Distance",
+  "searchWalkingUnknown": "Not available yet — walking distance is unknown",
+  "searchApply": "Apply to This Trip",
+  "searchEndpointsRequired": "Please select origin and destination stations.",
+  "searchEndpointsDifferent": "Origin and destination stations cannot be the same.",
+  "searchRampRequired": "Ramp Required",
+  "searchStepFreeFilter": "Step-Free",
+  "searchMinWalkFilter": "Min Walk",
+  "searchFind": "Find Buses",
+  "searchNoStops": "No shared stops available. Connect and retry.",
+  "searchPlan": "Plan Journey",
+  "searchSync": "Refresh bus data",
+  "searchBoardingHeading": "BOARDING POINT",
+  "searchChooseBoarding": "Choose Boarding Point",
+  "searchRampAvailable": "♿ Wheelchair Ramp Available",
+  "searchStandardStop": "Standard Stop",
+  "searchTapBoarding": "Tap to select boarding station",
+  "searchSwap": "Swap boarding point and destination",
+  "searchDestinationHeading": "WHERE ARE YOU GOING?",
+  "searchChooseDestination": "Choose Destination",
+  "searchAccessibleDestination": "♿ Accessible Destination",
+  "searchTapDestination": "Tap to select destination station",
+  "searchMyLocation": "My Location",
+  "searchBoardingSuggestions": "Suggested boarding stops",
+  "searchDestinationSuggestions": "Suggested destination stops",
+  "searchSuggestions": "Show suggested stops",
+  "searchDepartNow": "Depart Now",
+  "searchTravelHeading": "TRAVEL TIME",
+  "searchChange": "Change",
+  "searchOptions": "Accessibility Options",
+  "searchConfigure": "Configure",
+  "searchAllBusesHelp": "All buses shown. Tap Configure to require ramps or step-free access.",
+  "searchStationHint": "Type station or city (e.g. Pettah, Mount Lavinia)...",
+  "searchAllStops": "All Stops",
+  "searchNoMatches": "No matching stations found.\nTry a different spelling or clear filters.",
+  "searchRampBadge": "Ramp  ",
+  "searchElevatorBadge": "Elevator  ",
+  "searchSuggestionIcon": "Suggested stops",
+  "searchSuggestedBoarding": "Suggested Boarding Stops",
+  "searchSuggestedDestination": "Suggested Destination Stops",
+  "searchVoiceUnavailable": "Voice recognition is not available yet. Tap a suggested stop below:",
+  "searchSelectedTime": "Selected: {time}",
+  "searchTodayAt": "Today at {time}",
+  "searchDateAt": "{date} at {time}",
+  "searchStopSelected": "Selected: {name}",
+  "searchActiveNeeds": "{count, plural, =1{1 Active} other{{count} Active}}",
+  "@searchSelectedTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchTodayAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchDateAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchStopSelected": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchActiveNeeds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsScheduled": "Scheduled",
+  "resultsPastUnconfirmed": "Scheduled time passed - departure unconfirmed",
+  "resultsNowUnconfirmed": "Scheduled now - departure unconfirmed",
+  "resultsRampReady": "Wheelchair Ramp Ready · Step-free entry",
+  "resultsRampEquipped": "Ramp equipped · Check operator assistance",
+  "resultsStandardService": "Standard bus service",
+  "resultsUnknown": "Unknown",
+  "resultsLow": "Low",
+  "resultsMedium": "Medium",
+  "resultsHigh": "High",
+  "resultsStarted": "Started run",
+  "resultsDemoTimetable": "Demo timetable",
+  "resultsPublishedTimetable": "Published timetable",
+  "resultsWheelchairBus": "Wheelchair Accessible Bus",
+  "resultsRampBus": "Standard Ramp Bus",
+  "resultsStandardBus": "Standard Bus",
+  "resultsEstimatedTimes": "Some times are model estimates; confirm with the operator.",
+  "resultsWalkingUnknown": "Walking distance is unavailable for this journey. Results are not ranked by walking distance.",
+  "resultsReviewNeeds": "Review trip requirements",
+  "resultsReviewHelp": "Changes apply only to this search. Turning a requirement off may show services with unknown access or reported barriers. Review the evidence before choosing a journey.",
+  "resultsKeepNeeds": "Keep requirements",
+  "resultsApplyNeeds": "Apply to this search",
+  "resultsNoAccessible": "No Accessible Buses Found",
+  "resultsNoDirect": "No Direct Buses Found",
+  "resultsNoAccessibleHelp": "No scheduled journeys have known access matching these requirements. Stop access may be unknown or an active barrier may be reported. Review your accessibility filters.",
+  "resultsShowAll": "Show all matching buses",
+  "resultsShowAllHelp": "Shows options outside the Accessible tab, including unknown access or reported barriers. Your trip requirements stay applied.",
+  "resultsTitle": "Available Buses",
+  "resultsChooseHelp": "Select a bus to track live journey",
+  "resultsFastest": "Fastest",
+  "resultsRoute": "Route",
+  "resultsTimetableHelp": "Timetable estimates - departure unconfirmed. Open route details for GPS status.",
+  "resultsDeparture": "Departure",
+  "resultsArrival": "Arrival",
+  "resultsRampAvailable": "Ramp Available",
+  "resultsLowFloor": "Low Floor",
+  "detailsAmbiguous": "Departure identity is ambiguous. Refresh the selection.",
+  "detailsAccountChanged": "Account changed. Return to Search.",
+  "detailsUnavailable": "Service unavailable. Retry",
+  "detailsRunUnavailable": "Run status unavailable",
+  "detailsRunUnverified": "Scheduled · run not verified",
+  "detailsCompleted": "Completed",
+  "detailsCancelled": "Cancelled",
+  "detailsStale": "Location unavailable or stale",
+  "detailsLive": "LIVE GPS",
+  "detailsWheelchair": "Wheelchair access",
+  "detailsSavedHelp": "Saved selection · times and needs are preserved; review current conditions.",
+  "detailsDefaultsDiffer": "Your current accessibility defaults differ from this saved selection.",
+  "detailsCatalogueUnavailable": "Catalogue updates unavailable.",
+  "detailsStops": "Stops on your journey",
+  "detailsIntermediateUnknown": "Intermediate stop · time unavailable",
+  "detailsEvidence": "Accessibility evidence",
+  "detailsAssistanceUnavailable": "Driver assistance unavailable",
+  "detailsReport": "Report a condition",
+  "detailsLoadingReports": "Loading reports…",
+  "detailsRetry": "Retry updates",
+  "detailsVerifySave": "Connect to verify this departure before saving.",
+  "resultsSafe": "Safe",
+  "resultsWarning": "Warning",
+  "resultsNotAccessible": "Not accessible",
+  "detailsResolved": "Resolved",
+  "detailsRecheckUnknown": "Unresolved barrier - observation time unknown; needs recheck",
+  "detailsObservationUnknown": "Observation time unknown",
+  "detailsExpired": "Expired or unavailable",
+  "detailsRecheck": "Unresolved barrier — needs recheck",
+  "detailsRecent": "Recent observation",
+  "resultsRouteNumber": "Route {number}",
+  "@resultsRouteNumber": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsScheduledDate": "Scheduled {date}, {time}",
+  "@resultsScheduledDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsScheduledAt": "Scheduled {date} at {time}",
+  "@resultsScheduledAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsTomorrow": "Scheduled tomorrow, {time}",
+  "@resultsTomorrow": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsTomorrowAt": "Scheduled tomorrow at {time}",
+  "@resultsTomorrowAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsToday": "Scheduled today, {time}",
+  "@resultsToday": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsTodayAt": "Scheduled today at {time}",
+  "@resultsTodayAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsScheduledIn": "{minutes, plural, =1{Scheduled in 1 min - {time}} other{Scheduled in {minutes} mins - {time}}}",
+  "@resultsScheduledIn": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsBoardingEstimate": "Boarding estimate {time} · {source}",
+  "@resultsBoardingEstimate": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsCountTitle": "Available Buses ({count})",
+  "@resultsCountTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsAvailableCount": "{count, plural, =1{1 bus available} other{{count} buses available}}",
+  "@resultsAvailableCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsNoDirectHelp": "There are currently no direct bus routes connecting {origin} to {destination}.",
+  "@resultsNoDirectHelp": {
+    "placeholders": {
+      "origin": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsAllTab": "All ({count})",
+  "@resultsAllTab": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsAccessibleTab": "Accessible ({count})",
+  "@resultsAccessibleTab": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsDuration": "~{minutes} min",
+  "@resultsDuration": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "resultsCrowd": "{level} Crowd",
+  "@resultsCrowd": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsBoardingSource": "Boarding estimate · {source}",
+  "@resultsBoardingSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsBoardingAt": "Scheduled boarding: {date} · {time}",
+  "@detailsBoardingAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsArrivalAt": "Scheduled arrival: {date} · {time}",
+  "@detailsArrivalAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsDuration": "{minutes} min · selected segment",
+  "@detailsDuration": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "detailsBoardHere": "Board here · {time}",
+  "@detailsBoardHere": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsAlightHere": "Alight here · {time}",
+  "@detailsAlightHere": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsScheduledStop": "Scheduled {time}",
+  "@detailsScheduledStop": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "detailsNextStop": "Next itinerary stop: {name}",
+  "@detailsNextStop": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "resultsSourceDated": "Dated timetable",
+  "resultsSourceRoad": "Road progress + timetable (low confidence)",
+  "resultsSourceBoarding": "GPS at boarding stop",
+  "resultsSourceInterval": "Timetable interval from GPS-observed stop",
+  "evidenceRecheckSummary": "Unresolved barrier - needs recheck",
+  "evidenceBarrierSummary": "Barrier reported - review before travel",
+  "evidencePositiveSummary": "Positive observation - view details",
+  "evidenceUnknownSummary": "Unknown - no current observation",
+  "evidenceTimeUnknown": "Unknown - observation time unavailable",
+  "evidenceExpired": "Unknown — latest observation expired",
+  "evidenceRecheckUnknown": "Unresolved barrier — needs recheck; current condition unknown",
+  "evidenceConditionUnknown": "Unknown — condition could not be determined",
+  "evidenceBarrierConfirmed": "Barrier — community-confirmed observation",
+  "evidencePositiveConfirmed": "Positive — community-confirmed observation",
+  "evidenceBarrierUnverified": "Barrier reported — verification unknown",
+  "evidencePositiveUnverified": "Positive reported — verification unknown",
+  "evidenceNoConfirmationTime": "Confirmation time: Unknown",
+  "evidenceVehicleSection": "Vehicle ramp conditions",
+  "evidenceBoardingSection": "Boarding stop conditions",
+  "evidenceDestinationSection": "Destination stop conditions",
+  "evidenceAssistanceSection": "Driver assistance observations",
+  "evidenceDisclosure": "Community observations describe specific conditions; they do not verify the entire journey.",
+  "evidenceEmpty": "Unknown — no observation available",
+  "evidenceMember": "Community member",
+  "rampWorkingObserved": "Working observed",
+  "rampBrokenUnresolved": "Broken reported - unresolved warning",
+  "rampNewCheck": "Unknown - a new check is required",
+  "rampEquipped": "Equipped",
+  "rampNotListed": "Not listed",
+  "rampTitle": "Vehicle ramp",
+  "rampOperatorSource": "Operator observation",
+  "rampBarrierDisclosure": "A working observation does not resolve existing community barriers.",
+  "mapMissingCoordinates": "Map unavailable · stop coordinates have not been reviewed. Use the stop list.",
+  "mapCurrentBus": "Current bus location",
+  "mapNoRoadGeometry": "Stop locations · road route geometry unavailable",
+  "mapTileRetry": "Map tiles unavailable · retry or use the stop list",
+  "timetableUnassigned": "Published timetable • vehicle unassigned",
+  "timetableUnknownDisclosure": "Times may change. Vehicle registration, accessibility and live location are unknown. Driver assistance is unavailable until an authorized vehicle is connected.",
+  "evidenceCheckedAt": "Last checked: {time}",
+  "@evidenceCheckedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceRecheckedAt": "Last recheck: {time} by {name}. Unique confirmations unchanged.",
+  "@evidenceRecheckedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceDueAt": "Recheck due: {time}",
+  "@evidenceDueAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceExpiresAt": "Observation expires: {time}",
+  "@evidenceExpiresAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceReportedAt": "Reported at: {time}",
+  "@evidenceReportedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceConfirmedAt": "Last confirmation recorded at: {time}",
+  "@evidenceConfirmedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceReporter": "Reported by: {name}",
+  "@evidenceReporter": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "evidenceConfirmers": "{count, plural, =1{Confirmed by: 1 community member} other{Confirmed by: {count} community members}}",
+  "@evidenceConfirmers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rampCapability": "Ramp capability: {capability}",
+  "@rampCapability": {
+    "placeholders": {
+      "capability": {
+        "type": "String"
+      }
+    }
+  },
+  "rampCheckedAge": "Ramp last checked: {age}",
+  "@rampCheckedAge": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "rampSource": "Ramp observation source: {source}",
+  "@rampSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "rampRecordedAt": "Check recorded: {time}",
+  "@rampRecordedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "mapUpdatedAt": "Location updated: {time}",
+  "@mapUpdatedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "timetableSource": "Source: {source}",
+  "@timetableSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "reportSignInChange": "Sign in before changing a shared report.",
+  "reportChangeUnconfirmed": "Change is not confirmed. Check your connection and sign-in, then retry or refresh the shared report.",
+  "reportCopied": "Alert text copied to clipboard!",
+  "reportCopyFailed": "Could not copy the alert. Please retry.",
+  "reportImageUnavailable": "Image preview unavailable",
+  "reportDetailsTitle": "Report Details",
+  "reportRemoved": "Shared report unavailable or removed. Reopen the feed to refresh.",
+  "reportShare": "Share alert",
+  "reportStaleUpdates": "Shared updates unavailable. Showing the last received observation; refresh before acting.",
+  "reportSignInActions": "Sign in to confirm, flag or resolve shared reports.",
+  "reportResolutionDisclosure": "Resolution is the author's recorded observation; it does not independently verify a repair.",
+  "reportResolutionUnknown": "Resolution time: Unknown",
+  "reportResolvedTitle": "Condition Resolved",
+  "reportResolvedHelp": "The author recorded this condition as resolved.",
+  "reportObservationUnknown": "Observation time unknown",
+  "reportUnknownHelp": "The observation date is unavailable. Current condition cannot be confirmed.",
+  "reportConfirmedTitle": "Community-confirmed observation",
+  "reportActiveTitle": "Active Transit Alert",
+  "reportActiveHelp": "Reported by a commuter. Review the observation time and current evidence.",
+  "reportExpiredTitle": "Past Report (Expired)",
+  "reportExpiredHelp": "This observation has expired; it does not establish the current condition.",
+  "reportYours": "YOUR REPORT",
+  "reportBus": "BUS",
+  "reportStation": "STATION",
+  "reportHighSeverity": "High Severity",
+  "reportMinorSeverity": "Minor Issue",
+  "reportModerateSeverity": "Moderate",
+  "reportConditionDetails": "Reported Condition Details",
+  "reportRiderNote": "Rider Note:",
+  "reportPhotoEvidence": "Attached Photo Evidence",
+  "reportEnlarge": "Tap to enlarge",
+  "reportPhotoUnavailable": "Photo unavailable",
+  "reportMetrics": "Community Trust & Verification Metrics",
+  "reportRecheckDisclosure": "Rechecks are dated observations; unique confirmations are unchanged.",
+  "reportVoteHeading": "Vote Report Accuracy",
+  "reportRecheckAction": "Recheck condition",
+  "reportFixed": "Condition Marked Fixed",
+  "reportResolveAction": "Mark Condition as Fixed / Resolved",
+  "reportRampCategory": "Ramp & Access",
+  "reportLiftCategory": "Elevator / Lift",
+  "reportCrowdingCategory": "Crowding",
+  "reportCleanCategory": "Cleanliness",
+  "reportSafetyCategory": "Safety Hazard",
+  "deliveryTitle": "Report delivery",
+  "deliveryStatus": "Publication status",
+  "deliveryDraftUnavailable": "Draft unavailable",
+  "deliveryPublished": "Published",
+  "deliveryPending": "Pending upload",
+  "deliveryFailed": "Failed",
+  "deliveryPublicHelp": "Your report is available to other commuters.",
+  "deliveryRemovedHelp": "This draft was removed, expired or belongs to another account. Publication has not been confirmed.",
+  "deliveryPendingHelp": "Saved on this device. Publication has not been confirmed.",
+  "deliveryLocalUnavailable": "Local draft unavailable",
+  "deliveryObservation": "Your observation",
+  "deliveryTarget": "Location / Vehicle",
+  "deliveryCondition": "Condition reported",
+  "deliveryPhoto": "Attached photo",
+  "deliveryPhotoUnavailable": "Photo preview unavailable",
+  "deliveryUploading": "Uploading…",
+  "deliveryRetry": "Retry upload",
+  "deliveryRemoveDevice": "Remove draft from this device",
+  "deliveryAboutDrafts": "About local drafts",
+  "deliveryDraftExpiry": "Drafts expire after 7 days and are removed on sign-out/account change.",
+  "deliveryViewFeed": "View in Community Feed",
+  "deliveryHome": "Back to Home",
+  "deliverySaveFailed": "Could not save the upload status. Please retry.",
+  "deliveryRemoveQuestion": "Remove local draft?",
+  "deliveryRemoveHelp": "Stops future retries and removes the local note/photo. A request already sent may still complete. This does not delete a public report or an uploaded photo.",
+  "deliveryKeep": "Keep draft",
+  "deliveryRemove": "Remove draft",
+  "deliveryRemoveFailed": "Local removal could not be saved. Please retry.",
+  "deliveryUnknownTime": "Observation time unknown. Create a new report before uploading.",
+  "deliveryWaiting": "Waiting for a connection. This report is not confirmed as published.",
+  "deliveryUploadFailed": "Upload failed. Check your sign-in, photo and service access, then retry.",
+  "reportAlreadySaved": "This action was already recorded.",
+  "reportWaitRecheck": "Recheck not saved. Wait 30 minutes after the latest check, then retry.",
+  "reportChangeSaved": "Change saved. Shared details will refresh when connected.",
+  "reportConfirmationSaved": "Confirmation saved to the shared report.",
+  "reportRecheckSaved": "Recheck saved. Unique confirmations and points are unchanged.",
+  "reportFlagSaved": "Flag saved to the shared report.",
+  "reportFlagHiddenLegacy": "Flag saved. Report hidden after three independent flags.",
+  "reportResolutionSaved": "Resolution saved to the shared report.",
+  "reportShareText": "AccessTransit Alert: {title} at {target}. Check the observation in AccessTransit.",
+  "@reportShareText": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "reportResolvedBy": "Resolved by: {name}",
+  "@reportResolvedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportResolvedAt": "Resolved at: {date}, {time}",
+  "@reportResolvedAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reportHiddenHelp": "This report is hidden after {threshold} independent inaccuracy flags. This does not prove the condition was false.",
+  "@reportHiddenHelp": {
+    "placeholders": {
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "reportRecheckAge": "Last checked {age}. Current condition unknown; no repair recorded.",
+  "@reportRecheckAge": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "reportConfirmedRiders": "{count, plural, =1{Confirmed by 1 fellow rider.} other{Confirmed by {count} fellow riders.}}",
+  "@reportConfirmedRiders": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportTransitVehicle": "Transit Vehicle • {name}",
+  "@reportTransitVehicle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportTransitStation": "Transit Station • {name}",
+  "@reportTransitStation": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportUniqueCount": "{count, plural, =1{Unique confirmations: 1 rider} other{Unique confirmations: {count} riders}}",
+  "@reportUniqueCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportFlagCount": "Inaccuracy flags: {count} / {threshold} (Report hidden at {threshold} independent flags)",
+  "@reportFlagCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "reportOriginally": "Originally reported: {age}",
+  "@reportOriginally": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "reportLastRecheck": "Last recheck: {age} by {name}",
+  "@reportLastRecheck": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportLastConfirmed": "Last confirmed: {age}",
+  "@reportLastConfirmed": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "reportLegacyVoteHelp": "Confirm only what you observed. Previous confirmers can recheck the same condition 30 minutes after the latest check; unique votes and points do not increase. If the condition changed, submit a new report. {threshold} independent flags hide a report.",
+  "@reportLegacyVoteHelp": {
+    "placeholders": {
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "reportTrueCount": "True Flag ({count})",
+  "@reportTrueCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportFalseCount": "False Flag ({count}/{threshold})",
+  "@reportFalseCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "reportFalseRecorded": "False ({count}/{threshold})",
+  "@reportFalseRecorded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "deliveryCooldownAt": "Same-issue cooldown. Retry after {time} (UTC). Your draft is saved.",
+  "@deliveryCooldownAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "formPhotoFailed": "Could not attach the photo. Check permission and try again.",
+  "formSubmitFailed": "Report submission is not confirmed. Check your sign-in and connection, then retry.",
+  "formSignIn": "Please sign in before publishing a report.",
+  "formAccountChanged": "Account changed. Review the report again.",
+  "formReviewTarget": "Location / Vehicle: {target}",
+  "@formReviewTarget": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "formReviewCondition": "Condition: {condition}",
+  "@formReviewCondition": {
+    "placeholders": {
+      "condition": {
+        "type": "String"
+      }
+    }
+  },
+  "formReviewCrowding": "Crowding: {level}",
+  "@formReviewCrowding": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "formReviewNote": "Note: {note}",
+  "@formReviewNote": {
+    "placeholders": {
+      "note": {
+        "type": "String"
+      }
+    }
+  },
+  "formBusRoute": "Bus {number}",
+  "@formBusRoute": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "formVehicleRoute": "{vehicle} (Route {number})",
+  "@formVehicleRoute": {
+    "placeholders": {
+      "vehicle": {
+        "type": "String"
+      },
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "formBusRamp": "{vehicle} ♿ (Ramp)",
+  "@formBusRamp": {
+    "placeholders": {
+      "vehicle": {
+        "type": "String"
+      }
+    }
+  },
+  "formLowCrowd": "Low Crowd",
+  "formPlentyOfRoomWheelchairBay": "Plenty of room & wheelchair bay free",
+  "formModerate": "Moderate",
+  "formSeatsFullStandingRoomAvailable": "Seats full, standing room available",
+  "formCrowdedPacked": "Crowded / Packed",
+  "formWheelchairSpaceOrAisleBlocked": "Wheelchair space or aisle blocked",
+  "formRampBay": "Ramp & Bay",
+  "formRampWorking": "Ramp Working",
+  "formDriverAssistedDeployedRamp": "Driver assisted & deployed ramp",
+  "formRampBroken": "Ramp Broken",
+  "formMotorJammedOrRampBroken": "Motor jammed or ramp broken",
+  "formRampDenied": "Ramp Denied",
+  "formDriverDidNotLowerOr": "Driver did not lower or deploy",
+  "formBayBlocked": "Bay Blocked",
+  "formBlockedByBagsOrStanding": "Blocked by bags or standing crowd",
+  "formSeats": "Seats",
+  "formSeatsFree": "Seats Free",
+  "formElderlyDisabledSeatsFree": "Elderly / disabled seats free",
+  "formSeatsOccupied": "Seats Occupied",
+  "formOthersNotGivingUpSeats": "Others not giving up seats",
+  "formSeatBroken": "Seat Broken",
+  "formDamagedOrLooseSeating": "Damaged or loose seating",
+  "formSafetyClean": "Safety & Clean",
+  "formCleanSafe": "Clean & Safe",
+  "formVehicleWellMaintained": "Vehicle well-maintained",
+  "formDirtyOdor": "Dirty / Odor",
+  "formSpillOrUnpleasantSmell": "Spill or unpleasant smell",
+  "formRailBroken": "Rail Broken",
+  "formGrabRailsOrStrapsLoose": "Grab rails or straps loose",
+  "formRecklessDriving": "Reckless Driving",
+  "formSuddenJerksUnsafeRide": "Sudden jerks, unsafe ride",
+  "formElevator": "Elevator",
+  "formElevatorWorking": "Elevator Working",
+  "formOperatingSmoothlyAccessible": "Operating smoothly & accessible",
+  "formOutOfService": "Out of Service",
+  "formElevatorShutDownOrRepair": "Elevator shut down or repair",
+  "formDoorButtonFault": "Door / Button Fault",
+  "formDoorsStuckOrButtonsBroken": "Doors stuck or buttons broken",
+  "formRampPath": "Ramp & Path",
+  "formRampClear": "Ramp Clear",
+  "formSmoothWheelchairSlope": "Smooth wheelchair slope",
+  "formPathBlocked": "Path Blocked",
+  "formVendorsOrParkedVehicles": "Vendors or parked vehicles",
+  "formDamagedSteep": "Damaged / Steep",
+  "formPavementCrackedOrSteepSlope": "Pavement cracked or steep slope",
+  "formTactileTiles": "Tactile Tiles",
+  "formTilesIntact": "Tiles Intact",
+  "formGuidedTactileTilesClear": "Guided tactile tiles clear",
+  "formTilesBroken": "Tiles Broken",
+  "formLooseTilesCausingTripHazard": "Loose tiles causing trip hazard",
+  "formUnsafeEdgeGap": "Unsafe Edge Gap",
+  "formExcessiveGapBetweenCurbBus": "Excessive gap between curb & bus",
+  "formShelterLight": "Shelter & Light",
+  "formShelterGood": "Shelter Good",
+  "formRainProtectionSeatingIntact": "Rain protection & seating intact",
+  "formRoofDamaged": "Roof Damaged",
+  "formDamagedRoofOrBrokenBenches": "Damaged roof or broken benches",
+  "formDarkUnsafe": "Dark / Unsafe",
+  "formPoorNightLightingInWalkway": "Poor night lighting in walkway",
+  "formPhotoAttachedSuccessfully": "Photo attached successfully!",
+  "formAttachEvidencePhoto": "Attach Evidence Photo",
+  "formHelpVerifyConditionForCommuters": "Help commuters with disabilities understand the condition",
+  "formTakePhoto": "Take Photo",
+  "formFromGallery": "From Gallery",
+  "formSelectTheExactBusOr": "Select the exact bus or stop you observed.",
+  "formChooseTheConditionAndCrowding": "Choose the condition and crowding level you observed.",
+  "formChooseTheConditionYouObserved": "Choose the condition you observed.",
+  "formConfirmYourObservation": "Confirm your observation",
+  "formEvidence1PhotoAttached": "Evidence: 1 photo attached",
+  "formYourObservationNoteAndAttached": "Your observation, note and attached photo will be public after publication. Avoid faces, identifying details and sensitive personal information. Submit only photos you have permission to share.",
+  "formPendingDraftsStayOnThis": "Pending drafts stay on this device for up to 7 days and are removed on sign-out/account change. You can remove them from Your uploads. Removing a draft cannot recall a request already sent or delete a public report/photo.",
+  "formAndroidDraftsUseEncryptedPrivate": "Android drafts use encrypted private storage. On other platforms drafts last only for this app session.",
+  "formEditReport": "Edit report",
+  "formConfirmAndSubmit": "Confirm and submit",
+  "formCommunityReport": "Community Report",
+  "formHelpAccessibleTransitCommutersIn": "Share your observations with fellow commuters",
+  "formSelectBusRoute": "Select Bus Route",
+  "formWhichRouteAreYouTraveling": "Which route are you traveling on or waiting for?",
+  "formWhereIsTheIssue": "Where is the Issue?",
+  "formChooseWhetherYouAreInside": "Choose whether you are inside a vehicle or at a station",
+  "formVehicleAccessibilityCondition": "Vehicle Accessibility Condition",
+  "formStationAccessibilityCondition": "Station Accessibility Condition",
+  "formReportCrowdingLevelAndWheelchair": "Report crowding level and wheelchair access inside the bus",
+  "formReportElevatorRampAndPlatform": "Report elevator, ramp, and platform conditions at the stop",
+  "formEvidencePhotoOptional": "Evidence Photo (Optional)",
+  "formTakeAPhotoOrUpload": "Take a photo or choose one from the gallery to document the condition",
+  "formAdditionalNoteOptional": "Additional Note (Optional)",
+  "formAddHelpfulDetailsForFellow": "Add helpful details for fellow wheelchair or elderly riders",
+  "formEGRampWasLowered": "e.g. Ramp was lowered but driver needed bystander help",
+  "formSubmittingReport": "Submitting Report…",
+  "formReviewAndSubmitReport": "Review and submit report",
+  "formSelectARouteOptional": "Select a route (optional)",
+  "formOnABus": "On a Bus",
+  "formInsideTheVehicle": "Inside the vehicle",
+  "formAtABusStop": "At a Bus Stop",
+  "formStationPlatform": "Station & platform",
+  "formSelectSpecificBusLicensePlate": "Select Specific Bus / License Plate",
+  "formSelectStopAlongThisRoute": "Select Stop along this route",
+  "formCrowdingLevel": "Crowding Level",
+  "formChooseTheCrowdingLevelYou": "Choose the crowding level you observed.",
+  "formAccessibilityIssueCategory": "Accessibility Issue Category",
+  "formStationFacilityCategory": "Station Facility Category",
+  "formPhotoUploadsAreCurrentlyUnavailable": "Photo uploads are currently unavailable. You can submit your report without a photo.",
+  "formPhotoAttached": "Photo Attached",
+  "formWillBeUploadedWithReport": "Will be uploaded with report",
+  "formRemovePhoto": "Remove photo",
+  "formAddPhoto": "Add Photo",
+  "formTapToTakePhotoOr": "Tap to take photo or choose from device",
+  "formNotSelected": "Not selected",
+  "formReportSummary": "Report Summary",
+  "formLocationVehicle": "Location / Vehicle",
+  "formAccessibilityStatus": "Accessibility Status",
+  "formPhotoEvidence": "Photo Evidence",
+  "form1PhotoAttached": "1 photo attached",
+  "communityHubTitle": "Community Hub",
+  "communitySubtitle": "Community accessibility observations from fellow riders",
+  "communityReportAction": "Report Issue",
+  "communityPastReports": "Resolved & Past Reports",
+  "communityNoOwnReports": "No Reports Yet",
+  "communityEmptyTitle": "No current reports",
+  "communityOwnEmptyHelp": "Reports you submit about wheelchair access, crowding, or lifts will show up here.",
+  "communityEmptyHelp": "No current reports are available in this feed. This does not establish that conditions are accessible or safe.",
+  "communitySubmitReport": "Submit a Condition Report",
+  "communityUpdatesTab": "Live Updates",
+  "communityMyReportsTab": "My Reports",
+  "communityContributor": "Community Contributor",
+  "communityPhoto": "Photo",
+  "communityRecheckHelp": "Recheck the same observed condition after 30 minutes since the latest check. No extra votes or points. Report changed conditions separately.",
+  "communityActiveBadge": "Active",
+  "communityConfirmedBadge": "Community confirmed",
+  "communityResolvedBadge": "Resolved",
+  "communityPastBadge": "Past",
+  "communityUnavailable": "Community reports unavailable. Reconnect and retry.",
+  "communityRetry": "Retry reports",
+  "communityOwnSignIn": "Sign in to see your reports and local uploads.",
+  "outboxTitle": "Your uploads",
+  "outboxHelp": "Drafts expire after 7 days. Open an upload to retry or remove it. Sign-out removes local drafts.",
+  "communityStationTarget": "Station {id}",
+  "@communityStationTarget": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "communityBusTarget": "Bus {id}",
+  "@communityBusTarget": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "communityRouteTarget": "Bus Route {number}",
+  "@communityRouteTarget": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "communityContributionCount": "{count, plural, =1{1 shared report currently listed. Rewards are not calculated here.} other{{count} shared reports currently listed. Rewards are not calculated here.}}",
+  "@communityContributionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "communityChecked": "{freshness} · Last checked: {age}",
+  "@communityChecked": {
+    "placeholders": {
+      "freshness": {
+        "type": "String"
+      },
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "communityTrueCount": "True: {count}",
+  "@communityTrueCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "communityFalseCount": "False: {count}/{threshold}",
+  "@communityFalseCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "helpIntro": "Using AccessTransit",
+  "helpSearchTitle": "Searching for a bus",
+  "helpSearchBody": "Choose your boarding stop, destination and boarding time within the next 24 hours. Search starts with your saved accessibility preferences. Changes made for a search apply only to that search; save account-wide defaults in Settings.",
+  "helpSaveTitle": "What does Save Trip do?",
+  "helpSaveBody": "Open a result to see Bus Details and the selected stop segment. Saving is optional. It bookmarks the selection so you can reopen its details from saved trips; it does not book a seat or start a journey. Check refreshed times and cancellation notices when reopening.",
+  "helpLocationTitle": "Using My Location",
+  "helpLocationBody": "Allow location access when requested to find nearby boarding stops. Check the selected stop and direction before searching. Nearby does not establish a step-free walking route. If location is unavailable or permission is denied, choose a stop manually.",
+  "helpLiveTitle": "Timetable and live location",
+  "helpLiveBody": "A timetable is a plan, not proof that a bus has started. Future or unstarted runs show timetable information. Live position requires a started matching run and fresh GPS. If location is stale or unavailable, check the last-update wording. Estimates and arrival times can change.",
+  "helpReportsTitle": "Reports and pending uploads",
+  "helpReportsBody": "Report the exact bus or stop and what you observed. A local draft is private and is not a published report. Open Your uploads under My Reports to retry or remove it. Drafts expire after 7 days and are removed on sign-out. Avoid private information in public notes and photos.",
+  "helpVotesTitle": "Voting and community disputes",
+  "helpVotesBody": "Authors cannot vote True or False on their own reports. Vote only from your observations and give a reason for False. Under policy v2, five eligible other users' False votes hide a report and apply its recorded points penalty and strike. This is a community dispute, not proof of a false report. Authors can use the report review and appeal screens.",
+  "helpAssistanceTitle": "Boarding assistance",
+  "helpAssistanceBody": "Assistance is optional in Bus Details. Check the bus, run and boarding stop. Submitted means the request was recorded; accepted means the assigned driver accepted it. A saved trip or a sent request does not guarantee assistance. Check the latest request status, including decline, cancellation or expiry.",
+  "helpAccessTitle": "Account access and review",
+  "helpAccessBody": "If access is restricted, read the displayed reason and expiry and use the available appeal action. An appeal does not automatically lift a restriction. Permanent bans require administrator review. Self-service account deletion is not available in Profile; reviewed administrator deletion is a separate process.",
+  "rewardsTitle": "Rewards & Contributions",
+  "rewardsMine": "My Contributions",
+  "rewardsSettingsSoon": "Settings will be available soon.",
+  "rewardsReports": "Reports Submitted",
+  "rewardsConfirmations": "Recorded Confirmations",
+  "rewardsViewCard": "View Membership Card",
+  "rewardsTotal": "Total Points",
+  "rewardsGold": "Gold Contributor",
+  "rewardsSilver": "Silver Contributor",
+  "rewardsBronze": "Bronze Contributor",
+  "memberGold": "Gold Member",
+  "memberSilver": "Silver Member",
+  "memberBronze": "Bronze Member",
+  "memberBack": "Back to Rewards",
+  "memberTitle": "Digital Membership Card",
+  "memberPointsLabel": "Contribution points",
+  "memberNoCash": "Points have no cash or voucher value",
+  "memberNoRedemption": "Redemption unavailable",
+  "memberAvailability": "Reward availability",
+  "memberNoVouchers": "Partner discounts and vouchers are not available.",
+  "memberBenefits": "Member Benefits",
+  "memberNoPriority": "Membership does not include priority support or guaranteed access.",
+  "memberRecognition": "Community Recognition",
+  "memberLedgerNotice": "Contribution points follow the recorded reward policy. They do not verify accessibility.",
+  "rewardsLegacyNotice": "Historical policy: points update after administrator review and may take time. Published report: 10 points; unique confirmation: 5 points. Removed votes and hidden/deleted reports reverse credits. Points do not verify accessibility and have no cash value.",
+  "rewardsLevel": "Level: {level}",
+  "memberPointCount": "{count} Points",
+  "memberIdentity": "ID: {id}",
+  "@rewardsLevel": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "@memberPointCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@memberIdentity": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "assistFormUnknown": "The assistance bus or stop is unknown. Select a journey with an exact stop first.",
+  "assistFormSelect": "Please select at least one assistance option.",
+  "assistFormTarget": "Choose the exact bus and stop from your journey before requesting assistance.",
+  "assistFormWrongStop": "This stop could not be verified on the selected bus. Return to your journey and choose the correct target.",
+  "assistFormConfirm": "Confirm assistance target",
+  "assistFormEdit": "Edit request",
+  "assistFormSendConfirm": "Confirm and send",
+  "assistFormSignIn": "Please sign in before sending an assistance request.",
+  "assistFormPrepareError": "Could not prepare the request. Check your sign-in and device storage, then try again.",
+  "assistFormTitle": "Request Assistance",
+  "assistFormRamp": "Deploy Ramp",
+  "assistFormTime": "Extra Time",
+  "assistFormBoarding": "Boarding Help",
+  "assistFormAlighting": "Getting Off Help",
+  "assistFormSend": "Send Request",
+  "assistFormAckHelp": "Assistance is confirmed only after the driver acknowledges your request.",
+  "assistFormEtaUnknown": "ETA unknown",
+  "assistFormMinutes": "MIN (est.)",
+  "assistFormAccountChanged": "Your account changed during review. Review the request again before sending.",
+  "assistFormBoardAt": "Boarding at {stop}",
+  "assistFormAlightAt": "Getting off at {stop}",
+  "assistFormBusRoute": "{bus} (Route {route})",
+  "assistFormArrival": "{bus} - estimated arrival in {minutes} mins",
+  "@assistFormBoardAt": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistFormAlightAt": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistFormBusRoute": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      },
+      "route": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistFormArrival": {
+    "placeholders": {
+      "bus": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "assistReceiptTitle": "Assistance request",
+  "assistReceiptOwner": "Sign in with the account that created this request to view its status.",
+  "assistReceiptSent": "Sent to shared service",
+  "assistReceiptUnknown": "Request status unknown",
+  "assistReceiptPendingHint": "Saving the request does not mean the driver has accepted it.",
+  "assistReceiptAcceptedHint": "The driver has acknowledged the request. Assistance has not been marked completed.",
+  "assistReceiptDelivery": "Request delivery",
+  "assistReceiptOwn": "Your assistance request",
+  "assistReceiptSupport": "Support requested",
+  "assistReceiptUnspecified": "Not specified",
+  "assistReceiptDriver": "Driver response",
+  "assistReceiptUnconfirmed": "Driver acknowledgement is not confirmed.",
+  "assistReceiptStale": "Live status updates are unavailable. Displayed driver status is the last received status.",
+  "assistReceiptSending": "Sending?",
+  "assistReceiptRetry": "Retry upload",
+  "assistReceiptCancelling": "Cancelling?",
+  "assistReceiptCancel": "Cancel request",
+  "assistReceiptRetryError": "Could not save the retry on this device. Please try again.",
+  "assistReceiptCancelError": "Cancellation is not confirmed. Check your connection and try again.",
+  "assistReceiptPendingUpload": "Pending upload",
+  "assistReceiptDeliverySent": "Sent",
+  "assistReceiptFailed": "Failed",
+  "assistReceiptExpired": "Retry expired",
+  "assistReceiptOld": "Automatic retries stopped because this request is old. Check the driver status; delivery may still be unconfirmed.",
+  "assistReceiptDeliveryError": "Delivery is not confirmed. Retry when connected; keep checking the driver status.",
+  "assistReceiptSendError": "The request could not be sent. Check your sign-in and target, then retry.",
+  "assistReceiptRestoreError": "Some saved assistance requests could not be restored. Check your shared request history.",
+  "assistReceiptSaveError": "The latest request status could not be saved on this device. Check the shared request history.",
+  "assistReceiptHistory": "Your assistance requests",
+  "assistReceiptHistoryStale": "Shared request updates are unavailable. Saved receipts may be out of date.",
+  "assistReceiptError": "Request status is unavailable. Check your connection and account, then retry.",
+  "assistReceiptRoute": "Route {route}",
+  "assistReceiptSummary": "Route {route} · {stop}",
+  "@assistReceiptRoute": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistReceiptSummary": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      },
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "sharedCatalogueDemo": "DEMONSTRATION: Sample transit data. Shared reporting, assistance and journeys are disabled.",
+  "sharedCatalogueSaved": "Saved transit data. Refresh to check for updates; timetables and availability may have changed.",
+  "sharedCatalogueUnavailable": "Transit data unavailable. Connect and retry; no sample services are substituted.",
+  "sharedCatalogueEmpty": "No shared transit data available for this catalogue. Please retry later.",
+  "sharedRefresh": "Refresh",
+  "sharedRefreshing": "Refreshing…",
+  "sharedSavingStatus": "Saving status…",
+  "sharedOperatorStatusError": "Status update was not confirmed. Check your connection, operator approval and bus assignment, then retry.",
+  "sharedAdminAccess": "Administrator access",
+  "sharedAdminChecking": "Checking administrator access...",
+  "sharedAdminRequired": "An administrator claim and an online connection are required. A profile role does not grant access.",
+  "sharedCheckAgain": "Check again",
+  "sharedSignIn": "Sign in",
+  "sharedSavedJourney": "Saved journey",
+  "sharedJourneyUpdatesError": "Saved journey updates unavailable. Check your connection and reopen Home to retry.",
+  "sharedJourneyChangeError": "Journey status change is not confirmed. Retry when connected.",
+  "sharedResume": "Resume journey",
+  "sharedComplete": "Mark completed",
+  "sharedCancelJourney": "Cancel saved journey",
+  "sharedSaveDisclosure": "Saving keeps this selection. It does not book a seat or start a journey.",
+  "sharedSaveStatusError": "Saved status unavailable. Retry to verify your bookmark.",
+  "sharedSaveError": "Save change is not confirmed. Check your connection and retry.",
+  "sharedSaveOwner": "Sign in with the account saving this trip.",
+  "sharedSaveMismatch": "Saved trip acknowledgement did not match.",
+  "sharedSaveSignIn": "Sign in to save this trip.",
+  "sharedSaving": "Saving…",
+  "sharedStopAlert": "Stop alert unavailable",
+  "sharedStopAlertHelp": "Automatic stop alerts and background notifications are unavailable. Follow trip progress manually; the app will not notify you before your stop.",
+  "sharedSplashTagline": "Your journey to inclusive travel begins here.",
+  "sharedLoading": "Loading.",
+  "sharedStopsOrder": "Stops in travel order",
+  "sharedDriverReviewHelp": "Driver registration is an application for access. Review identity and operating authority before approval. Approval does not verify equipment or guarantee a service.",
+  "sharedAddStation": "Add New Halt / Station",
+  "sharedStationName": "Station Name",
+  "sharedStationExample": "e.g. Bambalapitiya Junction",
+  "sharedStationId": "Station ID (e.g. bambalapitiya_junc)",
+  "sharedTargetRoute": "Target Bus Route",
+  "sharedInsertIndex": "Insert Position Index (0-based)",
+  "sharedInsertHint": "1 (insert as 2nd stop)",
+  "sharedRequired": "Required",
+  "sharedRamp": "Ramp",
+  "sharedElevator": "Elevator",
+  "sharedCancel": "Cancel",
+  "sharedAddStationAction": "Add Station",
+  "sharedStationError": "Could not add the stop. Check your access and connection, then retry.",
+  "sharedLiveAccessibility": "Live Accessibility",
+  "sharedEquipmentHelp": "Equipment checks are separate from live GPS. A working report does not verify the whole journey.",
+  "sharedConditionsUnavailable": "Condition updates unavailable. Working conditions are Unknown; earlier warnings are retained.",
+  "sharedRampWarning": "Vehicle ramp telemetry reports a problem. Equipment-check time is Unknown; check before boarding.",
+  "sharedCommunityObservations": "Community observations",
+  "sharedRampUnknown": "Unknown — vehicle ramp warning needs checking",
+  "sharedDriverAssistance": "Driver assistance",
+  "sharedPositiveAssistance": "Positive assistance observation",
+  "sharedOperatorCheck": "Operator vehicle check",
+  "sharedHideObservations": "Hide observation details",
+  "sharedViewObservations": "View observation details",
+  "sharedVehicle": "Vehicle: {vehicle}",
+  "sharedTimetable": "Timetable: {time}",
+  "sharedStationAdded": "Stop \"{name}\" added to {bus} at position {index}.",
+  "sharedBusOption": "Bus {route} ({id})",
+  "sharedBoardingElevator": "Boarding stop elevator — {stop}",
+  "sharedDestinationElevator": "Destination stop elevator — {stop}",
+  "@sharedVehicle": {
+    "placeholders": {
+      "vehicle": {
+        "type": "String"
+      }
+    }
+  },
+  "@sharedTimetable": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@sharedStationAdded": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "bus": {
+        "type": "String"
+      },
+      "index": {
+        "type": "String"
+      }
+    }
+  },
+  "@sharedBusOption": {
+    "placeholders": {
+      "route": {
+        "type": "String"
+      },
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "@sharedBoardingElevator": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "@sharedDestinationElevator": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyUi0": "Working reported",
+  "legacyUi1": "Barrier reported",
+  "legacyUi2": "Sign in to save and resume your journey.",
+  "legacyUi3": "Journey ownership or status changed. Reopen your saved journeys.",
+  "legacyUi4": "Journey save is not confirmed. Check your connection and sign-in, then retry.",
+  "legacyUi5": "Vehicle not specified",
+  "legacyUi6": "Back",
+  "legacyUi7": "Confirm Journey",
+  "legacyUi8": "Travel schedule",
+  "legacyUi9": "Selected date",
+  "legacyUi10": "Selected time",
+  "legacyUi11": "First available service on selected date",
+  "legacyUi12": "Timetable departure",
+  "legacyUi13": "Estimated arrival",
+  "legacyUi14": "Some timetable intervals are missing. Times include model estimates; confirm them with the operator.",
+  "legacyUi15": "Estimated fare",
+  "legacyUi16": "Prototype estimate. Confirm the actual fare with the operator.",
+  "legacyUi17": "Fare details",
+  "legacyUi18": "Travel requirements",
+  "legacyUi19": "Saving a journey does not book a seat or confirm that the bus is running. Review current condition evidence.",
+  "legacyUi20": "Saving journey...",
+  "legacyUi21": "Confirm and save journey",
+  "legacyUi22": "Service unavailable. Select a shared service first.",
+  "legacyUi23": "This service is unavailable. Return to search.",
+  "legacyUi24": "Departure & Route Details",
+  "legacyUi25": "Saved location - live updates unavailable. This is not current bus movement.",
+  "legacyUi26": "SCHEDULE",
+  "legacyUi27": "SCHEDULED",
+  "legacyUi28": "EXPECTED ARRIVAL",
+  "legacyUi29": "Request Boarding Assistance",
+  "legacyUi30": "Route Stops Schedule & Live Progress",
+  "legacyUi31": "YOUR BOARDING STOP",
+  "legacyUi32": "BUS IS HERE NOW",
+  "legacyUi33": "Selected segment estimate; payment options unverified.",
+  "legacyUi34": "Unknown — no condition evidence available.",
+  "legacyUi35": "ACCESSIBLE VEHICLE FEATURES",
+  "legacyUi36": "ACCESSIBILITY WARNING",
+  "legacyUi37": "NOT ACCESSIBLE NOTICE",
+  "legacyUi38": "CONDITION UNKNOWN",
+  "legacyUi39": "Safety & Ride Conditions",
+  "legacyUi40": "Bus Crowd Level",
+  "legacyUi41": "Community Safety Reports",
+  "legacyUi42": "Review and confirm journey",
+  "legacyUi43": "Save to Trip Plan",
+  "legacyUi44": "Report Accessibility Condition",
+  "legacyUi45": "Unable to Load Journey",
+  "legacyUi46": "Loading live journey details from server",
+  "legacyUi47": "Loading your journey…",
+  "legacyUi48": "Bus has not been assigned yet.",
+  "legacyUi49": "A saved trip does not reserve a seat or guarantee bus assignment. Check the selected service status.",
+  "legacyUi50": "Return to Home screen",
+  "legacyUi51": "Close Live Navigation",
+  "legacyUi52": "Live Navigation",
+  "legacyUi53": "Back to Route Results",
+  "legacyUi54": "Live Tracking to",
+  "legacyUi55": "LIVE",
+  "legacyUi56": "SCHED",
+  "legacyUi57": "Real-time stop progression & ETA",
+  "legacyUi58": "Live Stops",
+  "legacyUi59": "YOUR STOP",
+  "legacyUi60": "Bus is currently here",
+  "legacyUi61": "Passed",
+  "legacyUi62": "Live GPS updates are unavailable. Equipment observations are shown separately below.",
+  "legacyUi63": "● Ongoing",
+  "legacyUi64": "● Scheduled",
+  "legacyUi65": "Tracking shows the current vehicle location; it does not confirm your scheduled run.",
+  "legacyUi66": "Detailed Vehicle Telemetry",
+  "legacyUi67": "Speed, GPS signals and raw trip data",
+  "legacyUi68": "Approaching",
+  "legacyUi69": "You Board Here",
+  "legacyUi70": "TIMETABLE",
+  "legacyUi71": "Collapse map",
+  "legacyUi72": "Expand map",
+  "legacyUi73": "Fit journey bounds",
+  "legacyUi74": "Focus on bus",
+  "legacyUi75": "Focus on my stop",
+  "legacyUi76": "Zoom in",
+  "legacyUi77": "Zoom out",
+  "legacyUi78": "No GPS signal",
+  "legacyUi79": "Signal Lost",
+  "legacyUi80": "En Route",
+  "legacyUi81": "Stopped",
+  "legacyUi82": "Trip Completed",
+  "legacyUi83": "Offline",
+  "legacyUi84": "Saved location - updates unavailable",
+  "legacyUi85": "Status: Live GPS updates receiving",
+  "legacyUi86": "Status: Location unavailable",
+  "legacyUi87": "Unavailable",
+  "legacyUi88": "Current Status",
+  "legacyUi89": "Last Updated",
+  "legacyUi90": "Next Stop",
+  "legacyUi91": "Your Destination",
+  "legacyUi92": "Next: ",
+  "legacyUi93": "Final: ",
+  "legacyUi94": "Request boarding or stop assistance from driver",
+  "legacyUi95": "Request Stop Assistance",
+  "legacyUi96": "Emergency calling unavailable. Use your phone to call for help.",
+  "legacyUi97": "Emergency",
+  "legacyUi98": "Report accessibility issue or vehicle condition",
+  "legacyUi99": "Emergency calling is unavailable in this app. Use your phone to call for help.",
+  "legacyUi100": "Live Per-Stop Timeline",
+  "legacyUi101": "Live Run",
+  "sharedCatalogueRefreshError": "Could not refresh transit data. Saved data may be out of date; retry when connected.",
+  "legacyFormat0": "Bus {p0}",
+  "@legacyFormat0": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat1": "Route {p0}",
+  "@legacyFormat1": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat2": "Upcoming Stops ({p0})",
+  "@legacyFormat2": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat3": "Scheduled: {p0}",
+  "@legacyFormat3": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat4": "Arriving in {p0} min",
+  "@legacyFormat4": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat5": "Destination: {p0}",
+  "@legacyFormat5": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat6": "Live interactive map showing bus {p0} heading toward {p1}",
+  "@legacyFormat6": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      },
+      "p1": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat7": "Next Stop: {p0}",
+  "@legacyFormat7": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat8": "Bus status: {p0}. Last updated: {p1}. Next stop: {p2}. Passenger stop: {p3}.",
+  "@legacyFormat8": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      },
+      "p1": {
+        "type": "String"
+      },
+      "p2": {
+        "type": "String"
+      },
+      "p3": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat9": "at {p0}",
+  "@legacyFormat9": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat10": "Scheduled: {p0}",
+  "@legacyFormat10": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat11": "Expected: {p0}",
+  "@legacyFormat11": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat12": "Driver Notice: {p0} (+{p1} mins)",
+  "@legacyFormat12": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      },
+      "p1": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat13": "Distance: {p0} km to {p1}",
+  "@legacyFormat13": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      },
+      "p1": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat14": "Journey progress: Bus approaching next stop {p0} towards destination {p1}",
+  "@legacyFormat14": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      },
+      "p1": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat15": "Notify driver you need extra time or ramp deployment at {p0}.",
+  "@legacyFormat15": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat16": "Reached at {p0}",
+  "@legacyFormat16": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat17": "Bus is here now (Confirmed {p0})",
+  "@legacyFormat17": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat18": "Est. {p0} (in about {p1} min)",
+  "@legacyFormat18": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      },
+      "p1": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat19": "Selected timetable departure: {p0} — current GPS does not confirm this scheduled run.",
+  "@legacyFormat19": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat20": "+{p0} min late",
+  "@legacyFormat20": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat21": "Driver Alert: {p0} (+{p1}m)",
+  "@legacyFormat21": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      },
+      "p1": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat22": "at {p0}",
+  "@legacyFormat22": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat23": "Passed at {p0}",
+  "@legacyFormat23": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat24": "Sched: {p0} · Exp: {p1}",
+  "@legacyFormat24": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      },
+      "p1": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat25": "(+{p0} min late)",
+  "@legacyFormat25": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "legacyFormat26": "{p0} crowding",
+  "@legacyFormat26": {
+    "placeholders": {
+      "p0": {
+        "type": "String"
+      }
+    }
+  },
+  "sharedOnTime": "On Time",
+  "sharedSampleNotice": "SAMPLE / TEST MODE — fictional vehicles, reports, equipment and GPS. Not for travel decisions.",
+  "sharedLocalNotice": "LOCAL TEST ONLY - synthetic services, no real transit or Cloudinary uploads",
+  "legacyEtaNow": "Bus arriving now",
+  "legacyEtaApprox": "Bus arriving in approximately {minutes} minutes",
+  "@legacyEtaApprox": {
+    "placeholders": {
+      "minutes": {
+        "type": "String"
+      }
+    }
+  },
+  "legacySpeedNext": "{speed} km/h · Next: {stop}",
+  "@legacySpeedNext": {
+    "placeholders": {
+      "speed": {
+        "type": "String"
+      },
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "formReviewPublicNotice": "Your report and photo will be public. Avoid faces and personal information.",
+  "formReviewDetails": "Privacy and saved drafts",
+  "formReviewCooldownShort": "Wait 5 minutes before reporting the same issue here again.",
+  "deliveryServiceUnavailable": "The report service cannot be reached. Your draft is saved. Retry when the service is available.",
+  "deliveryServiceConfiguration": "This app is not connected to the report service. Open the configured main app and retry your saved draft.",
+  "deliveryPermissionDenied": "Publication permission was denied. Check that you are using the configured main app and sign in again before retrying. Your draft is saved.",
+  "deliveryTargetIneligible": "This bus or stop is not eligible for publication. An administrator must review its catalogue record. Your draft is saved.",
+  "deliveryInvalidReport": "The report service could not accept these report details. Review the selected bus or stop and observation before trying again.",
+  "adminAccessibilityDetails": "Accessibility details",
+
+  "resultsOutsideNeeds": "{count} scheduled options do not meet your current accessibility requirements.",
+  "resultsRemoveAccessFilters": "Show without accessibility filters",
+  "resultsTemporaryFiltersHelp": "Changes this search only. These services may have unknown access or barriers; your saved preferences stay unchanged.",
+  "@resultsOutsideNeeds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
+
 }

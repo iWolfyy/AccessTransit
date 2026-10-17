@@ -1,4 +1,8 @@
 import 'evidence_refresh.dart';
+import '../l10n/shared_presentation.dart';
+import '../l10n/localization_context.dart';
+import '../l10n/journey_presentation.dart';
+import '../l10n/evidence_presentation.dart';
 
 import 'package:flutter/material.dart';
 
@@ -87,15 +91,20 @@ class _LiveAccessibilityPanelState extends State<LiveAccessibilityPanel> {
         now: widget.now,
         builder: (context, now) {
           final sections = [
-            ('Vehicle ramp', 'bus', widget.busId, 'rampAccess'),
             (
-              'Boarding stop elevator — ${widget.origin}',
+              context.evidenceText('Vehicle ramp'),
+              'bus',
+              widget.busId,
+              'rampAccess',
+            ),
+            (
+              context.l10n.sharedBoardingElevator(widget.origin),
               'station',
               widget.originId,
               'elevatorOut',
             ),
             (
-              'Destination stop elevator — ${widget.destination}',
+              context.l10n.sharedDestinationElevator(widget.destination),
               'station',
               widget.destinationId,
               'elevatorOut',
@@ -118,7 +127,7 @@ class _LiveAccessibilityPanelState extends State<LiveAccessibilityPanel> {
               Semantics(
                 header: true,
                 child: Text(
-                  'Live Accessibility',
+                  context.l10n.sharedLiveAccessibility,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -128,7 +137,7 @@ class _LiveAccessibilityPanelState extends State<LiveAccessibilityPanel> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Equipment checks are separate from live GPS. A working report does not verify the whole journey.',
+                context.l10n.sharedEquipmentHelp,
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.4,
@@ -168,7 +177,7 @@ class _LiveAccessibilityPanelState extends State<LiveAccessibilityPanel> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Community observations',
+                        context.l10n.sharedCommunityObservations,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
@@ -202,7 +211,7 @@ class _LiveAccessibilityPanelState extends State<LiveAccessibilityPanel> {
                               evidence,
                               warning: telemetryConflict,
                               label: telemetryConflict
-                                  ? 'Unknown \u2014 vehicle ramp warning needs checking'
+                                  ? context.l10n.sharedRampUnknown
                                   : null,
                             );
                           },
@@ -212,11 +221,11 @@ class _LiveAccessibilityPanelState extends State<LiveAccessibilityPanel> {
                         const Divider(height: 1),
                         _conditionRow(
                           context,
-                          'Driver assistance',
+                          context.l10n.sharedDriverAssistance,
                           assistance,
                           label:
                               assistance.state == EquipmentObservation.positive
-                              ? 'Positive assistance observation'
+                              ? context.l10n.sharedPositiveAssistance
                               : null,
                         ),
                       ],
@@ -226,7 +235,7 @@ class _LiveAccessibilityPanelState extends State<LiveAccessibilityPanel> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Operator vehicle check',
+                context.l10n.sharedOperatorCheck,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -252,8 +261,8 @@ class _LiveAccessibilityPanelState extends State<LiveAccessibilityPanel> {
                   ),
                   label: Text(
                     showDetails
-                        ? 'Hide observation details'
-                        : 'View observation details',
+                        ? context.l10n.sharedHideObservations
+                        : context.l10n.sharedViewObservations,
                   ),
                 ),
               ),
@@ -321,7 +330,8 @@ class _LiveAccessibilityPanelState extends State<LiveAccessibilityPanel> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  label ?? evidence.label,
+                  label ??
+                      context.journeyText(context.evidenceText(evidence.label)),
                   style: TextStyle(
                     fontSize: 14,
                     height: 1.4,
@@ -362,7 +372,7 @@ class _LiveAccessibilityPanelState extends State<LiveAccessibilityPanel> {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            message,
+            context.sharedText(message),
             style: TextStyle(
               fontSize: 14,
               height: 1.4,

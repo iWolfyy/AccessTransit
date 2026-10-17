@@ -170,7 +170,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(compactButtonHeight, 48.0);
-        expect(compactMinTapHeight, 44.0);
+        expect(compactMinTapHeight, 48.0);
         expect(compactTapIconSize, 20.0);
         expect(compactNavBarHeight, 72.0);
         expect(compactButtonFontSize, 15.0);

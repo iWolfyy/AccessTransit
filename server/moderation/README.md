@@ -1,8 +1,11 @@
 # Moderation policy v2: local trusted-server core
 
 This module is implemented and tested locally. It is **not a deployed service**
-and normal/shared Flutter still uses policy v1. The explicit local-validation
-debug app now uses v2 publication/voting. Do not provision shared v2 reports yet.
+and normal/shared Flutter uses policy v1 until the trusted HTTPS service, rules
+and migration are activated together. The main app now supports v2 HTTPS
+configuration in debug/release without requiring a local-validation app.
+The separate native Local Test APK workflow is retired; automated emulator
+tests remain available. Do not provision shared v2 reports before rollout.
 
 `policy.mjs` exports `createModerationPolicy({store, now, effectiveAt})`.
 `effectiveAt` is an explicit reviewed policy activation date. `now` defaults to
@@ -338,3 +341,28 @@ The Flutter activation gate stays closed until a dedicated test project and
 trusted v2 HTTPS host are configured together. Normal/local builds retain disabled
 auto-init and no Messaging token registration. No real send/device delivery was
 performed. See checkpoint 31 for native compile and account-race test coverage.
+
+Checkpoint 41 adds `createAccountPolicy` and optional `accounts` API wiring for
+admin-only scoped application suspension/restoration. The guarded loopback host
+wires it with trusted Admin Auth claim lookup and retains its normal-only scope
+allowlist. It does not disable Auth, revoke tokens or delete accounts. See
+[manual account controls](../../docs/manual-account-controls.md) for transaction,
+retry, operation reconciliation and activation limits.
+
+Checkpoint 44 adds the real-project localhost launcher at
+`test/security/serve-shared-backend.mjs` (loopback 8788), main-app `LOCAL_API`
+debug transport and readiness-gated bounded workers. It uses the existing
+trusted CLI account in process, verifies real Firebase tokens and refuses
+emulator/project overrides. The separately guarded demo launcher remains 8787.
+No real push adapter is wired. Readiness requires exact reviewed deployed rules,
+READY indexes, v2 activation and a valid effective policy date. See
+[main-app localhost workflow](../../docs/localhost-real-firebase.md) for the
+authorized shared changes, private recovery records and verification limits.
+
+Checkpoint 45 adds the durable `auth_lifecycle.mjs` operations and session
+cutoffs; see [Auth controls](../../docs/auth-account-lifecycle.md). Checkpoint 46
+adds optional `manualAppeals` API wiring backed by `manual_appeals.mjs` for
+revision-bound manual restriction appeals. Both localhost launchers wire these
+policies. Main-app admin Users/Activity use bounded pages. See
+[manual appeals](../../docs/manual-restriction-appeals.md) for privacy, restoration
+boundaries, pending queue and recovery behavior.

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/localization_context.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import 'mobility_preview.dart';
@@ -86,89 +88,102 @@ class _TailoredForYouPageState extends State<TailoredForYouPage>
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 400;
 
-    return Column(
-      children: [
-        Expanded(
-          child: Center(
-            child: AnimatedBuilder(
-              animation: Listenable.merge([
-                _entranceController,
-                _floatController,
-                _orbitController,
-              ]),
-              builder: (context, _) {
-                return FittedBox(
-                  fit: BoxFit.contain,
-                  child: SizedBox(
-                    width: 360,
-                    height: 360,
-                    child: FadeTransition(
-                      opacity: CurvedAnimation(
-                        parent: _entranceController,
-                        curve: const Interval(0, 0.4, curve: Curves.easeOut),
-                      ),
-                      child: MobilityPreview(
-                        entrance: _entranceController.value,
-                        float: _floatController.value,
-                        orbit: _orbitController.value,
-                        reduceMotion: widget.reduceMotion,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        FadeTransition(
-          opacity: CurvedAnimation(
-            parent: _entranceController,
-            curve: const Interval(0.35, 0.8, curve: Curves.easeOut),
-          ),
-          child: SlideTransition(
-            position:
-                Tween<Offset>(
-                  begin: const Offset(0, 0.12),
-                  end: Offset.zero,
-                ).animate(
-                  CurvedAnimation(
-                    parent: _entranceController,
-                    curve: const Interval(
-                      0.35,
-                      0.8,
-                      curve: Curves.easeOutCubic,
-                    ),
-                  ),
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: IntrinsicHeight(
             child: Column(
               children: [
-                Text(
-                  'Tailored for You',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: wide ? 32 : 22,
-                    height: wide ? 40 / 32 : 28 / 22,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: wide ? -0.64 : 0,
-                    color: context.textColor,
+                Expanded(
+                  child: Center(
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _entranceController,
+                        _floatController,
+                        _orbitController,
+                      ]),
+                      builder: (context, _) {
+                        return FittedBox(
+                          fit: BoxFit.contain,
+                          child: SizedBox(
+                            width: 360,
+                            height: 360,
+                            child: FadeTransition(
+                              opacity: CurvedAnimation(
+                                parent: _entranceController,
+                                curve: const Interval(
+                                  0,
+                                  0.4,
+                                  curve: Curves.easeOut,
+                                ),
+                              ),
+                              child: MobilityPreview(
+                                entrance: _entranceController.value,
+                                float: _floatController.value,
+                                orbit: _orbitController.value,
+                                reduceMotion: widget.reduceMotion,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 320),
-                  child: Text(
-                    'Choose wheelchair and step-free needs, then review current evidence. Voice guidance is unavailable.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      height: 24 / 16,
-                      fontWeight: context.isHighContrast
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                      color: context.isHighContrast
-                          ? Colors.black
-                          : AppColors.onSurfaceVariant,
+                const SizedBox(height: 24),
+                FadeTransition(
+                  opacity: CurvedAnimation(
+                    parent: _entranceController,
+                    curve: const Interval(0.35, 0.8, curve: Curves.easeOut),
+                  ),
+                  child: SlideTransition(
+                    position:
+                        Tween<Offset>(
+                          begin: const Offset(0, 0.12),
+                          end: Offset.zero,
+                        ).animate(
+                          CurvedAnimation(
+                            parent: _entranceController,
+                            curve: const Interval(
+                              0.35,
+                              0.8,
+                              curve: Curves.easeOutCubic,
+                            ),
+                          ),
+                        ),
+                    child: Column(
+                      children: [
+                        Text(
+                          context.l10n.onboardingTailored,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: wide ? 32 : 22,
+                            height: wide ? 40 / 32 : 28 / 22,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: wide ? -0.64 : 0,
+                            color: context.textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 320),
+                          child: Text(
+                            context.l10n.onboardingNeedsHelp,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 16,
+                              height: 24 / 16,
+                              fontWeight: context.isHighContrast
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              color: context.isHighContrast
+                                  ? Colors.black
+                                  : AppColors.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -176,7 +191,7 @@ class _TailoredForYouPageState extends State<TailoredForYouPage>
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }

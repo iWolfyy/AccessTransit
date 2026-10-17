@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' show Color;
+import 'package:characters/characters.dart';
 
 import '../theme/app_colors.dart';
 
@@ -61,7 +62,14 @@ abstract final class Validators {
     r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
   );
 
-  static final RegExp _nameRegex = RegExp(r"^[a-zA-Z\s'.-]+$");
+  // Letters and combining marks support Sinhala, Tamil and other personal
+  // names. Joiners are needed for Indic conjuncts; whitespace controls, digits
+  // and emoji are deliberately excluded. Do not normalize or transliterate.
+  static final RegExp _nameRegex = RegExp(
+    r"^(?:\p{L}[\p{M}\u200C\u200D]*|[\p{Zs}.'\u2019\u2010\u2011-])+$",
+    unicode: true,
+  );
+  static final RegExp _nameLetter = RegExp(r'\p{L}', unicode: true);
 
   static String? fullName(String? value) {
     final trimmed = value?.trim() ?? '';
@@ -70,12 +78,12 @@ abstract final class Validators {
       return 'Please enter your full name.';
     }
 
-    if (trimmed.length < 2) {
+    if (trimmed.characters.length < 2) {
       return 'Name must be at least 2 characters.';
     }
 
-    if (!_nameRegex.hasMatch(trimmed)) {
-      return 'Name can only contain letters and spaces.';
+    if (!_nameRegex.hasMatch(trimmed) || !_nameLetter.hasMatch(trimmed)) {
+      return 'Use letters, spaces, apostrophes, periods or hyphens in your name.';
     }
 
     return null;

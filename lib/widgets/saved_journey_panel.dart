@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../core/utils/time_utils.dart';
+import '../logic/transit_time.dart';
+import '../l10n/shared_presentation.dart';
 import '../models/journey_model.dart';
 import '../services/journey_service.dart';
 import '../screens/journey/journey_resume_screen.dart';
@@ -87,11 +88,9 @@ class _SavedJourneyPanelState extends State<SavedJourneyPanel> {
           stream: updates,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  'Saved journey updates unavailable. Check your connection and reopen Home to retry.',
-                ),
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(context.l10n.sharedJourneyUpdatesError),
               );
             }
             final journey = snapshot.data;
@@ -107,16 +106,22 @@ class _SavedJourneyPanelState extends State<SavedJourneyPanel> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Saved journey',
+                      context.l10n.sharedSavedJourney,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     Text('${journey.origin} → ${journey.destination}'),
-                    Text('Vehicle: ${journey.busNo ?? journey.busId}'),
+                    Text(
+                      context.l10n.sharedVehicle(
+                        journey.busNo ?? journey.busId,
+                      ),
+                    ),
                     if (journey.departureAt != null)
                       Text(
-                        'Timetable: ${TimeUtils.formatDateString(journey.departureAt!)}, ${TimeUtils.formatTimeString(journey.departureAt!)}',
+                        context.l10n.sharedTimetable(
+                          '${MaterialLocalizations.of(context).formatMediumDate(TransitTime.civil(journey.departureAt!))}, ${TimeOfDay.fromDateTime(TransitTime.civil(journey.departureAt!)).format(context)}',
+                        ),
                       ),
-                    if (error != null) Text(error!),
+                    if (error != null) Text(context.sharedText(error!)),
                     FilledButton(
                       onPressed: saving
                           ? null
@@ -134,7 +139,7 @@ class _SavedJourneyPanelState extends State<SavedJourneyPanel> {
                                 ),
                               );
                             },
-                      child: const Text('Resume journey'),
+                      child: Text(context.l10n.sharedResume),
                     ),
                     Wrap(
                       spacing: 8,
@@ -143,13 +148,13 @@ class _SavedJourneyPanelState extends State<SavedJourneyPanel> {
                           onPressed: saving
                               ? null
                               : () => finish(journey, true),
-                          child: const Text('Mark completed'),
+                          child: Text(context.l10n.sharedComplete),
                         ),
                         TextButton(
                           onPressed: saving
                               ? null
                               : () => finish(journey, false),
-                          child: const Text('Cancel saved journey'),
+                          child: Text(context.l10n.sharedCancelJourney),
                         ),
                       ],
                     ),

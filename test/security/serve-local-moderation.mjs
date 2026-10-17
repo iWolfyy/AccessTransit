@@ -1,3 +1,6 @@
+import {createManualAppeals} from '../../server/moderation/manual_appeals.mjs';
+import {createAccountPolicy} from '../../server/moderation/accounts.mjs';
+import {createAuthLifecycle} from '../../server/moderation/auth_lifecycle.mjs';
 // Loopback emulator server only. No cloud credentials or remote host overrides.
 import {createServer} from 'node:http';
 import {initializeApp,deleteApp} from 'firebase-admin/app';
@@ -24,10 +27,12 @@ const effectiveAt=new Date('2026-10-16T00:00:00Z');
 const policy=createModerationPolicy({store:adminStore(db),effectiveAt});
 const appeals=createAppealPolicy({store:adminStore(db)});
 const bans=createBanPolicy({store:adminStore(db),accountAdmin:async uid=>(await getAuth(app).getUser(uid)).customClaims?.admin===true});
+const accounts=createAccountPolicy({store:adminStore(db),accountAdmin:async uid=>(await getAuth(app).getUser(uid)).customClaims?.admin===true});
 const assistance=createAssistancePolicy({store:adminStore(db)});
 const operations=createOperationPolicy({store:adminStore(db),assistance});
 const notifications=createNotificationPolicy({store:adminStore(db),assistance,provider:localNotificationProvider(adminStore(db))});
-const api=createModerationApi({auth:getAuth(app),policy,appeals,bans,assistance,operations,notifications,allowedScopes:['normal']});
+const lifecycle=createAuthLifecycle({store:adminStore(db),auth:getAuth(app)});
+const api=createModerationApi({auth:getAuth(app),policy,appeals,bans,assistance,operations,notifications,accounts,lifecycle,manualAppeals:createManualAppeals({store:adminStore(db)}),allowedScopes:['normal']});
 await db.doc('moderation_config/active').set({enabled:true,policyVersion:2,effectiveAt,localOnly:true});
 await db.doc('assistance_config/active').set({enabled:true,policyVersion:2,localOnly:true});
 const server=createServer(createNodeModerationHandler({api,publicOrigin:'https://local-validation.invalid'}));

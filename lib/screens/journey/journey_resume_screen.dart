@@ -9,6 +9,8 @@ import '../../services/accessibility_preferences_service.dart';
 
 import '../../logic/journey_selection.dart';
 import '../../models/journey_model.dart';
+import '../../models/bus.dart';
+import '../../models/station.dart';
 import '../../services/firestore_service.dart';
 import '../../services/journey_service.dart';
 import 'bus_details_screen.dart';
@@ -92,10 +94,27 @@ class _JourneyResumeScreenState extends State<JourneyResumeScreen> {
       if (service.signedInPassenger != widget.journey.passengerId) {
         throw StateError('Sign in with the account that saved this journey.');
       }
-      final bus = await repository.getBusById(widget.journey.busId);
-      final stops = await repository.getStations();
+      Bus? bus;
+      List<Station> stops = [];
+      try {
+        bus = await repository.getBusById(widget.journey.busId);
+      } catch (_) {
+        if (widget.journey.scheduleSnapshot == null) rethrow;
+      }
+      try {
+        stops = await repository.getStations();
+      } catch (_) {
+        if (widget.journey.scheduleSnapshot == null) rethrow;
+      }
       if (bus == null) {
-        throw StateError('vehicle');
+        final snapshot = widget.journey.scheduleSnapshot;
+        if (snapshot == null) throw StateError('vehicle');
+        bus = snapshot.historicalBus(
+          id: widget.journey.busId,
+          routeId: widget.journey.routeId,
+          routeNo: widget.journey.routeNumber,
+          busNo: widget.journey.busNo,
+        );
       }
       final restored = JourneySelection.restore(widget.journey, bus, {
         for (final s in stops) s.id: s,

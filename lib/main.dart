@@ -33,6 +33,7 @@ import 'l10n/localization_context.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  ModerationMode.initializeMainApp();
   ModerationMode.validate();
   DriverPushConfiguration.validateBuild();
 
@@ -250,29 +251,22 @@ class _AccessTransitAppState extends State<AccessTransitApp>
               final prefs = AccessibilityPreferencesService.instance;
               final isHighContrast = prefs.isHighContrast;
               final hasLargeTargets = prefs.hasLargeTargets;
-              final baseTheme = isHighContrast
-                  ? AppTheme.highContrastTheme
-                  : AppTheme.lightTheme;
               return Theme(
-                data: baseTheme.copyWith(
-                  extensions: [
-                    AccessibilityTokens(
-                      hasLargeTargets: hasLargeTargets,
-                      isHighContrast: isHighContrast,
-                    ),
-                  ],
+                data: AppTheme.forPreferences(
+                  highContrast: isHighContrast,
+                  largeTargets: hasLargeTargets,
                 ),
                 child: Column(
                   children: [
                     if (SampleTestMode.enabled)
-                      const SafeArea(
+                      SafeArea(
                         bottom: false,
                         child: Material(
                           color: Colors.amber,
                           child: Padding(
                             padding: EdgeInsets.all(8),
                             child: Text(
-                              SampleTestMode.notice,
+                              context.l10n.sharedSampleNotice,
                               style: TextStyle(
                                 color: Colors.black,
                                 fontSize: 12,
@@ -282,14 +276,14 @@ class _AccessTransitAppState extends State<AccessTransitApp>
                         ),
                       ),
                     if (LocalValidationBackend.enabled)
-                      const SafeArea(
+                      SafeArea(
                         bottom: false,
                         child: Material(
                           color: Colors.amber,
                           child: Padding(
                             padding: EdgeInsets.all(8),
                             child: Text(
-                              'LOCAL TEST ONLY - synthetic services, no real transit or Cloudinary uploads',
+                              context.l10n.sharedLocalNotice,
                               style: TextStyle(
                                 color: Colors.black,
                                 fontSize: 12,

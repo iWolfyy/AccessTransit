@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/shared_presentation.dart';
+import '../l10n/localization_context.dart';
+
 import '../services/transit_catalogue.dart';
 import '../services/firestore_service.dart';
 
@@ -12,10 +15,17 @@ class CatalogueNotice extends StatefulWidget {
 
 class _CatalogueNoticeState extends State<CatalogueNotice> {
   bool refreshing = false;
+  bool failed = false;
   Future<void> refresh() async {
-    setState(() => refreshing = true);
+    if (refreshing) return;
+    setState(() {
+      refreshing = true;
+      failed = false;
+    });
     try {
       await (widget.onRefresh ?? FirestoreService().refreshCatalogue)();
+    } catch (_) {
+      if (mounted) setState(() => failed = true);
     } finally {
       if (mounted) setState(() => refreshing = false);
     }
@@ -42,27 +52,39 @@ class _CatalogueNoticeState extends State<CatalogueNotice> {
       } else {
         message = null;
       }
-      if (message == null) return const SizedBox.shrink();
+      if (message == null && !failed) return const SizedBox.shrink();
       return Material(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: SafeArea(
           bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    message,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * .35,
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (message != null)
+                      Text(
+                        context.sharedText(message),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    if (failed) Text(context.l10n.sharedCatalogueRefreshError),
+                    if (!TransitCatalogue.demo)
+                      TextButton(
+                        onPressed: refreshing ? null : refresh,
+                        child: Text(
+                          context.sharedText(
+                            refreshing ? 'Refreshing…' : 'Refresh',
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                if (!TransitCatalogue.demo)
-                  TextButton(
-                    onPressed: refreshing ? null : refresh,
-                    child: Text(refreshing ? 'Refreshing…' : 'Refresh'),
-                  ),
-              ],
+              ),
             ),
           ),
         ),

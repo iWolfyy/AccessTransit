@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../l10n/shared_presentation.dart';
+
 import 'package:flutter/material.dart';
 
 import '../screens/auth/login_screen.dart';
@@ -92,34 +94,38 @@ class _AdminAccessGateState extends State<AdminAccessGate>
   Widget build(BuildContext context) {
     if (_allowed) return widget.child;
     return Scaffold(
-      appBar: AppBar(title: const Text('Administrator access')),
+      appBar: AppBar(title: Text(context.sharedText('Administrator access'))),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_checking)
-                const CircularProgressIndicator()
-              else
-                const Icon(Icons.admin_panel_settings_outlined, size: 48),
-              const SizedBox(height: 20),
-              Text(
-                _checking ? 'Checking administrator access...' : 'An administrator claim and an online connection are required. A profile role does not grant access.',
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _checking ? null : _check,
-                child: const Text('Check again'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  (_) => false,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_checking)
+                  const CircularProgressIndicator()
+                else
+                  const Icon(Icons.admin_panel_settings_outlined, size: 48),
+                const SizedBox(height: 20),
+                Text(
+                  context.sharedText(
+                    _checking ? 'Checking administrator access...' : 'An administrator claim and an online connection are required. A profile role does not grant access.',
+                  ),
                 ),
-                child: const Text('Sign in'),
-              ),
-            ],
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _checking ? null : _check,
+                  child: Text(context.sharedText('Check again')),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (_) => false,
+                  ),
+                  child: Text(context.sharedText('Sign in')),
+                ),
+              ],
+            ),
           ),
         ),
       ),

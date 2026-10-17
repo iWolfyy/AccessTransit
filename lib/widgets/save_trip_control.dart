@@ -9,6 +9,7 @@ import '../core/theme/app_theme.dart';
 import '../logic/journey_selection.dart';
 import '../l10n/localization_context.dart';
 import '../models/journey_model.dart';
+import '../models/service_run.dart';
 import '../screens/journey/route_results_screen.dart';
 import '../services/journey_service.dart';
 
@@ -19,6 +20,7 @@ class SaveTripControl extends StatefulWidget {
     required this.route,
     required this.service,
     this.runId,
+    this.run,
     this.existing,
     this.fareQuote,
     this.fareValidated = false,
@@ -26,6 +28,7 @@ class SaveTripControl extends StatefulWidget {
   final RouteResultItem route;
   final JourneyService service;
   final String? runId;
+  final ServiceRun? run;
   final JourneyModel? existing;
   final TariffFareQuote? fareQuote;
   final bool fareValidated;
@@ -71,6 +74,7 @@ class _SaveTripControlState extends State<SaveTripControl> {
                 id: id,
                 passengerId: owner!,
                 serviceRunId: widget.runId,
+                run: widget.run,
                 fareQuote: widget.fareQuote,
                 overrideFareQuote: widget.fareValidated,
               ),
@@ -115,18 +119,21 @@ class _SaveTripControlState extends State<SaveTripControl> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (saved) Text(context.l10n.savedTrip),
-          const Text(
-            'Saving keeps this selection. It does not book a seat or start a journey.',
-          ),
+          Text(context.l10n.sharedSaveDisclosure),
           const SizedBox(height: 8),
-          if (error != null) Text(error!, semanticsLabel: error),
+          if (error != null)
+            Text(switch (error) {
+              'Sign in with the account saving this trip.' =>
+                context.l10n.sharedSaveOwner,
+              'Saved trip acknowledgement did not match.' =>
+                context.l10n.sharedSaveMismatch,
+              _ => context.l10n.sharedSaveError,
+            }),
           if (snapshot.hasError && error == null)
-            const Text(
-              'Saved status unavailable. Retry to verify your bookmark.',
-            ),
+            Text(context.l10n.sharedSaveStatusError),
           FilledButton.icon(
             style: FilledButton.styleFrom(
-              minimumSize: Size(48, context.buttonHeight),
+              minimumSize: Size(context.buttonHeight, context.buttonHeight),
             ),
             onPressed: busy || !sameOwner ? null : () => change(saved),
             icon: Icon(
@@ -136,13 +143,13 @@ class _SaveTripControlState extends State<SaveTripControl> {
             ),
             label: Text(
               busy
-                  ? 'Saving…'
+                  ? context.l10n.sharedSaving
                   : saved
                   ? context.l10n.removeSavedTrip
                   : context.l10n.saveTrip,
             ),
           ),
-          if (!sameOwner) const Text('Sign in to save this trip.'),
+          if (!sameOwner) Text(context.l10n.sharedSaveSignIn),
         ],
       );
     },

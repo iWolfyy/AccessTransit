@@ -1045,3 +1045,47 @@ test('recurring calendars are private active-admin immutable publications in bot
   await env.withSecurityRulesDisabled(async c=>setDoc(ref(c.firestore(),'account_access/admin'),{manualSuspended:true}));
   await assertFails(setDoc(ref(db,'service_schedules/blocked'),{schemaVersion:1,version:1,state:'published',updatedBy:'admin',updatedAt:serverTimestamp()}));
 });
+
+
+test('saved loop visit resolves its physical station without inventing an occurrence station document',async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    const db=c.firestore();await updateDoc(ref(db,'buses/bus1'),{stops:['s1','s2','s1-return'],stopStationIds:{s1:'s1',s2:'s2','s1-return':'s1'}});
+  });
+  const data={journeyId:'loop-save',passengerId:'alice',busId:'bus1',routeId:'route1',routeNumber:'1',routeTitle:'Loop',origin:'Stop 2',destination:'Stop 1 return',
+    fromStationId:'s2',toStationId:'s1-return',selectedDate:Timestamp.now(),departureAt:Timestamp.now(),durationMinutes:10,estimatedFareLkr:0,
+    wheelchairAccessRequired:false,stepFreeOnly:false,status:'confirmed',createdAt:serverTimestamp()};
+  await assertSucceeds(setDoc(ref(auth('alice'),'journeys/loop-save'),data));
+  assert.equal((await getDoc(ref(auth('alice'),'journeys/loop-save'))).data().toStationId,'s1-return');
+  await assertFails(setDoc(ref(auth('alice'),'journeys/wrong-visit'),{...data,journeyId:'wrong-visit',toStationId:'invented-return'}));
+  await assertFails(updateDoc(ref(auth('op'),'service_runs/forged'),{stopStationIds:{'s1-return':'s2'}}));
+});
+
+
+test('saved timetable snapshots are owner-scoped immutable selections with server-matched run version',async()=>{
+  const departure=Timestamp.now(),arrival=Timestamp.fromMillis(departure.toMillis()+600000);
+  await env.withSecurityRulesDisabled(async c=>setDoc(ref(c.firestore(),'service_runs/snapshot-run'),{busId:'bus1',scheduleVersion:1,initialStopTimes:{s1:{estimatedArrival:departure},s2:{estimatedArrival:arrival}}}));
+  const snapshot={schemaVersion:1,stops:['s1','s2'],stationIds:{s1:'s1',s2:'s2'},names:{s1:'Original boarding',s2:'Original destination'},times:{s1:departure,s2:arrival},runVersion:1};
+  const data={journeyId:'snapshot-save',passengerId:'alice',busId:'bus1',routeId:'route1',routeNumber:'1',routeTitle:'Original route',origin:'Original boarding',destination:'Original destination',
+    fromStationId:'s1',toStationId:'s2',serviceRunId:'snapshot-run',selectedDate:departure,departureAt:departure,durationMinutes:10,estimatedFareLkr:0,
+    wheelchairAccessRequired:false,stepFreeOnly:false,status:'confirmed',createdAt:serverTimestamp(),scheduleSnapshot:snapshot};
+  await assertSucceeds(setDoc(ref(auth('alice'),'journeys/snapshot-save'),data));
+  await assertFails(getDoc(ref(auth('op'),'journeys/snapshot-save')));
+  await assertFails(updateDoc(ref(auth('alice'),'journeys/snapshot-save'),{scheduleSnapshot:{...snapshot,names:{s1:'Changed',s2:'Changed'}}}));
+  for(const forged of [{...snapshot,runVersion:2},{...snapshot,stops:['s1','s1','s2']},{...snapshot,times:{s1:departure,s2:departure}}]) {
+    await assertFails(setDoc(ref(auth('alice'),'journeys/forged-snapshot'),{...data,journeyId:'forged-snapshot',scheduleSnapshot:forged}));
+  }
+});
+
+test('schedule change history is public and append-only, writable only by active admin in either scope',async()=>{
+  const db=auth('admin',{admin:true});
+  await env.withSecurityRulesDisabled(async c=>setDoc(ref(c.firestore(),'sample_test/shared/users/admin'),{uid:'admin',role:'passenger'}));
+  for(const prefix of ['', 'sample_test/shared/']) {
+    const path=prefix+'service_run_changes/old',data={previousRunId:'old',replacementRunId:'new',reason:'Public timetable change',updatedBy:'admin',updatedAt:serverTimestamp()};
+    await assertFails(setDoc(ref(auth('alice'),path),data));
+    await assertFails(setDoc(ref(auth('op'),path),data));
+    await assertSucceeds(setDoc(ref(db,path),data));
+    await assertSucceeds(getDoc(ref(guest(),path)));
+    await assertFails(updateDoc(ref(db,path),{reason:'Rewrite'}));
+    await assertFails(deleteDoc(ref(db,path)));
+  }
+});

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
+import '../l10n/localization_context.dart';
 
 /// Truthful availability state until stop detection and delivery are connected.
 class StopAlertUnavailable extends StatelessWidget {
@@ -14,12 +15,13 @@ class StopAlertUnavailable extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     button: true,
     enabled: false,
-    label: 'Stop alert unavailable. $explanation',
+    label:
+        '${context.l10n.sharedStopAlert}. ${context.l10n.sharedStopAlertHelp}',
     excludeSemantics: true,
     child: OutlinedButton.icon(
       onPressed: null,
       style: OutlinedButton.styleFrom(
-        minimumSize: Size(0, context.minTapHeight),
+        minimumSize: Size(context.buttonHeight, context.minTapHeight),
         disabledForegroundColor: context.textColor,
         side: BorderSide(color: context.textColor),
       ),
@@ -27,7 +29,7 @@ class StopAlertUnavailable extends StatelessWidget {
         Icons.notifications_off_outlined,
         size: context.tapIconSize - 2,
       ),
-      label: const Text('Stop alert unavailable', textAlign: TextAlign.center),
+      label: Text(context.l10n.sharedStopAlert, textAlign: TextAlign.center),
     ),
   );
 }

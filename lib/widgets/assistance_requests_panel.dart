@@ -1,3 +1,6 @@
+import '../l10n/localization_context.dart';
+import '../l10n/assistance_receipt_presentation.dart';
+
 import 'package:flutter/material.dart';
 
 import '../models/boarding_request.dart';
@@ -62,8 +65,8 @@ class _AssistanceRequestsPanelState extends State<AssistanceRequestsPanel> {
             rows[entry.request.id] = (
               entry.request,
               entry.delivery == AssistanceDeliveryState.sent
-                  ? entry.request.driverStatusLabel
-                  : entry.delivery.label,
+                  ? assistanceStatus(context, entry.request)
+                  : context.assistanceReceiptText(entry.delivery.label),
             );
           }
           for (final r in snapshot.data ?? <BoardingRequest>[]) {
@@ -81,17 +84,21 @@ class _AssistanceRequestsPanelState extends State<AssistanceRequestsPanel> {
             children: [
               const SizedBox(height: 16),
               Text(
-                'Your assistance requests',
+                context.l10n.assistReceiptHistory,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               if (snapshot.hasError)
-                const Text(
-                  'Shared request updates are unavailable. Saved receipts may be out of date.',
-                ),
-              if (service.loadError != null) Text(service.loadError!),
+                Text(context.l10n.assistReceiptHistoryStale),
+              if (service.loadError != null)
+                Text(context.assistanceReceiptText(service.loadError!)),
               for (final row in sorted.take(10))
                 ListTile(
-                  title: Text('Route ${row.$1.routeNo} · ${row.$1.stopName}'),
+                  title: Text(
+                    context.l10n.assistReceiptSummary(
+                      row.$1.routeNo,
+                      row.$1.stopName,
+                    ),
+                  ),
                   subtitle: Text(row.$2),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).push(

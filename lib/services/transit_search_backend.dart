@@ -5,20 +5,21 @@ import '../logic/transit_time.dart';
 import '../models/service_run.dart';
 import 'bus_details_repository.dart';
 import 'sample_test_mode.dart';
+import 'server_snapshot_stream.dart';
 
 class TransitSearchBackend extends BusDetailsRepository {
   Stream<List<ServiceRun>> searchRuns(String busId) async* {
-    yield* FirebaseFirestore.instance
-        .collection(SampleTestMode.collection('service_runs'))
-        .where('busId', isEqualTo: busId)
-        .where('status', whereIn: ['scheduled', 'boarding', 'in_progress'])
-        .snapshots(includeMetadataChanges: true)
-        .map((s) {
-          if (s.metadata.isFromCache || s.metadata.hasPendingWrites) {
-            throw StateError('Connect to refresh dated departures.');
-          }
-          return s.docs.map((d) => ServiceRun.fromMap(d.id, d.data())).toList();
-        });
+    yield* serverSnapshotStream(
+      FirebaseFirestore.instance
+          .collection(SampleTestMode.collection('service_runs'))
+          .where('busId', isEqualTo: busId)
+          .where('status', whereIn: ['scheduled', 'boarding', 'in_progress'])
+          .snapshots(includeMetadataChanges: true),
+      isVerified: (s) =>
+          !s.metadata.isFromCache && !s.metadata.hasPendingWrites,
+    ).map((s) {
+      return s.docs.map((d) => ServiceRun.fromMap(d.id, d.data())).toList();
+    });
   }
 
   SearchTimeAnchor? _anchor;

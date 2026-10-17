@@ -28,8 +28,15 @@ class OrderedSchedule {
     required List<String> scheduleTimes,
     required DateTime serviceDate,
     required DateTime fallbackDeparture,
+    bool utcCivil = false,
   }) {
     if (stopCount <= 0 || scheduleTimes.length > stopCount) return null;
+    // UTC here represents timezone-neutral civil clock fields. The caller
+    // subsequently converts Colombo civil fields into actual UTC instants.
+    DateTime civil(int year, int month, int day, int hour, int minute) =>
+        utcCivil
+        ? DateTime.utc(year, month, day, hour, minute)
+        : DateTime(year, month, day, hour, minute);
     final times = <DateTime>[];
     var estimated = false;
     for (var i = 0; i < stopCount; i++) {
@@ -47,7 +54,7 @@ class OrderedSchedule {
         final minutes = minutesOfDay(raw);
         if (minutes == null) return null;
         final base = times.isEmpty ? serviceDate : times.last;
-        next = DateTime(
+        next = civil(
           base.year,
           base.month,
           base.day,
@@ -55,7 +62,7 @@ class OrderedSchedule {
           minutes % 60,
         );
         if (times.isNotEmpty && next.isBefore(times.last)) {
-          next = DateTime(
+          next = civil(
             base.year,
             base.month,
             base.day + 1,

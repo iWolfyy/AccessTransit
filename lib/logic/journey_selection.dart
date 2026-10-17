@@ -2,6 +2,9 @@ import '../core/utils/time_utils.dart';
 import 'transit_time.dart';
 import 'tariff_fare.dart';
 import '../models/bus.dart';
+import '../models/service_run.dart';
+import '../models/saved_schedule_snapshot.dart';
+import 'bus_details_state.dart';
 import '../models/journey_model.dart';
 import '../models/station.dart';
 import '../screens/journey/route_results_screen.dart';
@@ -12,6 +15,7 @@ abstract final class JourneySelection {
     required String id,
     required String passengerId,
     String? serviceRunId,
+    ServiceRun? run,
     TariffFareQuote? fareQuote,
     bool overrideFareQuote = false,
   }) {
@@ -37,6 +41,36 @@ abstract final class JourneySelection {
       busId: bus.id,
       busNo: bus.displayBusNo,
       serviceRunId: serviceRunId ?? route.serviceRunId,
+      scheduleSnapshot: SavedScheduleSnapshot(
+        stops: bus.stops.sublist(from, to + 1),
+        stationIds: {
+          for (final key in bus.stops.sublist(from, to + 1))
+            key: bus.stationIdFor(key),
+        },
+        names: {
+          for (final key in bus.stops.sublist(from, to + 1))
+            key: key == route.fromStationId
+                ? route.origin
+                : key == route.toStationId
+                ? route.destination
+                : route.journeyStations[key]?.name ?? key,
+        },
+        times: {
+          for (final key in bus.stops.sublist(from, to + 1))
+            key: run != null && BusDetailsState.matchesRun(run, route)
+                ? run.stopTimes[key]
+                : key == route.fromStationId
+                ? route.nextDepartureDateTime
+                : key == route.toStationId
+                ? route.nextDepartureDateTime!.add(
+                    Duration(minutes: route.durationMinutes),
+                  )
+                : null,
+        },
+        runVersion: run != null && BusDetailsState.matchesRun(run, route)
+            ? run.scheduleVersion
+            : null,
+      ),
       origin: route.origin,
       destination: route.destination,
       fromStationId: route.fromStationId,
@@ -61,6 +95,20 @@ abstract final class JourneySelection {
     Bus bus,
     Map<String, Station> stations,
   ) {
+    final snapshot = journey.scheduleSnapshot;
+    if (snapshot != null) {
+      if (!snapshot.matches(bus) ||
+          bus.routeNo != journey.routeNumber ||
+          bus.routeId != journey.routeId) {
+        bus = snapshot.historicalBus(
+          id: journey.busId,
+          routeId: journey.routeId,
+          routeNo: journey.routeNumber,
+          busNo: journey.busNo,
+        );
+      }
+      stations = {...snapshot.historicalStations(), ...stations};
+    }
     final from = bus.stops.indexOf(journey.fromStationId ?? '');
     final to = bus.stops.indexOf(journey.toStationId ?? '');
     if (bus.id != journey.busId ||
@@ -111,7 +159,7 @@ abstract final class JourneySelection {
       ),
       wheelchairAccessRequired: journey.wheelchairAccessRequired,
       stepFreeOnly: journey.stepFreeOnly,
-      journeyStations: stations,
+      journeyStations: bus.resolveStations(stations),
       intermediateStops: bus.stops.sublist(from + 1, to),
     );
   }

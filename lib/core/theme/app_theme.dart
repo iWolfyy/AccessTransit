@@ -3,9 +3,104 @@ import 'package:flutter/material.dart';
 import '../../services/accessibility_preferences_service.dart';
 import 'app_colors.dart';
 
-/// Central theme configuration supporting standard and high contrast (WCAG AAA) themes.
+/// Central themes and shared accessibility preferences.
 class AppTheme {
   const AppTheme._();
+
+  /// Shared controls inherit preferences, including dialogs and nested routes.
+  static ThemeData forPreferences({
+    required bool highContrast,
+    required bool largeTargets,
+  }) {
+    final base = highContrast ? highContrastTheme : lightTheme;
+    final size = largeTargets ? 60.0 : 48.0;
+    final button = ButtonStyle(
+      minimumSize: WidgetStatePropertyAll(Size(size, size)),
+      tapTargetSize: MaterialTapTargetSize.padded,
+      visualDensity: VisualDensity.standard,
+    );
+    return base.copyWith(
+      extensions: [
+        AccessibilityTokens(
+          hasLargeTargets: largeTargets,
+          isHighContrast: highContrast,
+        ),
+      ],
+      appBarTheme: base.appBarTheme.copyWith(
+        toolbarHeight: largeTargets ? 64 : 56,
+        leadingWidth: largeTargets ? 64 : 56,
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: (base.iconButtonTheme.style ?? const ButtonStyle()).copyWith(
+          minimumSize: button.minimumSize,
+          tapTargetSize: button.tapTargetSize,
+          visualDensity: button.visualDensity,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: (base.filledButtonTheme.style ?? const ButtonStyle()).merge(
+          button,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: (base.elevatedButtonTheme.style ?? const ButtonStyle()).merge(
+          button,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: (base.outlinedButtonTheme.style ?? const ButtonStyle()).merge(
+          button,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: (base.textButtonTheme.style ?? const ButtonStyle()).merge(
+          button,
+        ),
+      ),
+      listTileTheme: base.listTileTheme.copyWith(minTileHeight: size),
+      chipTheme: base.chipTheme.copyWith(
+        padding: EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: largeTargets ? 12 : 4,
+        ),
+        labelStyle: highContrast ? const TextStyle(color: Colors.black) : null,
+        secondaryLabelStyle: highContrast
+            ? const TextStyle(color: Colors.black)
+            : null,
+        selectedColor: highContrast ? Colors.white : null,
+        backgroundColor: highContrast ? Colors.white : null,
+        showCheckmark: highContrast ? true : null,
+        checkmarkColor: highContrast ? Colors.black : null,
+        side: highContrast
+            ? const BorderSide(color: Colors.black, width: 2)
+            : null,
+      ),
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        constraints: BoxConstraints(minHeight: size),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: largeTargets ? 20 : 16,
+        ),
+        prefixIconConstraints: BoxConstraints(minWidth: size, minHeight: size),
+        suffixIconConstraints: BoxConstraints(minWidth: size, minHeight: size),
+      ),
+      popupMenuTheme: base.popupMenuTheme.copyWith(
+        labelTextStyle: WidgetStatePropertyAll(
+          TextStyle(color: base.colorScheme.onSurface),
+        ),
+      ),
+      cardTheme: highContrast
+          ? base.cardTheme.copyWith(
+              color: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Colors.black, width: 2),
+              ),
+            )
+          : base.cardTheme,
+    );
+  }
 
   /// Standard application theme with brand styling.
   static ThemeData get lightTheme {
@@ -21,16 +116,15 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.surfaceBright,
       materialTapTargetSize: MaterialTapTargetSize.padded,
       iconButtonTheme: IconButtonThemeData(
-        style: IconButton.styleFrom(
-          minimumSize: const Size(48, 48),
-        ),
+        style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
       ),
     );
   }
 
-  /// High Contrast Theme adhering to WCAG 2.2 AA/AAA guidelines.
+  /// High contrast palette. Token-pair contrast is tested independently;
+  /// complete rendered/native accessibility still requires device review.
   ///
-  /// Guarantees:
+  /// Palette characteristics:
   /// - Minimum 7:1 contrast ratio for normal text against surfaces.
   /// - Pure white background (#FFFFFF) with solid black text (#000000).
   /// - 2px dark outlines on interactive widgets for clear visual boundaries.
@@ -91,9 +185,7 @@ class AppTheme {
       ),
       materialTapTargetSize: MaterialTapTargetSize.padded,
       iconButtonTheme: IconButtonThemeData(
-        style: IconButton.styleFrom(
-          minimumSize: const Size(48, 48),
-        ),
+        style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -125,22 +217,20 @@ class AppTheme {
 
 /// Extension on [BuildContext] providing convenient, consistent high-contrast tokens.
 extension HighContrastX on BuildContext {
-  /// Whether the app is currently rendering in WCAG AAA High Contrast mode.
+  /// Whether the app is currently rendering in high contrast mode.
   bool get isHighContrast =>
       Theme.of(this).colorScheme.outline == const Color(0xFF000000) ||
       AccessibilityPreferencesService.instance.isHighContrast;
 
   /// Background color for full screen scaffolds.
-  Color get surfaceColor =>
-      isHighContrast ? Colors.white : AppColors.surface;
+  Color get surfaceColor => isHighContrast ? Colors.white : AppColors.surface;
 
   /// Background color for elevated containers and cards.
   Color get cardColor =>
       isHighContrast ? Colors.white : AppColors.surfaceContainerLowest;
 
   /// Primary high-contrast text color (pure black in high contrast).
-  Color get textColor =>
-      isHighContrast ? Colors.black : AppColors.onSurface;
+  Color get textColor => isHighContrast ? Colors.black : AppColors.onSurface;
 
   /// Secondary/subtext color (very dark gray #1A1A1A in high contrast).
   Color get subtextColor =>
@@ -149,6 +239,12 @@ extension HighContrastX on BuildContext {
   /// Primary interactive brand color (high-contrast navy).
   Color get primaryColor =>
       isHighContrast ? const Color(0xFF001F3F) : AppColors.primary;
+
+  Color get errorColor =>
+      isHighContrast ? const Color(0xFF8B0000) : AppColors.error;
+
+  Color get secondaryColor =>
+      isHighContrast ? const Color(0xFF003833) : AppColors.secondary;
 
   /// Primary container color for highlights and chips.
   Color get primaryContainerColor =>
@@ -169,17 +265,16 @@ extension HighContrastX on BuildContext {
       : const BorderSide(color: AppColors.surfaceVariant);
 
   /// Shadows are eliminated in high contrast mode to avoid blurry edges.
-  List<BoxShadow> cardShadow([List<BoxShadow>? normalShadow]) =>
-      isHighContrast
-          ? const []
-          : (normalShadow ??
-              const [
-                BoxShadow(
-                  color: Color(0x0A000000),
-                  blurRadius: 10,
-                  offset: Offset(0, 4),
-                ),
-              ]);
+  List<BoxShadow> cardShadow([List<BoxShadow>? normalShadow]) => isHighContrast
+      ? const []
+      : (normalShadow ??
+            const [
+              BoxShadow(
+                color: Color(0x0A000000),
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ]);
 
   // ==========================================
   // Large Tap Targets (48dp+) Sizing Tokens
@@ -199,8 +294,8 @@ extension HighContrastX on BuildContext {
       accessibilityTokens?.hasLargeTargets ??
       AccessibilityPreferencesService.instance.hasLargeTargets;
 
-  /// Minimum interactive element height: 60dp when large targets, 44dp compact.
-  double get minTapHeight => hasLargeTargets ? 60.0 : 44.0;
+  /// Minimum interactive element height: 60dp when large targets, 48dp compact.
+  double get minTapHeight => hasLargeTargets ? 60.0 : 48.0;
 
   /// Button height: 60dp when large targets, 48dp compact.
   double get buttonHeight => hasLargeTargets ? 60.0 : 48.0;
@@ -225,14 +320,14 @@ extension HighContrastX on BuildContext {
   /// Content padding vertical for inputs.
   double get inputVerticalPadding => hasLargeTargets ? 18.0 : 14.0;
 
-  /// Chip / filter touch target height: 52dp large, 38dp compact.
-  double get chipHeight => hasLargeTargets ? 52.0 : 38.0;
+  /// Chip / filter touch target height: 60dp large, 48dp compact.
+  double get chipHeight => hasLargeTargets ? 60.0 : 48.0;
 
   /// Constraints for AppBar action icons and small tap targets.
   BoxConstraints get appBarActionConstraints => BoxConstraints(
-        minWidth: hasLargeTargets ? 60.0 : 48.0,
-        minHeight: hasLargeTargets ? 60.0 : 48.0,
-      );
+    minWidth: hasLargeTargets ? 60.0 : 48.0,
+    minHeight: hasLargeTargets ? 60.0 : 48.0,
+  );
 }
 
 /// ThemeExtension delivering reactive accessibility sizing tokens to all screens.

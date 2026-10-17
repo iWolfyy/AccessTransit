@@ -7,6 +7,23 @@ import 'package:access_transit/services/trip_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('admin civil-clock mode retains nominal clocks without host DST normalization', () {
+    final ordered = OrderedSchedule.build(
+      stopCount: 3,
+      scheduleTimes: ['01:50', '02:10', '00:10'],
+      serviceDate: DateTime.utc(2026, 3, 29),
+      fallbackDeparture: DateTime.utc(2026, 3, 29),
+      utcCivil: true,
+    )!;
+    expect(ordered.times.every((time) => time.isUtc), isTrue);
+    expect(ordered.times[1], DateTime.utc(2026, 3, 29, 2, 10));
+    expect(
+      ordered.times[1].difference(ordered.times[0]),
+      const Duration(minutes: 20),
+    );
+    expect(ordered.times[2], DateTime.utc(2026, 3, 30, 0, 10));
+  });
+
   final day = DateTime(2026, 12, 31);
   const clocks = ['23:50', '00:10', '00:25'];
   const bus = Bus(

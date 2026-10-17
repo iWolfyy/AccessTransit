@@ -12,6 +12,9 @@ const errors = {
   'assistance-unavailable':409,'assistance-transition-denied':403,'request-id-conflict':409,
   'operation-unavailable':409,'operation-stale':409,'driver-ineligible':409,'gps-unavailable':409,
   'notification-unavailable':409,'device-limit':429,
+  'authentication-required':401,'auth-scope-denied':403,'auth-operation-pending':409,
+  'account-deleted':409,'auth-account-missing':404,'disable-before-delete':409,
+  'active-operation-blocks-delete':409,'deletion-confirmation-required':400,
 };
 class HttpError extends Error {
   constructor(status,code) { super(code);this.status=status;this.code=code; }
@@ -43,7 +46,7 @@ async function jsonBody(request,limit=4096) {
  * auth is a trusted Firebase Admin Auth instance, initialized for one project.
  * No request-body UID, role, points or client-provided clock is accepted.
  */
-export function createModerationApi({auth,policy,appeals,bans,assistance,operations,notifications,allowedScopes=['normal'],allowedOrigins=[]}) {
+export function createModerationApi({auth,policy,appeals,bans,assistance,operations,notifications,accounts,lifecycle,manualAppeals,allowedScopes=['normal'],allowedOrigins=[]}) {
   if (!auth || typeof auth.verifyIdToken !== 'function' || !policy ||
       !allowedScopes.length || allowedScopes.some(s=>!['normal','sample'].includes(s))) throw Error('invalid-server-configuration');
   return async request => {
@@ -62,6 +65,21 @@ export function createModerationApi({auth,policy,appeals,bans,assistance,operati
         '/v2/reviews/evidence':['scope','reportId','after'],
         '/v2/reviews/appeal':['scope','reportId','reason'],
         '/v2/reviews/decide':['scope','reportId','outcome','reason'],
+      };
+      const lifecycleFields={
+        '/v2/auth/detail':['scope','accountId'],
+        '/v2/auth/change':['scope','accountId','operationId','expectedRevision','action','reason','confirmAccountId'],
+        '/v2/auth/retry':['scope','accountId','operationId'],
+      };
+      const manualFields={
+        '/v2/manual-appeals/list':['scope','queue','after'],
+        '/v2/manual-appeals/current':['scope'],
+        '/v2/manual-appeals/submit':['scope','expectedRevision','reason'],
+        '/v2/manual-appeals/review':['scope','appealId','outcome','reason'],
+      };
+      const accountFields={
+        '/v2/accounts/detail':['scope','accountId'],
+        '/v2/accounts/change':['scope','accountId','operationId','expectedRevision','action','reason','durationHours'],
       };
       const banFields={
         '/v2/bans/list':['scope','after'],
@@ -87,7 +105,7 @@ export function createModerationApi({auth,policy,appeals,bans,assistance,operati
         '/v2/notifications/remove':['scope','deviceId'],
         '/v2/notifications/open':['scope','eventId'],
       };
-      if(!['/v2/reports/publish','/v2/reports/vote','/v2/reports/vote-status','/v2/account/status'].includes(path)&&!(appeals&&appealFields[path])&&!(bans&&banFields[path])&&!(assistance&&assistanceFields[path])&&!(operations&&operationFields[path])&&!(notifications&&notificationFields[path])) throw new HttpError(404,'not-found');
+      if(!['/v2/reports/publish','/v2/reports/vote','/v2/reports/vote-status','/v2/account/status'].includes(path)&&!(manualAppeals&&manualFields[path])&&!(lifecycle&&lifecycleFields[path])&&!(accounts&&accountFields[path])&&!(appeals&&appealFields[path])&&!(bans&&banFields[path])&&!(assistance&&assistanceFields[path])&&!(operations&&operationFields[path])&&!(notifications&&notificationFields[path])) throw new HttpError(404,'not-found');
       if(request.method==='OPTIONS') {
         if(request.headers.get('access-control-request-method') !== 'POST') throw new HttpError(405,'method-not-allowed');
         headers['access-control-allow-methods']='POST';
@@ -105,11 +123,25 @@ export function createModerationApi({auth,policy,appeals,bans,assistance,operati
         throw new HttpError(503,'authentication-unavailable');
       }
       if(!validId(identity?.uid)) throw new HttpError(401,'authentication-required');
-      const body=await jsonBody(request,path==='/v2/reports/publish'?16384:['/v2/reviews/appeal','/v2/reviews/decide','/v2/bans/decide','/v2/operations/handover','/v2/notifications/register'].includes(path)?8192:4096), scope=body.scope ?? 'normal';
+      if(lifecycle)await lifecycle.validateSession(identity);
+      const body=await jsonBody(request,path==='/v2/reports/publish'?16384:['/v2/manual-appeals/submit','/v2/manual-appeals/review','/v2/auth/change','/v2/accounts/change','/v2/reviews/appeal','/v2/reviews/decide','/v2/bans/decide','/v2/operations/handover','/v2/notifications/register'].includes(path)?8192:4096), scope=body.scope ?? 'normal';
       if(!allowedScopes.includes(scope)) throw new HttpError(403,'scope-denied');
-      const fields=notificationFields[path]??operationFields[path]??assistanceFields[path]??banFields[path]??appealFields[path]??(path==='/v2/reports/publish' ? ['reportId','report','scope'] : path==='/v2/reports/vote' ? ['reportId','value','reason','scope'] : path==='/v2/reports/vote-status' ? ['reportId','scope'] : ['scope']);
+      const fields=manualFields[path]??lifecycleFields[path]??accountFields[path]??notificationFields[path]??operationFields[path]??assistanceFields[path]??banFields[path]??appealFields[path]??(path==='/v2/reports/publish' ? ['reportId','report','scope'] : path==='/v2/reports/vote' ? ['reportId','value','reason','scope'] : path==='/v2/reports/vote-status' ? ['reportId','scope'] : ['scope']);
       if(Object.keys(body).some(key=>!fields.includes(key))) throw new HttpError(400,'unknown-field');
       let result;
+      if(manualFields[path]){
+        if(body.queue!=null&&typeof body.queue!=='boolean')throw new HttpError(400,'invalid-request');
+        result=await manualAppeals[path.split('/').at(-1)]({...body,scope,actorUid:identity.uid,actorAdmin:identity.admin===true});
+        return reply(200,{...result,policyVersion:2,uid:identity.uid,scope});
+      }
+      if(lifecycleFields[path]){
+        result=await lifecycle[path.split('/').at(-1)]({...body,scope,actorUid:identity.uid,actorAdmin:identity.admin===true});
+        return reply(200,{...result,policyVersion:2,uid:identity.uid,scope});
+      }
+      if(accountFields[path]){
+        result=await accounts[path.split('/').at(-1)]({...body,scope,actorUid:identity.uid,actorAdmin:identity.admin===true});
+        return reply(200,{...result,policyVersion:2,uid:identity.uid,scope});
+      }
       if(notificationFields[path]){
         result=await notifications[path.split('/').at(-1)]({...body,scope,actorUid:identity.uid});
         return reply(200,{...result,policyVersion:2,uid:identity.uid,scope});

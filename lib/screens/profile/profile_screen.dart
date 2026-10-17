@@ -1,6 +1,10 @@
+import '../../widgets/accessible_tap_target.dart';
+import '../community/manual_appeals_screen.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../l10n/localization_context.dart';
+import '../../l10n/profile_presentation.dart';
 import '../../services/moderation_mode.dart';
 import '../community/report_reviews_screen.dart';
 
@@ -19,6 +23,7 @@ import '../auth/login_screen.dart';
 import '../admin/admin_dashboard_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import 'rewards_contributions_screen.dart';
+import 'help_center_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -87,20 +92,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   String get _displayName {
     final name = _user?.name.trim() ?? '';
-    return name.isEmpty ? 'Passenger' : name;
+    return name.isEmpty ? context.l10n.profilePassenger : name;
   }
 
   String get _roleLabel {
     switch (_user?.role) {
       case UserRole.contributor:
-        return 'Community Contributor';
+        return context.l10n.profileContributor;
       case UserRole.operator:
-        return 'Transit Bus Operator';
+        return context.l10n.profileOperator;
       case UserRole.admin:
-        return 'System Administrator';
+        return context.l10n.profileAdministrator;
       case UserRole.passenger:
       case null:
-        return 'Inclusive Commuter';
+        return context.l10n.profileCommuter;
     }
   }
 
@@ -151,15 +156,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Edit Profile',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: context.textColor,
+                        Expanded(
+                          child: Text(
+                            context.profileText('Edit Profile'),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: context.textColor,
+                            ),
                           ),
                         ),
                         IconButton(
+                          tooltip: MaterialLocalizations.of(context)
+                              .closeButtonTooltip,
                           icon: const Icon(Icons.close),
                           onPressed: () => Navigator.pop(context, false),
                         ),
@@ -168,14 +177,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Full Name',
+                      decoration: InputDecoration(
+                        labelText: context.l10n.profileFullName,
                         prefixIcon: Icon(Icons.person_outline),
                         border: OutlineInputBorder(),
                       ),
                       validator: (val) {
                         if (val == null || val.trim().isEmpty) {
-                          return 'Please enter your name';
+                          return context.l10n.profileNameRequired;
                         }
                         return null;
                       },
@@ -184,8 +193,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     TextFormField(
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Email Address',
+                      decoration: InputDecoration(
+                        labelText: context.l10n.profileEmail,
                         prefixIcon: Icon(Icons.email_outlined),
                         border: OutlineInputBorder(),
                       ),
@@ -194,15 +203,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     TextFormField(
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Phone Number',
+                      decoration: InputDecoration(
+                        labelText: context.l10n.profilePhone,
                         prefixIcon: Icon(Icons.phone_outlined),
                         border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 24),
-                    SizedBox(
-                      height: context.buttonHeight,
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: context.buttonHeight,
+                      ),
                       child: FilledButton(
                         onPressed: () {
                           if (!formKey.currentState!.validate()) return;
@@ -214,8 +225,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : AppColors.primaryContainer,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text(
-                          'Save Changes',
+                        child: Text(
+                          context.profileText('Save Changes'),
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -259,8 +270,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Profile updated successfully!'),
+            SnackBar(
+              content: Text(context.l10n.profileSaved),
               backgroundColor: Colors.green,
             ),
           );
@@ -269,8 +280,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to save profile: $e'),
-              backgroundColor: AppColors.error,
+              content: Text(context.l10n.profileSaveFailed),
+              backgroundColor: context.errorColor,
             ),
           );
         }
@@ -283,19 +294,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final isHighContrast = context.isHighContrast;
 
+    final signedOutMessage = context.l10n.profileSignedOut;
+    final signOutFailure = context.l10n.profileSignOutFailed;
     final confirmed = await showLogoutConfirmationDialog(context);
     if (confirmed != true) return;
 
     try {
       await _authService.logout();
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Could not clear private drafts or sign out. Please retry.',
-          ),
-        ),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(signOutFailure)));
       return;
     }
     nav.pushAndRemoveUntil(
@@ -303,6 +310,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       (route) => false,
     );
     showLogoutSuccessSnackBar(
+      message: signedOutMessage,
       messenger: messenger,
       isHighContrast: isHighContrast,
     );
@@ -313,7 +321,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text('$feature will be available in a future update.'),
+          content: Text(
+            context.l10n.profileComingSoon(context.profileText(feature)),
+          ),
         ),
       );
   }
@@ -344,18 +354,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                _error ?? 'Profile unavailable.',
+                context.profileText(_error ?? 'Profile unavailable.'),
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.onSurfaceVariant),
+                style: TextStyle(color: context.subtextColor),
               ),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: _loadProfile,
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primaryContainer,
-                  minimumSize: Size(0, context.buttonHeight),
+                  backgroundColor: context.primaryContainerColor,
+                  minimumSize: Size(context.buttonHeight, context.buttonHeight),
                 ),
-                child: const Text('Retry'),
+                child: Text(context.profileText('Retry')),
               ),
             ],
           ),
@@ -429,10 +439,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
 
+                  if (ModerationMode.enabled)
+                    ListTile(
+                      leading: const Icon(Icons.manage_accounts_outlined),
+                      title: Text(context.l10n.manualAppealsTitle),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ManualAppealsScreen(),
+                        ),
+                      ),
+                    ),
+
                   // ── Settings Section (LMT Go style) ──
                   _SectionTitle(title: 'SETTINGS'),
                   const SizedBox(height: 12),
-                  const LanguageSelector(),
+                  const LanguageSelector(settingsCard: true),
                   if (_user?.role == UserRole.operator)
                     ValueListenableBuilder(
                       valueListenable: DriverPushRuntime.changes,
@@ -444,16 +465,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   FutureBuilder<bool>(
                     future: _authService.hasAdminAccess(),
                     builder: (context, snapshot) => snapshot.data == true
-                        ? ListTile(
-                            leading: const Icon(
-                              Icons.admin_panel_settings_outlined,
-                            ),
-                            title: const Text('Admin console'),
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const AdminDashboardScreen(),
+                        ? _GroupedCardList(
+                            items: [
+                              _GroupedCardItem(
+                                icon: Icons.admin_panel_settings_outlined,
+                                title: 'Admin console',
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const AdminDashboardScreen(),
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           )
                         : const SizedBox.shrink(),
                   ),
@@ -508,7 +532,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _GroupedCardItem(
                         icon: Icons.help_outline_rounded,
                         title: 'Help Center',
-                        onTap: () => _showComingSoon(context, 'Help Center'),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const HelpCenterScreen(),
+                          ),
+                        ),
                       ),
                       _GroupedCardItem(
                         icon: Icons.system_update_rounded,
@@ -615,35 +643,45 @@ class _GradientProfileHeader extends StatelessWidget {
                   ),
                   const Spacer(),
                   if (onEdit != null)
-                    Material(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        onTap: onEdit,
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: hasLargeTargets ? 16 : 12,
-                            vertical: hasLargeTargets ? 10 : 8,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.edit_rounded,
-                                color: Colors.white,
-                                size: hasLargeTargets ? 18 : 16,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Edit',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: hasLargeTargets ? 15 : 13,
-                                  fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: Material(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          child: AccessibleTapTarget(
+                            child: InkWell(
+                              onTap: onEdit,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                alignment: Alignment.center,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: hasLargeTargets ? 16 : 12,
+                                  vertical: hasLargeTargets ? 10 : 8,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.edit_rounded,
+                                      color: Colors.white,
+                                      size: hasLargeTargets ? 18 : 16,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        context.profileText('Edit'),
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: hasLargeTargets ? 15 : 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -749,12 +787,14 @@ class _GradientProfileHeader extends StatelessWidget {
                           size: 16,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          email,
-                          style: TextStyle(
-                            fontSize: hasLargeTargets ? 15 : 14,
-                            color: Colors.white.withValues(alpha: 0.70),
-                            fontWeight: FontWeight.w400,
+                        Flexible(
+                          child: Text(
+                            email,
+                            style: TextStyle(
+                              fontSize: hasLargeTargets ? 15 : 14,
+                              color: Colors.white.withValues(alpha: 0.70),
+                              fontWeight: FontWeight.w400,
+                            ),
                           ),
                         ),
                       ],
@@ -827,7 +867,7 @@ class _PersonalInfoCard extends StatelessWidget {
         ),
       _InfoRowData(
         icon: Icons.email_outlined,
-        title: email.isNotEmpty ? email : 'Not set',
+        title: email.isNotEmpty ? email : context.l10n.profileNotSet,
         subtitle: 'Email address',
       ),
     ];
@@ -941,7 +981,7 @@ class _InfoRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  data.subtitle,
+                  context.profileText(data.subtitle),
                   style: TextStyle(
                     fontSize: hasLargeTargets ? 13 : 12,
                     fontWeight: isHighContrast
@@ -1065,7 +1105,7 @@ class _StatCard extends StatelessWidget {
             ),
           ),
           Text(
-            label,
+            context.profileText(label),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: hasLargeTargets ? 13.5 : 12,
@@ -1125,83 +1165,89 @@ class _RewardsCard extends StatelessWidget {
                 ? const Color(0xFF001F3F)
                 : AppColors.primaryContainer,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: InkWell(
-              onTap: onSeeAll,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(hasLargeTargets ? 22 : 18),
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                  ),
-                  border: isHighContrast
-                      ? Border.all(color: Colors.black, width: 2)
-                      : null,
+            child: AccessibleTapTarget(
+              child: InkWell(
+                onTap: onSeeAll,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
                 ),
-                clipBehavior: Clip.hardEdge,
-                child: Stack(
-                  children: [
-                    Positioned(
-                      right: -24,
-                      top: -24,
-                      child: Icon(
-                        Icons.emoji_events_rounded,
-                        size: 100,
-                        color: Colors.white.withValues(alpha: 0.12),
-                      ),
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(hasLargeTargets ? 22 : 18),
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.emoji_events_rounded,
-                              size: hasLargeTargets ? 24 : 20,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Community Impact Score',
-                                style: TextStyle(
-                                  fontSize: hasLargeTargets ? 18 : 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                    border: isHighContrast
+                        ? Border.all(color: Colors.black, width: 2)
+                        : null,
+                  ),
+                  clipBehavior: Clip.hardEdge,
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        right: -24,
+                        top: -24,
+                        child: Icon(
+                          Icons.emoji_events_rounded,
+                          size: 100,
+                          color: Colors.white.withValues(alpha: 0.12),
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.emoji_events_rounded,
+                                size: hasLargeTargets ? 24 : 20,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  context.profileText('Community Impact Score'),
+                                  style: TextStyle(
+                                    fontSize: hasLargeTargets ? 18 : 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 32),
-                          child: Text(
-                            '$points Points • $reports reports • $badges badges',
-                            style: TextStyle(
-                              fontSize: hasLargeTargets ? 14 : 13,
-                              color: Colors.white.withValues(alpha: 0.80),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 32),
+                            child: Text(
+                              context.l10n.profileContributionSummary(
+                                points,
+                                reports,
+                                badges,
+                              ),
+                              style: TextStyle(
+                                fontSize: hasLargeTargets ? 14 : 13,
+                                color: Colors.white.withValues(alpha: 0.80),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            'See All →',
-                            style: TextStyle(
-                              fontSize: hasLargeTargets ? 14 : 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              context.profileText('See All →'),
+                              style: TextStyle(
+                                fontSize: hasLargeTargets ? 14 : 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1210,7 +1256,9 @@ class _RewardsCard extends StatelessWidget {
           // Badges row
           Padding(
             padding: EdgeInsets.all(hasLargeTargets ? 18 : 14),
-            child: Row(
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 8,
               children: [
                 ...[
                   Icons.rocket_launch_rounded,
@@ -1249,7 +1297,7 @@ class _RewardsCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '+ 9 more badges',
+                  context.l10n.profileBadgeDetails,
                   style: TextStyle(
                     fontSize: hasLargeTargets ? 14 : 12,
                     fontWeight: isHighContrast
@@ -1282,7 +1330,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
     return Text(
-      title,
+      context.profileText(title),
       style: TextStyle(
         fontSize: 13,
         fontWeight: isHighContrast ? FontWeight.w800 : FontWeight.w600,
@@ -1368,64 +1416,66 @@ class _GroupedCardTile extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: item.onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: context.minTapHeight),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: hasLargeTargets ? 16 : 14,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: hasLargeTargets ? 40 : 34,
-                  height: hasLargeTargets ? 40 : 34,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isHighContrast
-                        ? const Color(0xFFE5E5E5)
-                        : AppColors.primaryContainer.withValues(alpha: 0.08),
-                    border: isHighContrast
-                        ? Border.all(color: Colors.black, width: 1.5)
-                        : null,
-                  ),
-                  child: Icon(
-                    item.icon,
-                    size: hasLargeTargets ? 20 : 18,
-                    color: isHighContrast
-                        ? Colors.black
-                        : AppColors.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    item.title,
-                    style: TextStyle(
-                      fontSize: hasLargeTargets ? 17 : 15,
-                      fontWeight: isHighContrast
-                          ? FontWeight.w700
-                          : (hasLargeTargets
-                                ? FontWeight.w600
-                                : FontWeight.w500),
+      child: AccessibleTapTarget(
+        child: InkWell(
+          onTap: item.onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: context.minTapHeight),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: hasLargeTargets ? 16 : 14,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: hasLargeTargets ? 40 : 34,
+                    height: hasLargeTargets ? 40 : 34,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
                       color: isHighContrast
-                          ? Colors.black
-                          : AppColors.onSurface,
+                          ? const Color(0xFFE5E5E5)
+                          : AppColors.primaryContainer.withValues(alpha: 0.08),
+                      border: isHighContrast
+                          ? Border.all(color: Colors.black, width: 1.5)
+                          : null,
                     ),
-                  ),
-                ),
-                item.trailing ??
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: hasLargeTargets ? 24 : 20,
+                    child: Icon(
+                      item.icon,
+                      size: hasLargeTargets ? 20 : 18,
                       color: isHighContrast
                           ? Colors.black
                           : AppColors.onSurfaceVariant,
                     ),
-              ],
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      context.profileText(item.title),
+                      style: TextStyle(
+                        fontSize: hasLargeTargets ? 17 : 15,
+                        fontWeight: isHighContrast
+                            ? FontWeight.w700
+                            : (hasLargeTargets
+                                  ? FontWeight.w600
+                                  : FontWeight.w500),
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.onSurface,
+                      ),
+                    ),
+                  ),
+                  item.trailing ??
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: hasLargeTargets ? 24 : 20,
+                        color: isHighContrast
+                            ? Colors.black
+                            : AppColors.onSurfaceVariant,
+                      ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1444,9 +1494,11 @@ class _NotificationToggleState extends State<_NotificationToggle> {
 
   @override
   Widget build(BuildContext context) {
-    return Switch(
-      value: _enabled,
-      onChanged: (value) => setState(() => _enabled = value),
+    return AccessibleTapTarget(
+      child: Switch(
+        value: _enabled,
+        onChanged: (value) => setState(() => _enabled = value),
+      ),
     );
   }
 }
@@ -1497,33 +1549,37 @@ class _DangerZoneSection extends StatelessWidget {
           child: Material(
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              onTap: onSignOut,
-              borderRadius: BorderRadius.circular(16),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: context.minTapHeight),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: hasLargeTargets ? 16 : 14,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.logout_rounded,
-                        size: hasLargeTargets ? 24 : 20,
-                        color: dangerColor,
-                      ),
-                      const SizedBox(width: 14),
-                      Text(
-                        'Sign Out',
-                        style: TextStyle(
-                          fontSize: hasLargeTargets ? 17 : 15,
-                          fontWeight: FontWeight.w600,
+            child: AccessibleTapTarget(
+              child: InkWell(
+                onTap: onSignOut,
+                borderRadius: BorderRadius.circular(16),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: context.minTapHeight),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: hasLargeTargets ? 16 : 14,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.logout_rounded,
+                          size: hasLargeTargets ? 24 : 20,
                           color: dangerColor,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            context.profileText('Sign Out'),
+                            style: TextStyle(
+                              fontSize: hasLargeTargets ? 17 : 15,
+                              fontWeight: FontWeight.w600,
+                              color: dangerColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1555,53 +1611,57 @@ class _DangerZoneSection extends StatelessWidget {
           child: Material(
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              onTap: onDeleteAccount,
-              borderRadius: BorderRadius.circular(16),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: context.minTapHeight),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: hasLargeTargets ? 16 : 14,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.delete_outline_rounded,
-                        size: hasLargeTargets ? 24 : 20,
-                        color: dangerColor,
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Delete Account',
-                              style: TextStyle(
-                                fontSize: hasLargeTargets ? 17 : 15,
-                                fontWeight: FontWeight.w600,
-                                color: dangerColor,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Permanently remove your account',
-                              style: TextStyle(
-                                fontSize: hasLargeTargets ? 13 : 12,
-                                color: isHighContrast
-                                    ? const Color(0xFF1A1A1A)
-                                    : AppColors.onSurfaceVariant,
-                                fontWeight: isHighContrast
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                              ),
-                            ),
-                          ],
+            child: AccessibleTapTarget(
+              child: InkWell(
+                onTap: onDeleteAccount,
+                borderRadius: BorderRadius.circular(16),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: context.minTapHeight),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: hasLargeTargets ? 16 : 14,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.delete_outline_rounded,
+                          size: hasLargeTargets ? 24 : 20,
+                          color: dangerColor,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                context.profileText('Delete Account'),
+                                style: TextStyle(
+                                  fontSize: hasLargeTargets ? 17 : 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: dangerColor,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                context.profileText(
+                                  'Permanently remove your account',
+                                ),
+                                style: TextStyle(
+                                  fontSize: hasLargeTargets ? 13 : 12,
+                                  color: isHighContrast
+                                      ? const Color(0xFF1A1A1A)
+                                      : AppColors.onSurfaceVariant,
+                                  fontWeight: isHighContrast
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

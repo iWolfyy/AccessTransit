@@ -187,12 +187,45 @@ void main() {
           ('Source URL', 'https://example.test/source'),
         ]) {
           final field = find.widgetWithText(TextFormField, label);
-          await tester.ensureVisible(field);
+          await tester.scrollUntilVisible(
+            field,
+            150,
+            scrollable: find.byType(Scrollable).first,
+          );
           await tester.pumpAndSettle();
           await tester.enterText(field, value);
         }
+        // Selected accessibility values must fit inside their decorated field,
+        // including the larger touch-target menu item used by the app.
+        final assessment = find.widgetWithText(
+          DropdownButtonFormField<String>,
+          'Ramp capability',
+        );
+        await tester.scrollUntilVisible(
+          assessment,
+          -150,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.ensureVisible(assessment);
+        await tester.pumpAndSettle();
+        final value = find
+            .descendant(
+              of: assessment,
+              matching: find.text('Unknown / not assessed'),
+            )
+            .hitTestable();
+        expect(value, findsOneWidget);
+        final bounds = tester.getRect(assessment);
+        final textBounds = tester.getRect(value);
+        expect(textBounds.top, greaterThanOrEqualTo(bounds.top));
+        expect(textBounds.bottom, lessThanOrEqualTo(bounds.bottom));
+        await capture(tester, 'stop-assessments');
         final checkbox = find.byType(CheckboxListTile);
-        await tester.ensureVisible(checkbox);
+        await tester.scrollUntilVisible(
+          checkbox,
+          150,
+          scrollable: find.byType(Scrollable).first,
+        );
         await tester.pumpAndSettle();
         await tester.tap(checkbox);
         await tester.pumpAndSettle();

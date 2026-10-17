@@ -379,7 +379,13 @@ void main() {
       expect(attempts, isEmpty);
       await tester.tap(find.text('Save Trip'));
       await tester.pumpAndSettle();
-      expect(find.text('Denied'), findsOneWidget);
+      expect(
+        find.text(
+          'Save change is not confirmed. Check your connection and retry.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Denied'), findsNothing);
       expect(find.text('Saved trip'), findsNothing);
       reject = false;
       await tester.tap(find.text('Save Trip'));
@@ -389,7 +395,13 @@ void main() {
       expect(find.text('Saved trip'), findsOneWidget);
       await tester.tap(find.text('Remove saved trip'));
       await tester.pumpAndSettle();
-      expect(find.text('Remove denied'), findsOneWidget);
+      expect(
+        find.text(
+          'Save change is not confirmed. Check your connection and retry.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Remove denied'), findsNothing);
       expect(find.text('Saved trip'), findsOneWidget);
       removeReject = false;
       await tester.tap(find.text('Remove saved trip'));

@@ -2,6 +2,10 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+
+import '../../l10n/localization_context.dart';
+import '../../core/theme/app_theme.dart';
+
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -200,15 +204,19 @@ class _SplashScreenState extends State<SplashScreen>
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: AppColors.primaryContainer,
+        backgroundColor: context.isHighContrast
+            ? const Color(0xFF001F3F)
+            : AppColors.primaryContainer,
         body: Stack(
           fit: StackFit.expand,
           children: [
-            const _SplashBackdrop(),
-            _AmbientOrbs(controller: _orbController),
+            if (!context.isHighContrast) const _SplashBackdrop(),
+            if (!context.isHighContrast)
+              _AmbientOrbs(controller: _orbController),
             SafeArea(
               child: Semantics(
-                label: 'Access Transit. Your journey to inclusive travel begins here. Loading.',
+                label:
+                    'Access Transit. ${context.l10n.sharedSplashTagline} ${context.l10n.sharedLoading}',
                 child: Column(
                   children: [
                     Expanded(child: Center(child: _buildBrandBlock())),
@@ -264,14 +272,16 @@ class _SplashScreenState extends State<SplashScreen>
               opacity: _taglineOpacity,
               child: SlideTransition(
                 position: _taglineSlide,
-                child: const Text(
-                  'Your journey to inclusive travel begins here.',
+                child: Text(
+                  context.l10n.sharedSplashTagline,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 18,
                     height: 24 / 18,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primaryFixedDim,
+                    color: context.isHighContrast
+                        ? Colors.white
+                        : AppColors.primaryFixedDim,
                   ),
                 ),
               ),

@@ -479,6 +479,8 @@ void main() {
           // Colombo 23:30: tomorrow's fixture is inside the rolling horizon,
           // independent of the host clock/calendar at midnight.
           home: RouteResultsScreen(
+            wheelchairAccessRequired: false,
+            stepFreeOnly: false,
             searchBackend: FixtureSearchBackend(
               now: () => DateTime.utc(2026, 10, 17, 18),
             ),
@@ -503,6 +505,49 @@ void main() {
       expect(details.route.fromStationId, 'st_maharagama');
       expect(details.route.toStationId, 'st_kottawa');
       expect(details.route.selectedTimeMinutes, 0);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets(
+    'excluded services can be inspected with temporary filters without changing Settings',
+    (tester) async {
+      final preferences = AccessibilityPreferencesService.instance;
+      expect(preferences.isWheelchairOnly, isTrue);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteResultsScreen(
+            searchBackend: FixtureSearchBackend(
+              now: () => DateTime.utc(2050, 1, 1, 18),
+            ),
+            fromStationId: 'st_maharagama',
+            toStationId: 'st_kottawa',
+            origin: 'Maharagama',
+            destination: 'Kottawa',
+            selectedDate: DateTime(2050, 1, 2),
+            selectedTime: const TimeOfDay(hour: 0, minute: 0),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final action = find.byKey(const ValueKey('show-without-access-filters'));
+      await tester.scrollUntilVisible(
+        action,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(find.text('138'), findsWidgets);
+      expect(preferences.isWheelchairOnly, isTrue);
+      await tester.tap(find.text('138').first);
+      await tester.pumpAndSettle();
+      final details = tester.widget<BusDetailsScreen>(
+        find.byType(BusDetailsScreen),
+      );
+      expect(details.route.wheelchairAccessRequired, isFalse);
+      expect(details.route.stepFreeOnly, isFalse);
+      expect(preferences.isWheelchairOnly, isTrue);
       await tester.pumpWidget(const SizedBox());
     },
   );

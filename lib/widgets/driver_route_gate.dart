@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/localization_context.dart';
+
 import '../services/driver_route_service.dart';
 import '../services/auth_service.dart';
 import '../screens/auth/login_screen.dart';
@@ -90,7 +92,7 @@ class _DriverRouteGateState extends State<DriverRouteGate>
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Driver route assignment')),
+      appBar: AppBar(title: Text(context.l10n.driverRouteAssignment)),
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
@@ -100,16 +102,14 @@ class _DriverRouteGateState extends State<DriverRouteGate>
               children: [
                 const Icon(Icons.route, size: 40),
                 const SizedBox(height: 16),
-                const Text(
-                  'An administrator must assign an available route before you can operate a bus. A live connection is required to verify the assignment.',
-                ),
+                Text(context.l10n.driverRouteRequired),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: () {
                     _watch(null);
                     _start();
                   },
-                  child: const Text('Check assignment'),
+                  child: Text(context.l10n.driverCheckAssignment),
                 ),
                 TextButton(
                   onPressed: () async {
@@ -123,14 +123,14 @@ class _DriverRouteGateState extends State<DriverRouteGate>
                     } catch (_) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Could not sign out. Please retry.'),
+                          SnackBar(
+                            content: Text(context.l10n.driverSignOutFailed),
                           ),
                         );
                       }
                     }
                   },
-                  child: const Text('Sign out'),
+                  child: Text(context.l10n.profileSignOut),
                 ),
               ],
             ),

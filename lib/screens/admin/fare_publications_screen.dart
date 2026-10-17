@@ -1,3 +1,9 @@
+import 'admin_scaffold.dart';
+
+import 'package:intl/intl.dart';
+
+import '../../l10n/admin_catalogue_labels.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -20,6 +26,7 @@ class _FarePublicationsScreenState extends State<FarePublicationsScreen> {
   final rows = <AdminRecord>[];
   FarePublication? preview;
   String? next, error;
+  Object? failure;
   bool loading = true, busy = false, reviewed = false;
   int epoch = 0;
   late final service = AdminFareService(widget.repository);
@@ -43,6 +50,7 @@ class _FarePublicationsScreenState extends State<FarePublicationsScreen> {
     setState(() {
       loading = true;
       error = null;
+      failure = null;
     });
     try {
       final result = await widget.repository.page(
@@ -55,8 +63,13 @@ class _FarePublicationsScreenState extends State<FarePublicationsScreen> {
         rows.addAll(result.items);
         next = result.next;
       });
-    } catch (_) {
-      if (mounted && version == epoch) setState(() => error = 'load');
+    } catch (e) {
+      if (mounted && version == epoch) {
+        setState(() {
+          error = 'load';
+          failure = e;
+        });
+      }
     } finally {
       if (mounted && version == epoch) setState(() => loading = false);
     }
@@ -71,11 +84,13 @@ class _FarePublicationsScreenState extends State<FarePublicationsScreen> {
         preview = candidate;
         reviewed = false;
         error = null;
+        failure = null;
       });
-    } catch (_) {
+    } catch (e) {
       setState(() {
         preview = null;
         error = 'invalid';
+        failure = e;
       });
     }
   }
@@ -88,6 +103,7 @@ class _FarePublicationsScreenState extends State<FarePublicationsScreen> {
     setState(() {
       busy = true;
       error = null;
+      failure = null;
     });
     try {
       await service.publish(value, reason.text);
@@ -100,8 +116,13 @@ class _FarePublicationsScreenState extends State<FarePublicationsScreen> {
         reason.clear();
       });
       await load();
-    } catch (_) {
-      if (mounted) setState(() => error = 'save');
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          error = 'save';
+          failure = e;
+        });
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -111,7 +132,7 @@ class _FarePublicationsScreenState extends State<FarePublicationsScreen> {
     final input = TextEditingController();
     final text = await showDialog<String>(
       context: context,
-      builder: (c) => AlertDialog(
+      builder: (c) => AdminDialog(
         title: Text(c.l10n.fareArchive),
         content: TextField(
           controller: input,
@@ -135,21 +156,29 @@ class _FarePublicationsScreenState extends State<FarePublicationsScreen> {
     setState(() {
       busy = true;
       error = null;
+      failure = null;
     });
     try {
       await service.archive(record, text);
       if (mounted) await load();
-    } catch (_) {
-      if (mounted) setState(() => error = 'save');
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          error = 'save';
+          failure = e;
+        });
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }
   }
 
+  String _day(BuildContext c, String value) =>
+      MaterialLocalizations.of(c).formatMediumDate(DateTime.parse(value));
   @override
   Widget build(BuildContext c) {
     final l = c.l10n;
-    return Scaffold(
+    return AdminScaffold(
       appBar: AppBar(title: Text(l.fareAdminTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -186,20 +215,38 @@ class _FarePublicationsScreenState extends State<FarePublicationsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${preview!.table.routePatternId} · ${preview!.table.serviceClass}',
+                      l.adminFarePreviewRoute(
+                        preview!.table.routePatternId,
+                        preview!.table.serviceClass,
+                      ),
                     ),
                     Text(
-                      '${preview!.mapping.effectiveFrom} – ${preview!.mapping.effectiveUntil}',
+                      l.adminFarePreviewDates(
+                        _day(c, preview!.mapping.effectiveFrom),
+                        _day(c, preview!.mapping.effectiveUntil),
+                      ),
                     ),
-                    Text(preview!.table.source.toString()),
+                    Text(l.adminImportSource(preview!.table.source.toString())),
                     Text(
-                      '${preview!.table.version} / ${preview!.mapping.version}',
+                      l.adminFareVersions(
+                        preview!.table.version,
+                        preview!.mapping.version,
+                      ),
                     ),
-                    Text(preview!.busIds.join(', ')),
+                    Text(l.adminFareBuses(preview!.busIds.join(', '))),
                     for (final row in preview!.table.amounts.entries)
                       for (final cell in row.value.entries)
                         Text(
-                          '${row.key} → ${cell.key}: LKR ${cell.value ~/ 100}.${(cell.value % 100).toString().padLeft(2, '0')}',
+                          l.adminFareCell(
+                            row.key,
+                            cell.key,
+                            NumberFormat.currency(
+                              locale: Localizations.localeOf(c).toString(),
+                              name: 'LKR',
+                              symbol: 'LKR ',
+                              decimalDigits: 2,
+                            ).format(cell.value / 100),
+                          ),
                         ),
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
@@ -234,19 +281,31 @@ class _FarePublicationsScreenState extends State<FarePublicationsScreen> {
             child: Text(l.farePublish),
           ),
           if (error != null)
-            Text(error == 'invalid' ? l.fareInvalidImport : l.fareAdminError),
+            Text(
+              error == 'invalid'
+                  ? l.fareInvalidImport
+                  : error == 'load'
+                  ? l.adminFareLoadFailed
+                  : l.fareAdminError,
+            ),
+          if (error != null && c.adminImportFailure(failure) != null)
+            Text(c.adminImportFailure(failure)!),
           if (loading || busy) const Center(child: CircularProgressIndicator()),
           TextButton(
             onPressed: busy ? null : () => load(),
             child: Text(l.operationsRefresh),
           ),
-          if (!loading && rows.isEmpty) Text(l.fareNoPublications),
+          if (!loading && error == null && rows.isEmpty)
+            Text(l.fareNoPublications),
           for (final row in rows)
             Card(
               child: ListTile(
                 title: Text(row.id),
                 subtitle: Text(
-                  '${row.text('state')} · ${(row.data['table'] as Map?)?['version'] ?? ''}',
+                  l.adminFareRowStatus(
+                    c.adminFareState(row.text('state')),
+                    ((row.data['table'] as Map?)?['version'] ?? '').toString(),
+                  ),
                 ),
                 trailing: row.text('state') == 'published'
                     ? IconButton(

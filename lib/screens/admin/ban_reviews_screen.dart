@@ -1,3 +1,6 @@
+import 'admin_scaffold.dart';
+import '../../l10n/moderation_presentation.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../l10n/localization_context.dart';
@@ -71,11 +74,11 @@ class _BanReviewsScreenState extends State<BanReviewsScreen> {
         next = data['next'];
         loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (mounted && version == generation) {
         setState(() {
           loading = false;
-          error = 'unavailable';
+          error = e is ModerationException ? e.code : 'unavailable';
         });
       }
     }
@@ -108,11 +111,11 @@ class _BanReviewsScreenState extends State<BanReviewsScreen> {
         evidenceNext = entries['next'];
         loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (mounted && version == generation) {
         setState(() {
           loading = false;
-          error = 'unavailable';
+          error = e is ModerationException ? e.code : 'unavailable';
         });
       }
     }
@@ -133,9 +136,11 @@ class _BanReviewsScreenState extends State<BanReviewsScreen> {
           evidenceNext = data['next'];
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted && version == generation) {
-        setState(() => error = 'unavailable');
+        setState(
+          () => error = e is ModerationException ? e.code : 'unavailable',
+        );
       }
     } finally {
       if (mounted && version == generation) setState(() => busy = false);
@@ -159,21 +164,18 @@ class _BanReviewsScreenState extends State<BanReviewsScreen> {
       await open(id);
     } on ModerationException catch (e) {
       if (mounted && version == generation) setState(() => error = e.code);
-    } catch (_) {
+    } catch (e) {
       if (mounted && version == generation) {
-        setState(() => error = 'unavailable');
+        setState(
+          () => error = e is ModerationException ? e.code : 'unavailable',
+        );
       }
     } finally {
       if (mounted) setState(() => busy = false);
     }
   }
 
-  String status(String? value) => switch (value) {
-    'approved' => context.l10n.bansApproved,
-    'rejected' => context.l10n.bansRejected,
-    'withdrawn' => context.l10n.bansWithdrawn,
-    _ => context.l10n.bansPending,
-  };
+  String status(String? value) => context.banReviewStatus(value);
   @override
   Widget build(BuildContext context) {
     final d = detail;
@@ -183,9 +185,9 @@ class _BanReviewsScreenState extends State<BanReviewsScreen> {
       'review-stale' => context.l10n.bansStale,
       'appeals-pending' => context.l10n.bansAppealsPending,
       'admin-account-protected' => context.l10n.bansAdminProtected,
-      _ => context.l10n.reviewsError,
+      _ => context.reviewFailure(error) ?? context.l10n.reviewsError,
     };
-    return Scaffold(
+    return AdminScaffold(
       appBar: AppBar(
         title: Text(context.l10n.bansTitle),
         toolbarHeight: MediaQuery.textScalerOf(context).scale(20) > 30

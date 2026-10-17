@@ -58,15 +58,15 @@ class AuthInputField extends StatelessWidget {
       ),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(
-          color: isHC ? Colors.black54 : AppColors.onSurfaceVariant,
-        ),
+        hintStyle: TextStyle(color: context.subtextColor),
         prefixIcon: Icon(
           prefixIcon,
           size: context.tapIconSize,
           color: isHC ? Colors.black : AppColors.onSurfaceVariant,
         ),
         suffixIcon: suffixIcon,
+        prefixIconConstraints: context.appBarActionConstraints,
+        suffixIconConstraints: context.appBarActionConstraints,
         filled: true,
         fillColor: isHC ? Colors.white : Colors.transparent,
         contentPadding: EdgeInsets.symmetric(
@@ -96,15 +96,13 @@ class AuthInputField extends StatelessWidget {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: errorColor,
-            width: isHC ? 2 : 1,
-          ),
+          borderSide: BorderSide(color: errorColor, width: isHC ? 2 : 1),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: errorColor, width: 2),
         ),
+        errorMaxLines: 5,
         errorStyle: TextStyle(
           color: errorColor,
           fontSize: 12,

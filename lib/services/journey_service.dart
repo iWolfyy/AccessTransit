@@ -137,7 +137,8 @@ class JourneyService {
           : null;
     }
     _owner(owner);
-    if (value != null && (value.passengerId != owner || value.journeyId != id)) {
+    if (value != null &&
+        (value.passengerId != owner || value.journeyId != id)) {
       throw StateError('Saved trip does not match its owner');
     }
     return value;
@@ -211,10 +212,13 @@ class JourneyService {
                   snapshot.data()!,
                   documentId: snapshot.id,
                 );
+                // Retries retain the first acknowledged snapshot; refreshed catalogue labels
+                // never overwrite it or change the bookmark identity.
                 Map<String, dynamic> selection(JourneyModel j) => j.toMap()
                   ..['fareQuote'] = j.fareQuote == null
                       ? null
                       : jsonEncode(j.fareQuote!.toMap())
+                  ..remove('scheduleSnapshot')
                   ..remove('createdAt')
                   ..remove('status');
                 if (!mapEquals(selection(existing), selection(withId))) {
@@ -234,6 +238,7 @@ class JourneyService {
       ..['fareQuote'] = j.fareQuote == null
           ? null
           : jsonEncode(j.fareQuote!.toMap())
+      ..remove('scheduleSnapshot')
       ..remove('createdAt')
       ..remove('status');
     if (!mapEquals(selection(saved), selection(withId))) {

@@ -1,9 +1,10 @@
+import '../core/theme/app_theme.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 
-import '../core/theme/app_colors.dart';
 import '../models/bus_location_model.dart';
 import '../models/station.dart';
 import '../l10n/localization_context.dart';
@@ -65,11 +66,9 @@ class _SelectedSegmentMapState extends State<SelectedSegmentMap> {
         )
         .toList();
     if (located.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.all(16),
-        child: Text(
-          'Map unavailable · stop coordinates have not been reviewed. Use the stop list.',
-        ),
+        child: Text(context.l10n.mapMissingCoordinates),
       );
     }
     final points = [
@@ -110,7 +109,7 @@ class _SelectedSegmentMapState extends State<SelectedSegmentMap> {
                       polylines: [
                         Polyline(
                           points: widget.roadPath,
-                          color: AppColors.primary,
+                          color: context.primaryColor,
                           strokeWidth: 4,
                         ),
                       ],
@@ -124,7 +123,7 @@ class _SelectedSegmentMapState extends State<SelectedSegmentMap> {
                             message: s.name,
                             child: Icon(
                               Icons.location_on,
-                              color: AppColors.primary,
+                              color: context.primaryColor,
                               semanticLabel: s.name,
                             ),
                           ),
@@ -135,10 +134,10 @@ class _SelectedSegmentMapState extends State<SelectedSegmentMap> {
                             location!.latitude,
                             location!.longitude,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.directions_bus,
-                            color: AppColors.primary,
-                            semanticLabel: 'Current bus location',
+                            color: context.primaryColor,
+                            semanticLabel: context.l10n.mapCurrentBus,
                           ),
                         ),
                     ],
@@ -163,7 +162,7 @@ class _SelectedSegmentMapState extends State<SelectedSegmentMap> {
           Text(
             widget.roadPath.length > 1
                 ? context.l10n.geometryMap
-                : 'Stop locations · road route geometry unavailable',
+                : context.l10n.mapNoRoadGeometry,
           ),
           if (failed)
             TextButton(
@@ -176,12 +175,10 @@ class _SelectedSegmentMapState extends State<SelectedSegmentMap> {
                   silenceExceptions: true,
                 );
               }),
-              child: const Text(
-                'Map tiles unavailable · retry or use the stop list',
-              ),
+              child: Text(context.l10n.mapTileRetry),
             ),
           if (location != null)
-            Text('Location updated: ${location!.timestamp}'),
+            Text(context.l10n.mapUpdatedAt(location!.timestamp.toString())),
         ],
       ),
     );

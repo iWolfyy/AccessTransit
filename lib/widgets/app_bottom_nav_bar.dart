@@ -1,3 +1,6 @@
+import 'accessible_tap_target.dart';
+import '../l10n/home_presentation.dart';
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
@@ -57,21 +60,27 @@ class AppBottomNavBar extends StatelessWidget {
         shadowColor: AppColors.onSurface.withValues(alpha: 0.12),
         child: SafeArea(
           top: false,
-          child: SizedBox(
-            height: context.navBarHeight,
-            child: Row(
-              children: [
-                for (final tab in _tabs)
-                  Expanded(
-                    child: _NavItem(
-                      icon: currentTab == tab.label ? tab.activeIcon : tab.icon,
-                      label: tab.label,
-                      selected: currentTab == tab.label,
-                      isHighContrast: isHighContrast,
-                      onTap: () => onTabSelected(tab.label),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: context.navBarHeight),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final tab in _tabs)
+                    Expanded(
+                      child: _NavItem(
+                        icon: currentTab == tab.label
+                            ? tab.activeIcon
+                            : tab.icon,
+                        key: ValueKey('main-nav-${tab.label}'),
+                        label: context.homeText(tab.label),
+                        selected: currentTab == tab.label,
+                        isHighContrast: isHighContrast,
+                        onTap: () => onTabSelected(tab.label),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -94,6 +103,7 @@ class _TabDef {
 
 class _NavItem extends StatelessWidget {
   const _NavItem({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
@@ -118,49 +128,56 @@ class _NavItem extends StatelessWidget {
         : AppColors.onSurfaceVariant;
     final hasLargeTargets = context.hasLargeTargets;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: EdgeInsets.symmetric(
-          horizontal: 4,
-          vertical: hasLargeTargets ? 4 : 6,
-        ),
-        padding: EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: hasLargeTargets ? 6 : 4,
-        ),
-        decoration: selected
-            ? BoxDecoration(
-                color: activeBg,
-                borderRadius: BorderRadius.circular(12),
-                border: isHighContrast
-                    ? Border.all(color: Colors.black, width: 2.0)
-                    : null,
-              )
-            : null,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: context.navIconSize,
-              color: selected ? activeFg : inactiveFg,
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: AccessibleTapTarget(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            margin: EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: hasLargeTargets ? 4 : 6,
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: hasLargeTargets ? 13 : 11,
-                height: 14 / 11,
-                fontWeight: selected ? FontWeight.w800 : (isHighContrast ? FontWeight.w700 : FontWeight.w600),
-                color: selected ? activeFg : inactiveFg,
-              ),
+            padding: EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: hasLargeTargets ? 6 : 4,
             ),
-          ],
+            decoration: selected
+                ? BoxDecoration(
+                    color: activeBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: isHighContrast
+                        ? Border.all(color: Colors.black, width: 2.0)
+                        : null,
+                  )
+                : null,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: context.navIconSize,
+                  color: selected ? activeFg : inactiveFg,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: hasLargeTargets ? 13 : 11,
+                    height: 14 / 11,
+                    fontWeight: selected
+                        ? FontWeight.w800
+                        : (isHighContrast ? FontWeight.w700 : FontWeight.w600),
+                    color: selected ? activeFg : inactiveFg,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

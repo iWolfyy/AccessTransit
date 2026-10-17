@@ -1,3 +1,6 @@
+import 'admin_scaffold.dart';
+import '../../l10n/moderation_presentation.dart';
+
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -69,11 +72,11 @@ class _ActiveOperationsScreenState extends State<ActiveOperationsScreen> {
         next = result['next'];
         loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (mounted && version == generation) {
         setState(() {
           loading = false;
-          error = 'unavailable';
+          error = e is ModerationException ? e.code : 'unavailable';
         });
       }
     }
@@ -108,11 +111,11 @@ class _ActiveOperationsScreenState extends State<ActiveOperationsScreen> {
         candidateNext = result['next'];
         loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (mounted && version == generation) {
         setState(() {
           loading = false;
-          error = 'unavailable';
+          error = e is ModerationException ? e.code : 'unavailable';
         });
       }
     }
@@ -136,9 +139,11 @@ class _ActiveOperationsScreenState extends State<ActiveOperationsScreen> {
           candidateNext = result['next'];
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted && version == generation) {
-        setState(() => error = 'unavailable');
+        setState(
+          () => error = e is ModerationException ? e.code : 'unavailable',
+        );
       }
     } finally {
       if (mounted && version == generation) setState(() => busy = false);
@@ -174,9 +179,11 @@ class _ActiveOperationsScreenState extends State<ActiveOperationsScreen> {
       if (mounted && version == generation) setState(() => acknowledged = true);
     } on ModerationException catch (e) {
       if (mounted && version == generation) setState(() => error = e.code);
-    } catch (_) {
+    } catch (e) {
       if (mounted && version == generation) {
-        setState(() => error = 'unavailable');
+        setState(
+          () => error = e is ModerationException ? e.code : 'unavailable',
+        );
       }
     } finally {
       if (mounted && version == generation) setState(() => busy = false);
@@ -186,7 +193,7 @@ class _ActiveOperationsScreenState extends State<ActiveOperationsScreen> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return Scaffold(
+    return AdminScaffold(
       appBar: AppBar(title: Text(l.operationsTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -198,7 +205,7 @@ class _ActiveOperationsScreenState extends State<ActiveOperationsScreen> {
               child: Text(
                 error == 'operation-stale' || error == 'driver-ineligible'
                     ? l.operationsStale
-                    : l.operationsError,
+                    : context.reviewFailure(error) ?? l.operationsError,
               ),
             ),
           if (!loading && detail == null) ...[
@@ -206,12 +213,14 @@ class _ActiveOperationsScreenState extends State<ActiveOperationsScreen> {
               onPressed: () => load(),
               child: Text(l.operationsRefresh),
             ),
-            if (items.isEmpty) Text(l.operationsEmpty),
+            if (items.isEmpty && error == null) Text(l.operationsEmpty),
             for (final item in items)
               Card(
                 child: ListTile(
                   title: Text('${item['routeNo']} · ${item['busId']}'),
-                  subtitle: Text('${item['runId']}\n${item['driverId']}'),
+                  subtitle: Text(
+                    l.reviewRunDriver(item['runId'], item['driverId']),
+                  ),
                   isThreeLine: true,
                   onTap: () => open(item['runId']),
                 ),
@@ -228,7 +237,7 @@ class _ActiveOperationsScreenState extends State<ActiveOperationsScreen> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            Text('${detail!['runId']}\n${detail!['driverId']}'),
+            Text(l.reviewRunDriver(detail!['runId'], detail!['driverId'])),
             const SizedBox(height: 16),
             Text(acknowledged ? l.operationsDone : l.operationsExplanation),
             if (!acknowledged) ...[
@@ -245,7 +254,7 @@ class _ActiveOperationsScreenState extends State<ActiveOperationsScreen> {
                     for (final driver in candidates)
                       RadioListTile<String>(
                         title: Text(driver['name']),
-                        subtitle: Text(driver['driverId']),
+                        subtitle: Text(l.reviewDriverId(driver['driverId'])),
                         value: driver['driverId'],
                         enabled: !busy && operationId == null,
                       ),

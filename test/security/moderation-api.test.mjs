@@ -131,3 +131,14 @@ test('account status exposes only the verified caller; no public credit or revie
   assert.equal((await handler(request({uid:'someone-else'},'/v2/account/status'))).status,400);
   assert.equal((await handler(request({},'/v2/reports/credit'))).status,404);
 });
+
+test('manual-account API derives trusted actor and rejects forged authority and stale updates',async()=>{
+  const calls=[],accounts={async change(i){calls.push(i);throw new PolicyError('review-stale');},async detail(i){calls.push(i);return {accountId:i.accountId};}};
+  const {handler}=fixture({auth:{async verifyIdToken(){return {uid:'admin',admin:true};}},accounts});
+  const body={accountId:'rider',operationId:'request',expectedRevision:0,action:'suspend',reason:'Reviewed issue',durationHours:72};
+  assert.equal((await handler(request(body,'/v2/accounts/change'))).status,409);
+  assert.deepEqual(calls[0],{...body,scope:'normal',actorUid:'admin',actorAdmin:true});
+  for(const key of ['actorAdmin','actorUid','manualSuspended','points','serverTime'])assert.equal((await handler(request({...body,[key]:true},'/v2/accounts/change'))).status,400);
+  assert.equal((await handler(request({accountId:'rider'},'/v2/accounts/detail'))).status,200);
+  assert.equal((await fixture().handler(request(body,'/v2/accounts/change'))).status,404);
+});

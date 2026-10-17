@@ -1,3 +1,10 @@
+import 'admin_scaffold.dart';
+import '../../widgets/accessible_tap_target.dart';
+import '../../widgets/accessible_dropdown.dart';
+import '../../l10n/admin_catalogue_labels.dart';
+import '../community/manual_appeals_screen.dart';
+import 'account_controls_screen.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -57,6 +64,48 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
   final _subscriptions = <StreamSubscription<List<AdminRecord>>>[];
   final _records = <String, List<AdminRecord>>{};
   final _errors = <String, String>{};
+  final _nextPages = <String, String?>{};
+  final _pageVersions = <String, int>{};
+  final _pageBusy = <String>{};
+  final _pageErrors = <String>{};
+  bool _paged(String kind) =>
+      ['users', 'admin_audit', 'buses', 'routes', 'stations'].contains(kind);
+  Future<void> _more(String kind) async {
+    final cursor = _nextPages[kind];
+    if (cursor == null || _pageBusy.contains(kind)) return;
+    final generation = _generation, version = _pageVersions[kind];
+    setState(() {
+      _pageBusy.add(kind);
+      _pageErrors.remove(kind);
+    });
+    try {
+      final result = await widget.repository.page(kind, after: cursor);
+      if (!mounted ||
+          generation != _generation ||
+          version != _pageVersions[kind]) {
+        return;
+      }
+      setState(() {
+        final ids = _of(kind).map((r) => r.id).toSet();
+        _records[kind] = [
+          ..._of(kind),
+          ...result.items.where((r) => ids.add(r.id)),
+        ];
+        _nextPages[kind] = result.next;
+        _pageBusy.remove(kind);
+      });
+    } catch (_) {
+      if (mounted &&
+          generation == _generation &&
+          version == _pageVersions[kind]) {
+        setState(() {
+          _pageBusy.remove(kind);
+          _pageErrors.add(kind);
+        });
+      }
+    }
+  }
+
   final _search = TextEditingController();
   late final _service = AdminService(widget.repository);
   String _tab = 'Overview';
@@ -76,6 +125,10 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
     _subscriptions.clear();
     _records.clear();
     _errors.clear();
+    _nextPages.clear();
+    _pageBusy.clear();
+    _pageErrors.clear();
+    _pageVersions.clear();
     for (final kind in _kinds) {
       _subscriptions.add(
         widget.repository
@@ -84,7 +137,17 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
               (records) {
                 if (!mounted || generation != _generation) return;
                 setState(() {
-                  _records[kind] = records;
+                  if (_paged(kind)) {
+                    _pageVersions[kind] = (_pageVersions[kind] ?? 0) + 1;
+                    _records[kind] = records.take(20).toList();
+                    _nextPages[kind] = records.length > 20
+                        ? records[19].id
+                        : null;
+                    _pageBusy.remove(kind);
+                    _pageErrors.remove(kind);
+                  } else {
+                    _records[kind] = records;
+                  }
                   _errors.remove(kind);
                 });
               },
@@ -129,16 +192,10 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
     setState(() => _busy = true);
     try {
       await action();
-      if (mounted) _message('Change confirmed by the server.');
+      if (mounted) _message(context.l10n.adminChangeConfirmed);
     } catch (e) {
       if (mounted) {
-        _message(
-          e is FormatException
-              ? e.message
-              : e is StateError
-              ? e.message
-              : 'Change was not confirmed. Check access/connection and reload before retrying.',
-        );
+        _message(context.adminFailure(e));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -149,19 +206,21 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AdminScaffold(
       backgroundColor: context.surfaceColor,
       appBar: AppBar(
         toolbarHeight: MediaQuery.textScalerOf(context).scale(20) > 30
             ? 96
             : 56,
-        centerTitle: true,
-        title: const Text('Admin console'),
+        centerTitle: false,
+        title: Text(context.l10n.adminConsole),
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) => Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => value == 'geometry'
+                builder: (_) => value == 'manual-appeals'
+                    ? const ManualAppealsScreen(admin: true)
+                    : value == 'geometry'
                     ? RouteGeometryScreen(repository: widget.repository)
                     : value == 'fares'
                     ? FarePublicationsScreen(repository: widget.repository)
@@ -173,38 +232,49 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
               ),
             ),
             itemBuilder: (_) => [
+              if (ModerationMode.enabled)
+                PopupMenuItem(
+                  height: context.buttonHeight,
+                  value: 'manual-appeals',
+                  child: Text(context.l10n.manualAppealsTitle),
+                ),
               PopupMenuItem(
+                height: context.buttonHeight,
                 value: 'geometry',
                 child: Text(context.l10n.geometryTitle),
               ),
               PopupMenuItem(
+                height: context.buttonHeight,
                 value: 'fares',
                 child: Text(context.l10n.fareAdminTitle),
               ),
               if (ModerationMode.enabled)
                 PopupMenuItem(
+                  height: context.buttonHeight,
                   value: 'operations',
                   child: Text(context.l10n.operationsTitle),
                 ),
               if (ModerationMode.enabled)
                 PopupMenuItem(
+                  height: context.buttonHeight,
                   value: 'bans',
                   child: Text(context.l10n.bansTitle),
                 ),
               if (ModerationMode.enabled)
                 PopupMenuItem(
+                  height: context.buttonHeight,
                   value: 'reviews',
                   child: Text(context.l10n.reviewsAdminTitle),
                 ),
             ],
           ),
           IconButton(
-            tooltip: 'Refresh server data',
+            tooltip: context.l10n.adminRefresh,
             onPressed: _busy ? null : () => setState(_listen),
             icon: const Icon(Icons.refresh),
           ),
           IconButton(
-            tooltip: 'Sign out',
+            tooltip: context.l10n.adminSignOut,
             onPressed: _busy
                 ? null
                 : () async {
@@ -223,9 +293,9 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
       body: Column(
         children: [
           if (SampleTestMode.enabled)
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(12),
-              child: Text('Sample/Test catalogue administration'),
+              child: Text(context.l10n.adminSampleCatalogue),
             ),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -235,15 +305,21 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
                 for (final tab in _tabs)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(tab == 'Driver reviews' ? 'Drivers' : tab),
-                      selected: _tab == tab,
-                      onSelected: _busy
-                          ? null
-                          : (_) => setState(() {
-                              _tab = tab;
-                              _search.clear();
-                            }),
+                    child: AccessibleTapTarget(
+                      child: ChoiceChip(
+                        label: Text(
+                          context.adminText(
+                            tab == 'Driver reviews' ? 'Drivers' : tab,
+                          ),
+                        ),
+                        selected: _tab == tab,
+                        onSelected: _busy
+                            ? null
+                            : (_) => setState(() {
+                                _tab = tab;
+                                _search.clear();
+                              }),
+                      ),
                     ),
                   ),
               ],
@@ -254,7 +330,9 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                '${_errors.values.join(' ')} Actions are disabled. Use Refresh to retry.',
+                context.l10n.adminLoadKindsFailed(
+                  _errors.keys.map(context.adminKind).join(', '),
+                ),
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ),
@@ -265,8 +343,10 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
               child: TextField(
                 controller: _search,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'Search records',
+                decoration: InputDecoration(
+                  labelText: _paged(_kind)
+                      ? context.l10n.adminSearchLoaded
+                      : context.l10n.adminSearchLoaded,
                   prefixIcon: Icon(Icons.search),
                 ),
               ),
@@ -276,8 +356,8 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
                 ? Center(
                     child: Text(
                       _errors.isEmpty
-                          ? 'Loading verified server records...'
-                          : 'Server data unavailable.',
+                          ? context.l10n.adminLoading
+                          : context.l10n.adminUnavailable,
                     ),
                   )
                 : _content(),
@@ -290,11 +370,11 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
               onPressed: _busy ? null : () => _edit(_kind),
               icon: const Icon(Icons.add),
               label: Text(
-                'Add ${_tab == 'Bus stops'
-                    ? 'stop'
+                '${context.l10n.adminAdd} ${context.adminText(_tab == 'Bus stops'
+                    ? 'bus stop'
                     : _tab == 'Buses'
-                    ? 'bus'
-                    : 'route'}',
+                    ? 'bus / timetable'
+                    : 'route')}',
               ),
             )
           : null,
@@ -319,12 +399,12 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
             'Maintain sourced catalogue records and review operator access. All changes require server acknowledgement.',
           ),
           for (final (title, count, tab) in [
-            ('Buses & timetables', _of('buses').length, 'Buses'),
-            ('Routes', _of('routes').length, 'Routes'),
-            ('Bus stops', _of('stations').length, 'Bus stops'),
-            ('Users', _of('users').length, 'Users'),
+            ('Buses & timetables (loaded)', _of('buses').length, 'Buses'),
+            ('Routes (loaded)', _of('routes').length, 'Routes'),
+            ('Bus stops (loaded)', _of('stations').length, 'Bus stops'),
+            ('Users (loaded)', _of('users').length, 'Users'),
             (
-              'Drivers awaiting review',
+              'Drivers awaiting review (loaded)',
               _of('users')
                   .where(
                     (u) =>
@@ -336,9 +416,15 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
             ),
           ])
             _card(
-              const Icon(Icons.chevron_right),
-              '$count $title',
-              'Open $tab',
+              Icon(switch (tab) {
+                'Buses' => Icons.directions_bus_outlined,
+                'Routes' => Icons.route_outlined,
+                'Bus stops' => Icons.location_on_outlined,
+                'Users' => Icons.people_outline,
+                _ => Icons.badge_outlined,
+              }),
+              '$count ${context.adminText(title)}',
+              context.adminText(tab),
               onTap: () => setState(() => _tab = tab),
             ),
           OutlinedButton.icon(
@@ -346,13 +432,11 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
                 Navigator.of(context)
                     .push(MaterialPageRoute(builder: (_) => const MainShell())),
             icon: const Icon(Icons.home_outlined),
-            label: const Text('Open passenger app'),
+            label: Text(context.l10n.adminOpenPassenger),
           ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.all(12),
-            child: Text(
-              'Driver registration is an application for access. Review identity and operating authority before approval. Approval does not verify equipment or guarantee a service.',
-            ),
+            child: Text(context.l10n.sharedDriverReviewHelp),
           ),
         ],
       );
@@ -376,18 +460,40 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
             )
           : _title(a).compareTo(_title(b)),
     );
-    if (records.isEmpty) {
-      return const Center(
+    if (records.isEmpty && !_paged(_kind)) {
+      return Center(
         child: Padding(
           padding: EdgeInsets.all(24),
-          child: Text('No matching records.'),
+          child: Text(context.l10n.adminNoMatches),
         ),
       );
     }
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-      itemCount: records.length,
+      itemCount: records.length + (_paged(_kind) ? 1 : 0),
       itemBuilder: (_, i) {
+        if (i == records.length) {
+          return Column(
+            children: [
+              Text(context.l10n.adminLoadedPages),
+              if (records.isEmpty) Text(context.l10n.adminNoMatches),
+              if (_pageErrors.contains(_kind))
+                Text(context.l10n.accountControlsUnavailable),
+              if (_nextPages[_kind] != null)
+                TextButton(
+                  onPressed: _pageBusy.contains(_kind)
+                      ? null
+                      : () => _more(_kind),
+                  child: Text(
+                    _pageErrors.contains(_kind)
+                        ? context.l10n.accountStatusRetry
+                        : context.l10n.adminLoadMore,
+                  ),
+                ),
+              if (_pageBusy.contains(_kind)) const LinearProgressIndicator(),
+            ],
+          );
+        }
         final r = records[i];
         return _card(
           Icon(switch (_kind) {
@@ -403,23 +509,35 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
               ? [
                   TextButton(
                     onPressed: _busy ? null : () => _review(r),
-                    child: const Text('Review access'),
+                    child: Text(context.l10n.adminReviewAccess),
                   ),
                   TextButton(
                     onPressed: _busy ? null : () => _assignRoute(r),
-                    child: const Text('Assign route'),
+                    child: Text(context.l10n.adminAssignRoute),
                   ),
                 ]
               : _kind == 'users'
               ? [
                   TextButton(
                     onPressed: _busy ? null : () => _editUser(r),
-                    child: const Text('Edit profile'),
+                    child: Text(context.l10n.adminEditProfile),
                   ),
+                  if (ModerationMode.enabled)
+                    TextButton(
+                      onPressed: _busy
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    AccountControlsScreen(accountId: r.id),
+                              ),
+                            ),
+                      child: Text(context.l10n.accountControlsTitle),
+                    ),
                   if (r.text('role') == 'operator')
                     TextButton(
                       onPressed: _busy ? null : () => _review(r),
-                      child: const Text('Review driver'),
+                      child: Text(context.l10n.adminReviewDriver),
                     ),
                 ]
               : _kind == 'admin_audit'
@@ -438,7 +556,7 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
                                 ),
                               ),
                             ),
-                      child: const Text('Dated departures'),
+                      child: Text(context.l10n.adminDatedDepartures),
                     ),
                   TextButton(
                     onPressed: _busy
@@ -447,15 +565,19 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
                               ? _action(() => _service.restoreCatalogue(r))
                               : _edit(_kind, r),
                     child: Text(
-                      r.data['deletionPending'] == true ? 'Restore' : 'Edit',
+                      context.adminText(
+                        r.data['deletionPending'] == true ? 'Restore' : 'Edit',
+                      ),
                     ),
                   ),
                   TextButton(
                     onPressed: _busy ? null : () => _delete(r),
                     child: Text(
-                      r.data['deletionPending'] == true
-                          ? 'Finish deletion'
-                          : 'Delete',
+                      context.adminText(
+                        r.data['deletionPending'] == true
+                            ? 'Finish deletion'
+                            : 'Delete',
+                      ),
                     ),
                   ),
                 ],
@@ -468,20 +590,33 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
     'buses' =>
       r.text('busNo').isNotEmpty
           ? r.text('busNo')
-          : 'Route ${r.text('routeNo')} timetable',
+          : context.l10n.adminTimetableFor(r.text('routeNo')),
     'routes' => '${r.text('routeNo')} - ${r.text('routeName')}',
     'stations' || 'users' => r.text('name'),
     _ => r.text('action').replaceAll('_', ' '),
   };
   String _subtitle(AdminRecord r) => switch (r.kind) {
-    'buses' =>
-      'Route ${r.text('routeNo')} | ${r.text('catalogueRecordType') == 'published_timetable' ? 'Published timetable' : 'Vehicle'}\nDriver: ${_of('users').where((u) => u.id == r.text('driverId')).firstOrNull?.text('name') ?? 'Unassigned'}',
-    'routes' => '${(r.data['stops'] as List? ?? []).length} ordered stops',
+    'buses' => context.l10n.adminBusSummary(
+      r.text('routeNo'),
+      r.text('catalogueRecordType') == 'published_timetable'
+          ? context.l10n.adminPublishedTimetable
+          : context.l10n.adminPhysicalVehicle,
+      _of('users')
+              .where((u) => u.id == r.text('driverId'))
+              .firstOrNull
+              ?.text('name') ??
+          (r.text('driverId').isEmpty
+              ? context.l10n.adminUnassigned
+              : r.text('driverId')),
+    ),
+    'routes' => context.l10n.adminStopCount(
+      (r.data['stops'] as List? ?? []).length,
+    ),
     'stations' => '${r.text('lat')}, ${r.text('lng')}',
     'users' =>
-      '${r.text('email')}\n${r.text('role')}${r.text('role') == 'operator' ? ' | ${_status(r)}\n${_assignedRouteLabel(r.id)}' : ''}',
+      '${r.text('email')}\n${r.text('role')}${r.text('role') == 'operator' ? ' | ${context.adminText(_status(r))}\n${_assignedRouteLabel(r.id)}' : ''}',
     _ =>
-      'By ${r.text('actorId')}\n${r.data['createdAt']}\n${(r.data['targets'] as List? ?? []).join(', ')}',
+      '${context.l10n.adminAuditBy(r.text('actorId'))}\n${r.data['createdAt']}\n${(r.data['targets'] as List? ?? []).join(', ')}',
   };
   Widget _card(
     Widget icon,
@@ -493,43 +628,80 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
     padding: const EdgeInsets.only(bottom: 12),
     child: Card(
       color: context.cardColor,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        side: BorderSide(
+          color: context.isHighContrast
+              ? Theme.of(context).colorScheme.outline
+              : Theme.of(context).colorScheme.outlineVariant
+                    .withValues(alpha: .5),
+          width: context.isHighContrast ? 2 : 1,
+        ),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  icon,
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+      child: AccessibleTapTarget(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary
+                            .withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconTheme(
+                        data: IconThemeData(
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 24,
+                        ),
+                        child: icon,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(subtitle),
-              if (actions.isNotEmpty)
-                Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 8,
-                  children: actions,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (onTap != null)
+                      Icon(
+                        Icons.chevron_right,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                  ],
                 ),
-            ],
+                const SizedBox(height: 10),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+                ),
+                if (actions.isNotEmpty) const SizedBox(height: 8),
+                if (actions.isNotEmpty)
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    children: actions,
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -548,19 +720,17 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
   Future<void> _delete(AdminRecord r) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Delete ${_title(r)}?'),
-        content: const Text(
-          'This removes the catalogue record. Referenced records and active buses cannot be deleted. This action cannot be undone.',
-        ),
+      builder: (ctx) => AdminDialog(
+        title: Text(context.l10n.adminDeleteFor(_title(r))),
+        content: Text(context.l10n.adminDeleteHelp),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.adminCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete record'),
+            child: Text(context.l10n.adminDeleteRecord),
           ),
         ],
       ),
@@ -575,8 +745,8 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
     final phone = TextEditingController(text: user.text('phone'));
     final save = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit user profile'),
+      builder: (ctx) => AdminDialog(
+        title: Text(context.l10n.adminEditUser),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -584,28 +754,26 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
               Text(user.text('email')),
               TextField(
                 controller: name,
-                decoration: const InputDecoration(labelText: 'Name'),
+                decoration: InputDecoration(labelText: context.l10n.adminName),
                 maxLength: 100,
               ),
               TextField(
                 controller: phone,
-                decoration: const InputDecoration(labelText: 'Phone'),
+                decoration: InputDecoration(labelText: context.l10n.adminPhone),
                 maxLength: 40,
               ),
-              const Text(
-                'Login email, passwords and Auth account deletion are managed in Firebase Authentication.',
-              ),
+              Text(context.l10n.adminAuthProfileHelp),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.adminCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Save profile'),
+            child: Text(context.l10n.adminSaveProfile),
           ),
         ],
       ),
@@ -626,17 +794,27 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
     final route = _of('routes')
         .where((r) => r.id == grant?.text('routeId'))
         .firstOrNull;
-    return route == null
-        ? 'No active route assignment'
-        : 'Assigned route: ${_title(route)}';
+    return grant == null
+        ? context.l10n.adminNoActiveRoute
+        : context.l10n.adminAssignedRouteFor(
+            route == null ? grant.text('routeId') : _title(route),
+          );
   }
 
   Future<void> _assignRoute(AdminRecord user) async {
-    final note = TextEditingController();
     final grant = _of('driver_route_assignments')
         .where((g) => g.id == user.id && g.data['active'] == true)
         .firstOrNull;
-    final routes = _of('routes')
+    List<AdminRecord> allRoutes;
+    try {
+      allRoutes = await widget.repository.referencePages('routes');
+    } catch (_) {
+      if (mounted) _message(context.l10n.adminSourceLoadError);
+      return;
+    }
+    if (!mounted) return;
+    final note = TextEditingController();
+    final routes = allRoutes
         .where(
           (r) =>
               r.data['deletionPending'] != true &&
@@ -650,29 +828,29 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
     final save = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, update) => AlertDialog(
-          title: Text('Route for ${user.text('name')}'),
+        builder: (ctx, update) => AdminDialog(
+          title: Text(context.l10n.adminRouteFor(user.text('name'))),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Approval is separate from route assignment. End any active trip before changing or removing a route.',
-                ),
+                Text(context.l10n.adminAssignmentHelp),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
+                  isDense: false,
+                  itemHeight: null,
                   initialValue: selected,
                   isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Assigned route',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.adminAssignedRoute,
                   ),
                   items: [
-                    const DropdownMenuItem(
+                    AccessibleDropdownMenuItem(
                       value: '',
-                      child: Text('No route / remove assignment'),
+                      child: Text(context.l10n.adminNoRoute),
                     ),
                     for (final r in routes)
-                      DropdownMenuItem(
+                      AccessibleDropdownMenuItem(
                         value: r.id,
                         child: Text(
                           _title(r),
@@ -688,8 +866,8 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
                   maxLength: 2000,
                   minLines: 2,
                   maxLines: 5,
-                  decoration: const InputDecoration(
-                    labelText: 'Assignment reason (at least 10 characters)',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.adminAssignmentReason,
                   ),
                 ),
               ],
@@ -698,11 +876,11 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.adminCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Save assignment'),
+              child: Text(context.l10n.adminSaveAssignment),
             ),
           ],
         ),
@@ -729,27 +907,45 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
     final save = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, update) => AlertDialog(
-          title: Text('Review ${user.text('name')}'),
+        builder: (ctx, update) => AdminDialog(
+          title: Text(context.l10n.adminReviewFor(user.text('name'))),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(user.text('email')),
-                Text('Current access: ${_status(user)}'),
+                Text(
+                  context.l10n.adminCurrentAccessFor(
+                    context.adminText(_status(user)),
+                  ),
+                ),
                 if (access?.text('reviewNote').isNotEmpty == true)
-                  Text('Previous review: ${access!.text('reviewNote')}'),
+                  Text(
+                    context.l10n.adminPreviousReviewFor(
+                      access!.text('reviewNote'),
+                    ),
+                  ),
                 DropdownButtonFormField<String>(
+                  isDense: false,
+                  itemHeight: null,
                   initialValue: decision,
                   isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Decision'),
-                  items: const [
-                    DropdownMenuItem(value: 'approved', child: Text('Approve')),
-                    DropdownMenuItem(value: 'rejected', child: Text('Reject')),
-                    DropdownMenuItem(
+                  decoration: InputDecoration(
+                    labelText: context.l10n.adminDecision,
+                  ),
+                  items: [
+                    AccessibleDropdownMenuItem(
+                      value: 'approved',
+                      child: Text(context.l10n.adminApprove),
+                    ),
+                    AccessibleDropdownMenuItem(
+                      value: 'rejected',
+                      child: Text(context.l10n.adminReject),
+                    ),
+                    AccessibleDropdownMenuItem(
                       value: 'revoked',
-                      child: Text('Revoke access'),
+                      child: Text(context.l10n.adminRevoke),
                     ),
                   ],
                   onChanged: (v) => update(() => decision = v!),
@@ -759,37 +955,33 @@ class _AdminWorkspaceState extends State<AdminWorkspace> {
                   maxLength: 2000,
                   minLines: 3,
                   maxLines: 6,
-                  decoration: const InputDecoration(
-                    labelText: 'Review evidence / reason',
-                    helperText: 'Record the identity and operating-authority checks or decision reason.',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.adminReviewReason,
+                    helperText: context.l10n.adminReviewChecksHelp,
                   ),
                 ),
                 if (decision == 'approved')
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'I checked this driver\'s identity and operating authority.',
-                    ),
+                    title: Text(context.l10n.adminDriverChecked),
                     value: verified,
                     onChanged: (v) => update(() => verified = v!),
                   ),
                 if (decision != 'approved')
-                  const Text(
-                    'Access will be withdrawn and bus assignments released. Active trip/telemetry records remain for reconciliation; they are not marked completed.',
-                  ),
+                  Text(context.l10n.adminReferenceWithdrawHelp),
               ],
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.adminCancel),
             ),
             FilledButton(
               onPressed: decision == 'approved' && !verified
                   ? null
                   : () => Navigator.pop(ctx, true),
-              child: const Text('Confirm decision'),
+              child: Text(context.l10n.adminConfirmDecision),
             ),
           ],
         ),

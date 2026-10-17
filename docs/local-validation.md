@@ -1,5 +1,13 @@
 # Isolated Android/Firebase walkthrough
 
+**Workflow retired for native APKs on 2026-10-17.** Continue implementation in
+the main app using its existing Firebase configuration. Do not run the historical
+Local Test APK build/install commands below; Android now rejects that native
+build flag. No intermediate APK is needed. Automated Flutter/backend/emulator
+checks remain usable independently of an installed test app. Build the main APK
+at final delivery. Earlier walkthroughs, credentials for synthetic accounts and
+validation results below are retained as historical evidence.
+
 This mode uses synthetic local data only. It does not verify real services or deployed Firebase security. The original Android application/account data stays in `com.accesstransit.access_transit`; the separate local APK uses `com.accesstransit.access_transit.validation`, label **AccessTransit Local Test**.
 
 Start the local backend from `test/security` (requires its installed dependencies and a compatible JDK):
@@ -67,12 +75,14 @@ Build and launch the separate local package:
 flutter run -d emulator-5554 --dart-define=LOCAL_VALIDATION=true --dart-define=MODERATION_V2=true
 ```
 
-`MODERATION_V2=true` without `LOCAL_VALIDATION` debug mode fails startup. This
-mode's HTTP exception is fixed to the Android emulator's `10.0.2.2:8787`; arbitrary
-HTTP origins remain forbidden. The normal app keeps the staged HTTPS-only client
-and v1 flow. The local Android package remains
-`com.accesstransit.access_transit.validation`. Do not change the demo host/project
-constants to point to production or deploy these flags to users.
+The original local-only activation gate has been replaced. Main-app v2 activation
+uses `MODERATION_V2=true` plus a configured `MODERATION_API_ORIGIN=https://...`
+for the deployed trusted service, in debug or release. Without an actual trusted
+endpoint and corresponding backend/rules migration, this is configuration support,
+not evidence that shared v2 operations are live. The fixed HTTP emulator exception
+is retained only for explicit debug automated tests, never a main-app HTTPS
+activation. The separate `.validation` native APK is retired. Do not redirect
+synthetic seed/reset tools to the real project.
 
 Fresh seeding also creates `reader1@local.test` through `reader5@local.test` with
 the same public local-only password `LocalTest-Only25!`. Use
@@ -688,3 +698,145 @@ error appeared in the inspected process log (`phase24-apk-manifest.log`,
 `phase24-local-install.log`, `phase24-local-launch-confirmed.log`,
 `phase24-local-startup.log`). This is startup evidence, not a native calendar
 walkthrough. The normal installed app was not replaced.
+
+## Repeated-stop visits / loop patterns (2026-10-17)
+
+Admin route editing can add the same physical station again; each visit keeps a
+unique ID. Select the exact route visits in the bus editor and enter their own
+times, then publish a dated departure or reviewed calendar. Search now offers
+each valid boarding/alighting visit pair separately and excludes passed visits.
+Saved trips and assistance keep the chosen visit; reports/coordinates/capabilities
+continue using the physical station. See [stop occurrences](stop-occurrences.md).
+
+Validation: **708 full Flutter tests** (`phase25-full-final.log`), **38 local-v2
+focused tests** (`phase25-local.log`), **121 isolated rules/backend tests**
+(`test/security/phase25-rules-backend.log`, `demo-phase25-loops`, port 8088) and
+clean analyzer (`phase25-analyze-final.log`). All calendar/occurrence strings now
+have Unicode regression checks after the Sinhala/Tamil calendar encoding fix.
+
+The local emulators were found stopped and restarted on Auth 9099 / Firestore
+8087. Updated API runs on loopback 8787 (`phase25-server.out.log`). Named local
+fixtures/admin were initialized because that restarted Auth emulator was empty;
+no live Firebase database was accessed or reset. Existing emulator processes
+should remain running for walkthroughs. Sign in again if an old local session
+predates the restarted Auth emulator.
+
+With the documented emulator variables, run from root:
+
+```powershell
+node test/security/verify-local-loops.mjs
+```
+
+The smoke loads local rules and creates uniquely named fictional visits, users,
+bus/run and bookmarks. It verifies actual local tokens, physical station
+resolution, exact-driver assistance acknowledgement, retention after the first
+visit and expiry after the later visit (`phase25-local-smoke.log`). Its progress
+changes are trusted fixtures, not a GPS/device journey. It does not clear the
+database. No shared deployment, billing upgrade, real fare/geometry migration or
+real FCM test is included. Legacy v1 assistance is not claimed to enforce the
+new run/visit contract; use local v2 activation.
+
+Final Local Test APK build succeeded (`phase25-local-build.log`), the manifest
+identified `.validation` (`phase25-apk-manifest.log`) and installation succeeded
+(`phase25-local-install.log`). Normal app installation/data were preserved.
+This is not a native loop-route/TalkBack walkthrough.
+
+Repeat launch returned Status ok and the inspected process startup log had no
+fatal/unhandled Flutter error (`phase25-local-launch-confirmed.log`,
+`phase25-local-startup.log`). Optional named-fixture bootstrap is guarded by both
+empty Auth and empty functional demo collections; existing records are retained.
+
+## Schedule replacements and saved snapshots (2026-10-17)
+
+Admin Dated departures → Publish replacement atomically cancels an unstarted
+original and publishes its linked next version with a public reason/history.
+New Save Trip records retain the original selected timetable and run version.
+Cancellation/replacement does not move the bookmark. Missing/changed catalogue
+details show an honest historical record with original times, rather than live
+GPS/accessibility claims. See [schedule history](schedule-history.md).
+
+Validation: **715 full Flutter tests** (`phase26-full-final.log`), **42 focused
+local-v2 tests** (`phase26-local.log`), **73 isolated rules tests**
+(`test/security/phase26-rules.log`, `demo-phase26-history`, port 8088) and clean
+analyzer (`phase26-analyze-final.log`). The final full suite includes the
+timezone-neutral admin clock/overnight regression.
+
+With the documented emulator environment variables, from root:
+
+```powershell
+node test/security/verify-local-schedule-history.mjs
+```
+
+The smoke loads local rules without resetting data and creates unique fictional
+normal/Sample records. Actual tokens verify saved snapshot receipt, linked
+atomic replacement/history, unchanged original saved time/version and denied
+rewrites (`phase26-local-smoke.log`). It tests the rules contract; production
+rescheduling/snapshot callbacks are covered by Flutter. Emulators/API remain on
+their existing local ports. Shared rules must be reviewed/deployed before
+releasing clients that send `scheduleSnapshot`. No shared deployment, billing
+upgrade or real FCM test is included. Legacy snapshot backfill, template lineage,
+native accessibility and fluent translation review remain separate work.
+
+Final Local Test APK built (`phase26-local-build-final.log`), manifest confirmed
+`.validation` (`phase26-apk-manifest-final.log`), installation succeeded and launch
+returned Status ok (`phase26-local-install-final.log`, `phase26-local-launch-final.log`).
+No fatal/unhandled Flutter error was found in the inspected process startup log
+(`phase26-local-startup-final.log`). Normal installed app/data were preserved.
+Startup evidence is not a native reschedule/TalkBack walkthrough.
+
+### Manual account access (2026-10-17, checkpoint 41)
+
+In the local-v2 Admin Users view, open **Account access**. Enter a reason and
+suspend for 72 hours (default), or explicitly choose until admin restoration.
+Restore clears only manual restrictions; community bans and driver permissions
+remain independent. Active driver operations are cancelled/reconciled by the
+existing worker. Self/admin accounts are protected by the trusted backend.
+
+Full Flutter: **721 passed** (`phase27-full-final.log`); local-v2 focused:
+**29 passed** (`phase27-local-tests.log`); isolated rules/backend/transports:
+**142 passed** (`test/security/phase27-final.log`); full analyzer clean
+(`phase27-analyze-clean.log`). All three locales fit 320dp/200% text in widgets;
+fluent and native accessibility review remain pending.
+
+With the documented fixed demo emulator environment, run:
+
+```powershell
+node test/security/verify-local-account-controls.mjs
+```
+
+The actual-token smoke passed (`phase27-local-smoke-final.log`), including a
+concurrent revision winner, request retry, active driver trip/GPS/lock
+reconciliation and restoration preserving a separate community ban. It creates
+unique fictional local records without resetting existing data. The API remains
+loopback-only with its existing normal-only allowlist; scoped policy tests also
+cover Sample isolation. No Auth account is disabled/deleted or token revoked.
+
+The separate `.validation` APK built, manifest-checked, installed and launched
+successfully (`phase27-local-build.log`, `phase27-apk-manifest.log`,
+`phase27-local-install.log`, `phase27-local-launch.log`). Inspected process
+startup showed no fatal/unhandled Flutter error (`phase27-local-startup.log`).
+Normal app/data were preserved. See [manual account controls](manual-account-controls.md)
+for remaining Auth lifecycle, manual appeal, deployment and native QA work.
+No shared deployment, billing change or real push test occurred.
+
+### Main app / real Firebase / localhost (checkpoint 44)
+
+The real-project localhost setup is now implemented and active; this supersedes
+historical Local Test APK instructions above. Use
+`node test/security/serve-shared-backend.mjs` from the root and the VS Code main
+app localhost launch profile when intentionally running the emulator app. The
+API uses loopback 8788; the old demo server remains separately guarded on 8787.
+No APK was built or installed during this work.
+
+The authorized shared update verified the requested admin claim, exact rules,
+15 READY composite indexes and the required collection-group field index, then
+activated v2 with a transactionally checked zero-baseline cohort and unchanged
+UIDs/balances/history. No Functions deployment or billing change occurred.
+
+Flutter **726 passed** (4 mode-specific skips), explicit main-localhost **28
+passed**, final isolated security/runtime **152 passed**, clean analyzer.
+Actual loopback readiness/auth rejection and shared metadata read-back passed.
+A valid-user native report/assistance walkthrough is still pending; no fictional
+accounts/reports were created in the real project to claim one. See
+[real Firebase localhost guide](localhost-real-firebase.md) for complete scope,
+run commands, private recovery records and remaining work.

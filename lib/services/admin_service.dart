@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import 'sample_test_mode.dart';
+import 'server_snapshot_stream.dart';
 import '../logic/ordered_schedule.dart';
 import '../models/service_run.dart';
 
@@ -30,6 +31,25 @@ class AdminChange {
 }
 
 extension AdminRepositoryPages on AdminRepository {
+  /// Explicit editor reference loading; never truncates a selector to page one.
+  Future<List<AdminRecord>> referencePages(String kind) async {
+    if (this is FirestoreAdminRepository) {
+      return (this as FirestoreAdminRepository).referencePages(kind);
+    }
+    final items = <AdminRecord>[];
+    final ids = <String>{}, cursors = <String>{};
+    String? after;
+    do {
+      final result = await page(kind, after: after);
+      items.addAll(result.items.where((r) => ids.add(r.id)));
+      after = result.next;
+      if (after != null && !cursors.add(after)) {
+        throw StateError('Page cursor changed. Reload.');
+      }
+    } while (after != null);
+    return items;
+  }
+
   Future<({List<AdminRecord> items, String? next})> page(
     String kind, {
     String? after,
@@ -37,11 +57,19 @@ extension AdminRepositoryPages on AdminRepository {
     if (this is FirestoreAdminRepository) {
       return (this as FirestoreAdminRepository).page(kind, after: after);
     }
-    final rows = (await load(kind))..sort((a, b) => a.id.compareTo(b.id));
-    final values = rows
-        .where((r) => after == null || r.id.compareTo(after) > 0)
-        .take(21)
-        .toList();
+    final rows = (await load(kind))
+      ..sort(
+        (a, b) => kind == 'admin_audit'
+            ? b.text('createdAt').compareTo(a.text('createdAt')) == 0
+                  ? b.id.compareTo(a.id)
+                  : b.text('createdAt').compareTo(a.text('createdAt'))
+            : a.id.compareTo(b.id),
+      );
+    final start = after == null ? 0 : rows.indexWhere((r) => r.id == after) + 1;
+    if (after != null && start == 0) {
+      throw StateError('Page cursor changed. Reload.');
+    }
+    final values = rows.skip(start).take(21).toList();
     return (
       items: values.take(20).toList(),
       next: values.length > 20 ? values[19].id : null,
@@ -56,15 +84,48 @@ abstract class AdminRepository {
 }
 
 class FirestoreAdminRepository implements AdminRepository {
+  Future<List<AdminRecord>> referencePages(String kind) async {
+    final owner = await _authorize(), scope = SampleTestMode.collection(kind);
+    final records = <AdminRecord>[], seen = <String>{};
+    final cursors = <String>{};
+    String? after;
+    do {
+      final result = await page(kind, after: after);
+      if (FirebaseAuth.instance.currentUser?.uid != owner ||
+          SampleTestMode.collection(kind) != scope) {
+        throw StateError('Account changed. Reload references.');
+      }
+      records.addAll(result.items.where((r) => seen.add(r.id)));
+      after = result.next;
+      if (after != null && !cursors.add(after)) {
+        throw StateError('Page cursor changed. Reload.');
+      }
+    } while (after != null);
+    return records;
+  }
+
   Future<({List<AdminRecord> items, String? next})> page(
     String kind, {
     String? after,
   }) async {
     await _authorize();
-    Query<Map<String, dynamic>> query = _collection(kind)
-        .orderBy(FieldPath.documentId)
-        .limit(21);
-    if (after != null) query = query.startAfter([after]);
+    Query<Map<String, dynamic>> query = kind == 'admin_audit'
+        ? _collection(kind)
+              .orderBy('createdAt', descending: true)
+              .orderBy(FieldPath.documentId, descending: true)
+              .limit(21)
+        : _collection(kind).orderBy(FieldPath.documentId).limit(21);
+    if (after != null) {
+      if (kind == 'admin_audit') {
+        final cursor = await _collection(kind)
+            .doc(after)
+            .get(const GetOptions(source: Source.server));
+        if (!cursor.exists) throw StateError('Page cursor changed. Reload.');
+        query = query.startAfterDocument(cursor);
+      } else {
+        query = query.startAfter([after]);
+      }
+    }
     final result = await query.get(const GetOptions(source: Source.server));
     return (
       items: result.docs
@@ -95,12 +156,18 @@ class FirestoreAdminRepository implements AdminRepository {
   Stream<List<AdminRecord>> watch(String kind) async* {
     await _authorize();
     final Query<Map<String, dynamic>> query = kind == 'admin_audit'
-        ? _collection(kind).orderBy('createdAt', descending: true).limit(100)
+        ? _collection(kind)
+              .orderBy('createdAt', descending: true)
+              .orderBy(FieldPath.documentId, descending: true)
+              .limit(21)
+        : ['users', 'buses', 'routes', 'stations'].contains(kind)
+        ? _collection(kind).orderBy(FieldPath.documentId).limit(21)
         : _collection(kind);
-    yield* query.snapshots(includeMetadataChanges: true).map((s) {
-      if (s.metadata.isFromCache || s.metadata.hasPendingWrites) {
-        throw StateError('A server connection is required. Retry when online.');
-      }
+    yield* serverSnapshotStream(
+      query.snapshots(includeMetadataChanges: true),
+      isVerified: (s) =>
+          !s.metadata.isFromCache && !s.metadata.hasPendingWrites,
+    ).map((s) {
       return s.docs.map((d) => AdminRecord(kind, d.id, d.data())).toList();
     });
   }
@@ -166,6 +233,28 @@ bool adminDataEqual(dynamic a, dynamic b) {
   return a == b;
 }
 
+/// Stable presentation metadata; the inherited English message preserves
+/// diagnostic/test compatibility without requiring UI string parsing.
+class AdminValidationException extends FormatException {
+  const AdminValidationException(
+    this.code,
+    String message, {
+    this.field,
+    this.maximum,
+  }) : super(message);
+  final String code;
+  final String? field;
+  final int? maximum;
+}
+
+class AdminDependencyException extends StateError {
+  AdminDependencyException(this.kind)
+    : super(
+        'Cannot delete: this record is referenced by $kind. Remove the dependency or retain it for history.',
+      );
+  final String kind;
+}
+
 class AdminService {
   AdminService(this.repository);
   final AdminRepository repository;
@@ -177,7 +266,12 @@ class AdminService {
   ]) {
     final text = d[field]?.toString().trim() ?? '';
     if (text.isEmpty || text.length > max) {
-      throw FormatException('$field is required (maximum $max characters).');
+      throw AdminValidationException(
+        'required-field',
+        '$field is required (maximum $max characters).',
+        field: field,
+        maximum: max,
+      );
     }
     return text;
   }
@@ -190,8 +284,27 @@ class AdminService {
         'Select at least two distinct stops in travel order.',
       );
     }
+    final mapping = Map<String, String>.from(d['stopStationIds'] as Map? ?? {});
+    if (mapping.isNotEmpty &&
+        (mapping.length != stops.length ||
+            stops.any(
+              (s) =>
+                  !mapping.containsKey(s) ||
+                  mapping[s]!.isEmpty ||
+                  mapping[s]!.contains('/'),
+            ) ||
+            mapping.entries.any(
+              (e) => e.key != e.value && mapping.values.contains(e.key),
+            ))) {
+      throw const FormatException(
+        'Every stop occurrence requires an unambiguous physical station.',
+      );
+    }
     return stops;
   }
+
+  static String stationIdFor(Map<String, dynamic> data, String occurrence) =>
+      (data['stopStationIds'] as Map?)?[occurrence]?.toString() ?? occurrence;
 
   static void validate(String kind, Map<String, dynamic> d) {
     if (!catalogueKinds.contains(kind)) {
@@ -211,7 +324,11 @@ class AdminService {
             !value.isFinite ||
             value < -limit ||
             value > limit) {
-          throw FormatException('Enter valid $field coordinates.');
+          throw AdminValidationException(
+            'coordinate-invalid',
+            'Enter valid $field coordinates.',
+            field: field,
+          );
         }
       }
     } else {
@@ -282,13 +399,17 @@ class AdminService {
 
     if (kind != 'stations') {
       final stations = await repository.load('stations');
-      if (orderedStops(data).any((id) => !stations.any((s) => s.id == id))) {
+      if (orderedStops(data)
+          .any((id) => !stations.any((s) => s.id == stationIdFor(data, id)))) {
         throw const FormatException(
           'A selected stop no longer exists. Reload the form.',
         );
       }
       for (final station in stations.where(
-        (s) => orderedStops(data).contains(s.id),
+        (s) =>
+            orderedStops(data)
+                .map((id) => stationIdFor(data, id))
+                .contains(s.id),
       )) {
         guard(station);
       }
@@ -300,7 +421,9 @@ class AdminService {
         var previous = -1;
         for (final stop in List<String>.from(bus.data['stops'] ?? [])) {
           final index = stops.indexOf(stop);
-          if (index <= previous || data['routeNo'] != bus.data['routeNo']) {
+          if (index <= previous ||
+              data['routeNo'] != bus.data['routeNo'] ||
+              stationIdFor(data, stop) != stationIdFor(bus.data, stop)) {
             throw StateError(
               'Update dependent buses before changing the route number or removing/reordering their stops.',
             );
@@ -311,6 +434,16 @@ class AdminService {
       }
     }
     if (kind == 'buses') {
+      if (original != null &&
+          orderedStops(data).any(
+            (key) =>
+                (original.data['stops'] as List).contains(key) &&
+                stationIdFor(original.data, key) != stationIdFor(data, key),
+          )) {
+        throw StateError(
+          'Existing stop occurrences cannot be rebound to another station. Use new occurrence IDs.',
+        );
+      }
       final routes = await repository.load('routes');
       final route = routes.where((r) => r.id == data['routeId']).firstOrNull;
       if (route == null || route.text('routeNo') != data['routeNo']) {
@@ -323,7 +456,8 @@ class AdminService {
       var previous = -1;
       for (final stop in orderedStops(data)) {
         final index = routeStops.indexOf(stop);
-        if (index <= previous) {
+        if (index <= previous ||
+            stationIdFor(data, stop) != stationIdFor(route.data, stop)) {
           throw const FormatException(
             'Vehicle stops must follow the selected route order.',
           );
@@ -377,6 +511,10 @@ class AdminService {
       AdminChange(kind, id, original?.data, {
         ...?original?.data,
         ...data,
+        if (kind != 'stations')
+          'physicalStopIds': orderedStops(data)
+              .map((s) => stationIdFor(data, s))
+              .toList(),
         'catalogueSource': 'operator_catalogue',
         'isDemo': false,
       }),
@@ -410,13 +548,17 @@ class AdminService {
     final checks = switch (record.kind) {
       'stations' => [
         ('routes', 'stops'),
+        ('routes', 'physicalStopIds'),
         ('buses', 'stops'),
+        ('buses', 'physicalStopIds'),
         ('journeys', 'fromStationId'),
         ('journeys', 'toStationId'),
         ('boarding_requests', 'stationId'),
         ('reports', 'targetId'),
         ('service_runs', 'stops'),
+        ('service_runs', 'physicalStopIds'),
         ('service_schedules', 'stops'),
+        ('service_schedules', 'physicalStopIds'),
       ],
       'routes' => [
         ('buses', 'routeId'),
@@ -443,9 +585,7 @@ class AdminService {
             ? (r.data[field] as List).contains(record.id)
             : r.data[field] == record.id,
       )) {
-        throw StateError(
-          'Cannot delete: this record is referenced by $kind. Remove the dependency or retain it for history.',
-        );
+        throw AdminDependencyException(kind);
       }
     }
   }
@@ -660,6 +800,9 @@ class AdminService {
       AdminChange('service_schedules', id, null, {
         'schemaVersion': 1,
         'stops': orderedStops(bus.data),
+        'physicalStopIds': orderedStops(bus.data)
+            .map((s) => stationIdFor(bus.data, s))
+            .toList(),
         'version': 1,
         'state': 'published',
         'busId': bus.id,
@@ -718,6 +861,7 @@ class AdminService {
           'routeNo',
           'stops',
           'scheduleTimes',
+          'stopStationIds',
           'catalogueRecordType',
         ].any((k) => !adminDataEqual(bus.data[k], snapshot[k]))) {
       throw StateError(
@@ -794,7 +938,7 @@ class AdminService {
       throw const FormatException('Choose an available physical bus.');
     }
     final stops = orderedStops(bus.data);
-    final date = DateTime(civilDate.year, civilDate.month, civilDate.day);
+    final date = DateTime.utc(civilDate.year, civilDate.month, civilDate.day);
     final schedule = OrderedSchedule.build(
       stopCount: stops.length,
       scheduleTimes: List<String>.from(
@@ -802,6 +946,7 @@ class AdminService {
       ),
       serviceDate: date,
       fallbackDeparture: date,
+      utcCivil: true,
     );
     if (schedule == null || schedule.usesEstimates) {
       throw const FormatException(
@@ -816,7 +961,7 @@ class AdminService {
     }
     final start = departureMinutes == null
         ? schedule.times.first
-        : DateTime(
+        : DateTime.utc(
             date.year,
             date.month,
             date.day,
@@ -845,6 +990,9 @@ class AdminService {
           times.first.add(ServiceRun.maximumLateStart),
         ),
         'stops': stops,
+        'physicalStopIds': stops.map((s) => stationIdFor(bus.data, s)).toList(),
+        if (bus.data['stopStationIds'] != null)
+          'stopStationIds': bus.data['stopStationIds'],
         'status': 'scheduled',
         'initialStopTimes': {
           for (var i = 0; i < stops.length; i++)
@@ -855,6 +1003,84 @@ class AdminService {
         },
       }),
     ];
+  }
+
+  /// Cancel and publish the linked replacement atomically. Started operations
+  /// cannot be rescheduled here; exact snapshots reject concurrent starts.
+  Future<void> rescheduleServiceRun(
+    AdminRecord previous,
+    DateTime date, {
+    required int departureMinutes,
+    required String publicReason,
+  }) async {
+    final reason = publicReason.trim();
+    if (previous.kind != 'service_runs' ||
+        !['scheduled', 'cancelled'].contains(previous.text('status')) ||
+        previous.data['replacementRunId'] != null ||
+        reason.length < 5 ||
+        reason.length > 300) {
+      throw StateError(
+        'Choose an unreplaced, not-started run and a public reason (5–300 characters).',
+      );
+    }
+    final bus = (await repository.load('buses'))
+        .where((b) => b.id == previous.text('busId'))
+        .firstOrNull;
+    if (bus == null) {
+      throw StateError('Review the current physical bus timetable first.');
+    }
+    final changes = await _prepareServiceRun(
+      bus,
+      date,
+      departureMinutes: departureMinutes,
+    );
+    final replacement = changes.singleWhere((c) => !c.checkOnly);
+    if (replacement.id == previous.id) {
+      throw StateError('Choose a different departure time.');
+    }
+    final oldVersion = previous.data['scheduleVersion'] as int? ?? 1;
+    if (oldVersion < 1) {
+      throw StateError('Review the original schedule version.');
+    }
+    final trip = (await repository.load('trips'))
+        .where((t) => t.id == previous.id)
+        .firstOrNull;
+    if (trip?.text('status') == 'in_progress') {
+      throw StateError('Reconcile the active operation first.');
+    }
+    await repository.commit([
+      ...changes.where((c) => c.checkOnly),
+      AdminChange(
+        'trips',
+        previous.id,
+        trip?.data,
+        trip?.data,
+        checkOnly: true,
+      ),
+      AdminChange(previous.kind, previous.id, previous.data, {
+        ...previous.data,
+        'status': 'cancelled',
+        'replacementRunId': replacement.id,
+        'replacementDepartureAt': replacement.after!['plannedDepartureAt'],
+        'changeReason': reason,
+      }),
+      AdminChange(replacement.kind, replacement.id, null, {
+        ...replacement.after!,
+        'scheduleVersion': oldVersion + 1,
+        'replacesRunId': previous.id,
+        'changeReason': reason,
+      }),
+      AdminChange('service_run_changes', previous.id, null, {
+        'previousRunId': previous.id,
+        'replacementRunId': replacement.id,
+        'previousDepartureAt': previous.data['plannedDepartureAt'],
+        'replacementDepartureAt': replacement.after!['plannedDepartureAt'],
+        'previousVersion': oldVersion,
+        'replacementVersion': oldVersion + 1,
+        'busId': bus.id,
+        'reason': reason,
+      }),
+    ], 'reschedule_service_run');
   }
 
   Future<void> cancelScheduledRun(AdminRecord run) async {

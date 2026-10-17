@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/localization_context.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_theme.dart';
 
@@ -49,7 +50,7 @@ Future<bool?> showLogoutConfirmationDialog(BuildContext context) {
             const SizedBox(width: 14),
             Expanded(
               child: Text(
-                'Sign Out',
+                dialogContext.l10n.profileSignOut,
                 style: TextStyle(
                   fontSize: hasLargeTargets ? 21 : 19,
                   fontWeight: FontWeight.w700,
@@ -60,7 +61,7 @@ Future<bool?> showLogoutConfirmationDialog(BuildContext context) {
           ],
         ),
         content: Text(
-          'Sign out and remove pending report drafts and photos from this device? Requests already sent may still complete. Published reports remain available after signing back in.',
+          dialogContext.l10n.profileLogoutQuestion,
           style: TextStyle(
             fontSize: hasLargeTargets ? 16 : 14,
             height: 1.45,
@@ -88,11 +89,14 @@ Future<bool?> showLogoutConfirmationDialog(BuildContext context) {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    minimumSize: Size(0, context.minTapHeight),
+                    minimumSize: Size(
+                      context.buttonHeight,
+                      context.minTapHeight,
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
                   child: Text(
-                    'Cancel',
+                    dialogContext.l10n.profileCancel,
                     style: TextStyle(
                       fontSize: hasLargeTargets ? 16 : 15,
                       fontWeight: FontWeight.w600,
@@ -114,11 +118,14 @@ Future<bool?> showLogoutConfirmationDialog(BuildContext context) {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    minimumSize: Size(0, context.minTapHeight),
+                    minimumSize: Size(
+                      context.buttonHeight,
+                      context.minTapHeight,
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
                   child: Text(
-                    'Sign Out',
+                    dialogContext.l10n.profileSignOut,
                     style: TextStyle(
                       fontSize: hasLargeTargets ? 16 : 15,
                       fontWeight: FontWeight.w700,
@@ -140,6 +147,7 @@ void showLogoutSuccessSnackBar({
   BuildContext? context,
   ScaffoldMessengerState? messenger,
   bool isHighContrast = false,
+  String? message,
 }) {
   final targetMessenger =
       messenger ?? (context != null ? ScaffoldMessenger.of(context) : null);
@@ -151,13 +159,14 @@ void showLogoutSuccessSnackBar({
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(
-        content: const Row(
+        content: Row(
           children: [
             Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
             SizedBox(width: 12),
             Expanded(
               child: Text(
-                'You have been signed out successfully.',
+                message ??
+                    (context ?? targetMessenger.context).l10n.profileSignedOut,
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               ),
             ),

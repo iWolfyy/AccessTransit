@@ -14,12 +14,22 @@ abstract final class BusDetailsState {
     if (selection.toStationId != null) selection.toStationId!,
   ];
 
+  static List<String> physicalSegment(RouteResultItem selection) =>
+      segment(selection)
+          .map((s) => selection.rawBus?.stationIdFor(s) ?? s)
+          .toSet()
+          .toList();
+
   static bool matchesRun(ServiceRun run, RouteResultItem selection) {
     final stops = run.stopTimes.keys.toList();
     final from = stops.indexOf(selection.fromStationId ?? '');
     final to = stops.indexOf(selection.toStationId ?? '');
     return run.busId == selection.busId &&
         run.routeId == (selection.rawBus?.routeId ?? '') &&
+        stops.every(
+          (s) =>
+              run.stationIdFor(s) == (selection.rawBus?.stationIdFor(s) ?? s),
+        ) &&
         (selection.serviceRunId == null || selection.serviceRunId == run.id) &&
         from >= 0 &&
         to > from &&
@@ -75,7 +85,7 @@ abstract final class BusDetailsState {
     RouteResultItem selection,
     DateTime now,
   ) {
-    final stops = segment(selection).toSet();
+    final stops = physicalSegment(selection).toSet();
     return reports
         .where(
           (r) =>

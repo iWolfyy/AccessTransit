@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../constants/firestore_constants.dart';
+import 'station.dart';
 
 /// Represents a bus vehicle operating on a route, including its vehicle registration number,
 /// scheduled times, route reference, and accessibility attributes.
@@ -14,6 +15,7 @@ class Bus {
     this.routeId,
     this.scheduledDeparture,
     this.stops = const [],
+    this.stopStationIds = const {},
     this.scheduleTimes = const [],
     required this.hasRamp,
     required this.lowFloor,
@@ -44,6 +46,20 @@ class Bus {
 
   /// Ordered stops served by this bus run.
   final List<String> stops;
+
+  /// Unique visit IDs in `stops`; this map resolves each visit to its physical stop.
+  /// Legacy catalogues use the station ID itself as their single visit ID.
+  final Map<String, String> stopStationIds;
+  String stationIdFor(String occurrence) =>
+      stopStationIds[occurrence] ?? occurrence;
+  List<String> occurrencesAt(String stationId) =>
+      stops.where((s) => stationIdFor(s) == stationId).toList();
+  Map<String, Station> resolveStations(Map<String, Station> stations) => {
+    ...stations,
+    for (final key in stops)
+      if (stations[stationIdFor(key)] != null)
+        key: stations[stationIdFor(key)]!,
+  };
 
   /// Ordered scheduled time strings aligned with stops (e.g. `["08:00 AM", "08:12 AM"]`).
   final List<String> scheduleTimes;
@@ -180,6 +196,9 @@ class Bus {
           map['scheduledDeparture']?.toString() ??
           (parsedTimes.isNotEmpty ? parsedTimes.first : null),
       stops: parsedStops,
+      stopStationIds: Map<String, String>.from(
+        map['stopStationIds'] as Map? ?? {},
+      ),
       scheduleTimes: parsedTimes,
       hasRamp: map[FirestoreConstants.fieldHasRamp] as bool? ?? false,
       lowFloor: map[FirestoreConstants.fieldLowFloor] as bool? ?? false,
@@ -215,6 +234,7 @@ class Bus {
       if (scheduledDeparture != null)
         FirestoreConstants.fieldScheduledDeparture: scheduledDeparture,
       FirestoreConstants.fieldStops: stops,
+      if (stopStationIds.isNotEmpty) 'stopStationIds': stopStationIds,
       FirestoreConstants.fieldScheduleTimes: scheduleTimes,
       FirestoreConstants.fieldHasRamp: hasRamp,
       FirestoreConstants.fieldLowFloor: lowFloor,
@@ -240,6 +260,7 @@ class Bus {
     String? routeId,
     String? scheduledDeparture,
     List<String>? stops,
+    Map<String, String>? stopStationIds,
     List<String>? scheduleTimes,
     bool? hasRamp,
     bool? lowFloor,
@@ -257,6 +278,7 @@ class Bus {
       routeId: routeId ?? this.routeId,
       scheduledDeparture: scheduledDeparture ?? this.scheduledDeparture,
       stops: stops ?? List.from(this.stops),
+      stopStationIds: stopStationIds ?? Map.of(this.stopStationIds),
       scheduleTimes: scheduleTimes ?? List.from(this.scheduleTimes),
       hasRamp: hasRamp ?? this.hasRamp,
       lowFloor: lowFloor ?? this.lowFloor,
@@ -294,6 +316,10 @@ class Bus {
           catalogueRecordType == other.catalogueRecordType &&
           sourceUrl == other.sourceUrl &&
           _listEquals(stops, other.stops) &&
+          stopStationIds.length == other.stopStationIds.length &&
+          stopStationIds.entries.every(
+            (e) => other.stopStationIds[e.key] == e.value,
+          ) &&
           _listEquals(scheduleTimes, other.scheduleTimes);
 
   static bool _listEquals(List<String> a, List<String> b) {
@@ -320,6 +346,9 @@ class Bus {
       driverId.hashCode ^
       catalogueRecordType.hashCode ^
       sourceUrl.hashCode ^
+      Object.hashAllUnordered(
+        stopStationIds.entries.map((e) => Object.hash(e.key, e.value)),
+      ) ^
       Object.hashAll(stops) ^
       Object.hashAll(scheduleTimes);
 }

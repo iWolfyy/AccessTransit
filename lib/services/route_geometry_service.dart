@@ -72,7 +72,13 @@ class AdminRouteGeometryService {
     final guards = <AdminChange>[];
     final stations = await repository.load('stations');
     for (var i = 0; i < geometry.stops.length; i++) {
-      final stop = stations.where((s) => s.id == geometry.stops[i]).firstOrNull;
+      final stop = stations
+          .where(
+            (s) =>
+                s.id ==
+                AdminService.stationIdFor(route.data, geometry.stops[i]),
+          )
+          .firstOrNull;
       final lat = stop?.data['lat'], lng = stop?.data['lng'];
       if (stop == null ||
           stop.data['deletionPending'] == true ||

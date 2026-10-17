@@ -1,9 +1,10 @@
+import '../../l10n/localization_context.dart';
+import '../../l10n/legacy_journey_presentation.dart';
 import '../../widgets/fare_estimate_text.dart';
 import '../../services/transit_catalogue.dart';
 
 import 'package:flutter/material.dart';
 
-import '../../core/utils/time_utils.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../logic/journey_selection.dart';
@@ -117,10 +118,11 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
         route.busNo?.trim().isNotEmpty == true &&
             route.busNo?.trim() != route.busId
         ? route.busNo!
-        : 'Vehicle not specified';
+        : context.legacyText('Vehicle not specified');
     final requirements = [
-      if (route.wheelchairAccessRequired) 'Wheelchair access',
-      if (route.stepFreeOnly) 'Step-free',
+      if (route.wheelchairAccessRequired)
+        context.legacyText('Wheelchair access'),
+      if (route.stepFreeOnly) context.legacyText('Step-free'),
     ];
     return Scaffold(
       backgroundColor: context.surfaceColor,
@@ -135,7 +137,7 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
             ? const Border(bottom: BorderSide(color: Colors.black, width: 2))
             : null,
         leading: IconButton(
-          tooltip: 'Back',
+          tooltip: context.legacyText('Back'),
           onPressed: () => Navigator.of(context).maybePop(),
           icon: Icon(
             Icons.arrow_back_rounded,
@@ -144,7 +146,7 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
           ),
         ),
         title: Text(
-          'Confirm Journey',
+          context.legacyText('Confirm Journey'),
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -168,7 +170,11 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                         Text(
                           route.title == route.busId ||
                                   route.busNo?.trim() == route.busId
-                              ? 'Route ${route.routeNo ?? route.rawBus?.routeNo ?? 'Unknown'}'
+                              ? context.l10n.legacyFormat1(
+                                  route.routeNo ??
+                                      route.rawBus?.routeNo ??
+                                      context.l10n.resultsUnknown,
+                                )
                               : route.title,
                           style: TextStyle(
                             fontSize: 20,
@@ -186,13 +192,13 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                         ),
                         const Divider(height: 28),
                         _detail(
-                          'Boarding',
+                          context.legacyText('Boarding'),
                           route.origin,
                           icon: Icons.trip_origin_rounded,
                         ),
                         const SizedBox(height: 16),
                         _detail(
-                          'Destination',
+                          context.legacyText('Destination'),
                           route.destination,
                           icon: Icons.location_on_outlined,
                         ),
@@ -204,31 +210,34 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _heading('Travel schedule'),
+                        _heading(context.legacyText('Travel schedule')),
                         const SizedBox(height: 16),
                         _detail(
-                          'Selected date',
+                          context.legacyText('Selected date'),
                           route.selectedDate == null
-                              ? 'Unknown'
-                              : TimeUtils.formatDateString(route.selectedDate!),
+                              ? context.legacyText('Unknown')
+                              : MaterialLocalizations.of(context)
+                                    .formatMediumDate(route.selectedDate!),
                         ),
                         const SizedBox(height: 12),
                         _detail(
-                          'Selected time',
+                          context.legacyText('Selected time'),
                           route.selectedTimeMinutes == null
-                              ? 'First available service on selected date'
+                              ? context.legacyText(
+                                  'First available service on selected date',
+                                )
                               : '${(route.selectedTimeMinutes! ~/ 60).toString().padLeft(2, '0')}:${(route.selectedTimeMinutes! % 60).toString().padLeft(2, '0')}',
                         ),
                         const Divider(height: 28),
                         LayoutBuilder(
                           builder: (context, constraints) {
                             final start = _detail(
-                              'Timetable departure',
+                              context.legacyText('Timetable departure'),
                               _dateTime(departure),
                               icon: Icons.schedule_rounded,
                             );
                             final end = _detail(
-                              'Estimated arrival',
+                              context.legacyText('Estimated arrival'),
                               _dateTime(arrival),
                               icon: Icons.flag_outlined,
                             );
@@ -257,7 +266,9 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                         if (route.usesEstimatedTimes) ...[
                           const SizedBox(height: 16),
                           _notice(
-                            'Some timetable intervals are missing. Times include model estimates; confirm them with the operator.',
+                            context.legacyText(
+                              'Some timetable intervals are missing. Times include model estimates; confirm them with the operator.',
+                            ),
                           ),
                         ],
                       ],
@@ -268,7 +279,7 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _heading('Estimated fare'),
+                        _heading(context.legacyText('Estimated fare')),
                         const SizedBox(height: 12),
                         FareEstimateText(
                           amount: route.estimatedPriceLkr,
@@ -280,7 +291,9 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Prototype estimate. Confirm the actual fare with the operator.',
+                          context.legacyText(
+                            'Prototype estimate. Confirm the actual fare with the operator.',
+                          ),
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.4,
@@ -293,7 +306,7 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                           shape: const Border(),
                           collapsedShape: const Border(),
                           title: Text(
-                            'Fare details',
+                            context.legacyText('Fare details'),
                             style: TextStyle(
                               fontSize: 14,
                               color: context.primaryColor,
@@ -318,7 +331,7 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _heading('Travel requirements'),
+                          _heading(context.legacyText('Travel requirements')),
                           const SizedBox(height: 12),
                           Wrap(
                             spacing: 8,
@@ -342,7 +355,9 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                   ],
                   const SizedBox(height: 16),
                   _notice(
-                    'Saving a journey does not book a seat or confirm that the bus is running. Review current condition evidence.',
+                    context.legacyText(
+                      'Saving a journey does not book a seat or confirm that the bus is running. Review current condition evidence.',
+                    ),
                   ),
                   if (error != null) ...[
                     const SizedBox(height: 16),
@@ -358,7 +373,10 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                     style: FilledButton.styleFrom(
                       backgroundColor: context.primaryColor,
                       foregroundColor: Colors.white,
-                      minimumSize: Size(48, context.buttonHeight),
+                      minimumSize: Size(
+                        context.buttonHeight,
+                        context.buttonHeight,
+                      ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 20,
                         vertical: 14,
@@ -368,7 +386,9 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
                       ),
                     ),
                     child: Text(
-                      saving ? 'Saving journey...' : 'Confirm and save journey',
+                      saving
+                          ? context.legacyText('Saving journey...')
+                          : context.legacyText('Confirm and save journey'),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 16,
@@ -395,8 +415,8 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
   }
 
   String _dateTime(DateTime? value) => value == null
-      ? 'Unknown'
-      : '${TimeUtils.formatDateString(value)}, ${TimeUtils.formatTimeString(value)}';
+      ? context.legacyText('Unknown')
+      : '${MaterialLocalizations.of(context).formatMediumDate(value)}, ${TimeOfDay.fromDateTime(value).format(context)}';
 
   Widget _heading(String value) => Semantics(
     header: true,
@@ -427,7 +447,7 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              value,
+              context.legacyText(value),
               style: TextStyle(
                 fontSize: 15,
                 height: 1.4,
@@ -454,7 +474,7 @@ class _JourneyConfirmationScreenState extends State<JourneyConfirmationScreen> {
       const SizedBox(width: 12),
       Expanded(
         child: Text(
-          value,
+          context.legacyText(value),
           style: TextStyle(
             fontSize: 14,
             height: 1.4,
