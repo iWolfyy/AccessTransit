@@ -1,3 +1,26 @@
+# Current connection policy — 2026-10-18
+
+The app now uses online Firebase project `accesstransit-b615b` only.
+VS Code launches no local server; ordinary Android debug startup no longer
+selects localhost. `LOCAL_API` and `LOCAL_VALIDATION` are rejected by app startup
+and native builds. Firebase emulator scripts remain isolated test tools.
+
+Run the **AccessTransit: online Firebase** VS Code profile or `flutter run`.
+The Sample profile also uses online Firebase, under `sample_test/shared/`.
+
+No hosted moderation API origin is configured in this repository. Operations
+that require the trusted v2 API (including report publication, assistance and
+account administration) require a deployed service and a build with
+`--dart-define=MODERATION_V2=true` and
+`--dart-define=MODERATION_API_ORIGIN=https://YOUR_DEPLOYED_HOST` (replace the
+placeholder with the actual service origin). Do not use the placeholder as a
+working endpoint. Existing server activation and Firestore rules are preserved;
+this change does not restore retired direct writes or deploy a backend.
+
+The material below records the previous setup and is historical.
+
+---
+
 # Main app implementation and trusted backend
 
 Latest agreement, 2026-10-17: use the main Android app with real Firebase

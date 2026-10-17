@@ -1,3 +1,5 @@
+> Historical setup: superseded on 2026-10-18 by the [online-only app connection policy](main-app-backend.md). The app no longer supports these localhost launch instructions.
+
 # Main app with real Firebase and a localhost API
 
 Implemented 2026-10-17, Asia/Colombo. Main application ID:

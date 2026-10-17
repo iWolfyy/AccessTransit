@@ -44,13 +44,7 @@ Future<void> main() async {
     );
   }
 
-  if (LocalValidationBackend.enabled) {
-    await LocalValidationBackend.initialize();
-  } else {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  }
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   if (DriverPushConfiguration.requested) {
     DriverPushConfiguration.validateProject();
   }

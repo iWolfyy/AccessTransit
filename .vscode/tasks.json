@@ -1,14 +1,4 @@
 {
   "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "AccessTransit: ensure localhost backend",
-      "type": "process",
-      "command": "powershell.exe",
-      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/test/security/start-shared-backend.ps1"],
-      "options": {"cwd": "${workspaceFolder}"},
-      "problemMatcher": [],
-      "presentation": {"reveal": "silent", "panel": "dedicated"}
-    }
-  ]
+  "tasks": []
 }

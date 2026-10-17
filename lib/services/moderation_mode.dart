@@ -75,27 +75,18 @@ abstract final class ModerationMode {
   static ModerationConfiguration get configuration =>
       _mainAppConfiguration ?? _buildConfiguration;
 
-  /// The main Android debug app uses the agreed localhost backend even when
-  /// started with the ordinary Flutter Run action. Release builds, explicit
-  /// configuration and isolated emulator tests keep their existing policy.
+  /// The app uses online Firebase only. Emulator configurations remain
+  /// available to isolated tests, but cannot be selected by app startup.
   static ModerationConfiguration mainAppConfiguration({
     required ModerationConfiguration build,
     required bool android,
     required bool explicitV2,
     required bool explicitLocalApi,
   }) {
-    if (build.debug &&
-        android &&
-        !build.localValidation &&
-        !explicitV2 &&
-        !explicitLocalApi &&
-        build.origin.isEmpty) {
-      return const ModerationConfiguration(
-        requested: true,
-        localValidation: false,
-        debug: true,
-        origin: '',
-        localApi: true,
+    if (build.localValidation || build.localApi) {
+      throw StateError(
+        'The app uses online Firebase. Remove LOCAL_VALIDATION and LOCAL_API; '
+        'server operations require MODERATION_API_ORIGIN with an HTTPS origin.',
       );
     }
     return build;

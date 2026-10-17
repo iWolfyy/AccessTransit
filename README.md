@@ -18,6 +18,12 @@ Spoken TTS/voice navigation, stop/background notifications, emergency contact, w
 
 ## Run and validate
 
+The app connects to online Firebase project `accesstransit-b615b`; no local
+Firebase or API server is started. Use the **AccessTransit: online Firebase**
+VS Code launch profile or `flutter run`. Trusted v2 server features need a
+hosted HTTPS API, which is not configured yet. See the
+[current connection policy](docs/main-app-backend.md).
+
 For the populated shared **Sample/Test mode**, run
 `flutter run -d emulator-5554 --dart-define=SAMPLE_TEST=true`.
 It uses the same app/accounts, an isolated Firebase namespace and a persistent

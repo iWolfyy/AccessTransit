@@ -21,10 +21,8 @@ if (localValidation) {
 }
 apply(plugin = "com.google.gms.google-services")
 
-if (localApi && gradle.startParameter.taskNames.any {
-    it.contains("release", ignoreCase = true) || it.contains("profile", ignoreCase = true)
-}) {
-    error("LOCAL_API is debug-only. Release/profile builds require an HTTPS backend.")
+if (localApi) {
+    error("The app uses online Firebase. Remove LOCAL_API and configure a hosted HTTPS backend for server operations.")
 }
 
 android {
@@ -56,11 +54,6 @@ android {
     }
 
     buildTypes {
-        debug {
-            if (localApi) {
-                manifestPlaceholders["networkSecurity"] = "@xml/debug_localhost_network_security"
-            }
-        }
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
