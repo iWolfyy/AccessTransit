@@ -2910,3 +2910,24 @@ Implemented on 2026-10-17:
 Validation: **41 focused search/journey tests passed** (`phase67-targeted-tests.log`); **5 empty-state recovery tests passed** (`phase67-recovery-tests.log`). Existing recovery tap helpers now wait for scrolling to settle. A read-only snapshot of the actual normal timetable data matched **36 upcoming timetable opportunities**, including **2 Badulla -> Ella** options (`phase67-normal-catalogue-test.log`); an initial Bandarawela probe correctly returned zero because that stop pair is absent. Analyzer **No issues found** (`phase67-analyze.log`), main debug build succeeded (`phase67-debug-build.log`) and same-package update/install returned Success. Final full-suite results are in `phase67-final-full-tests.log`; the earlier run still included two scroll-helper failures before their correction.
 
 Final checkpoint 81 verification: **1,044 full Flutter tests passed, 4 skipped** (`phase67-final-full-tests.log`). This clears the previously recorded journey-selection and fare/scroll test failures. Normal published timetable matching was verified read-only; no catalogue records were changed. Main package was updated with sign-in/data retained and localhost health is ready.
+
+## 82. Adapt and import the user-pasted legacy seed
+
+Completed on 2026-10-18 (Asia/Colombo):
+
+- Parsed the pasted Dart data without executing its destructive `seedAll()` implementation. Normalized 21 stops, 10 route directions and 29 vehicles into a reviewable source snapshot. Imported into the existing Sample/Test namespace, using prefixed IDs and visible SAMPLE labels; normal data remained unchanged.
+- Added 58 dated scheduled runs for Colombo 2026-10-18/19, preserving ordered stop times, overnight handling, route references and the -5/+30-minute start policy. No active trips/GPS/driver assignment was invented. Undated ramp/crowding claims do not become current observations.
+- Adapted the three sample reports to v2 with source observation ages/statuses, no legacy vote impersonation, isolated sample ledger events/summaries and synthetic author profiles without Auth accounts. No real rewards/accounts were changed.
+- Create-only atomic import backed up targets and verified all 130 records; a repeat apply read-back verified without duplicate or reset writes. The same application's existing SAMPLE launch configuration exposes the data. No APK build/install or app source change was needed for this import.
+
+Validation: **4 offline importer tests passed**; current Flutter models parsed all records and the dated matcher found **29 upcoming service opportunities** (`phase68-model-tests.log`). Shared read-back and idempotency receipts: `phase68-import.log`, `phase68-idempotency.log`. See [pasted sample import](pasted-sample-import.md) for exact scope, limitations and commands. This import does not claim real operating schedules or verified accessibility.
+
+## 83. Recover a stopped localhost backend and automate development launch
+
+Completed on 2026-10-18 (Asia/Colombo):
+
+- The reported account screen coincided with ECONNREFUSED on localhost port 8788: no trusted backend was listening. Firebase itself had not stopped; the emulator does not start the developer computer's API process.
+- Added `test/security/start-shared-backend.ps1` and a shared VS Code pre-launch task. Both existing main/Sample launch configurations now ensure the correct backend is running and ready before Flutter starts. The helper runs hidden, reuses a healthy matching process, checks project/mode/readiness, records local logs and never clears app data or starts a Windows auto-run service.
+- Started the server with normal and explicit Sample scopes. Non-mutating runtime verification passed: readiness true, authentication required, invalid tokens rejected. Re-running the launch helper reused the existing process. Retried the current main app's account check through its gate; native debug state now reports ready true / failed false, with v2/localhost enabled. No APK, rules, billing or Firebase data mutation was needed.
+
+Opening the installed app directly after a computer/server restart still requires starting this localhost service. See [development connection](localhost-real-firebase.md) for the one-command helper and VS Code launch behavior.

@@ -6,6 +6,7 @@
       "type": "dart",
       "request": "launch",
       "program": "lib/main.dart",
+      "preLaunchTask": "AccessTransit: ensure localhost backend",
       "flutterMode": "debug",
       "deviceId": "emulator-5554",
       "toolArgs": [
@@ -18,6 +19,7 @@
       "type": "dart",
       "request": "launch",
       "program": "lib/main.dart",
+      "preLaunchTask": "AccessTransit: ensure localhost backend",
       "flutterMode": "debug",
       "deviceId": "emulator-5554",
       "toolArgs": [

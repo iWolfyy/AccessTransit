@@ -18,6 +18,23 @@ From the workspace root, with the existing Firebase CLI sign-in:
 node test/security/serve-shared-backend.mjs
 ```
 
+Both VS Code launch profiles now run **AccessTransit: ensure localhost backend**
+before Flutter starts. The task starts the server hidden, waits for verified
+readiness and reuses an already-running matching server. It does not install a
+Windows startup service. Starting the Android emulator or opening its installed
+app icon alone does not run a VS Code task. If the computer/server was stopped,
+start it once from the workspace before retrying account access:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File test/security/start-shared-backend.ps1
+```
+
+Startup logs are `.dart_tool/shared-backend-startup.log` and
+`.dart_tool/shared-backend-startup-error.log`. The helper enables normal plus
+explicit Sample/Test scopes, binds only to localhost and leaves Firebase
+credentials inside the existing server process. A readiness failure prevents
+the app launch task from claiming success.
+
 For explicitly labelled fictional walkthrough data in the same app, use
 `node test/security/serve-shared-backend.mjs --sample` and the
 **AccessTransit: realistic SAMPLE data (same app)** launch profile.
