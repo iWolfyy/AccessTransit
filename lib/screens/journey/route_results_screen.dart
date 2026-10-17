@@ -1,4 +1,13 @@
-import '../../logic/journey_fare.dart';
+import 'package:flutter/foundation.dart';
+
+import 'dart:async';
+
+import '../../logic/tariff_fare.dart';
+import '../../services/fare_catalogue.dart';
+import '../../logic/route_geometry.dart';
+import '../../services/route_geometry_service.dart';
+import '../../widgets/route_progress_eta_text.dart';
+
 import '../../widgets/fare_estimate_text.dart';
 import '../../widgets/evidence_refresh.dart';
 import '../../services/transit_catalogue.dart';
@@ -10,7 +19,12 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 
 import '../../logic/bus_matcher.dart';
-import '../../logic/passenger_journey_plan.dart';
+import '../../logic/dated_boarding_matcher.dart';
+import '../../logic/transit_time.dart';
+import '../../services/dated_search_state.dart';
+import '../../services/transit_search_backend.dart';
+import '../../logic/search_session.dart';
+import '../../l10n/localization_context.dart';
 import '../../logic/status_logic.dart';
 import '../../models/bus.dart';
 import '../../models/bus_route.dart';
@@ -18,7 +32,7 @@ import '../../models/report.dart';
 import '../../models/station.dart';
 import '../../services/accessibility_preferences_service.dart';
 import '../../services/firestore_service.dart';
-import 'route_details_screen.dart';
+import 'bus_details_screen.dart';
 
 /// Route result item used for passenger route selection.
 /// Timetable planning data; live GPS is evaluated separately in route details.
@@ -59,6 +73,11 @@ class RouteResultItem {
     this.journeyStations = const {},
     this.selectedDate,
     this.selectedTimeMinutes,
+    this.serviceRunId,
+    this.boardingEstimateAt,
+    this.boardingEstimateSource,
+    this.progressEstimate,
+    this.fareQuote,
   });
 
   final String id;
@@ -79,6 +98,7 @@ class RouteResultItem {
   final String departureTimeStr;
   final String arrivalTimeStr;
   final int estimatedPriceLkr;
+  final TariffFareQuote? fareQuote;
   final String timetableStatusLabel;
   final bool usesEstimatedTimes;
   final String origin;
@@ -96,6 +116,10 @@ class RouteResultItem {
   final Map<String, Station> journeyStations;
   final DateTime? selectedDate;
   final int? selectedTimeMinutes;
+  final String? serviceRunId;
+  final DateTime? boardingEstimateAt;
+  final String? boardingEstimateSource;
+  final RouteProgressEstimate? progressEstimate;
 }
 
 enum AccessibilityStatus { accessible, partial, notAccessible, unknown }
@@ -115,6 +139,10 @@ class RouteResultsScreen extends StatefulWidget {
     this.wheelchairAccessRequired,
     this.stepFreeOnly,
     this.minimizeWalking,
+    this.needsDraft,
+    this.searchBackend,
+    this.fareFeed,
+    this.geometryFeed,
   });
 
   final String fromStationId;
@@ -126,12 +154,17 @@ class RouteResultsScreen extends StatefulWidget {
   final bool? wheelchairAccessRequired;
   final bool? stepFreeOnly;
   final bool? minimizeWalking;
+  final SearchNeedsDraft? needsDraft;
+  final TransitSearchBackend? searchBackend;
+  final Stream<List<FarePublication>> Function(String)? fareFeed;
+  final Stream<ReviewedRouteGeometry?> Function(String)? geometryFeed;
 
   @override
   State<RouteResultsScreen> createState() => _RouteResultsScreenState();
 }
 
-class _RouteResultsScreenState extends State<RouteResultsScreen> {
+class _RouteResultsScreenState extends State<RouteResultsScreen>
+    with WidgetsBindingObserver {
   static const double _desktopBreakpoint = 768;
   final FirestoreService _firestoreService = FirestoreService();
 
@@ -142,17 +175,175 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   late RouteFilterTab _selectedFilterTab;
   late bool _isWheelchair;
   late bool _isStepFree;
+  late final SearchNeedsDraft _needs;
+  late final int _accountRevision;
+  late DatedSearchState _search;
+  bool _searchDisposed = false;
+  bool _scopePending = false;
+  List<String> _scope = const [];
+  final _fareSubscriptions =
+      <String, StreamSubscription<List<FarePublication>>>{};
+  final _fares = <String, List<FarePublication>>{};
+  final _geometrySubscriptions =
+      <String, StreamSubscription<ReviewedRouteGeometry?>>{};
+  final _geometries = <String, ReviewedRouteGeometry>{};
+  void _watchFares(List<String> ids) {
+    for (final id in _fareSubscriptions.keys.toList()) {
+      if (!ids.contains(id)) {
+        _fareSubscriptions.remove(id)?.cancel();
+        _fares.remove(id);
+      }
+    }
+    for (final id in ids) {
+      if (!_geometrySubscriptions.containsKey(id)) {
+        final route = _allBuses.where((b) => b.id == id).firstOrNull?.routeId;
+        if (route != null && route.isNotEmpty) {
+          _geometrySubscriptions[id] =
+              (widget.geometryFeed ?? RouteGeometryService().watch)(route)
+                  .listen(
+                    (g) {
+                      if (!mounted || _searchDisposed) return;
+                      setState(() {
+                        if (g == null) {
+                          _geometries.remove(id);
+                        } else {
+                          _geometries[id] = g;
+                        }
+                      });
+                    },
+                    onError: (_) {
+                      if (mounted && !_searchDisposed) {
+                        setState(() => _geometries.remove(id));
+                      }
+                    },
+                  );
+        }
+      }
+      if (_fareSubscriptions.containsKey(id)) continue;
+      _fareSubscriptions[id] = (widget.fareFeed ?? FareCatalogue().watchBus)(id)
+          .listen(
+            (values) {
+              if (mounted && !_searchDisposed) {
+                setState(() => _fares[id] = values);
+              }
+            },
+            onError: (_) {
+              if (mounted && !_searchDisposed) {
+                setState(() => _fares.remove(id));
+              }
+            },
+          );
+    }
+  }
+
+  List<String> _busScope(List<Bus> buses) => BusMatcher.findDirectBuses(
+    buses,
+    widget.fromStationId,
+    widget.toStationId,
+  ).where((b) => !b.isPublishedTimetable).map((b) => b.id).toList()..sort();
+
+  void _checkScope(List<Bus> buses) {
+    if (_searchDisposed ||
+        _scopePending ||
+        listEquals(_busScope(buses), _scope)) {
+      return;
+    }
+    _scopePending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scopePending = false;
+      if (!mounted || _searchDisposed) return;
+      _allBuses = List.of(buses);
+      _retrySearch();
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _search = DatedSearchState(widget.searchBackend ?? TransitSearchBackend())
+      ..addListener(_onSearchChanged);
     final prefs = AccessibilityPreferencesService.instance;
-    _isWheelchair = widget.wheelchairAccessRequired ?? prefs.isWheelchairOnly;
-    _isStepFree = widget.stepFreeOnly ?? prefs.isStepFree;
+    _needs = widget.needsDraft ?? SearchNeedsDraft(prefs);
+    if (widget.needsDraft == null) {
+      if (widget.wheelchairAccessRequired != null) {
+        _needs.setWheelchair(widget.wheelchairAccessRequired!);
+      }
+      if (widget.stepFreeOnly != null) _needs.setStepFree(widget.stepFreeOnly!);
+    }
+    _accountRevision = _needs.accountRevision;
+    _isWheelchair = _needs.wheelchair;
+    _isStepFree = _needs.stepFree;
+    _needs.addListener(_onNeedsChanged);
     _selectedFilterTab = _isWheelchair
         ? RouteFilterTab.accessible
         : RouteFilterTab.all;
     _loadInitialData();
+  }
+
+  void _onNeedsChanged() {
+    if (!mounted) return;
+    setState(() {
+      final changedWheelchair = _isWheelchair != _needs.wheelchair;
+      _isWheelchair = _needs.wheelchair;
+      _isStepFree = _needs.stepFree;
+      if (_accountRevision != _needs.accountRevision) _stopSearch();
+      if (changedWheelchair) {
+        _selectedFilterTab = _isWheelchair
+            ? RouteFilterTab.accessible
+            : RouteFilterTab.all;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopSearch();
+    _needs.removeListener(_onNeedsChanged);
+    if (widget.needsDraft == null) _needs.dispose();
+    super.dispose();
+  }
+
+  void _stopSearch() {
+    for (final s in _geometrySubscriptions.values) {
+      s.cancel();
+    }
+    _geometrySubscriptions.clear();
+    _geometries.clear();
+    for (final s in _fareSubscriptions.values) {
+      s.cancel();
+    }
+    _fareSubscriptions.clear();
+    _fares.clear();
+    if (_searchDisposed) return;
+    _searchDisposed = true;
+    _search.removeListener(_onSearchChanged);
+    _search.dispose();
+  }
+
+  void _onSearchChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_searchDisposed) {
+      _search.synchronize(force: true);
+    }
+  }
+
+  void _retrySearch() {
+    if (_accountRevision != _needs.accountRevision) return;
+    final backend = _search.backend;
+    _stopSearch();
+    _searchDisposed = false;
+    _search = DatedSearchState(backend)..addListener(_onSearchChanged);
+    final ids = _busScope(_allBuses);
+    _watchFares(ids);
+    _scope = List.of(ids);
+    _search.start(ids);
+    setState(() {});
   }
 
   Future<void> _loadInitialData() async {
@@ -167,6 +358,12 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 
       final stationsMap = {for (final s in stationsList) s.id: s};
       final routesMap = {for (final r in routesList) r.id: r};
+      if (!mounted || _searchDisposed) return;
+      final ids = _busScope(buses);
+      _allBuses = buses;
+      _watchFares(ids);
+      _scope = List.of(ids);
+      _search.start(ids);
 
       if (mounted) {
         setState(() {
@@ -189,18 +386,70 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   }
 
   void _onSelectRoute(RouteResultItem route) {
+    final window = _search.window;
+    // A card may have crossed its boarding boundary since its last rebuild.
+    if (_needs.accountRevision != _accountRevision ||
+        window == null ||
+        route.nextDepartureDateTime == null ||
+        window.lowerBound(
+              date: widget.selectedDate,
+              minutes: widget.selectedTime == null
+                  ? null
+                  : widget.selectedTime!.hour * 60 +
+                        widget.selectedTime!.minute,
+            ) ==
+            null ||
+        !_stillBoardable(route, window)) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.searchSelectionExpired)),
+      );
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => RouteDetailsScreen(
+        builder: (_) => BusDetailsScreen(
           origin: route.origin,
           destination: route.destination,
           route: route,
           bus: route.rawBus,
           statusResult: route.statusResult,
+          repository: _search.backend,
+          searchClock: _search.clock,
+          fareFeed: widget.fareFeed,
+          geometryFeed: widget.geometryFeed,
         ),
       ),
     );
   }
+
+  bool _stillBoardable(RouteResultItem route, BoardingSearchWindow window) =>
+      route.rawBus != null &&
+      DatedBoardingMatcher.forBus(
+        bus: route.rawBus!,
+        from: widget.fromStationId,
+        to: widget.toStationId,
+        window: window,
+        notBefore:
+            window.lowerBound(
+              date: widget.selectedDate,
+              minutes: widget.selectedTime == null
+                  ? null
+                  : widget.selectedTime!.hour * 60 +
+                        widget.selectedTime!.minute,
+            ) ??
+            window.end,
+        selectedDate: widget.selectedDate,
+        runs: _search.runsFor(route.busId),
+        trips: _search.trips,
+        locations: _search.locations,
+        stations: _stationsMap,
+        geometry: _geometries[route.busId],
+      ).any(
+        (o) =>
+            o.runId == route.serviceRunId &&
+            o.plan.departure == route.nextDepartureDateTime,
+      );
 
   int _statusRank(AccessibilityStatus status) {
     switch (status) {
@@ -221,9 +470,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
     bool applyTabFilter = true,
     DateTime? currentTime,
   }) {
-    final busesToMatch = (buses != null && buses.isNotEmpty)
-        ? buses
-        : _allBuses;
+    final busesToMatch = buses ?? _allBuses;
 
     // 1. Direct bus matching
     final matchedBuses = BusMatcher.findDirectBuses(
@@ -232,35 +479,47 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       widget.toStationId,
     );
 
-    final now = currentTime ?? DateTime.now();
-    final travelDate = widget.selectedDate ?? now;
-    final day = DateTime(travelDate.year, travelDate.month, travelDate.day);
+    final window = _search.window;
+    if (window == null) return [];
+    final now = window.now;
+    if (!_needs.isReady || _needs.accountRevision != _accountRevision) {
+      return [];
+    }
+    final travelDate = widget.selectedDate ?? TransitTime.civil(now);
+    final day = TransitTime.day(travelDate);
     final departNow =
-        widget.selectedTime == null && DateUtils.isSameDay(day, now);
-    final notBefore = widget.selectedTime != null
-        ? DateTime(
-            day.year,
-            day.month,
-            day.day,
-            widget.selectedTime!.hour,
-            widget.selectedTime!.minute,
-          )
-        : departNow
-        ? now.subtract(const Duration(minutes: 10))
-        : day;
+        widget.selectedTime == null &&
+        DateUtils.isSameDay(day, TransitTime.civil(now));
+    final notBefore = window.lowerBound(
+      date: widget.selectedDate,
+      minutes: widget.selectedTime == null
+          ? null
+          : widget.selectedTime!.hour * 60 + widget.selectedTime!.minute,
+    );
+    if (notBefore == null) return [];
 
     // 2. Compute status & reasons
-    final List<RouteResultItem> items = matchedBuses
-        .map<RouteResultItem?>((bus) {
-          final plan = PassengerJourneyPlan.forBus(
-            bus: bus,
-            fromId: widget.fromStationId,
-            toId: widget.toStationId,
-            travelDate: day,
-            notBefore: notBefore,
-            rollToNextDay: departNow,
-          );
-          if (plan == null) return null;
+    final candidates = [
+      for (final bus in matchedBuses)
+        for (final option in DatedBoardingMatcher.forBus(
+          bus: bus,
+          from: widget.fromStationId,
+          to: widget.toStationId,
+          window: window,
+          notBefore: notBefore,
+          selectedDate: widget.selectedDate,
+          runs: _search.runsFor(bus.id),
+          trips: _search.trips,
+          locations: _search.locations,
+          stations: _stationsMap,
+          geometry: _geometries[bus.id],
+        ))
+          (bus: bus, option: option),
+    ];
+    final List<RouteResultItem> items = candidates
+        .map<RouteResultItem?>((candidate) {
+          final bus = candidate.bus, option = candidate.option;
+          final plan = option.plan;
           final requestedStatus = StatusLogic.getBusStatus(
             bus,
             activeReports,
@@ -303,11 +562,13 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
 
           // Determine scheduled departure at the passenger's boarding station
           final nextDepDateTime = plan.departure;
-          final stopTimeStr = TimeUtils.formatTimeString(nextDepDateTime);
-          final isToday = DateUtils.isSameDay(nextDepDateTime, now);
+          final civilDeparture = TransitTime.civil(nextDepDateTime);
+          final civilNow = TransitTime.civil(now);
+          final stopTimeStr = TimeUtils.formatTimeString(civilDeparture);
+          final isToday = DateUtils.isSameDay(civilDeparture, civilNow);
           final isTomorrow = DateUtils.isSameDay(
-            nextDepDateTime,
-            DateTime(now.year, now.month, now.day + 1),
+            civilDeparture,
+            DateTime.utc(civilNow.year, civilNow.month, civilNow.day + 1),
           );
 
           final diffMins = nextDepDateTime.difference(now).inMinutes;
@@ -315,7 +576,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
           final String scheduledDepartureDisplay;
           final String etaLabelDisplay;
           if (!isToday && !isTomorrow) {
-            final dateLabel = TimeUtils.formatDateString(nextDepDateTime);
+            final dateLabel = TimeUtils.formatDateString(civilDeparture);
             scheduledDepartureDisplay = 'Scheduled $dateLabel, $stopTimeStr';
             etaLabelDisplay = 'Scheduled $dateLabel at $stopTimeStr';
           } else if (isTomorrow) {
@@ -337,10 +598,10 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
           final durationMinutes = plan.durationMinutes;
           final arrivalDateTime = plan.arrival;
           final departureTimeFormatted = TimeUtils.formatTimeString(
-            nextDepDateTime,
+            civilDeparture,
           );
           final arrivalTimeFormatted = TimeUtils.formatTimeString(
-            arrivalDateTime,
+            TransitTime.civil(arrivalDateTime),
           );
 
           final summaryText = statusResult.reasons.isNotEmpty
@@ -362,6 +623,13 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
               _stationsMap[widget.toStationId]?.name ?? widget.destination;
 
           final estimatedPrice = plan.estimatedPriceLkr;
+          final fareQuote = FarePublication.quote(
+            _fares[bus.id] ?? const [],
+            bus,
+            widget.fromStationId,
+            widget.toStationId,
+            plan.departure,
+          );
 
           return RouteResultItem(
             id: bus.id,
@@ -373,9 +641,18 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
             departureTimeStr: departureTimeFormatted,
             arrivalTimeStr: arrivalTimeFormatted,
             durationMinutes: durationMinutes,
-            etaLabel: etaLabelDisplay,
+            etaLabel: option.active
+                ? 'Boarding estimate ${TimeUtils.formatTimeString(TransitTime.civil(option.boardingAt))} · ${option.source}'
+                : etaLabelDisplay,
+            serviceRunId: option.runId,
+            boardingEstimateAt: option.active ? option.boardingAt : null,
+            boardingEstimateSource: option.active ? option.source : null,
+            progressEstimate: option.progressEstimate,
             estimatedPriceLkr: estimatedPrice,
-            timetableStatusLabel: TransitCatalogue.demo
+            fareQuote: fareQuote,
+            timetableStatusLabel: option.active
+                ? 'Started run'
+                : TransitCatalogue.demo
                 ? 'Demo timetable'
                 : bus.isPublishedTimetable
                 ? 'Published timetable'
@@ -403,7 +680,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                 _selectedFilterTab == RouteFilterTab.accessible,
             stepFreeOnly: _isStepFree,
             journeyStations: {
-              for (final id in [widget.fromStationId, widget.toStationId])
+              for (final id in plan.stops)
                 if (_stationsMap.containsKey(id)) id: _stationsMap[id]!,
             },
             rawBus: bus,
@@ -447,8 +724,8 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
       }
 
       // Default: Earliest upcoming bus first
-      final timeA = a.nextDepartureDateTime ?? DateTime.now();
-      final timeB = b.nextDepartureDateTime ?? DateTime.now();
+      final timeA = a.boardingEstimateAt ?? a.nextDepartureDateTime ?? now;
+      final timeB = b.boardingEstimateAt ?? b.nextDepartureDateTime ?? now;
       final timeComp = timeA.compareTo(timeB);
       if (timeComp != 0) {
         return timeComp;
@@ -479,6 +756,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                     stream: _firestoreService.streamBuses(),
                     builder: (context, busSnapshot) {
                       final buses = busSnapshot.data ?? _allBuses;
+                      _checkScope(buses);
 
                       return StreamBuilder<List<Report>>(
                         stream: _firestoreService.streamReports(),
@@ -487,6 +765,22 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                           return EvidenceRefresh(
                             reports: reports,
                             buses: buses,
+                            now: () =>
+                                _search.clock?.now ?? DateTime.now().toUtc(),
+                            boundaries: [
+                              for (final bus in buses)
+                                for (final run in _search.runsFor(bus.id)) ...[
+                                  run.latestStartAt,
+                                  if (run.stopTimes[widget.fromStationId] !=
+                                      null)
+                                    run.stopTimes[widget.fromStationId]!,
+                                ],
+                              for (final gps in _search.locations.values)
+                                if (gps.timestamp != null)
+                                  gps.timestamp!.add(
+                                    const Duration(seconds: 30),
+                                  ),
+                            ],
                             builder: (context, now) {
                               final routes = _buildAndFilterRouteItems(
                                 reports,
@@ -529,6 +823,55 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                                             matchedCount: routes.length,
                                             selectedDate: widget.selectedDate,
                                             selectedTime: widget.selectedTime,
+                                            currentTime: TransitTime.civil(now),
+                                          ),
+                                          const SizedBox(height: 14),
+                                          if (_search.error != null)
+                                            TextButton(
+                                              onPressed: _retrySearch,
+                                              child: Text(
+                                                context.l10n.retrySearch,
+                                              ),
+                                            ),
+                                          Text(
+                                            _needs.accountRevision !=
+                                                    _accountRevision
+                                                ? context
+                                                      .l10n
+                                                      .searchAccountChanged
+                                                : _search.window == null
+                                                ? (_search.error == null
+                                                      ? context
+                                                            .l10n
+                                                            .verifyingDatedSearch
+                                                      : _search.clockError !=
+                                                            null
+                                                      ? context
+                                                            .l10n
+                                                            .searchTimeUnavailable
+                                                      : context
+                                                            .l10n
+                                                            .datedSearchUnavailable)
+                                                : _search.window!.lowerBound(
+                                                        date:
+                                                            widget.selectedDate,
+                                                        minutes:
+                                                            widget.selectedTime ==
+                                                                null
+                                                            ? null
+                                                            : widget.selectedTime!.hour *
+                                                                      60 +
+                                                                  widget
+                                                                      .selectedTime!
+                                                                      .minute,
+                                                      ) ==
+                                                      null
+                                                ? context
+                                                      .l10n
+                                                      .searchWindowInvalid
+                                                : context
+                                                      .l10n
+                                                      .searchWindowNotice,
                                           ),
                                           const SizedBox(height: 14),
                                           if (widget.minimizeWalking == true)
@@ -555,7 +898,8 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
                                           const SizedBox(height: 16),
 
                                           // Route Results Cards or Empty State
-                                          if (routes.isEmpty) ...[
+                                          if (routes.isEmpty &&
+                                              _search.window != null) ...[
                                             _buildEmptyState(
                                               allCount: totalAvailable,
                                             ),
@@ -616,6 +960,7 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
   }
 
   Future<void> _reviewTripRequirements() async {
+    final accountRevision = _needs.accountRevision;
     var wheelchair =
         _isWheelchair || _selectedFilterTab == RouteFilterTab.accessible;
     var stepFree = _isStepFree;
@@ -657,7 +1002,14 @@ class _RouteResultsScreenState extends State<RouteResultsScreen> {
         ),
       ),
     );
-    if (!mounted || apply != true) return;
+    if (!mounted ||
+        apply != true ||
+        accountRevision != _needs.accountRevision ||
+        _accountRevision != _needs.accountRevision) {
+      return;
+    }
+    _needs.setWheelchair(wheelchair);
+    _needs.setStepFree(stepFree);
     setState(() {
       _isWheelchair = wheelchair;
       _isStepFree = stepFree;
@@ -835,6 +1187,7 @@ class _TripSummaryCard extends StatelessWidget {
     required this.matchedCount,
     this.selectedDate,
     this.selectedTime,
+    this.currentTime,
   });
 
   final String origin;
@@ -842,11 +1195,15 @@ class _TripSummaryCard extends StatelessWidget {
   final int matchedCount;
   final DateTime? selectedDate;
   final TimeOfDay? selectedTime;
+  final DateTime? currentTime;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
-    final dateStr = TimeUtils.formatDateString(selectedDate ?? DateTime.now());
+    final dateStr = TimeUtils.formatDateString(
+      selectedDate ?? currentTime ?? TransitTime.civil(DateTime.now()),
+      clock: currentTime,
+    );
     final travelLabel = selectedTime == null
         ? dateStr
         : '$dateStr at ${selectedTime!.format(context)}';
@@ -1299,6 +1656,7 @@ class _LmtGoRouteCard extends StatelessWidget {
 
                   // Estimated Price in LKR (Right-aligned, bold)
                   FareEstimateText(
+                    quote: route.fareQuote,
                     amount: route.estimatedPriceLkr,
                     style: TextStyle(
                       fontSize: hasLargeTargets ? 19 : 17,
@@ -1310,18 +1668,26 @@ class _LmtGoRouteCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              Text(
-                'Timetable estimates - departure unconfirmed. Open route details for GPS status.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isHighContrast
-                      ? Colors.black
-                      : AppColors.onSurfaceVariant,
+              if (route.progressEstimate != null)
+                RouteProgressEtaText(
+                  estimate: route.progressEstimate!,
+                  target: route.origin,
+                )
+              else
+                Text(
+                  route.boardingEstimateAt == null
+                      ? 'Timetable estimates - departure unconfirmed. Open route details for GPS status.'
+                      : 'Boarding estimate · ${route.boardingEstimateSource}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isHighContrast
+                        ? Colors.black
+                        : AppColors.onSurfaceVariant,
+                  ),
                 ),
-              ),
               const SizedBox(height: 8),
-              const Text(
-                JourneyFare.disclosure,
+              FareDisclosureText(
+                quote: route.fareQuote,
                 style: TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 8),

@@ -1,5 +1,20 @@
 # Contribution points: policy v1 and operation
 
+Policy v1 below describes the existing client/batch behavior. The new, locally
+tested v2 core is documented in [server/moderation](../server/moderation/README.md).
+V2 gives points only to report authors; votes earn no points. V2 is wired into
+the explicit LOCAL_VALIDATION + MODERATION_V2 debug app, not the shared/live app. V1 reconciliation now refuses v2 reports; do not mix the
+processors or silently rewrite historical confirmation credits.
+
+Local v2 now includes author appeals and audited admin uphold/overturn. An overturn
+restores the original double penalty once through an immutable restoration event
+and removes its counted strike; it does not award another publication credit.
+Voting stays closed on the restored report. Other restrictions remain effective.
+One final review per report is supported; permanent-ban decisions are still pending.
+See [checkpoint 26](product-flow-implementation-plan.md) and
+[local walkthrough](local-validation.md#local-report-appeals-and-admin-review-2026-10-16).
+
+
 Points are nominal contribution counts with no cash/voucher value. A published,
 dated, non-demo active/resolved report on a reviewed `operator_catalogue` target
 earns its author 10 points and one report count. Each distinct non-author confirmer

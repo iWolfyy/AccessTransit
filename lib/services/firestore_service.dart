@@ -1,5 +1,8 @@
 import 'transit_catalogue.dart';
 import 'sample_test_mode.dart';
+import 'transit_search_backend.dart';
+import 'moderation_client.dart';
+import 'moderation_mode.dart';
 
 import 'dart:async';
 
@@ -9,6 +12,7 @@ import 'package:flutter/foundation.dart';
 
 import '../constants/firestore_constants.dart';
 import '../logic/report_mutation.dart';
+import '../logic/report_cooldown.dart';
 import '../data/seed_data.dart';
 import '../models/boarding_request.dart';
 import '../models/bus.dart';
@@ -22,6 +26,9 @@ class FirestoreService {
   FirestoreService({
     FirebaseFirestore? firestore,
     this.reportWriter,
+    this.moderation,
+    this.v2Publication,
+    this.v2Assistance,
     this.busWriter,
     this.reportMutationWriter,
     this.reportActorId,
@@ -32,6 +39,44 @@ class FirestoreService {
   }) : _customFirestore = firestore;
   final Future<void> Function(String, Map<String, dynamic>)? busWriter;
   final Future<void> Function(Report)? reportWriter;
+  final ModerationClient? moderation;
+  final bool? v2Publication;
+  final bool? v2Assistance;
+  bool get runAssistanceEnabled =>
+      v2Assistance ??
+      (ModerationMode.enabled &&
+          boardingWriter == null &&
+          boardingStatusWriter == null);
+  static final _sharedModeration = ModerationClient();
+  ModerationClient get moderationClient => moderation ?? _sharedModeration;
+
+  Future<void> voteReportV2(
+    Report report, {
+    required bool isTrue,
+    String reason = '',
+  }) async {
+    if (!report.isV2) throw StateError('Select a v2 report.');
+    final actor = currentReportActorId;
+    if (actor == null || actor.isEmpty || actor == report.userId) {
+      throw StateError('Only other signed-in users can vote.');
+    }
+    final receipt = await moderationClient.voteReport(
+      reportId: report.id,
+      isTrue: isTrue,
+      reason: reason,
+    );
+    if (currentReportActorId != actor) return;
+    _cacheReport(
+      report.copyWith(
+        status: receipt.hidden ? 'hidden' : report.status,
+        falseCount: receipt.falseCount,
+        confirmCount: receipt.confirmCount,
+        confirmedBy: isTrue ? [actor] : [],
+        flaggedBy: isTrue ? [] : [actor],
+      ),
+    );
+  }
+
   final Future<ReportMutationResult> Function(ReportMutationPlan)?
   reportMutationWriter;
   final String? Function()? reportActorId;
@@ -248,8 +293,7 @@ class FirestoreService {
                   matches(r) &&
                   r.isPublic &&
                   r.status != 'hidden' &&
-                  r.falseCount < 3 &&
-                  r.flaggedBy.length < 3,
+                  !r.isDisputed,
             )
             .toList()
           ..sort(
@@ -260,6 +304,8 @@ class FirestoreService {
     StreamSubscription? remote;
     void readError(Object error, StackTrace stack) {
       if (controller.isClosed) return;
+      _localReportsFallback.removeWhere((r) => r.isV2 && matches(r));
+      _localStreamController.add(List.unmodifiable(_localReportsFallback));
       if (surfaceErrors) {
         controller.addError(error, stack);
         unawaited(controller.close());
@@ -278,6 +324,8 @@ class FirestoreService {
           Query<Map<String, dynamic>> query = _reportsRef;
           if (status != null && status.isNotEmpty) {
             query = query.where('status', isEqualTo: status);
+          } else {
+            query = query.where('status', whereIn: ['active', 'resolved']);
           }
           if (userId != null && userId.isNotEmpty) {
             query = query.where('userId', isEqualTo: userId);
@@ -285,9 +333,13 @@ class FirestoreService {
           remote = query.snapshots(includeMetadataChanges: true).listen((
             snapshot,
           ) {
+            if (snapshot.metadata.isFromCache) {
+              _localReportsFallback.removeWhere((r) => r.isV2 && matches(r));
+            }
             final shared = snapshot.docs
                 .where((d) => !d.metadata.hasPendingWrites)
                 .map(Report.fromFirestore)
+                .where((r) => !snapshot.metadata.isFromCache || !r.isV2)
                 .toList();
             if (!snapshot.metadata.isFromCache &&
                 !snapshot.metadata.hasPendingWrites) {
@@ -326,7 +378,11 @@ class FirestoreService {
   }) {
     Report? cached() {
       for (final r in _localReportsFallback) {
-        if (r.id == reportId && r.isPublic) return r;
+        if (r.id == reportId &&
+            r.isPublic &&
+            (!r.isV2 || !r.isDisputed || r.userId == currentReportActorId)) {
+          return r;
+        }
       }
       return null;
     }
@@ -336,6 +392,11 @@ class FirestoreService {
     StreamSubscription? remote;
     void readError(Object error, StackTrace stack) {
       if (controller.isClosed) return;
+      if (error is FirebaseException && error.code == 'permission-denied') {
+        _localReportsFallback.removeWhere((r) => r.id == reportId);
+        _localStreamController.add(List.unmodifiable(_localReportsFallback));
+        controller.add(null);
+      }
       if (surfaceErrors) {
         controller.addError(error, stack);
         unawaited(controller.close());
@@ -401,33 +462,83 @@ class FirestoreService {
     Report saved = newReport;
     if (reportWriter != null) {
       await reportWriter!(newReport);
+    } else if (v2Publication ?? ModerationMode.enabled) {
+      await moderationClient.publishReport(newReport);
+      final snapshot = await _reportsRef
+          .doc(reportId)
+          .get(const GetOptions(source: Source.server));
+      if (!snapshot.exists ||
+          snapshot.metadata.isFromCache ||
+          snapshot.metadata.hasPendingWrites) {
+        throw StateError(
+          'Publication receipt unavailable. Retry the saved draft.',
+        );
+      }
+      saved = Report.fromFirestore(snapshot);
+      if (!saved.isV2 || saved.userId != newReport.userId) {
+        throw StateError('Publication identity changed.');
+      }
     } else {
-      saved = await _db.runTransaction<Report>((transaction) async {
-        final ref = _reportsRef.doc(reportId);
-        final existing = await transaction.get(ref);
-        if (existing.exists) {
-          final current = Report.fromFirestore(existing);
-          if (current.userId != newReport.userId ||
-              current.targetType != newReport.targetType ||
-              current.targetId != newReport.targetId ||
-              current.problemType != newReport.problemType) {
-            throw StateError('This report ID belongs to a different report.');
+      try {
+        saved = await _db.runTransaction<Report>((transaction) async {
+          final ref = _reportsRef.doc(reportId);
+          final existing = await transaction.get(ref);
+          if (existing.exists) {
+            final current = Report.fromFirestore(existing);
+            if (current.userId != newReport.userId ||
+                current.targetType != newReport.targetType ||
+                current.targetId != newReport.targetId ||
+                current.category != newReport.category ||
+                current.problemType != newReport.problemType) {
+              throw StateError('This report ID belongs to a different report.');
+            }
+            return current;
           }
-          return current;
+          final cooldown = _db.doc(
+            SampleTestMode.collection(ReportCooldown.path(newReport)),
+          );
+          // The shared guard participates in transaction retries across devices.
+          // Rules, using request.time, decide whether 300 seconds have elapsed.
+          await transaction.get(cooldown);
+          transaction.set(ref, newReport.toMap(isServerTimestamp: true));
+          transaction.set(cooldown, {
+            'reportId': reportId,
+            'lastPublishedAt': FieldValue.serverTimestamp(),
+          });
+          return newReport;
+        }, timeout: const Duration(seconds: 10));
+      } on FirebaseException catch (error) {
+        if (error.code == 'permission-denied') {
+          DateTime? retryAt;
+          try {
+            final guard = await _db
+                .doc(SampleTestMode.collection(ReportCooldown.path(newReport)))
+                .get(const GetOptions(source: Source.server));
+            final published = guard.data()?['lastPublishedAt'];
+            if (!guard.metadata.isFromCache &&
+                !guard.metadata.hasPendingWrites &&
+                published is Timestamp) {
+              final deadline = published.toDate().add(ReportCooldown.interval);
+              final clock = await TransitSearchBackend().synchronizeTime();
+              if (clock.lowerNow.isBefore(deadline)) retryAt = deadline;
+            }
+          } catch (_) {
+            // An unavailable diagnostic never masks the original denial.
+          }
+          if (retryAt != null) throw ReportCooldownException(retryAt);
         }
-        transaction.set(ref, newReport.toMap(isServerTimestamp: true));
-        return newReport;
-      }, timeout: const Duration(seconds: 10));
+        rethrow;
+      }
     }
 
     _cacheReport(saved);
   }
 
-  /// Checks if a user has created a report for the same target in the last [thresholdMinutes] (AC-77).
+  /// Legacy advisory only. Publication is protected by the server cooldown.
   Future<bool> checkRateLimit(
     String userId,
     String targetId, {
-    int thresholdMinutes = 15,
+    int thresholdMinutes = 5,
   }) async {
     if (userId.isEmpty || targetId.isEmpty) return false;
     final cutoff = DateTime.now().subtract(Duration(minutes: thresholdMinutes));
@@ -460,7 +571,11 @@ class FirestoreService {
 
   void _cacheReport(Report report) {
     _localReportsFallback.removeWhere((r) => r.id == report.id);
-    _localReportsFallback.add(report);
+    if (!report.isV2 ||
+        !report.isDisputed ||
+        report.userId == currentReportActorId) {
+      _localReportsFallback.add(report);
+    }
     _localStreamController.add(List.unmodifiable(_localReportsFallback));
   }
 
@@ -822,18 +937,45 @@ class FirestoreService {
           );
           final ref = _busesRef.doc(busId);
           final snapshot = await tx.get(ref);
+          final assignmentRef = _db
+              .collection(SampleTestMode.collection('driver_route_assignments'))
+              .doc(uid);
+          final assignment = await tx.get(assignmentRef);
           if (approval.data()?['approved'] != true) {
             throw StateError('Operator approval required');
           }
           if (!snapshot.exists) throw StateError('Bus unavailable');
           TransitCatalogue.requireVehicleRecord(busId, snapshot.data()!);
           final existing = Bus.fromFirestore(snapshot);
+          if (existing.routeId == null ||
+              existing.routeId!.isEmpty ||
+              assignment.data()?['active'] != true ||
+              assignment.data()?['routeId'] != existing.routeId) {
+            throw StateError(
+              'Ask an administrator to assign you to this route first',
+            );
+          }
+          final route = await tx.get(
+            _db
+                .collection(SampleTestMode.collection('routes'))
+                .doc(existing.routeId),
+          );
+          if (!route.exists || route.data()?['deletionPending'] == true) {
+            throw StateError('Assigned route is unavailable');
+          }
           if (existing.driverId != null &&
               existing.driverId!.isNotEmpty &&
               existing.driverId != uid) {
             throw StateError('This bus is assigned to another operator');
           }
-          if (existing.driverId != uid) tx.update(ref, {'driverId': uid});
+          if (existing.driverId != uid) {
+            tx.update(ref, {'driverId': uid});
+            tx.update(assignmentRef, {
+              'claimRevision':
+                  (assignment.data()?['claimRevision'] as int? ?? 0) + 1,
+              'lastClaimedBusId': busId,
+            });
+          }
           return existing.copyWith(driverId: uid);
         })
         .timeout(const Duration(seconds: 12));
@@ -923,6 +1065,8 @@ class FirestoreService {
     final BoardingRequest saved;
     if (boardingWriter != null) {
       saved = await boardingWriter!(request);
+    } else if (runAssistanceEnabled) {
+      saved = await moderationClient.submitAssistance(request);
     } else {
       saved = await _db.runTransaction<BoardingRequest>(
         (transaction) async {
@@ -956,6 +1100,9 @@ class FirestoreService {
         saved.busId != request.busId ||
         saved.stationId != request.stationId ||
         saved.purpose != request.purpose ||
+        saved.serviceRunId != request.serviceRunId ||
+        saved.boardingStationId != request.boardingStationId ||
+        saved.alightingStationId != request.alightingStationId ||
         !listEquals(saved.assistanceTypes, request.assistanceTypes)) {
       throw StateError('The service returned a different assistance request.');
     }
@@ -1043,9 +1190,62 @@ class FirestoreService {
       _watchAcknowledgedRequests('busId', busId);
   Stream<List<BoardingRequest>> streamBoardingRequestsForRider(
     String riderId,
-  ) => _watchAcknowledgedRequests('riderId', riderId);
+  ) => runAssistanceEnabled
+      ? _pollAssistance(
+          () async => _boardingViewer == riderId
+              ? (await moderationClient.assistanceRequests()).items
+              : <BoardingRequest>[],
+          <BoardingRequest>[],
+        )
+      : _watchAcknowledgedRequests('riderId', riderId);
+
+  Stream<T> _pollAssistance<T>(Future<T> Function() fetch, T empty) {
+    final owner = _boardingViewer;
+    late StreamController<T> controller;
+    Timer? timer;
+    bool busy = false, cancelled = false;
+    Future<void> reload() async {
+      if (busy || cancelled || controller.isClosed) return;
+      busy = true;
+      try {
+        if (owner == null || owner != _boardingViewer) {
+          controller.add(empty);
+          return;
+        }
+        final value = await fetch();
+        if (!cancelled && !controller.isClosed) {
+          controller.add(owner == _boardingViewer ? value : empty);
+        }
+      } catch (e) {
+        if (!cancelled && !controller.isClosed) {
+          controller.add(empty);
+          controller.addError(e);
+        }
+      } finally {
+        busy = false;
+      }
+    }
+
+    controller = StreamController<T>(
+      onListen: () {
+        reload();
+        timer = Timer.periodic(const Duration(seconds: 15), (_) => reload());
+      },
+      onCancel: () {
+        cancelled = true;
+        timer?.cancel();
+      },
+    );
+    return controller.stream;
+  }
 
   Stream<BoardingRequest?> watchBoardingRequest(String id) {
+    if (runAssistanceEnabled) {
+      return _pollAssistance<BoardingRequest?>(
+        () => moderationClient.assistanceRequest(id),
+        null,
+      );
+    }
     final viewer = _boardingViewer;
     BoardingRequest? cached() {
       _scopeBoardingCache();
@@ -1122,6 +1322,8 @@ class FirestoreService {
         throw StateError('Invalid assistance status transition.');
       }
       updated = await boardingStatusWriter!(existing, status);
+    } else if (runAssistanceEnabled) {
+      updated = await moderationClient.assistanceAction(requestId, status);
     } else {
       updated = await _db.runTransaction<BoardingRequest>(
         (transaction) async {

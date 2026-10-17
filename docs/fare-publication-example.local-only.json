@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "busIds": ["REPLACE_LOCAL_PHYSICAL_BUS_ID"],
+  "table": {
+    "reviewed": true,
+    "currency": "LKR",
+    "version": "fictional-table-v1",
+    "routePatternId": "REPLACE_LOCAL_ROUTE_ID",
+    "serviceClass": "normal",
+    "effectiveFrom": "2026-10-01",
+    "effectiveUntil": "2026-10-31",
+    "source": "https://authority.example/FICTIONAL-NOT-A-REAL-TARIFF",
+    "amounts": {"A": {"B": 12345}}
+  },
+  "mapping": {
+    "reviewed": true,
+    "version": "fictional-mapping-v1",
+    "tariffId": "REPLACE_WITH_PUBLICATION_ID",
+    "routePatternId": "REPLACE_LOCAL_ROUTE_ID",
+    "serviceClass": "normal",
+    "effectiveFrom": "2026-10-01",
+    "effectiveUntil": "2026-10-31",
+    "occurrences": ["REPLACE_FIRST_STOP_ID", "REPLACE_SECOND_STOP_ID"],
+    "stageByOccurrence": {"REPLACE_FIRST_STOP_ID": "A", "REPLACE_SECOND_STOP_ID": "B"}
+  }
+}

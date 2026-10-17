@@ -1,3 +1,7 @@
+import '../../l10n/localization_context.dart';
+import '../../services/moderation_mode.dart';
+import '../../services/moderation_client.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -33,13 +37,34 @@ class _RewardsContributionsScreenState
   final AuthService _authService = AuthService();
   UserModel? _user;
   bool _isLoading = false;
+  int? _v2Points;
+  bool _v2Unavailable = false;
 
   @override
   void initState() {
     super.initState();
     _user = widget.user;
+    if (ModerationMode.enabled) _loadV2Points();
     if (_user == null && widget.totalPoints == null) {
       _loadProfile();
+    }
+  }
+
+  Future<void> _loadV2Points() async {
+    final owner = _authService.currentUser?.uid;
+    final client = ModerationClient();
+    try {
+      final value = await client.accountStatus();
+      if (mounted && _authService.currentUser?.uid == owner) {
+        setState(() {
+          _v2Points = value.points;
+          _v2Unavailable = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _v2Unavailable = true);
+    } finally {
+      client.dispose();
     }
   }
 
@@ -68,10 +93,14 @@ class _RewardsContributionsScreenState
   Widget build(BuildContext context) {
     final isHC = context.isHighContrast;
 
-    final points = widget.totalPoints ?? _user?.points ?? 0;
+    final points = ModerationMode.enabled
+        ? (_v2Points ?? 0)
+        : widget.totalPoints ?? _user?.points ?? 0;
     final reports = widget.reportsSubmitted ?? _user?.reportsSubmitted ?? 0;
     final verified = widget.verifiedSpots ?? _user?.verifiedCount ?? 0;
-    final badges = _user?.badges ?? (points ~/ 100);
+    final badges = ModerationMode.enabled
+        ? (points < 0 ? 0 : points ~/ 100)
+        : _user?.badges ?? (points ~/ 100);
 
     final String level =
         widget.levelLabel ??
@@ -108,14 +137,18 @@ class _RewardsContributionsScreenState
                         ),
                       ),
                       const SizedBox(height: 24),
-                      const Text(
-                        'Points update after administrator review and may take time. '
-                        'Published report: 10 points; unique confirmation: 5 points. '
-                        'Removed votes and hidden/deleted reports reverse credits. '
-                        'Points do not verify accessibility and have no cash value.',
+                      Text(
+                        ModerationMode.enabled ? context.l10n.v2PointsNotice : 'Points update after administrator review and may take time. Published report: 10 points; unique confirmation: 5 points. Removed votes and hidden/deleted reports reverse credits. Points do not verify accessibility and have no cash value.',
                       ),
                       const SizedBox(height: 16),
-                      _PointsHeroCard(totalPoints: points, levelLabel: level),
+                      if (ModerationMode.enabled &&
+                          (_v2Unavailable || _v2Points == null))
+                        TextButton(
+                          onPressed: _loadV2Points,
+                          child: Text(context.l10n.refreshV2Points),
+                        )
+                      else
+                        _PointsHeroCard(totalPoints: points, levelLabel: level),
                       const SizedBox(height: 24),
                       Row(
                         children: [

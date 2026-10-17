@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
+import '../core/theme/app_colors.dart';
+
 import '../models/enums/report_publication_state.dart';
 import '../services/report_submission_service.dart';
 import '../screens/journey/report_submitted_screen.dart';
@@ -31,24 +34,62 @@ class ReportOutboxList extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Your uploads',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: context.textColor,
+              ),
             ),
-            const Text(
+            const SizedBox(height: 8),
+            Text(
               'Drafts expire after 7 days. Open an upload to retry or remove it. Sign-out removes local drafts.',
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.4,
+                color: context.subtextColor,
+              ),
             ),
+            const SizedBox(height: 12),
             for (final entry in entries)
-              ListTile(
-                title: Text(entry.report.problemType),
-                subtitle: Text(entry.report.publicationState.label),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ReportSubmittedScreen(
-                      report: entry.report,
-                      targetName: entry.report.targetName,
-                      submissionService: service,
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: context.cardColor,
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: context.isHighContrast
+                          ? Colors.black
+                          : AppColors.outlineVariant.withValues(alpha: .6),
+                      width: context.isHighContrast ? 2 : 1,
+                    ),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    leading: Icon(
+                      entry.report.publicationState ==
+                              ReportPublicationState.failed
+                          ? Icons.error_outline_rounded
+                          : Icons.cloud_upload_outlined,
+                      color: context.primaryColor,
+                    ),
+                    title: Text(entry.report.problemType),
+                    subtitle: Text(entry.report.publicationState.label),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ReportSubmittedScreen(
+                          report: entry.report,
+                          targetName: entry.report.targetName,
+                          submissionService: service,
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -1,3 +1,4 @@
+import '../../l10n/localization_context.dart';
 import '../../services/transit_catalogue.dart';
 
 import 'dart:io';
@@ -708,6 +709,8 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              Text(context.l10n.reportCooldownNotice),
+              const SizedBox(height: 12),
               Text('Location / Vehicle: $targetName'),
               Text('Condition: ${option.title}'),
               if (isBus) Text('Crowding: ${crowding.label}'),
@@ -743,21 +746,6 @@ class _ReportConditionScreenState extends State<ReportConditionScreen> {
 
     try {
       final userId = _getOrCreateUserId();
-
-      // Rate limit check: 15-minute window
-      final isRateLimited = await _firestoreService.checkRateLimit(
-        userId,
-        targetId,
-        thresholdMinutes: 15,
-      );
-
-      if (isRateLimited && mounted) {
-        _showSnack(
-          'You already submitted a report for this target recently. Please wait a few minutes.',
-        );
-        setState(() => _isSubmitting = false);
-        return;
-      }
 
       String problemType;
       if (isBus) {

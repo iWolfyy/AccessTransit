@@ -29,12 +29,14 @@ class EvidenceRefresh extends StatefulWidget {
     this.reports = const [],
     this.buses = const [],
     this.now,
+    this.boundaries = const [],
     required this.builder,
   });
 
   final List<Report> reports;
   final List<Bus> buses;
   final DateTime Function()? now;
+  final List<DateTime> boundaries;
   final Widget Function(BuildContext context, DateTime now) builder;
 
   @override
@@ -74,6 +76,9 @@ class _EvidenceRefreshState extends State<EvidenceRefresh>
       if (instant.isAfter(now) && instant.isBefore(next)) next = instant;
     }
 
+    for (final boundary in widget.boundaries) {
+      consider(boundary, inclusiveEnd: true);
+    }
     for (final report in widget.reports) {
       consider(report.createdAt);
       consider(report.lastConfirmedAt);

@@ -87,6 +87,29 @@ class _CatalogueCollection extends Fake
 }
 
 void main() {
+  test('pending deletion removes acknowledged cache entries, including document updates', () async {
+    SharedPreferences.setMockInitialValues({});
+    TransitCatalogue.resetMemoryForTesting();
+    await TransitCatalogue.accept('buses', {
+      'admin_bus': {'catalogueSource': 'operator_catalogue'},
+    });
+    expect(TransitCatalogue.cached('buses'), contains('admin_bus'));
+    await TransitCatalogue.accept('buses', {
+      'admin_bus': {
+        'catalogueSource': 'operator_catalogue',
+        'deletionPending': true,
+      },
+    }, replace: false);
+    expect(TransitCatalogue.cached('buses'), isEmpty);
+    expect(
+      () => TransitCatalogue.requireRealRecord('buses', 'admin_bus', {
+        'deletionPending': true,
+      }),
+      throwsStateError,
+    );
+    TransitCatalogue.resetMemoryForTesting();
+  });
+
   final checkedAt = DateTime(2026, 10, 15, 12);
   Map<String, dynamic> vehicle() => {
     'hasRamp': true,

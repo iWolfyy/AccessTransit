@@ -18,7 +18,8 @@ class PassengerJourneyPlan {
 
   int get durationMinutes => arrival.difference(departure).inMinutes;
 
-  /// Estimate only; uses travel time and stops inside the passenger's segment.
+  /// Synthetic-mode estimate only. Normal mode returns the legacy unknown
+  /// sentinel until a reviewed tariff quote is integrated.
   int get estimatedPriceLkr {
     final intermediateCount = (stops.length - 2).clamp(0, stops.length);
     return JourneyFare.estimate(

@@ -1,4 +1,3 @@
-import '../../logic/journey_fare.dart';
 import '../../widgets/fare_estimate_text.dart';
 import '../../widgets/published_timetable_notice.dart';
 
@@ -1556,7 +1555,7 @@ class _DraggableJourneySheetContent extends StatelessWidget {
 
         const SizedBox(height: 12),
 
-        const Text(JourneyFare.disclosure, style: TextStyle(fontSize: 12)),
+        FareDisclosureText(style: TextStyle(fontSize: 12)),
         const SizedBox(height: 12),
         // Hero Arrival & Delay Banner
         Container(

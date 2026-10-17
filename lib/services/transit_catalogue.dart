@@ -70,6 +70,9 @@ class TransitCatalogue {
     Map<String, dynamic> data,
   ) {
     requireSharedWrites();
+    if (data['deletionPending'] == true) {
+      throw StateError('This catalogue record is pending deletion.');
+    }
     if (isDemonstration(collection, id, data)) {
       throw StateError('Demonstration or unreviewed catalogue record.');
     }
@@ -192,12 +195,19 @@ class TransitCatalogue {
     if (demo) return;
     final accepted = Map<String, Map<String, dynamic>>.fromEntries(
       records.entries.where(
-        (entry) => !isDemonstration(collection, entry.key, entry.value),
+        (entry) =>
+            entry.value['deletionPending'] != true &&
+            !isDemonstration(collection, entry.key, entry.value),
       ),
     );
     _records[collection] = replace
         ? accepted
         : {...?_records[collection], ...accepted};
+    for (final entry in records.entries) {
+      if (entry.value['deletionPending'] == true) {
+        _records[collection]?.remove(entry.key);
+      }
+    }
     _receipt(
       collection,
       replace

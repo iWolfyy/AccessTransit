@@ -3,6 +3,8 @@ import 'package:access_transit/models/report.dart';
 import 'package:access_transit/services/user_service.dart';
 import 'package:access_transit/services/journey_service.dart';
 import 'package:access_transit/models/journey_model.dart';
+import 'package:access_transit/models/service_run.dart';
+import 'package:access_transit/services/service_run_service.dart';
 
 // Firestore interfaces are faked to exercise the production transaction callbacks.
 // ignore_for_file: subtype_of_sealed_class
@@ -16,6 +18,235 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('report publication commits cooldown with report; retry preserves its first receipt', () async {
+    final db = _Firestore();
+    final service = FirestoreService(firestore: db);
+    final report = Report(
+      id: 'cooldown-report',
+      targetType: 'bus',
+      targetId: 'bus1',
+      problemType: 'Ramp broken',
+      status: 'active',
+      createdAt: DateTime.now(),
+      userId: 'author',
+    );
+    await service.createReport(report);
+    final path = 'report_cooldowns/author/bus/bus1/issues/rampAccess';
+    expect(db.documents[path]?['reportId'], report.id);
+    final first = Map.of(db.documents[path]!);
+    await service.createReport(report);
+    expect(db.documents[path], first);
+    expect(
+      db.documents.keys.where((p) => p.startsWith('reports/')),
+      hasLength(1),
+    );
+    await expectLater(
+      service.createReport(report.copyWith(category: 'crowding')),
+      throwsStateError,
+    );
+  });
+
+  test(
+    'rejected report transaction leaves both report and cooldown absent',
+    () async {
+      final db = _Firestore()..reject = true;
+      final service = FirestoreService(firestore: db);
+      await expectLater(
+        service.createReport(
+          Report(
+            id: 'rejected-report',
+            targetType: 'station',
+            targetId: 's1',
+            problemType: 'Blocked ramp',
+            status: 'active',
+            createdAt: DateTime.now(),
+            userId: 'author',
+          ),
+        ),
+        throwsStateError,
+      );
+      expect(db.documents, isEmpty);
+    },
+  );
+  void seedRun(_Firestore db, String id, String bus, DateTime planned) {
+    db.documents['operator_access/driver'] = {'approved': true};
+    db.documents['driver_route_assignments/driver'] = {
+      'active': true,
+      'routeId': 'r1',
+    };
+    db.documents['buses/$bus'] = {'driverId': 'driver', 'routeId': 'r1'};
+    db.documents['service_runs/$id'] = {
+      'busId': bus,
+      'routeId': 'r1',
+      'routeNo': '1',
+      'serviceDate': '2026-10-16',
+      'status': 'scheduled',
+      'plannedDepartureAt': Timestamp.fromDate(planned),
+      'latestStartAt': Timestamp.fromDate(
+        planned.add(ServiceRun.maximumLateStart),
+      ),
+      'stops': ['a', 'b'],
+      'initialStopTimes': {
+        'a': {
+          'estimatedArrival': Timestamp.fromDate(planned),
+          'actualArrival': null,
+        },
+        'b': {
+          'estimatedArrival': Timestamp.fromDate(
+            planned.add(const Duration(minutes: 20)),
+          ),
+          'actualArrival': null,
+        },
+      },
+    };
+  }
+
+  BusLocationModel fix(String bus) => BusLocationModel(
+    busId: bus,
+    driverId: 'driver',
+    latitude: 7,
+    longitude: 80,
+  );
+
+  test('dated start is boarding, retries preserve one run and departure is acknowledged separately', () async {
+    final db = _Firestore();
+    seedRun(
+      db,
+      'dated-one',
+      'dated-bus',
+      DateTime.now().toUtc().add(const Duration(minutes: 1)),
+    );
+    final service = ServiceRunService(firestore: db);
+    final started = await service.startRun(
+      runId: 'dated-one',
+      driverId: 'driver',
+      gps: fix('dated-bus'),
+    );
+    expect(started.isBoarding, isTrue);
+    expect(started.actualDepartureTime, isNull);
+    expect(started.stopTimes['a']!.actualArrival, isNull);
+    await service.startRun(
+      runId: 'dated-one',
+      driverId: 'driver',
+      gps: fix('dated-bus'),
+    );
+    expect(db.documents.keys.where((p) => p.startsWith('trips/')).length, 1);
+    await expectLater(
+      TripService(firestore: db).confirmNextStopArrival('dated-bus'),
+      throwsStateError,
+    );
+    final departed = await service.recordDeparture('dated-one', 'driver');
+    expect(departed.actualDepartureTime, isNotNull);
+    expect(departed.isBoarding, isFalse);
+    final actual = departed.actualDepartureTime;
+    expect(
+      (await service.recordDeparture(
+        'dated-one',
+        'driver',
+      )).actualDepartureTime,
+      actual,
+    );
+    final completed = await TripService(firestore: db)
+        .confirmNextStopArrival('dated-bus');
+    expect(completed!.isCompleted, isTrue);
+    expect(db.documents['service_runs/dated-one']!['status'], 'completed');
+    expect(db.documents['operation_locks/driver']!['active'], isFalse);
+    expect(
+      db.documents['live_locations/dated-bus']!['isBroadcasting'],
+      isFalse,
+    );
+    await expectLater(
+      service.startRun(
+        runId: 'dated-one',
+        driverId: 'driver',
+        gps: fix('dated-bus'),
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('driver lock blocks a second bus; cancelling boarding releases it atomically', () async {
+    final db = _Firestore();
+    final now = DateTime.now().toUtc();
+    seedRun(
+      db,
+      'lock-one',
+      'lock-bus-one',
+      now.add(const Duration(minutes: 1)),
+    );
+    seedRun(
+      db,
+      'lock-two',
+      'lock-bus-two',
+      now.add(const Duration(minutes: 1)),
+    );
+    final service = ServiceRunService(firestore: db);
+    await service.startRun(
+      runId: 'lock-one',
+      driverId: 'driver',
+      gps: fix('lock-bus-one'),
+    );
+    await expectLater(
+      service.startRun(
+        runId: 'lock-two',
+        driverId: 'driver',
+        gps: fix('lock-bus-two'),
+      ),
+      throwsStateError,
+    );
+    db.reject = true;
+    await expectLater(
+      TripService(firestore: db).completeTrip('lock-bus-one'),
+      throwsStateError,
+    );
+    expect(db.documents['operation_locks/driver']!['active'], isTrue);
+    db.reject = false;
+    final cancelled = await TripService(firestore: db)
+        .completeTrip('lock-bus-one');
+    expect(cancelled!.status, 'cancelled');
+    expect(db.documents['operation_locks/driver']!['active'], isFalse);
+    await service.startRun(
+      runId: 'lock-two',
+      driverId: 'driver',
+      gps: fix('lock-bus-two'),
+    );
+    expect(db.documents['operation_locks/driver']!['tripId'], 'lock-two');
+  });
+
+  test(
+    'early/expired runs and unexplained late starts do not publish',
+    () async {
+      final db = _Firestore();
+      final now = DateTime.now().toUtc();
+      final service = ServiceRunService(firestore: db);
+      for (final entry in {
+        'early': now.add(const Duration(minutes: 6)),
+        'expired': now.subtract(const Duration(minutes: 31)),
+        'late': now.subtract(const Duration(minutes: 1)),
+      }.entries) {
+        seedRun(db, entry.key, 'timed-bus', entry.value);
+        await expectLater(
+          service.startRun(
+            runId: entry.key,
+            driverId: 'driver',
+            gps: fix('timed-bus'),
+          ),
+          throwsStateError,
+        );
+        expect(db.documents['trips/${entry.key}'], isNull);
+      }
+      await service.startRun(
+        runId: 'late',
+        driverId: 'driver',
+        gps: fix('timed-bus'),
+        lateReason: 'Traffic delayed arrival',
+      );
+      expect(
+        db.documents['driver_trip_notes/late']!['reason'],
+        'Traffic delayed arrival',
+      );
+    },
+  );
   test(
     'a rejected condition write retains a bus read from the shared backend',
     () async {
@@ -176,6 +407,7 @@ void main() {
     final db = _Firestore();
     db.documents['buses/claim-test'] = {
       'routeNo': '1',
+      'routeId': 'r1',
       'stops': ['a', 'b'],
       'driverId': null,
     };
@@ -190,12 +422,39 @@ void main() {
     expect(db.documents['buses/claim-test']!['driverId'], isNull);
     db.documents['operator_access/driver'] = {'approved': true};
     await expectLater(
+      service.assignBusDriver('claim-test', 'driver'),
+      throwsStateError,
+    );
+    db.documents['driver_route_assignments/driver'] = {
+      'active': true,
+      'routeId': 'wrong',
+    };
+    await expectLater(
+      service.assignBusDriver('claim-test', 'driver'),
+      throwsStateError,
+    );
+    db.documents['driver_route_assignments/driver'] = {
+      'active': true,
+      'routeId': 'r1',
+    };
+    await expectLater(
+      service.assignBusDriver('claim-test', 'driver'),
+      throwsStateError,
+    );
+    db.documents['routes/r1'] = {
+      'stops': ['a', 'b'],
+    };
+    await expectLater(
       service.assignBusDriver('claim-test', 'other'),
       throwsStateError,
     );
     await service.assignBusDriver('claim-test', 'driver');
     await service.assignBusDriver('claim-test', 'driver');
     expect(db.documents['buses/claim-test']!['driverId'], 'driver');
+    expect(
+      db.documents['driver_route_assignments/driver']!['claimRevision'],
+      1,
+    );
     db.documents['buses/claim-test']!['driverId'] = 'other';
     await expectLater(
       service.assignBusDriver('claim-test', 'driver'),
@@ -488,6 +747,9 @@ void main() {
 }
 
 class _Firestore extends Fake implements FirebaseFirestore {
+  @override
+  DocumentReference<Map<String, dynamic>> doc(String path) =>
+      refs.putIfAbsent(path, () => _Document(this, path));
   final documents = <String, Map<String, dynamic>>{};
   final refs = <String, _Document>{};
   bool reject = false;

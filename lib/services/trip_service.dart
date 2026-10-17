@@ -24,6 +24,8 @@ class TripService {
     _localTripsStreamController.add(Map.unmodifiable(_localTripsFallback));
   }
 
+  void acceptAcknowledgedTrip(TripModel trip) => _cache(trip);
+
   final FirebaseFirestore? _customFirestore;
 
   FirebaseFirestore? get _db {
@@ -43,7 +45,9 @@ class TripService {
   CollectionReference<Map<String, dynamic>>? get _tripsRef =>
       _db?.collection(SampleTestMode.collection('trips'));
 
-  /// 1. Starts a new trip for a bus route using ordered timetable intervals or explicit model estimates.
+  /// Legacy/injected timeline adapter. Production operator UI starts dated runs
+  /// through ServiceRunService; rules reject newly created undated trips.
+  /// Builds ordered timetable intervals or explicit model estimates for compatibility.
   /// [departureTime] is the actual departure. [serviceDate] optionally fixes the
   /// first stop's timetable date; otherwise the nearest daily departure is used.
   /// Estimates shift by actual minus planned departure, retaining planned time.
@@ -255,6 +259,9 @@ class TripService {
     TransitCatalogue.requireSharedWrites();
     final active = _localTripsFallback[busId];
     if (active == null || !active.isInProgress) return null;
+    if (active.isBoarding) {
+      throw StateError('Record departure before confirming the next stop.');
+    }
     if (expectedTripId != null && active.tripId != expectedTripId) {
       throw StateError(
         'The active trip changed. Resume the current trip before confirming arrival.',
@@ -314,7 +321,9 @@ class TripService {
       );
     }
 
-    final completedTrip = active.copyWith(status: 'completed');
+    final completedTrip = active.copyWith(
+      status: active.isBoarding ? 'cancelled' : 'completed',
+    );
 
     final acknowledged = await _commitProgress(active, completedTrip);
     _cache(acknowledged);
@@ -340,6 +349,24 @@ class TripService {
         .runTransaction<TripModel>((tx) async {
           final snapshot = await tx.get(ref);
           final telemetry = await tx.get(live);
+          final runId = before.serviceRunId;
+          final runRef = runId == null
+              ? null
+              : db
+                    .collection(SampleTestMode.collection('service_runs'))
+                    .doc(runId);
+          final lockRef = runId == null
+              ? null
+              : db
+                    .collection(SampleTestMode.collection('operation_locks'))
+                    .doc(before.driverId);
+          final run = runRef == null ? null : await tx.get(runRef);
+          final lock = lockRef == null ? null : await tx.get(lockRef);
+          if (runId != null &&
+              (run?.data()?['tripId'] != before.tripId ||
+                  lock?.data()?['tripId'] != before.tripId)) {
+            throw StateError('The dated run or driver lock changed.');
+          }
           if (!snapshot.exists ||
               telemetry.data()?['tripId'] != before.tripId) {
             throw StateError(
@@ -382,6 +409,16 @@ class TripService {
             if (!saved.isInProgress) 'addedDelayMinutes': 0,
             if (!saved.isInProgress) 'delayReason': FieldValue.delete(),
           });
+          if (!saved.isInProgress && runRef != null && lockRef != null) {
+            tx.update(runRef, {
+              'status': saved.status,
+              'completedAt': FieldValue.serverTimestamp(),
+            });
+            tx.update(lockRef, {
+              'active': false,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
           return saved;
         })
         .timeout(const Duration(seconds: 12));

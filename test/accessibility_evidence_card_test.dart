@@ -41,6 +41,7 @@ void main() {
           body: SingleChildScrollView(
             child: AccessibilityEvidenceCard(
               reports: reports,
+              initiallyExpanded: true,
               busId: 'test-bus',
               origin: 'origin-stop',
               destination: 'destination-stop',
@@ -90,7 +91,7 @@ void main() {
       ]);
       expect(find.text('Ramp Working'), findsOneWidget);
       expect(find.text('Reported by: Alice'), findsOneWidget);
-      expect(find.text('Confirmed by: Bob'), findsOneWidget);
+      expect(find.text('Confirmed by: 1 community member'), findsOneWidget);
       expect(find.text('Reported at: 2026-10-14 09:00 AM'), findsOneWidget);
       expect(
         find.text('Last confirmation recorded at: 2026-10-14 09:45 AM'),

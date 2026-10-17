@@ -1,0 +1,77 @@
+{
+  "indexes": [
+    { "collectionGroup": "reports", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "targetType", "order": "ASCENDING" },
+      { "fieldPath": "targetId", "order": "ASCENDING" },
+      { "fieldPath": "__name__", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "journeys", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "passengerId", "order": "ASCENDING" },
+      { "fieldPath": "__name__", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "journeys", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "passengerId", "order": "ASCENDING" },
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" },
+      { "fieldPath": "__name__", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "fare_publications", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "state", "order": "ASCENDING" },
+      { "fieldPath": "synthetic", "order": "ASCENDING" },
+      { "fieldPath": "busIds", "arrayConfig": "CONTAINS" }
+    ]},
+    { "collectionGroup": "notification_devices", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "uid", "order": "ASCENDING" },
+      { "fieldPath": "enabled", "order": "ASCENDING" },
+      { "fieldPath": "provider", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "events", "queryScope": "COLLECTION_GROUP", "fields": [
+      { "fieldPath": "kind", "order": "ASCENDING" },
+      { "fieldPath": "pushState", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "driver_route_assignments", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "active", "order": "ASCENDING" },
+      { "fieldPath": "routeId", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "boarding_requests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "policyVersion", "order": "ASCENDING" },
+      { "fieldPath": "riderId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "boarding_requests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "policyVersion", "order": "ASCENDING" },
+      { "fieldPath": "serviceRunId", "order": "ASCENDING" },
+      { "fieldPath": "status", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "boarding_requests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "policyVersion", "order": "ASCENDING" },
+      { "fieldPath": "serviceRunId", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "boarding_requests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "policyVersion", "order": "ASCENDING" },
+      { "fieldPath": "riderId", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "boarding_requests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "policyVersion", "order": "ASCENDING" },
+      { "fieldPath": "status", "order": "ASCENDING" }
+    ]},
+    {
+      "collectionGroup": "report_appeals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "authorUid", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "service_runs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "busId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

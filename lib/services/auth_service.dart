@@ -7,6 +7,7 @@ import 'user_service.dart';
 import 'sample_test_mode.dart';
 import 'report_submission_service.dart';
 import 'accessibility_preferences_service.dart';
+import 'firebase_driver_push.dart';
 
 /// Handles Firebase Authentication for AccessTransit.
 class AuthService {
@@ -25,6 +26,16 @@ class AuthService {
       return _auth.currentUser;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Stream that emits whenever the authentication state changes.
+  Future<bool> hasAdminAccess() async {
+    try {
+      return (await currentUser?.getIdTokenResult(true))?.claims?['admin'] ==
+          true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -49,6 +60,13 @@ class AuthService {
     String? phone,
     UserRole role = UserRole.passenger,
   }) async {
+    if (!role.canSelfRegister) {
+      throw ArgumentError.value(
+        role,
+        'role',
+        'Administrator registration is not allowed',
+      );
+    }
     if (SampleTestMode.enabled) {
       throw StateError(
         'Sample/Test mode uses the eight existing test accounts. Registration is available in normal mode.',
@@ -126,6 +144,7 @@ class AuthService {
   /// Logs out the currently authenticated user.
   Future<void> logout() async {
     try {
+      await DriverPushRuntime.session?.disable();
       await AccessibilityPreferencesService.instance.activateAccount(null);
       await ReportSubmissionService.instance.activateAccount(null);
       await _auth.signOut();

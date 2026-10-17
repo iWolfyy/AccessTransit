@@ -9,6 +9,7 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/assistance_submission_service.dart';
 import 'assistance_request_status_screen.dart';
+import '../../l10n/localization_context.dart';
 
 /// Every entry point carries an exact resolved target; missing context stays unknown.
 void openBoardingAssistance(
@@ -34,6 +35,9 @@ void openBoardingAssistance(
         stopName: target.stopName,
         busLabel: target.busLabel,
         purpose: target.purpose,
+        serviceRunId: target.serviceRunId,
+        boardingStationId: target.boardingStationId,
+        alightingStationId: target.alightingStationId,
         minutesAway: minutesAway != null && minutesAway >= 0
             ? minutesAway
             : null,
@@ -55,9 +59,13 @@ class BoardingAssistanceScreen extends StatefulWidget {
     this.firestoreService,
     this.authService,
     this.submissionService,
+    this.serviceRunId,
+    this.boardingStationId,
+    this.alightingStationId,
   });
 
   final String busId;
+  final String? serviceRunId, boardingStationId, alightingStationId;
   final String stopName;
   final String stationId;
   final String busLabel;
@@ -94,6 +102,15 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
 
   Future<void> _sendRequest() async {
     if (_isSubmitting) return;
+    if (_firestoreService.runAssistanceEnabled &&
+        [
+          widget.serviceRunId,
+          widget.boardingStationId,
+          widget.alightingStationId,
+        ].any((v) => v == null || v.isEmpty)) {
+      _showSnack(context.l10n.assistanceChooseRun);
+      return;
+    }
 
     if (!_hasSelection) {
       _showSnack('Please select at least one assistance option.');
@@ -173,6 +190,9 @@ class _BoardingAssistanceScreenState extends State<BoardingAssistanceScreen> {
                 : 'Rider (${riderId.length > 6 ? riderId.substring(0, 6) : riderId})');
 
       final request = BoardingRequest(
+        serviceRunId: widget.serviceRunId,
+        boardingStationId: widget.boardingStationId,
+        alightingStationId: widget.alightingStationId,
         id: '',
         riderId: riderId,
         riderName: riderName,

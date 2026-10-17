@@ -14,8 +14,12 @@ class AssistanceTarget {
     required this.stopName,
     required this.busLabel,
     this.purpose = AssistancePurpose.boarding,
+    this.serviceRunId,
+    this.boardingStationId,
+    this.alightingStationId,
   });
   final String busId;
+  final String? serviceRunId, boardingStationId, alightingStationId;
   final String stationId;
   final String stopName;
   final String busLabel;
@@ -30,6 +34,7 @@ class AssistanceTarget {
     final checkedAt = telemetry?.timestamp;
     if (telemetry == null ||
         telemetry.busId != busId ||
+        (serviceRunId != null && telemetry.tripId != serviceRunId) ||
         !telemetry.isBroadcasting ||
         telemetry.status != BusStatus.active ||
         checkedAt == null ||
@@ -53,6 +58,9 @@ class AssistanceTarget {
     String? stationId,
     required Map<String, Station> stations,
     AssistancePurpose purpose = AssistancePurpose.boarding,
+    String? serviceRunId,
+    String? boardingStationId,
+    String? alightingStationId,
   }) {
     if (bus == null ||
         bus.isPublishedTimetable ||
@@ -77,6 +85,9 @@ class AssistanceTarget {
       return null;
     }
     return AssistanceTarget(
+      serviceRunId: serviceRunId,
+      boardingStationId: boardingStationId,
+      alightingStationId: alightingStationId,
       busId: bus.id,
       stationId: stop.id,
       stopName: stop.name,

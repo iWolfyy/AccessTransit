@@ -24,6 +24,9 @@ for(const a of plan.accounts){
   const other=plan.accounts.find(x=>x.uid!==a.uid);
   const denied=await fetch(`${base}/${prefix}users/${other.uid}`,{headers});if(denied.status!==403)throw new Error('Sample profile privacy failed.');
   if(a.role==='operator'){
+    const grantResponse=await fetch(`${base}/${prefix}driver_route_assignments/${a.uid}`,{headers});
+    const grant=await grantResponse.json();
+    if(!grantResponse.ok||grant.fields?.active?.booleanValue!==true||!grant.fields?.routeId?.stringValue)throw new Error('Sample route assignment missing. Refresh reviewed fixtures after rules rollout.');
     for(const [path,expected] of [[`${prefix}operator_access/${a.uid}`,true],[`operator_access/${a.uid}`,false]]){
       const response=await fetch(`${base}/${path}`,{headers});const d=await response.json();
       if(!response.ok||d.fields?.approved?.booleanValue!==expected)throw new Error('Approval isolation failed.');

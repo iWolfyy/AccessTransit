@@ -9,7 +9,8 @@ if (process.env.FIRESTORE_EMULATOR_HOST !== '127.0.0.1:8087' ||
 }
 const password = 'LocalTest-Only25!';
 const users = {};
-for (const [role, email] of [['passenger','passenger@local.test'], ['operator','operator@local.test']]) {
+for (const [role, email] of [['passenger','passenger@local.test'], ['operator','operator@local.test'],
+    ...[1,2,3,4,5].map(i=>['reader'+i,`reader${i}@local.test`])]) {
   const body = JSON.stringify({email,password,returnSecureToken:true});
   let response = await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=local-validation-key',
     {method:'POST',headers:{'content-type':'application/json'},body});
@@ -28,7 +29,7 @@ try {
     const db = context.firestore();
     const write = (path,data) => setDoc(doc(db,path),data);
     for (const [role,user] of Object.entries(users)) {
-      await write(`users/${user.uid}`,{uid:user.uid,email:user.email,name:`Local ${role}`,role,
+      await write(`users/${user.uid}`,{uid:user.uid,email:user.email,name:`Local ${role}`,role:role==='operator'?'operator':'passenger',
         phone:null,points:0,reportsSubmitted:0,verifiedCount:0,createdAt:Timestamp.now()});
     }
     await write(`operator_access/${users.operator.uid}`,{approved:true,validationOnly:true});
@@ -39,14 +40,21 @@ try {
     }
     await write('routes/local_test_route',{routeNo:'TEST25',routeName:'LOCAL TEST synthetic route',stops,
       description:'Synthetic local fixture, not real transit',catalogueSource:'operator_catalogue',validationOnly:true});
+    await write(`driver_route_assignments/${users.operator.uid}`,{driverId:users.operator.uid,
+      routeId:'local_test_route',active:true,claimRevision:0,validationOnly:true});
     // A future local time keeps the short fixture selectable during walkthrough.
-    const start = new Date(Date.now()+15*60000);
-    const clocks = [0,10,20].map(min => {const d=new Date(+start+min*60000);
-      return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;});
+    const start = new Date(Math.floor(Date.now()/60000)*60000+4*60000);
+    const clocks = [0,10,20].map(min => new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Colombo',
+      hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(+start+min*60000)));
     await write('buses/local_test_bus',{routeNo:'TEST25',routeId:'local_test_route',busNo:'LOCAL TEST BUS',stops,
       scheduleTimes:clocks,scheduledDeparture:clocks[0],hasRamp:true,lowFloor:true,rampOk:true,
       rampCheckedAt:Timestamp.now(),rampCheckedBy:users.operator.uid,occupancy:'low',driverId:users.operator.uid,
       catalogueSource:'operator_catalogue',validationOnly:true});
+    await write('service_runs/local_test_run',{busId:'local_test_bus',routeId:'local_test_route',routeNo:'TEST25',
+      serviceDate:new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Colombo'}).format(start),status:'scheduled',
+      plannedDepartureAt:Timestamp.fromDate(start),latestStartAt:Timestamp.fromMillis(+start+30*60000),stops,
+      initialStopTimes:Object.fromEntries(stops.map((id,i)=>[id,{estimatedArrival:Timestamp.fromMillis(+start+i*10*60000),actualArrival:null}])),
+      validationOnly:true});
   });
   console.log('Local fixtures ready: demo-accesstransit; passenger@local.test and operator@local.test. No production writes.');
 } finally { await env.cleanup(); }

@@ -31,7 +31,11 @@ const fixtureStop = Station(
 );
 
 class FixtureService extends FirestoreService {
+  FixtureService() : super(v2Assistance: true);
   final sent = <BoardingRequest>[];
+  @override
+  Stream<BoardingRequest?> watchBoardingRequest(String id) =>
+      Stream.value(null);
   @override
   Future<Bus?> getBusById(String id) async =>
       id == fixtureBus.id ? fixtureBus : null;
@@ -66,6 +70,7 @@ void main() {
     WidgetTester tester, {
     String stopId = 'destination',
     bool signedIn = true,
+    String? runId = 'selected-run',
   }) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2;
@@ -89,6 +94,9 @@ void main() {
           stopName: fixtureStop.name,
           busLabel: 'NE-3390 (Route 101)',
           purpose: AssistancePurpose.alighting,
+          serviceRunId: runId,
+          boardingStationId: 'boarding',
+          alightingStationId: 'destination',
           firestoreService: service,
           authService: auth,
           submissionService: submission,
@@ -136,6 +144,9 @@ void main() {
       expect(sent.stopName, fixtureStop.name);
       expect(sent.riderId, 'real-rider');
       expect(sent.purpose, 'alighting');
+      expect(sent.serviceRunId, 'selected-run');
+      expect(sent.boardingStationId, 'boarding');
+      expect(sent.alightingStationId, 'destination');
       expect(sent.assistanceTypes, ['Alighting Help']);
       expect(
         BoardingRequest.fromMap(sent.toMap(), id: sent.id).purpose,
@@ -150,6 +161,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.sent, isEmpty);
   });
+  testWidgets(
+    'missing run context stops before sending or selecting another departure',
+    (tester) async {
+      final service = await show(tester, runId: null);
+      await review(tester);
+      expect(find.textContaining('Choose a dated trip'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(service.sent, isEmpty);
+    },
+  );
   testWidgets('invalid stop is rejected without selecting another target', (
     tester,
   ) async {

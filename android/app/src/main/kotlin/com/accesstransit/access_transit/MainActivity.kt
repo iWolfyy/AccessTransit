@@ -6,6 +6,10 @@ import io.flutter.plugin.common.MethodChannel
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.AtomicFile
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Notification
+import android.os.Build
 import java.io.File
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -30,6 +34,21 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
+            "access_transit/notification_channels").setMethodCallHandler { call, result ->
+            if (call.method != "create") { result.notImplemented() }
+            else {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val channel = NotificationChannel("assistance_requests",
+                        call.argument<String>("name") ?: "Boarding assistance",
+                        NotificationManager.IMPORTANCE_HIGH)
+                    channel.description = call.argument<String>("description") ?: "Assistance requests"
+                    channel.lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+                    getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+                }
+                result.success(null)
+            }
+        }
         val queue = flutterEngine.dartExecutor.binaryMessenger.makeBackgroundTaskQueue()
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
             "access_transit/report_outbox", io.flutter.plugin.common.StandardMethodCodec.INSTANCE, queue)

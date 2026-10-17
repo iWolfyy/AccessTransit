@@ -1,9 +1,11 @@
+import 'support/fixture_search_backend.dart';
 import 'package:access_transit/models/bus.dart';
 import 'package:access_transit/screens/journey/route_results_screen.dart';
-import 'package:access_transit/screens/journey/route_details_screen.dart';
+import 'package:access_transit/screens/journey/bus_details_screen.dart';
 import 'package:access_transit/services/transit_catalogue.dart';
 import 'package:access_transit/services/accessibility_preferences_service.dart';
 import 'package:access_transit/widgets/evidence_refresh.dart';
+import 'package:access_transit/logic/search_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,7 +35,7 @@ void main() {
   Widget results(DateTime Function() now, {DateTime? date}) => MaterialApp(
     home: EvidenceClock(
       now: now,
-      child: RouteResultsScreen(
+      child: RouteResultsScreen(searchBackend: FixtureSearchBackend(now: now), 
         fromStationId: 'a',
         toStationId: 'b',
         origin: 'A',
@@ -74,34 +76,71 @@ void main() {
       await tester.tap(find.text('WP TEST-22'));
       await tester.pumpAndSettle();
       final route = tester
-          .widget<RouteDetailsScreen>(find.byType(RouteDetailsScreen))
-          .route!;
+          .widget<BusDetailsScreen>(find.byType(BusDetailsScreen))
+          .route;
       expect(route.timetableStatusLabel, 'Scheduled');
       expect(route.etaLabel, startsWith('Scheduled'));
       expect(route.scheduledDeparture, startsWith('Scheduled'));
       expect(route.etaLabel, isNot(contains('Arriving')));
       if (time.isAfter(DateTime(2026, 10, 15, 10))) {
-        expect(route.etaLabel, 'Scheduled time passed - departure unconfirmed');
+        expect(route.nextDepartureDateTime!.isAtSameMomentAs(DateTime(2026, 10, 16, 10)), isTrue);
+        expect(route.etaLabel, startsWith('Scheduled tomorrow'));
       }
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
-  testWidgets('future-day results retain timetable provenance', (tester) async {
+  testWidgets('future-day requests cannot extend the 24 hour window', (
+    tester,
+  ) async {
     final now = DateTime(2026, 10, 15, 9, 58);
     await tester.pumpWidget(
       results(() => now, date: now.add(const Duration(days: 7))),
     );
     await tester.pumpAndSettle();
-    expectTimetable();
-    await tester.tap(find.text('WP TEST-22'));
-    await tester.pumpAndSettle();
-    final route = tester
-        .widget<RouteDetailsScreen>(find.byType(RouteDetailsScreen))
-        .route!;
-    expect(route.etaLabel, startsWith('Scheduled'));
-    expect(route.nextDepartureDateTime, DateTime(2026, 10, 22, 10));
+    expect(find.text('WP TEST-22'), findsNothing);
+    expect(find.text('All (0)'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+  testWidgets(
+    'open results follow defaults, preserve overrides and close on account switch',
+    (tester) async {
+      final preferences = AccessibilityPreferencesService.instance;
+      await preferences.setWheelchairOnly(false);
+      final draft = SearchNeedsDraft(preferences);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: EvidenceClock(
+            now: () => DateTime(2026, 10, 16, 9),
+            child: RouteResultsScreen(searchBackend: FixtureSearchBackend(now: () => DateTime(2026,10,16,9)), 
+              fromStationId: 'a',
+              toStationId: 'b',
+              origin: 'A',
+              destination: 'B',
+              needsDraft: draft,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('WP TEST-22'), findsOneWidget);
+      await preferences.setWheelchairOnly(true);
+      await tester.pumpAndSettle();
+      expect(find.text('WP TEST-22'), findsNothing);
+      draft.setWheelchair(false);
+      await tester.pumpAndSettle();
+      expect(find.text('WP TEST-22'), findsOneWidget);
+      await preferences.setHighContrast(true);
+      await tester.pumpAndSettle();
+      expect(find.text('WP TEST-22'), findsOneWidget);
+      expect(preferences.isWheelchairOnly, isTrue);
+      await preferences.activateAccount('another-user');
+      await tester.pumpAndSettle();
+      expect(find.text('WP TEST-22'), findsNothing);
+      expect(find.textContaining('Account changed.'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      draft.dispose();
+    },
+  );
   testWidgets(
     'crossing departure on a silent screen does not create a live badge',
     (tester) async {

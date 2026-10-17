@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/boarding_request.dart';
 import 'firestore_service.dart';
+import 'moderation_client.dart';
 
 enum AssistanceDeliveryState {
   pendingUpload('Pending upload'),
@@ -155,6 +156,9 @@ class AssistanceSubmissionService extends ChangeNotifier {
           existing.request.busId != request.busId ||
           existing.request.stationId != request.stationId ||
           existing.request.purpose != request.purpose ||
+          existing.request.serviceRunId != request.serviceRunId ||
+          existing.request.boardingStationId != request.boardingStationId ||
+          existing.request.alightingStationId != request.alightingStationId ||
           !listEquals(
             existing.request.assistanceTypes,
             request.assistanceTypes,
@@ -231,6 +235,9 @@ class AssistanceSubmissionService extends ChangeNotifier {
             published.busId != entry.request.busId ||
             published.stationId != entry.request.stationId ||
             published.purpose != entry.request.purpose ||
+            published.serviceRunId != entry.request.serviceRunId ||
+            published.boardingStationId != entry.request.boardingStationId ||
+            published.alightingStationId != entry.request.alightingStationId ||
             !listEquals(
               published.assistanceTypes,
               entry.request.assistanceTypes,
@@ -247,6 +254,11 @@ class AssistanceSubmissionService extends ChangeNotifier {
       } catch (error) {
         final transient =
             error is TimeoutException ||
+            error is ModerationException &&
+                const {
+                  'service-unavailable',
+                  'authentication-unavailable',
+                }.contains(error.code) ||
             error is FirebaseException &&
                 const {
                   'unavailable',

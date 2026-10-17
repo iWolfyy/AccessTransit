@@ -1,4 +1,6 @@
 import '../core/utils/time_utils.dart';
+import 'transit_time.dart';
+import 'tariff_fare.dart';
 import '../models/bus.dart';
 import '../models/journey_model.dart';
 import '../models/station.dart';
@@ -9,6 +11,9 @@ abstract final class JourneySelection {
     RouteResultItem route, {
     required String id,
     required String passengerId,
+    String? serviceRunId,
+    TariffFareQuote? fareQuote,
+    bool overrideFareQuote = false,
   }) {
     final bus = route.rawBus;
     final from = bus?.stops.indexOf(route.fromStationId ?? '') ?? -1;
@@ -31,21 +36,21 @@ abstract final class JourneySelection {
       routeTitle: route.title,
       busId: bus.id,
       busNo: bus.displayBusNo,
+      serviceRunId: serviceRunId ?? route.serviceRunId,
       origin: route.origin,
       destination: route.destination,
       fromStationId: route.fromStationId,
       toStationId: route.toStationId,
-      selectedDate:
-          route.selectedDate ??
-          DateTime(
-            route.nextDepartureDateTime!.year,
-            route.nextDepartureDateTime!.month,
-            route.nextDepartureDateTime!.day,
-          ),
+      selectedDate: TransitTime.instant(
+        TransitTime.day(
+          route.selectedDate ?? TransitTime.civil(route.nextDepartureDateTime!),
+        ),
+      ),
       selectedTimeMinutes: route.selectedTimeMinutes,
       departureAt: route.nextDepartureDateTime,
       durationMinutes: route.durationMinutes,
       estimatedFareLkr: route.estimatedPriceLkr,
+      fareQuote: overrideFareQuote ? fareQuote : route.fareQuote,
       wheelchairAccessRequired: route.wheelchairAccessRequired,
       stepFreeOnly: route.stepFreeOnly,
     );
@@ -85,16 +90,24 @@ abstract final class JourneySelection {
       destination: journey.destination,
       rawBus: bus,
       busNo: journey.busNo,
+      serviceRunId: journey.serviceRunId,
       routeNo: journey.routeNumber,
       fromStationId: journey.fromStationId,
       toStationId: journey.toStationId,
       nextDepartureDateTime: journey.departureAt,
-      selectedDate: journey.selectedDate,
+      selectedDate: journey.selectedDate == null
+          ? null
+          : TransitTime.day(TransitTime.civil(journey.selectedDate!)),
       selectedTimeMinutes: journey.selectedTimeMinutes,
       estimatedPriceLkr: journey.estimatedFareLkr!,
-      departureTimeStr: TimeUtils.formatTimeString(journey.departureAt!),
+      fareQuote: journey.fareQuote,
+      departureTimeStr: TimeUtils.formatTimeString(
+        TransitTime.civil(journey.departureAt!),
+      ),
       arrivalTimeStr: TimeUtils.formatTimeString(
-        journey.departureAt!.add(Duration(minutes: journey.durationMinutes!)),
+        TransitTime.civil(
+          journey.departureAt!.add(Duration(minutes: journey.durationMinutes!)),
+        ),
       ),
       wheelchairAccessRequired: journey.wheelchairAccessRequired,
       stepFreeOnly: journey.stepFreeOnly,

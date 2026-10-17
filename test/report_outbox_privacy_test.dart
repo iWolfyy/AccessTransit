@@ -291,6 +291,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(ReportSubmittedScreen), findsOneWidget);
     await tester.ensureVisible(find.text('Remove draft from this device'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Remove draft from this device'));
     await tester.pumpAndSettle();
     expect(

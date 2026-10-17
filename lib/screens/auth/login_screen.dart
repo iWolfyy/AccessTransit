@@ -1,5 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import '../../l10n/localization_context.dart';
+import '../../widgets/language_selector.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/validators.dart';
@@ -7,6 +11,7 @@ import '../../models/enums/user_role.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth/auth_input_field.dart';
 import '../operator/operator_dashboard_screen.dart';
+import '../admin/admin_dashboard_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
@@ -53,21 +58,24 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       final profile = await _authService.getCurrentUserProfile();
+      final isAdmin = await _authService.hasAdminAccess();
       if (!mounted) return;
 
-      if (profile?.role == UserRole.operator) {
+      if (isAdmin) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => const OperatorDashboardScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+          (route) => false,
+        );
+      } else if (profile?.role == UserRole.operator) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const OperatorDashboardScreen()),
           (route) => false,
         );
       } else {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (_) => const AccessibilityPreferencesScreen(
-              continueToHome: true,
-            ),
+            builder: (_) =>
+                const AccessibilityPreferencesScreen(continueToHome: true),
           ),
           (route) => false,
         );
@@ -95,7 +103,9 @@ class _LoginScreenState extends State<LoginScreen> {
       ..showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: isError ? AppColors.error : AppColors.primaryContainer,
+          backgroundColor: isError
+              ? AppColors.error
+              : AppColors.primaryContainer,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           margin: const EdgeInsets.all(16),
@@ -137,7 +147,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: BoxDecoration(
                   color: context.cardColor,
                   borderRadius: BorderRadius.circular(12),
-                  border: isHC ? Border.all(color: Colors.black, width: 2) : null,
+                  border: isHC
+                      ? Border.all(color: Colors.black, width: 2)
+                      : null,
                   boxShadow: isHC
                       ? null
                       : const [
@@ -160,10 +172,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         _buildHeader(isHC),
                         const SizedBox(height: 24),
+                        const LanguageSelector(),
+                        const SizedBox(height: 16),
                         AuthInputField(
                           controller: _emailController,
-                          label: 'Email',
-                          hint: 'Enter your email address',
+                          label: context.l10n.email,
+                          hint: context.l10n.emailHint,
                           prefixIcon: Icons.mail_outline_rounded,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
@@ -206,9 +220,13 @@ class _LoginScreenState extends State<LoginScreen> {
               height: 64,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+                  color: isHC
+                      ? const Color(0xFF001F3F)
+                      : AppColors.primaryContainer,
                   shape: BoxShape.circle,
-                  border: isHC ? Border.all(color: Colors.black, width: 2) : null,
+                  border: isHC
+                      ? Border.all(color: Colors.black, width: 2)
+                      : null,
                 ),
                 child: Icon(
                   Icons.accessible_forward_rounded,
@@ -233,7 +251,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Welcome Back',
+          context.l10n.welcomeBack,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 18,
@@ -283,7 +301,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 minimumSize: Size(0, context.minTapHeight),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                foregroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primary,
+                foregroundColor: isHC
+                    ? const Color(0xFF001F3F)
+                    : AppColors.primary,
               ),
               child: Text(
                 'Forgot Password?',
@@ -329,7 +349,9 @@ class _LoginScreenState extends State<LoginScreen> {
       child: FilledButton(
         onPressed: _isLoading ? null : _login,
         style: FilledButton.styleFrom(
-          backgroundColor: isHC ? const Color(0xFF001F3F) : AppColors.primaryContainer,
+          backgroundColor: isHC
+              ? const Color(0xFF001F3F)
+              : AppColors.primaryContainer,
           foregroundColor: Colors.white,
           disabledBackgroundColor: isHC
               ? const Color(0xFF001F3F).withValues(alpha: 0.6)
@@ -337,7 +359,9 @@ class _LoginScreenState extends State<LoginScreen> {
           disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
-            side: isHC ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+            side: isHC
+                ? const BorderSide(color: Colors.black, width: 2)
+                : BorderSide.none,
           ),
           textStyle: TextStyle(
             fontSize: context.hasLargeTargets ? 19 : 18,
@@ -354,7 +378,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: Colors.white,
                 ),
               )
-            : const Text('Sign In'),
+            : Text(context.l10n.signIn),
       ),
     );
   }
@@ -377,7 +401,9 @@ class _LoginScreenState extends State<LoginScreen> {
               fontSize: 12,
               height: 16 / 12,
               fontWeight: isHC ? FontWeight.w700 : FontWeight.w500,
-              color: isHC ? Colors.black : AppColors.onSurfaceVariant.withValues(alpha: 0.9),
+              color: isHC
+                  ? Colors.black
+                  : AppColors.onSurfaceVariant.withValues(alpha: 0.9),
             ),
           ),
         ),
@@ -396,7 +422,9 @@ class _LoginScreenState extends State<LoginScreen> {
     return SizedBox(
       height: context.buttonHeight,
       child: OutlinedButton.icon(
-        onPressed: _isLoading ? null : () => _showComingSoon('Biometric sign-in'),
+        onPressed: _isLoading
+            ? null
+            : () => _showComingSoon('Biometric sign-in'),
         icon: Icon(Icons.fingerprint_rounded, size: context.tapIconSize),
         label: const Text('Sign in with Biometrics'),
         style: OutlinedButton.styleFrom(
@@ -515,34 +543,10 @@ class _GoogleLogoPainter extends CustomPainter {
     final yellow = Paint()..color = const Color(0xFFFBBC05);
     final red = Paint()..color = const Color(0xFFEA4335);
 
-    canvas.drawArc(
-      Rect.fromLTWH(0, 0, w, h),
-      -0.4,
-      1.2,
-      true,
-      blue,
-    );
-    canvas.drawArc(
-      Rect.fromLTWH(0, 0, w, h),
-      0.8,
-      1.0,
-      true,
-      green,
-    );
-    canvas.drawArc(
-      Rect.fromLTWH(0, 0, w, h),
-      1.8,
-      1.0,
-      true,
-      yellow,
-    );
-    canvas.drawArc(
-      Rect.fromLTWH(0, 0, w, h),
-      2.8,
-      1.0,
-      true,
-      red,
-    );
+    canvas.drawArc(Rect.fromLTWH(0, 0, w, h), -0.4, 1.2, true, blue);
+    canvas.drawArc(Rect.fromLTWH(0, 0, w, h), 0.8, 1.0, true, green);
+    canvas.drawArc(Rect.fromLTWH(0, 0, w, h), 1.8, 1.0, true, yellow);
+    canvas.drawArc(Rect.fromLTWH(0, 0, w, h), 2.8, 1.0, true, red);
 
     canvas.drawCircle(
       Offset(w / 2, h / 2),

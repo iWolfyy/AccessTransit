@@ -15,6 +15,9 @@ class Report {
     this.targetName = '',
     required this.problemType,
     this.severity = 'moderate',
+    this.policyVersion = 1,
+    this.moderationOverturned = false,
+    this.observedAt,
     this.category = 'rampAccess',
     this.subCategory = '',
     this.condition,
@@ -38,6 +41,15 @@ class Report {
     this.resolvedAt,
   });
 
+  final int policyVersion;
+  final bool moderationOverturned;
+  final DateTime? observedAt;
+  bool get isV2 => policyVersion == 2;
+  int get flagThreshold => isV2 ? 5 : 3;
+  bool get isDisputed =>
+      status == 'hidden' ||
+      (!moderationOverturned && falseCount >= flagThreshold) ||
+      (!isV2 && flaggedBy.length >= flagThreshold);
   final String id;
   final String targetType; // 'station' or 'bus'
   final String targetId;
@@ -143,6 +155,11 @@ class Report {
           map[FirestoreConstants.fieldSeverity]?.toString() ??
           map['severity']?.toString() ??
           'moderate',
+      moderationOverturned: map['moderationOverturned'] == true,
+      policyVersion: map['policyVersion'] is int
+          ? map['policyVersion'] as int
+          : 1,
+      observedAt: _parseTimestamp(map['observedAt']),
       category:
           map[FirestoreConstants.fieldCategory]?.toString() ??
           map['category']?.toString() ??
@@ -212,6 +229,9 @@ class Report {
   /// Converts the [Report] instance into a Firestore map representation.
   Map<String, dynamic> toMap({bool isServerTimestamp = false}) {
     return {
+      if (policyVersion != 1) 'policyVersion': policyVersion,
+      if (moderationOverturned) 'moderationOverturned': true,
+      if (observedAt != null) 'observedAt': Timestamp.fromDate(observedAt!),
       if (lastRecheckedAt != null)
         'lastRecheckedAt': Timestamp.fromDate(lastRecheckedAt!),
       if (lastRecheckedBy != null) 'lastRecheckedBy': lastRecheckedBy,
@@ -260,6 +280,8 @@ class Report {
     String? targetName,
     String? problemType,
     String? severity,
+    int? policyVersion,
+    DateTime? observedAt,
     String? category,
     String? subCategory,
     ReportCondition? condition,
@@ -293,6 +315,9 @@ class Report {
       targetName: targetName ?? this.targetName,
       problemType: problemType ?? this.problemType,
       severity: severity ?? this.severity,
+      policyVersion: policyVersion ?? this.policyVersion,
+      moderationOverturned: moderationOverturned,
+      observedAt: observedAt ?? this.observedAt,
       category: category ?? this.category,
       subCategory: subCategory ?? this.subCategory,
       condition: condition ?? this.condition,

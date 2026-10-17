@@ -1,3 +1,4 @@
+import 'support/fixture_search_backend.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,8 +22,8 @@ void main() {
         await AccessibilityPreferencesService.instance.setWheelchairOnly(true);
 
         await tester.pumpWidget(
-          const MaterialApp(
-            home: RouteResultsScreen(
+          MaterialApp(
+            home: RouteResultsScreen(searchBackend: FixtureSearchBackend(), 
               fromStationId: 'st_fort',
               toStationId: 'st_kottawa',
               origin: 'Colombo Fort Station',
@@ -54,8 +55,8 @@ void main() {
         await AccessibilityPreferencesService.instance.setWheelchairOnly(false);
 
         await tester.pumpWidget(
-          const MaterialApp(
-            home: RouteResultsScreen(
+          MaterialApp(
+            home: RouteResultsScreen(searchBackend: FixtureSearchBackend(), 
               fromStationId: 'st_fort',
               toStationId: 'st_kottawa',
               origin: 'Colombo Fort Station',
@@ -89,7 +90,7 @@ void main() {
           minimizeWalking: true,
         );
 
-        await tester.pumpWidget(const MaterialApp(home: JourneySearchScreen()));
+        await tester.pumpWidget(MaterialApp(home: JourneySearchScreen()));
         await tester.pumpAndSettle();
 
         // All 3 active filter chips should be displayed
@@ -133,7 +134,7 @@ void main() {
           minimizeWalking: false,
         );
 
-        await tester.pumpWidget(const MaterialApp(home: JourneySearchScreen()));
+        await tester.pumpWidget(MaterialApp(home: JourneySearchScreen()));
         await tester.pumpAndSettle();
 
         expect(find.text('Ramp Required'), findsOneWidget);
@@ -144,6 +145,8 @@ void main() {
           matching: find.byIcon(Icons.close),
         );
         expect(deleteIconFinder, findsOneWidget);
+        await tester.ensureVisible(deleteIconFinder);
+        await tester.pumpAndSettle();
         await tester.tap(deleteIconFinder);
         await tester.pumpAndSettle();
 
@@ -168,7 +171,7 @@ void main() {
         );
 
         await tester.pumpWidget(
-          const MaterialApp(home: AccessibilityPreferencesScreen()),
+          MaterialApp(home: AccessibilityPreferencesScreen()),
         );
         await tester.pumpAndSettle();
 
@@ -208,7 +211,7 @@ void main() {
     testWidgets(
       'JourneySearchScreen renders title and no back button in top bar',
       (WidgetTester tester) async {
-        await tester.pumpWidget(const MaterialApp(home: JourneySearchScreen()));
+        await tester.pumpWidget(MaterialApp(home: JourneySearchScreen()));
         await tester.pumpAndSettle();
 
         expect(find.text('Plan Journey'), findsOneWidget);

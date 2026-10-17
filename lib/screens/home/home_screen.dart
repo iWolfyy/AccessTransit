@@ -1513,7 +1513,7 @@ class _RecentReportCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 _buildFlagChip(
                   icon: Icons.flag_outlined,
-                  label: 'False: ${report.falseCount}/3',
+                  label: 'False: ${report.falseCount}/${report.flagThreshold}',
                   color: Colors.red.shade700,
                   isHighContrast: isHighContrast,
                 ),

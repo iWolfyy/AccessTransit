@@ -37,8 +37,8 @@ class TimeUtils {
   }
 
   /// Formats a [DateTime] into a user-facing date string (e.g. "Today, Sep 30, 2026").
-  static String formatDateString(DateTime dateTime) {
-    final now = DateTime.now();
+  static String formatDateString(DateTime dateTime, {DateTime? clock}) {
+    final now = clock ?? DateTime.now();
     final isToday =
         dateTime.year == now.year &&
         dateTime.month == now.month &&

@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/localization_context.dart';
+import '../../services/moderation_mode.dart';
+import '../community/report_reviews_screen.dart';
+
+import '../../widgets/language_selector.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/enums/user_role.dart';
+import '../../services/firebase_driver_push.dart';
+import '../../widgets/driver_notification_settings.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
 import '../../widgets/logout_confirmation_dialog.dart';
 import '../auth/login_screen.dart';
+import '../admin/admin_dashboard_screen.dart';
 import '../preferences/accessibility_preferences_screen.dart';
 import 'rewards_contributions_screen.dart';
 
@@ -409,8 +418,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 24),
 
+                  if (ModerationMode.enabled)
+                    ListTile(
+                      leading: const Icon(Icons.rate_review_outlined),
+                      title: Text(context.l10n.reviewsTitle),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ReportReviewsScreen(),
+                        ),
+                      ),
+                    ),
+
                   // ── Settings Section (LMT Go style) ──
                   _SectionTitle(title: 'SETTINGS'),
+                  const SizedBox(height: 12),
+                  const LanguageSelector(),
+                  if (_user?.role == UserRole.operator)
+                    ValueListenableBuilder(
+                      valueListenable: DriverPushRuntime.changes,
+                      builder: (_, session, _) => session == null
+                          ? const SizedBox.shrink()
+                          : DriverNotificationSettings(session: session),
+                    ),
+                  const SizedBox(height: 12),
+                  FutureBuilder<bool>(
+                    future: _authService.hasAdminAccess(),
+                    builder: (context, snapshot) => snapshot.data == true
+                        ? ListTile(
+                            leading: const Icon(
+                              Icons.admin_panel_settings_outlined,
+                            ),
+                            title: const Text('Admin console'),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const AdminDashboardScreen(),
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
                   const SizedBox(height: 8),
                   _GroupedCardList(
                     items: [

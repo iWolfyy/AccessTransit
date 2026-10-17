@@ -354,3 +354,340 @@ The user reported no buses after setup. Read-only process/package checks showed 
 Source inspection also found a fixture design error: station barriers on Kandy and Badulla plus ramp condition grouped by direction could remove all four primary routes under the default wheelchair filter. Moved station barrier examples to other sample timing points and distributed working/faulty/unknown ramp cases by departure group. Every primary direction now retains a working, clear-endpoint option; no passenger requirements or safety filters were changed. Refreshed only the 143 fixed sample fixture IDs with update-time preconditions, preserved all 84 normal records and left non-fixture sample activity intact.
 
 A new read-only exporter captured the actual public sample catalogue/reports and anonymized all eight actor IDs. The committed snapshot regression exercises real passenger planning plus wheelchair/step-free evidence matching in all four primary directions, while requiring faulty/unknown/barrier cases to remain present. **1 targeted regression passed**, targeted analyzer **No issues found** (`shared-sample-search-tests.log`, `shared-sample-search-analyze.log`). This supplements the preceding 467-test run; no new full-suite total is claimed. Users already on results should reopen Plan and search again to fetch the corrected catalogue.
+
+### UI alignment step 1: vehicle ramp observation, 2026-10-16
+
+Scope corrected per user feedback: retain the existing app UI and align newly added blocks individually, rather than redesigning whole screens. Styled only `BusRampObservation` using the existing surface/outline colors, 16px card radius, brand typography and high-contrast treatment. Capability, operational condition and check age remain visible; source and exact local check time expand inside the card. Replaced raw operator identifiers in presentation with the role label Operator observation. The community-barrier warning remains visible when collapsed. Freshness and operational matching logic are unchanged.
+
+Validation: **49 focused regression tests passed**, **4 ramp layout tests passed** (320dp, normal/200% text, working/unknown/broken and high contrast), targeted analyzer **No issues found**. Generated widget renders were visually inspected under `build/ui-ramp-style/`; these are test renders, not native device screenshots. No APK installation or backend changes were made in this step. Existing Flutter run session was retained; hot reload is required to view the update. Next scoped component: Accessibility evidence.
+
+### UI alignment step 2: accessibility evidence card, 2026-10-16
+
+Aligned only the newly added AccessibilityEvidenceCard with the existing app card style. Vehicle, boarding-stop, destination-stop and driver-assistance scopes retain separate summaries. Observation metadata now expands per scope; empty scopes remain explicitly Unknown. Collapsed summaries prioritize unresolved/active barriers over newer positive observations. Exact check/report/confirmation/expiry metadata remains available, using local display time. Attribution retains available reporter names, uses Community member when unavailable and displays unique confirmer counts rather than raw account IDs; rechecker IDs are likewise omitted from presentation. Target scoping, eligibility, freshness and operational matching policies are unchanged.
+
+Validation: **42 focused regression tests passed**, **3 evidence layout tests passed** (320dp, normal/200% text and high contrast), targeted analyzer **No issues found**. Layout checks cover a stale unresolved barrier alongside a newer positive observation, expanded metadata, unique confirmation counts and absence of raw actor IDs. Generated widget renders under `build/ui-evidence-style/` were visually inspected; native device/TalkBack validation is not claimed. No APK installation or backend changes were made. Use hot reload in the existing Flutter session. Next scoped surface: Confirm Journey, aligned to the existing UI rather than a global redesign.
+
+### UI alignment step 3: Confirm Journey, 2026-10-16
+
+Aligned the newly added JourneyConfirmationScreen with existing app colors, centered header, rounded outlined cards and navy action styling. Grouped the selected service/endpoints, travel schedule, estimated fare and requirements. Long endpoint names wrap; internal stop IDs and bus-ID fallback labels are omitted from presentation. Fare limitations remain visible through Fare details, with the estimate clearly labelled. Save errors are announced and scrolled into view. Existing acknowledged save, retry/idempotency, owner checks and live-journey navigation remain in place; no service/backend changes were made. LiveAccessibilityPanel remains the next separate alignment step.
+
+Validation: **23 focused tests passed**, including the 20 existing save/persistence/fare regressions and 3 responsive confirmation tests at 320dp with normal/200% text and high contrast. Checks include full stop names, missing physical vehicle identification, accessible fare details and failed saves retaining the confirmation screen. Targeted analyzer **No issues found**. Widget renders under `build/ui-confirmation-style/` were visually inspected; native device/TalkBack behavior is not claimed. No APK installation was performed; use hot reload in the existing Flutter session.
+
+### UI alignment step 4: Live Accessibility panel, 2026-10-16
+
+Aligned only LiveAccessibilityPanel with the existing card colors, rounded outline, typography and spacing. Community observations now have separate readable ramp/boarding-elevator/destination-elevator rows, with non-color status icons. Operator vehicle checks are explicitly labelled as a separate source. Full scoped evidence is available through View observation details instead of repeating all summaries on initial display. Relevant driver-assistance observations remain visible in the summary, so collapsing detailed evidence cannot hide an assistance barrier. Stream failures and negative ramp telemetry receive distinct visible warnings. Existing equipment scoping, freshness policy, telemetry conflicts and failed-read barrier retention remain in use.
+
+Validation: **40 focused regressions passed**, **3 responsive panel tests passed** (320dp, normal/200% text and high contrast), targeted analyzer **No issues found**. New checks cover long stop names, ramp/boarding/destination separation, driver-assistance barriers before disclosure, expanded timestamps, actor-ID-free presentation and failed updates removing working claims while retaining barriers. Generated widget renders under `build/ui-live-panel-style/` were visually inspected. No backend changes or APK installation were made; hot reload is required in the retained Flutter session. Native device/TalkBack validation remains pending.
+
+Four-component alignment checkpoint: full Flutter suite **481 passed** (`ui-alignment-checkpoint-tests.log`); full `flutter analyze lib test` **No issues found** (`ui-alignment-checkpoint-analyze.log`). This validates the current working tree's automated checks, not native device/screen-reader or live backend delivery.
+
+### UI alignment step 5: assistance request status, 2026-10-16
+
+Aligned the newly added AssistanceRequestStatusScreen with existing app surfaces, rounded cards, typography and navy actions. Request delivery, route/stop/support details and driver response are separate cards. Raw bus identifiers are omitted from presentation. Pending/Sent/acknowledged/completed/declined/cancelled labels retain their existing meanings, with contextual acknowledgement guidance and visible offline/error notices. Retry/cancel conditions and owner-only access behavior are unchanged. The title wraps at large text sizes instead of truncating. No global theme, assistance form, operator workflow or service/backend changes were made.
+
+Validation: **22 focused assistance regressions passed**, **3 receipt layout tests passed** (320dp, normal/200% text and high contrast), targeted analyzer **No issues found**. Layout checks exercise failed upload retry, remote delivery and all five driver states, full stop names and omission of internal actor/target IDs. Generated widget renders under `build/ui-assistance-status/` were visually inspected. No APK installation or native TalkBack/device validation was performed; use hot reload in the retained Flutter session. Next scoped surface: report delivery/upload receipt.
+
+### UI alignment step 6: report delivery and uploads, 2026-10-16
+
+Aligned ReportSubmittedScreen and ReportOutboxList with existing app cards, typography, spacing and navy actions. Publication status, observation details, attached photo and draft-retention guidance are grouped separately. Pending/failed/published states, acknowledged-only Community access, retry, owner-filtered uploads and local draft removal retain their existing delivery/storage behavior. The removal warning explicitly distinguishes deleting a local draft from deleting a public report or uploaded photo. Large-text dialogs scroll; actions wrap without fixed-height clipping. Button typography follows the existing theme with 48/60dp minimum sizing. No global theme, report form, backend or retention-policy changes were made.
+
+Validation: **31 focused report/privacy/touch-target tests passed**; **3 responsive receipt tests passed** at 320dp with normal/200% text and high contrast. New checks exercise offline pending, rejected retry, successful acknowledgement and durable draft cleanup. Full alignment checkpoint: **487 Flutter tests passed**, full analyzer **No issues found** (`ui-alignment-final-tests.log`, `ui-alignment-final-analyze.log`). After the final button-font adjustment, responsive/touch-target tests passed again (`ui-report-delivery-layout-tests.log`); targeted analyzer was also clean. Widget renders under `build/ui-report-delivery/` were visually inspected; these are generated test renders, not native device screenshots. No APK installation or backend changes were performed. Use hot reload in the retained Flutter session; native device/TalkBack verification remains pending.
+
+### Admin console implementation, 2026-10-16
+
+Added an admin-only Flutter console using the trusted Firebase admin custom claim. Includes catalogue CRUD for physical buses/published timetables, routes and stops; ordered stops and complete schedules; explicit source review; approved-driver assignment; searchable user profiles and name/phone editing; pending driver discovery, approve/reject/revoke with review evidence and reviewer attribution; and transactional private activity records. Profile roles cannot grant admin authority. Revocation releases assignments but retains active trip/telemetry history for project-owner reconciliation. Auth account disabling/deletion/password operations remain outside this console.
+
+Deletion checks dependencies, withdraws an eligible record from new references, rechecks dependencies and then deletes it. Interrupted deletions expose Restore/Finish deletion. New server rules reject references to withdrawn records, while passenger caches exclude them. Existing passenger/operator authorization was retained. Added admin account-switch/resume/error tests, permission and immutable-activity tests, and CRUD/assignment/deletion/failure regressions.
+
+Validation: **509 Flutter tests passed**, **52 isolated Firestore rules tests passed**, full analyzer **No issues found**, normal-mode Android debug APK build passed. Widget previews were inspected at normal/large text; 320dp/200%/high-contrast tests passed. Live rules were backed up. Automatic approval review rejected the shared rules deployment because explicit authorization for that persistent authorization-boundary change was required. The requested account's claim plan/backup is prepared, but no claim was granted, no real driver was approved and no catalogue was mutated by this session. Live activation remains pending; see [admin console guide](../admin-console.md).
+
+### Product flow phase 1: registration and localization foundation, 2026-10-16
+
+Aligned contributor registration with passenger permissions in local root/generated Sample/Test rules. Added early rejection of public admin registration, clarified Reporter/Driver registration labels and retained the independent operator approval gate. New rules tests verify immediate reporter reporting/assistance access while denying self-promotion, approval writes and bus operation.
+
+Added generated English/Sinhala/Tamil localization resources and app delegates, initial login/registration messages, and a language selector on Login/Profile. Language persists locally per UID, separately for guest and Sample/Test; account switching reloads defaults/saved language, delayed old-owner saves cannot change another account, and storage failures retain the old locale. This is the localization foundation, not a fully translated app or cross-device locale sync; fluent translation and native accessibility/font review remain pending.
+
+Validation: **516 full Flutter tests passed**, **7 new focused tests passed**, **53 isolated Firestore rules tests passed**, full analyzer **No issues found**. Logs: `phase1-full-tests.log`, `phase1-targeted-tests.log`, `phase1-analyze.log`, `test/security/phase1-rules-tests.log`. No new APK build/install, shared deployment, admin claim or production writes. Shared reporter registration remains dependent on the pending reviewed rules rollout. The [implementation plan](../product-flow-implementation-plan.md) records this checkpoint and subsequent route-assignment, passenger-flow and moderation work.
+
+### Product flow: admin driver-route grants, 2026-10-16
+
+Added independent route assignment/removal in Admin -> Drivers, with reason, route labels and audited commits. Bus editor/service preassignment requires current approval plus that exact route grant. Driver dashboard verifies server-acknowledged grant and route, filters physical buses by exact route ID and disposes the old workspace on withdrawal/account/route changes. No assigned route or no eligible bus produces an explicit waiting/empty state; the hard-coded default vehicle/route selection was removed.
+
+Rules and production claim transactions enforce route scope for bus claims, conditions, GPS, trips and assistance actions. Claims atomically record a grant revision to invalidate concurrent admin route changes. Administrative route changes release stopped bus claims and transaction-check telemetry; active trips/broadcasts block those changes. Approval revocation withdraws route access as well; shared active-trip reconciliation remains separate. Updated local/sample fixture tools without running shared seed operations.
+
+Validation: **523 Flutter tests passed**, **26 focused admin/route-gate tests passed**, **16 operator transaction callback tests passed**, **56 isolated rules tests passed**, full analyzer **No issues found**. Logs: `phase2-full-tests.log`, `phase2-targeted-tests.log`, `phase2-transaction-tests.log`, `phase2-analyze.log`, `test/security/phase2-rules-tests.log`. No new APK build/install, shared deployment, admin claim or production data changes. Existing drivers need reviewed route grants before rollout. Dated-run scheduling, exclusive operation locks and the five-minute start gate remain next; see the [implementation checkpoint](../product-flow-implementation-plan.md).
+
+### Product flow: dated service runs, timing and operation locks, 2026-10-16
+
+Added admin dated departures with Colombo service dates, UTC immutable timetable snapshots and one-off departure overrides that preserve overnight intervals. Fixed the user-confirmed start window at -5 through +30 minutes; late starts require a private driver/admin reason. The driver selects an admin-published run. A server-rule-enforced atomic transaction starts boarding, creates a trip keyed by run ID, acquires the private driver operation lock and acknowledges bus GPS. Actual departure is a separate linked server timestamp; starting no longer invents first-stop arrival/departure. Retries preserve one run/timeline. Next-stop confirmation requires departure, while boarding cancellation/final completion atomically close run/GPS and release the matching driver lock.
+
+Rules reject early/expired/forged starts, incomplete linked writes, competing operations, active telemetry deletion and legacy-trip resurrection. Newly created undated trips are denied; existing legacy active operations need reviewed reconciliation/migration before rollout. Updated local/sample fixture scripts without executing shared seeds. Recurring calendar/template management and full admin handover/revocation reconciliation remain separate work.
+
+Validation: **532 full Flutter tests passed**, **60 isolated rules tests passed**, analyzer **No issues found**. Exact boundary/Colombo rollover, late reason/privacy, transaction retry/rollback, lock release, duplicate start and competing-bus cases are covered; admin run UI passes at 320dp/200% text. Final boarding/time-label UI regressions: **7 passed**. Logs: `phase3-full-tests.log`, `phase3-analyze.log`, `phase3-ui-final-tests.log`, `test/security/phase3-rules-tests.log`. No shared deployment, admin claim, billing upgrade, seed execution or APK build/install. Native/background GPS and TalkBack validation remain pending. See [checkpoint 17](../product-flow-implementation-plan.md).
+
+### Product flow: temporary search needs and timetable window, 2026-10-16
+
+Search and Results now share an account-aware draft: temporary needs never write Settings, unedited fields follow updated defaults, explicit overrides survive default changes, Reset restores defaults and new searches start fresh. Account switching clears Search and invalidates the old Results session. Pending requirement/date/time dialogs cannot apply captured values after an account change.
+
+Date/time/submission validation and independent Results/card checks constrain scheduled boarding opportunities to the rolling next 24 hours, inclusive. Destination arrival may fall later. Old explicit future selections are rejected; no-time daily timetable matching may roll to the next occurrence inside the same horizon. Existing evidence/lifecycle refresh updates eligibility. Empty bus streams no longer resurrect the initial bus list. New status messages have English/Sinhala/Tamil resources; fluent review is pending.
+
+Validation: **538 full Flutter tests passed**, **39 focused tests passed**, **17 additional accessibility/evidence regressions passed**, analyzer **No issues found**. Logs: `phase4-search-full-tests.log`, `phase4-search-targeted-tests.log`, `phase4-search-regression-tests.log`, `phase4-search-analyze.log`. No shared backend/rules/data changes or APK build/install. This is the timetable/search-draft foundation: trusted-time/device-timezone independence, dated/active-run boarding search and the consolidated Bus Details/map/reports/optional-save flow remain pending. See [checkpoint 18](../product-flow-implementation-plan.md).
+
+### Product flow: consolidated passenger Bus Details, 2026-10-16
+
+Results and owner-scoped saved-entry reopening now use one Bus Details screen with the selected segment/times/needs, stop timeline, fare disclosure, capability/evidence widgets and optional assistance/report actions. Compact exact-bus/selected-stop community reports appear immediately above optional Save Trip. Opening details never saves or starts a journey; saving/removing stays on the same screen, reports acknowledgement failures and uses stable retry identity. Saved run identity survives serialization; old bookmarks without it remain static. Remote removal clears Saved status.
+
+Live GPS requires a pinned matching dated run and matching trip/bus/driver/itinerary/planned departure, fresh acknowledged telemetry and a started operational state. Future/terminal runs and stale/cached/unrelated/error telemetry show no current marker. Silent expiry is tested. Maps show stop coordinates without inventing road geometry; missing coordinates/tiles retain a stop-list alternative and tile retry. Local rules validate saved run/bus/boarding-time links. Redundant catalogue rule reads were reduced without changing permission conditions after a late-start access-call-limit failure.
+
+Validation: **545 full Flutter tests passed**, **37 focused passenger regressions passed**, **7 final details/bookmark tests passed**, **61 isolated rules tests passed**, analyzer **No issues found**. Logs: `phase5-details-full-final.log`, `phase5-details-targeted-final.log`, `phase5-details-final-widget-tests.log`, `phase5-details-analyze-clean.log`, `test/security/phase5-details-rules-final.log`. No shared deployment/data changes, billing changes or APK build/install. Trusted-time/Colombo dated and active boarding search, full saved-list/version/loop support, scoped report-query pagination, run-aware assistance, road ETA and complete localization remain pending; existing moderation thresholds are unchanged. See [checkpoint 19](../product-flow-implementation-plan.md).
+
+
+### Product flow: trusted time and dated/active-run search, 2026-10-16
+
+Search now uses an owner-only server-timestamp receipt advanced monotonically for up to five minutes, with conservative network uncertainty, expiry/resume verification and explicit offline/retry states. Asia/Colombo civil dates are separate from UTC transport timestamps throughout search/details/bookmark restoration. Physical bus results require actual published dated runs; active boarding eligibility requires matching driver/run/progress and fresh stationary GPS at a known recorded stop. Scheduled identity stays separate from the explicitly labelled boarding estimate. Moving/off-stop buses without supported geometry are excluded rather than assigned a guessed speed. Exact-run propagation, account guards and silent eligibility/GPS expiry are preserved.
+
+Validation: **554 full Flutter tests**, **14 core/draft tests**, **16 final boundary/localization regressions**, **6 filter regressions**, **62 isolated rules tests**, analyzer **No issues found**. Logs: `phase6-search-full-verified.log`, `phase6-dated-core-tests.log`, `phase6-search-boundary-final.log`, `phase6-filter-regression.log`, `phase6-search-analyze-clean.log`, `test/security/phase6-search-rules-tests.log`. Index configuration is prepared locally and must be merged against deployed inventory before rollout. No shared deployment/data write, billing change or APK/native verification occurred. Road geometry/moving-bus ETA, full saved-list/loop/version support, assistance/handover and moderation remain follow-ups. See [checkpoint 20](../product-flow-implementation-plan.md).
+
+
+### Product flow: My Location nearby boarding stops, 2026-10-16
+
+Search My Location now obtains one foreground GPS fix and offers the nearest five valid catalogue stops by approximate straight-line distance. The rider explicitly chooses a boarding stop; destination/time/needs are retained and late results cannot cross account changes. Disabled/denied/blocked/timeout/poor-location states support settings, retry and manual selection. The sheet has English/Sinhala/Tamil wording and explains road-side/direction checks and the absence of a walking-route/time guarantee. No passenger location is saved or broadcast.
+
+Validation: **23 focused tests passed**, including **7 new location/selection tests**; analyzer **No issues found**. Logs: `phase7-nearby-final-tests.log`, `phase7-nearby-analyze-final.log`. No full-suite rerun, production/backend deployment, APK install or physical GPS/permission verification. See [checkpoint 21](../product-flow-implementation-plan.md).
+
+
+### Product flow: server-enforced same-issue report cooldown, 2026-10-16
+
+Report creation now commits a matching private cooldown guard atomically. Rules enforce 300 seconds per author/target-type/target/category using server time; wording/condition changes, deletion and concurrent phones cannot bypass the guard. Different categories/targets remain immediately reportable. An acknowledged same-ID retry preserves the original guard, and a rejected write retains the outbox draft. Removed the incorrect production 15-minute whole-target preflight and added a localized five-minute policy notice. Existing author voting/recheck exclusion is preserved.
+
+Validation: **564 full Flutter tests**, **65 isolated rules tests**, analyzer **No issues found**. Logs: `phase8-report-full-tests.log`, `test/security/phase8-report-rules-final.log`, `phase8-report-analyze-final.log`. No production deployment/data write or billing/APK change. Client/rules must roll out together; no old reports or moderation history were rewritten. Five-voter hiding/double penalties, automated rewards/strikes/bans/admin review remain the next backend slice; existing three-flag/ledger behavior is unchanged. See [checkpoint 22](../product-flow-implementation-plan.md).
+
+
+### Product flow: local trusted moderation/reward v2 core, 2026-10-16
+
+Implemented atomic v2 publication credits and per-user voting, fifth-False hide/-20/one strike, signed balances, one 72-hour restriction at strike five and pending permanent-ban review at ten. The user confirmed that votes earn no points; only authors receive +10. Original v1 reports/balances are not migrated and v1 reconciliation now rejects v2 reports. Rules deny direct v2 mutation; Sample state remains scoped. Durable notification/operation reconciliation intentions are not delivery or completed reconciliation.
+
+Validation: **75 isolated emulator tests passed** (`test/security/phase9-moderation-final.log`), comprising 65 existing cases and 10 v2 race/idempotency/rollback/threshold/access cases. Server modules passed syntax checks. No Flutter code changed or new full Flutter/analyzer run was claimed. The Admin adapter is not hosted/runtime verified. This is a staged backend core: Flutter v2 integration, authenticated endpoints/hosting, hidden-report privacy queries, full account enforcement, appeals/admin decisions and migrations remain rollout gates. No deployment/production write/billing/APK change occurred. See [checkpoint 23](../product-flow-implementation-plan.md) and [server notes](../../server/moderation/README.md).
+
+
+### Product flow: authenticated moderation endpoint adapters and Flutter transport, 2026-10-16
+
+Added bearer-token/revocation-checked vote and own-status API handlers, an HTTP host adapter, strict scope/input/response limits and sanitized errors. Flutter now has a staged HTTPS-only authenticated transport with scoped typed receipts, signed balances, account-change guards and no direct-write fallback. Existing screens/router are not switched to v2 yet; publication/privacy/filter/account-enforcement migrations remain activation gates.
+
+Validation: **576 full Flutter tests**, **12 focused client tests**, analyzer **No issues found**, **8 API/loopback tests**, **76 isolated rules/policy/API tests**, **11 final policy regressions**. Logs: `phase10-full-tests.log`, `phase10-client-tests.log`, `phase10-analyze-final.log`, `phase10-http-final.log`, `test/security/phase10-policy-api-tests.log`, `phase10-policy-final.log`. Auth verifier tests are injected, not live Admin/Auth verification. No hosted deployment, production writes, billing or APK/native changes. See [checkpoint 24](../product-flow-implementation-plan.md).
+
+
+### Product flow: local/emulator v2 publication and voting activation, 2026-10-16
+
+The user chose local activation first. Local-debug v2 reports now publish through one trusted transaction (report/cooldown/+10), Community/Details use authenticated private vote state and False reasons, v2 evidence hides at five and signed points display correctly. Normal builds preserve v1. Rules distinguish private hidden v2 reads/public filtered queries, reject direct v2 writes and enforce account-access restrictions on old sessions. The local account gate removes the operational workspace; a retryable local Admin worker cancels the matching suspended operation/GPS/assistance without fabricating completion. Actual demo Auth tokens/Admin transactions/worker were exercised.
+
+Validation: **582 full Flutter tests**, **18 final focused tests**, **18 tests with local activation flags**, analyzer **No issues found**, **89 backend/security tests**, and successful actual local Auth/Admin/worker smoke. Logs: `phase11-full-verified.log`, `phase11-ui-verified.log`, `phase11-local-mode-tests.log`, `phase11-analyze-done.log`, `phase11-backend-verified.log`, `phase11-worker-smoke.log`. Local-only APK built, manifest-checked, installed and launched on emulator-5554 under `.validation`; startup logs were free of the inspected fatal/Flutter exceptions. Complete native manual/TalkBack/GPS acceptance remains unverified. No shared deployment/data/billing change. Appeals/permanent-ban decisions, migrations and production rollout remain pending. See [checkpoint 25](../product-flow-implementation-plan.md) and [local instructions](../local-validation.md).
+
+### Product flow: local author appeals and admin report correction, 2026-10-16
+
+Added private author dispute views/appeals, including access while suspended, and
+a claim-authorized admin queue with vote evidence and audited uphold/overturn.
+Overturn atomically restores the original deduction/one strike, keeps further
+voting closed and recomputes community restrictions without removing independent
+restrictions or restarting ended trips. Duplicate reviews are idempotent and
+self-review is denied. Local-only admin provisioning preserves existing records.
+
+Validation: **589 Flutter tests**, **7 new review UI/model tests**, **18 existing
+moderation regressions**, analyzer **No issues found**, **95 isolated backend/rules
+tests**, and successful actual local Auth/Admin/worker/appeal/overturn smoke.
+Logs: `phase12-full-tests.log`, `phase12-reviews-ui-final.log`,
+`phase12-existing-ui.log`, `phase12-analyze-verified.log`,
+`phase12-backend-verified.log`, `phase12-worker-smoke-final.log`.
+Local `.validation` APK built/manifest-checked/installed/launched; inspected startup
+logs contained no fatal/unhandled Flutter error. No complete native/TalkBack
+walkthrough or fluent translation review is claimed. No production deployment,
+data/real-account changes or billing change. Mandatory permanent-ban decisions,
+migrations and hosted rollout remain pending. See [checkpoint 26](../product-flow-implementation-plan.md).
+
+### Product flow: local mandatory permanent-ban review, 2026-10-16
+
+Added a claim-authorized admin queue, contributing-report links and reasoned
+approve/reject decisions. Approval requires ten current strikes, no pending
+appeals and a matching trusted moderation revision. Restrictions/audit/immutable
+decision/outbox commit atomically; rejection adds no restriction. Duplicate
+decisions are idempotent, stale/racing appeals fail, administrator targets and
+self-review are protected. Later report corrections preserve independent
+restrictions; genuinely new reports can start a new review cycle while prior
+decisions remain immutable. Local Auth stays enabled for private appeal access.
+
+Validation: **596 Flutter tests**, **32 focused tests including exact local-v2
+flags**, clean analyzer, **105 isolated backend/rules tests**, and actual local
+Auth/Admin smoke including explicit permanent approval and old-session denial.
+An existing trip-start rule access-limit failure was fixed by checking occupancy
+against the telemetry resource and prior driver state in the lock write; linked
+atomic writes remain required and the new occupied-bus regression passes.
+Logs: `phase13-full-tests.log`, `phase13-local-mode-tests.log`,
+`phase13-analyze-verified.log`, `phase13-backend-complete.log`,
+`phase13-auth-smoke-final.log`. The local `.validation` APK was built, checked,
+installed and verified running after an emulator reconnect; startup logs had no
+inspected fatal/unhandled Flutter error. Full native/TalkBack/fluent-language QA
+remains unverified. No production data/permissions, billing or shared Auth changes.
+See [checkpoint 27](../product-flow-implementation-plan.md) and
+[local walkthrough](../local-validation.md#local-permanent-ban-reviews-2026-10-16).
+
+### Product flow: local run-bound assistance, 2026-10-16
+
+Bus Details/form/outbox now retain the selected dated run and segment. Trusted
+endpoints resolve the authorized current driver, require matching active operation
+state, and enforce ownership/roles/transitions. Driver inbox is run-scoped and
+paginated; rider history is latest-first. The local worker expires ended/passed/
+revoked/deadline requests and retargets matching handovers with renewed driver
+acknowledgement and an audit. Old-driver reads/actions fail independently of the
+worker. Direct v2 mutations/legacy-creation bypasses are denied locally. Cross-account
+outbox publication is rejected. New strings cover three-language statuses/controls.
+
+Validation: **605 full Flutter tests**, **41 assistance tests with local-v2 flags**,
+clean analyzer, **112 isolated backend/rules tests**, successful actual local
+Auth/Admin assistance/worker smoke and existing moderation/appeal/ban smoke.
+Logs: `phase14-full-verified.log`, `phase14-local-mode-verified.log`,
+`phase14-analyze-clean.log`, `phase14-backend-complete.log`,
+`phase14-auth-smoke-complete.log`, `phase14-moderation-smoke.log`.
+The separate `.validation` APK was built/checked/installed and verified running
+after an initial activity wait timeout; inspected startup logs had no fatal/
+unhandled Flutter error. No full manual native/TalkBack/background acceptance is
+claimed. Full active-trip administrative handover and actual push delivery remain;
+in-app availability is explicit, with no fabricated background delivery status.
+No production data/rules/permissions, real assignments/claims or billing changed.
+See [checkpoint 28](../product-flow-implementation-plan.md) and
+[local walkthrough](../local-validation.md#local-run-bound-boarding-assistance-2026-10-16).
+
+### 2026-10-16: local active-trip admin handover
+
+Added an existing-theme admin Active trips workflow and trusted transactional
+handover of dated run/trip/bus/driver locks, with stable IDs, expected versions,
+reason/audit and paused GPS. Replacement drivers explicitly resume with fresh
+GPS; old-driver writes are rejected immediately. Assistance follows current
+authority and resets acceptance through bounded, version-aware reconciliation.
+Multiple transfers before worker processing cannot retain an obsolete acceptance.
+Approval withdrawal now requires transferring/ending an active operation first.
+
+Validation: 611 full Flutter tests, 39 final focused local-v2 tests, 120 isolated
+backend/rules tests and clean analyzer; actual local admin/driver/rider token
+smoke passed through the real API/worker. See plan checkpoint 29 and local
+walkthrough for exact logs, APK checks and remaining native/provider work.
+No production Firebase data/rules/permissions, real assignments or billing changed.
+
+### 2026-10-16: local notification delivery preparation
+
+Added a private authenticated device registry, bounded leased delivery/retry
+pipeline and notification-open authorization checks. Device generations protect
+shared-account rebinding and stale invalid-token/removal results. A local-only
+provider records explicitly simulated receipts; the inactive FCM adapter uses
+generic localized text and opaque event IDs. Neither simulation nor provider
+acceptance changes assistance acknowledgement. Flutter has staged transport
+contracts; Firebase Messaging/native callbacks, OS permissions and navigation
+are not wired or activated.
+
+Validation: 615 full Flutter tests, 27 focused local-v2 tests, 130 isolated
+backend/rules/provider tests, clean analyzer and a passed actual-token local
+worker simulation (`phase16-auth-smoke.log`). Plan checkpoint 30 and the local
+notification walkthrough distinguish this from real background phone delivery.
+No FCM credentials/provider/token, APK build/install, production state or billing
+was changed. A dedicated test project and native/device acceptance remain open.
+
+### 2026-10-16: staged Android notification lifecycle/navigation
+
+Added official Messaging plugin with disabled auto-init, native assistance channel,
+opt-in/permission/token/locale/logout lifecycle, foreground and opened-message
+handlers and server-authorized driver request navigation. Account changes clear
+private details; stale hints never authorize acceptance. Activation remains closed
+without a reviewed dedicated test project/host. Current local APK does not obtain
+an FCM token or receive background push.
+
+Validation: 629 full Flutter tests, 26 local-v2 focused tests, 20 final notification/
+profile checks, clean analyzer, explicit activation-denial check and 13 provider/
+API tests. Native plugin/channel APK compile succeeded. See checkpoint 31 and
+local walkthrough for manifest/install evidence and remaining real-device scope.
+No production state, credentials/provider, real token/account or billing changed.
+
+### 2026-10-16: fare mode safety and reviewed lookup foundation
+
+User deferred actual push/device tests. Normal fare displays now stay unavailable
+without reviewed tariff/stage mapping; the prototype calculation is confined to
+explicit synthetic debug modes with Sample labels. Shared fare/disclosure widgets
+have en/si/ta resources and hide historic prototype amounts in normal mode.
+Added immutable directed fare-matrix/table/mapping contracts with exact pattern/
+class/occurrences, integer minor units and Colombo boarding-date applicability.
+Missing or conflicting data fails closed; no guessed stage arithmetic is used.
+
+Validation: 639 full Flutter tests, 23 focused local-v2 fare tests, clean analyzer
+and successful local APK build. See plan checkpoint 32/local walkthrough for logs.
+No official fare/source mapping was imported or verified; trusted admin ingestion,
+live quote/saved-version integration and ETA work remain. No shared data/rules,
+production deployment, billing or FCM activation changed.
+
+### Plan checkpoint 33: reviewed fare publication and quote integration
+
+Admin JSON import/review publishes immutable, audited vehicle-scoped fare bundles;
+archival replaces editing/deletion. Results and consolidated Bus Details show exact
+directed-matrix cents/source/versions from acknowledged publications. Optional saved
+trips retain the quote snapshot; current details revalidate and show changes.
+Rules reject forged amount/version/segment snapshots and unauthorized publication.
+Synthetic and normal fare inputs remain separate. See fare policy and plan
+checkpoint 33 for schema limitations and remaining operational data review.
+
+Validation: 648 Flutter tests, 39 local-v2 focused tests, 132 backend/rules tests,
+actual local admin/rider-token publication/save/archive smoke and clean analyzer.
+Local APK built. No official tariff import, shared deployment, billing or FCM
+activation occurred; ETA geometry and real push/device validation remain separate.
+
+### Plan checkpoint 34: reviewed road path and moving-run ETA baseline
+
+Added audited admin geometry import/review/withdrawal, Firestore-compatible point
+maps, current route/station transaction guards and isolated publication permissions.
+The consolidated passenger flow uses exact-run fresh GPS projection restricted to
+the recorded road leg. Results estimates boarding; Details shares the model and
+draws only the selected reviewed road path. Wrong/stale/off-route/ambiguous inputs
+fail closed. Future runs have no live ETA. Labels are localized and explicitly
+low confidence; the range is heuristic, not measured accuracy.
+
+No actual operating trace, traffic data or historical ETA model was imported.
+Multi-fix motion/accuracy/sequence validation, measured errors, physical GPS and
+native accessibility review remain pending. Real push testing stays deferred.
+No shared deployment, billing or production account/data change occurred. See
+plan checkpoint 34 and `docs/route-geometry-eta.md` for limits and validation logs.
+
+### Plan checkpoint 35: opt-in local ETA measurement and replay
+
+Added a Local Test-only Details diagnostic action, per-account bounded local
+forecast ledger, separate timetable/geometry summaries and JSON export/replay.
+Matching uses acknowledged driver-reported stop timestamps; this is explicitly
+not independent physical arrival ground truth or production accuracy evidence.
+Pending/cancelled/invalid/corrected records cannot become zero-error successes.
+The tool freezes forecasts, balances repeated observations by run/stop/lead bucket,
+and measures median/nearest-rank P90 absolute errors with sample/run counts.
+Normal builds remain inactive and no operational/backend data is written.
+
+Validation: 673 full Flutter tests, 41 focused local-v2 tests, 30 focused
+persistence/diagnostic/replay regressions and clean analyzer. Local APK built.
+Fixed an existing midnight-sensitive search test fixture without changing the
+navigation assertion. See plan checkpoint 35, `docs/eta-evaluation.md` and local
+validation notes. No production rollout, rule changes, billing or FCM activation.
+
+### Plan checkpoint 36: Saved Trips pagination and owner-safe reopening
+
+Home now exposes all saved records, including past/closed legacy bookmarks, in
+twenty-row server-acknowledged pages. Next/Previous, retry, refresh and remove retain
+owner/cursor boundaries and avoid whole-history listeners. Home's latest-open
+preview is bounded separately. All-record ordering uses stable IDs rather than
+claiming hash IDs establish chronology. Exact saved documents reopen consolidated
+Details with their selection intact; account changes invalidate stale private views.
+Removal acknowledgement affects only owner bookmarks. Existing owner rules remain
+unchanged, and prepared query indexes are not deployed. See checkpoint 36 and
+`docs/saved-trips.md`; native/fluent review and production rollout remain pending.
+
+### Plan checkpoint 37: scoped report preview and paginated public evidence
+
+Details now queries only its selected physical bus and segment stops with bounded
+preview limits. The compact section remains above Save Trip and discloses partial
+coverage. View all opens exact bus/stop live pages with bounded records, stable
+cursor navigation, loading/error/retry and hidden-report removal. Existing report
+details/votes and public freshness checks are reused. Prepared indexes remain local;
+rules permissions, points and ban policy are unchanged. See checkpoint 37 and
+`docs/segment-reports.md` for coverage/order limits and validation. Real FCM tests,
+native/fluent review and production rollout remain separate.

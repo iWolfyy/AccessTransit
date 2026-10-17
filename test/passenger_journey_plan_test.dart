@@ -1,4 +1,5 @@
 import 'package:access_transit/logic/passenger_journey_plan.dart';
+import 'package:access_transit/logic/journey_fare.dart';
 import 'package:access_transit/models/bus.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -64,9 +65,13 @@ void main() {
     final full = plan(from: 'a', to: 'h')!;
     expect(short.stops, ['f', 'g']);
     expect(short.durationMinutes, 12);
-    expect(short.estimatedPriceLkr, 60);
+    expect(short.estimatedPriceLkr, JourneyFare.prototypeEnabled ? 60 : 0);
     expect(full.durationMinutes, 84);
-    expect(short.estimatedPriceLkr, lessThan(full.estimatedPriceLkr));
+    if (JourneyFare.prototypeEnabled) {
+      expect(short.estimatedPriceLkr, lessThan(full.estimatedPriceLkr));
+    } else {
+      expect(full.estimatedPriceLkr, 0);
+    }
   });
 
   test('missing schedules estimate only the travelled legs', () {

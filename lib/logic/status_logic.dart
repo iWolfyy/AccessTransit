@@ -40,7 +40,7 @@ class StatusLogic {
   /// Confirmations may refresh evidence only with an account and valid timestamp.
   static DateTime? lastCheckedAt(Report report, {DateTime? currentTime}) {
     final now = currentTime ?? DateTime.now();
-    final created = report.createdAt;
+    final created = report.observedAt ?? report.createdAt;
     if (created == null) return null;
     final confirmed = report.lastConfirmedAt;
     final confirmation =
@@ -148,7 +148,7 @@ class StatusLogic {
     if (report.status.trim().toLowerCase() != 'active') {
       return false;
     }
-    if (report.falseCount >= 3 || report.flaggedBy.length >= 3) {
+    if (report.isDisputed) {
       return false;
     }
 

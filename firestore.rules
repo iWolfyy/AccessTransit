@@ -2,62 +2,168 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
+    function accessPermitsWrites(state) {
+      return state.get('permanent', false) != true && state.get('communityPermanent', false) != true && state.get('manualSuspended', false) != true
+        && (state.get('communitySuspendedUntil', null) == null || state.communitySuspendedUntil <= request.time)
+        && (state.get('manualSuspendedUntil', null) == null || state.manualSuspendedUntil <= request.time);
+    }
+    function activeAccount() {
+      return signedIn() && (!exists(/databases/$(database)/documents/account_access/$(request.auth.uid))
+        || accessPermitsWrites(get(/databases/$(database)/documents/account_access/$(request.auth.uid)).data));
+    }
+    function v2Enabled() {
+      return exists(/databases/$(database)/documents/moderation_config/active)
+        && get(/databases/$(database)/documents/moderation_config/active).data.get('enabled', false) == true;
+    }
+    match /moderation_config/{id} { allow get: if signedIn(); allow list, write: if false; }
+    match /account_access/{uid} { allow get: if owner(uid); allow list, write: if false; }
+    match /contribution_summaries/{uid} { allow get: if owner(uid); allow list, write: if false; }
     function owner(uid) { return signedIn() && request.auth.uid == uid; }
     function admin() { return signedIn() && request.auth.token.get('admin', false) == true; }
+    match /route_geometries/{id} {
+      allow read: if true;
+      allow create, update: if activeAccount() && admin()
+        && request.resource.data.routeId == id && request.resource.data.reviewed is bool
+        && request.resource.data.synthetic is bool && nonempty(request.resource.data.version,128)
+        && request.resource.data.points is list && request.resource.data.points.size() >= 2 && request.resource.data.points.size() <= 5000
+        && request.resource.data.stops is list && request.resource.data.stops.size() >= 2 && request.resource.data.stops.size() <= 300
+        && request.resource.data.stopVertices is list && request.resource.data.stopVertices.size() == request.resource.data.stops.size()
+        && nonempty(request.resource.data.source,2048) && nonempty(request.resource.data.reviewReason,2000)
+        && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    match /fare_publications/{id} {
+      allow read: if admin() || resource.data.state == 'published';
+      allow create: if activeAccount() && admin()
+        && request.resource.data.schemaVersion == 1 && request.resource.data.state == 'published'
+        && request.resource.data.synthetic is bool && request.resource.data.busIds is list
+        && request.resource.data.busIds.size() > 0 && request.resource.data.busIds.size() <= 30
+        && request.resource.data.table.reviewed == true && request.resource.data.mapping.reviewed == true
+        && request.resource.data.mapping.tariffId == id
+        && request.resource.data.table.routePatternId == request.resource.data.mapping.routePatternId
+        && request.resource.data.table.serviceClass == request.resource.data.mapping.serviceClass
+        && request.resource.data.validFromAt is timestamp && request.resource.data.validUntilAt is timestamp
+        && request.resource.data.validFromAt < request.resource.data.validUntilAt
+        && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time
+        && nonempty(request.resource.data.reviewReason, 2000);
+      allow update: if activeAccount() && admin() && resource.data.state == 'published'
+        && request.resource.data.state == 'archived' && changesOnly(['state','archiveReason','updatedBy','updatedAt'])
+        && nonempty(request.resource.data.archiveReason, 2000)
+        && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    function validFareSnapshot(d) {
+      let q = d.fareQuote;
+      let p = get(/databases/$(database)/documents/fare_publications/$(q.tariffId)).data;
+      return q.keys().hasOnly(['amountMinor','currency','tariffId','tariffVersion','mappingId','mappingVersion','source','serviceDate',
+          'routePatternId','serviceClass','boardingOccurrenceId','alightingOccurrenceId'])
+        && p.state == 'published' && d.busId in p.busIds && q.mappingId == q.tariffId
+        && q.currency == 'LKR' && q.tariffVersion == p.table.version && q.mappingVersion == p.mapping.version
+        && q.source == p.table.source && q.serviceClass == p.table.serviceClass && q.routePatternId == p.table.routePatternId
+        && q.routePatternId == get(/databases/$(database)/documents/buses/$(d.busId)).data.routeId
+        && q.boardingOccurrenceId == d.fromStationId && q.alightingOccurrenceId == d.toStationId
+        && d.departureAt >= p.validFromAt && d.departureAt < p.validUntilAt
+        && q.amountMinor is int && q.amountMinor > 0
+        && q.amountMinor == p.table.amounts[p.mapping.stageByOccurrence[d.fromStationId]][p.mapping.stageByOccurrence[d.toStationId]];
+    }
     // Approval is provisioned by the project owner/Admin SDK, never by a profile role.
     function approvedOperator() {
       return signedIn() && exists(/databases/$(database)/documents/operator_access/$(request.auth.uid))
         && get(/databases/$(database)/documents/operator_access/$(request.auth.uid)).data.approved == true;
     }
     function realCatalogue(kind, id) {
-      return exists(/databases/$(database)/documents/$(kind)/$(id))
-        && get(/databases/$(database)/documents/$(kind)/$(id)).data.get('isDemo', false) != true
-        && get(/databases/$(database)/documents/$(kind)/$(id)).data.get('catalogueSource', '') != 'demo';
+      let d = get(/databases/$(database)/documents/$(kind)/$(id)).data;
+      return d != null && d.get('deletionPending', false) != true
+        && d.get('isDemo', false) != true && d.get('catalogueSource', '') != 'demo';
     }
     function assignedOperator(busId) {
       return approvedOperator() && realCatalogue('buses', busId)
+        && allowedOperatorRoute(get(/databases/$(database)/documents/buses/$(busId)).data.get('routeId', ''))
         && get(/databases/$(database)/documents/buses/$(busId)).data.get('catalogueRecordType', 'vehicle') != 'published_timetable'
         && get(/databases/$(database)/documents/buses/$(busId)).data.get('driverId', '') == request.auth.uid;
+    }
+    function allowedOperatorRoute(routeId) {
+      return approvedOperator() && realCatalogue('routes', routeId)
+        && exists(/databases/$(database)/documents/driver_route_assignments/$(request.auth.uid))
+        && get(/databases/$(database)/documents/driver_route_assignments/$(request.auth.uid)).data.get('active', false) == true
+        && get(/databases/$(database)/documents/driver_route_assignments/$(request.auth.uid)).data.get('routeId', '') == routeId;
     }
     function text(value, max) { return value is string && value.size() <= max; }
     function nonempty(value, max) { return text(value, max) && value.size() > 0; }
     function changesOnly(fields) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields); }
+    // A minimal owner-only server timestamp receipt; it grants no role or rewards.
+    match /search_clock/{uid} {
+      allow get: if owner(uid);
+      allow delete: if activeAccount() && (owner(uid));
+      allow list: if false;
+      allow create, update: if activeAccount() && (owner(uid)
+        && request.resource.data.keys().hasOnly(['serverTime'])
+        && request.resource.data.serverTime == request.time);
+    }
     match /operator_access/{uid} {
       allow get: if owner(uid) || admin();
-      allow list, write: if admin();
+      allow list: if admin();
+      allow write: if activeAccount() && (admin());
+    }
+    match /driver_route_assignments/{uid} {
+      allow get: if owner(uid) || admin();
+      allow list: if admin();
+      allow create, delete: if activeAccount() && (admin());
+      allow update: if activeAccount() && (admin() || (owner(uid) && allowedOperatorRoute(resource.data.get('routeId', ''))
+        && changesOnly(['claimRevision', 'lastClaimedBusId'])
+        && request.resource.data.claimRevision is int
+        && request.resource.data.claimRevision == resource.data.get('claimRevision', 0) + 1
+        && realCatalogue('buses', request.resource.data.lastClaimedBusId)
+        && getAfter(/databases/$(database)/documents/buses/$(request.resource.data.lastClaimedBusId)).data.get('driverId', '') == uid
+        && getAfter(/databases/$(database)/documents/buses/$(request.resource.data.lastClaimedBusId)).data.get('routeId', '') == resource.data.routeId));
+    }
+    function recordedClaim(busId) {
+      let before = get(/databases/$(database)/documents/driver_route_assignments/$(request.auth.uid)).data;
+      let after = getAfter(/databases/$(database)/documents/driver_route_assignments/$(request.auth.uid)).data;
+      return after.get('lastClaimedBusId', '') == busId && after.get('claimRevision', 0) == before.get('claimRevision', 0) + 1;
+    }
+    match /admin_audit/{id} {
+      allow read: if admin();
+      allow create: if activeAccount() && (admin());
+      allow update, delete: if false;
     }
     match /users/{uid} {
       allow read: if owner(uid) || admin();
-      allow create: if owner(uid) && request.resource.data.keys().hasOnly(
+      allow create: if activeAccount() && (owner(uid) && request.resource.data.keys().hasOnly(
           ['uid', 'name', 'email', 'phone', 'role', 'createdAt', 'points', 'reportsSubmitted', 'verifiedCount'])
         && request.resource.data.uid == uid && nonempty(request.resource.data.name, 100)
         && request.resource.data.email == request.auth.token.email
         && (request.resource.data.phone == null || text(request.resource.data.phone, 40))
-        && request.resource.data.role in ['passenger', 'operator']
+        && request.resource.data.role in ['passenger', 'contributor', 'operator']
         && request.resource.data.createdAt == request.time
         && request.resource.data.points == 0 && request.resource.data.reportsSubmitted == 0
-        && request.resource.data.verifiedCount == 0;
-      allow update: if admin() || (owner(uid) && changesOnly(['name', 'phone', 'email'])
+        && request.resource.data.verifiedCount == 0);
+      allow update: if activeAccount() && (admin() || (owner(uid) && changesOnly(['name', 'phone', 'email'])
         && nonempty(request.resource.data.name, 100) && request.resource.data.email == request.auth.token.email
-        && (request.resource.data.phone == null || text(request.resource.data.phone, 40)));
-      allow delete: if admin();
+        && (request.resource.data.phone == null || text(request.resource.data.phone, 40))));
+      allow delete: if activeAccount() && (admin());
     }
     match /journeys/{id} {
       allow get: if (signedIn() && resource == null) || owner(resource.data.passengerId) || admin();
       allow list: if owner(resource.data.passengerId) || admin();
-      allow create: if owner(request.resource.data.passengerId)
+      allow create: if activeAccount() && (owner(request.resource.data.passengerId)
         && request.resource.data.keys().hasOnly(['journeyId', 'passengerId', 'routeId', 'routeNumber',
           'routeTitle', 'busId', 'origin', 'destination', 'status', 'createdAt', 'fromStationId', 'toStationId',
           'selectedDate', 'selectedTimeMinutes', 'departureAt', 'durationMinutes', 'estimatedFareLkr', 'busNo',
-          'wheelchairAccessRequired', 'stepFreeOnly'])
+          'wheelchairAccessRequired', 'stepFreeOnly', 'serviceRunId','fareQuote'])
         && request.resource.data.journeyId == id && request.resource.data.createdAt == request.time
         && request.resource.data.status in ['confirmed', 'active']
         && realCatalogue('buses', request.resource.data.busId)
         && nonempty(request.resource.data.origin, 200) && nonempty(request.resource.data.destination, 200)
-        && validJourneySelection(request.resource.data);
-      allow update: if admin() || (owner(resource.data.passengerId) && changesOnly(['status'])
-        && resource.data.status in ['confirmed', 'active'] && request.resource.data.status in ['completed', 'cancelled']);
-      allow delete: if owner(resource.data.passengerId) || admin();
+        && validJourneySelection(request.resource.data)
+        && (!request.resource.data.keys().hasAny(['fareQuote']) || validFareSnapshot(request.resource.data))
+        && (!request.resource.data.keys().hasAny(['serviceRunId']) || (
+          request.resource.data.serviceRunId is string
+          && get(/databases/$(database)/documents/service_runs/$(request.resource.data.serviceRunId)).data.busId == request.resource.data.busId
+          && get(/databases/$(database)/documents/service_runs/$(request.resource.data.serviceRunId)).data.initialStopTimes[request.resource.data.fromStationId].estimatedArrival == request.resource.data.departureAt)));
+      allow update: if activeAccount() && (admin() || (owner(resource.data.passengerId) && changesOnly(['status'])
+        && resource.data.status in ['confirmed', 'active'] && request.resource.data.status in ['completed', 'cancelled']));
+      allow delete: if activeAccount() && (owner(resource.data.passengerId) || admin());
     }
     function validJourneySelection(d) {
       // Older schemas remain readable/creatable; any new selection fields require a complete selection.
@@ -74,52 +180,193 @@ service cloud.firestore {
         && d.wheelchairAccessRequired is bool && d.stepFreeOnly is bool);
     }
     match /reward_ledger/{id} {
-      allow read, write: if admin();
-      match /revisions/{revision} { allow read, write: if admin(); }
+      allow read: if admin();
+      allow write: if activeAccount() && (admin());
+      match /revisions/{revision} { allow read: if admin();
+      allow write: if activeAccount() && (admin()); }
     }
-    match /stations/{id} { allow read: if true; allow write: if admin(); }
-    match /routes/{id} { allow read: if true; allow write: if admin(); }
+    match /stations/{id} { allow read: if true; allow write: if activeAccount() && (admin()); }
+    match /routes/{id} { allow read: if true; allow write: if activeAccount() && (admin()); }
     match /buses/{busId} {
       allow read: if true;
-      allow create, delete: if admin();
-      allow update: if admin() || (approvedOperator()
+      allow create, delete: if activeAccount() && (admin());
+      allow update: if activeAccount() && (admin() || (allowedOperatorRoute(resource.data.get('routeId', ''))
+        && realCatalogue('buses', busId)
         && resource.data.get('catalogueRecordType', 'vehicle') != 'published_timetable'
         && resource.data.get('isDemo', false) != true && resource.data.get('catalogueSource', '') != 'demo'
         && ((resource.data.get('driverId', '') in ['', null]
-          && request.resource.data.driverId == request.auth.uid && changesOnly(['driverId']))
+          && request.resource.data.driverId == request.auth.uid && changesOnly(['driverId']) && recordedClaim(busId))
         || (resource.data.get('driverId', '') == request.auth.uid
           && request.resource.data.driverId == resource.data.driverId
           && changesOnly(['rampOk', 'occupancy', 'rampCheckedAt', 'rampCheckedBy'])
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['rampOk', 'rampCheckedAt', 'rampCheckedBy'])
             || (request.resource.data.rampOk is bool && request.resource.data.rampCheckedBy == request.auth.uid
               && request.resource.data.rampCheckedAt == request.time))
-          && request.resource.data.occupancy in ['low', 'medium', 'high'])));
+          && request.resource.data.occupancy in ['low', 'medium', 'high']))));
     }
     function validTelemetry(busId) {
       let d = request.resource.data;
       return d.busId == busId && d.driverId == request.auth.uid && d.operatorId == request.auth.uid
         && d.latitude is number && d.latitude >= -90 && d.latitude <= 90
         && d.longitude is number && d.longitude >= -180 && d.longitude <= 180
+        && !(d.latitude == 0 && d.longitude == 0)
         && d.speed is number && d.speed >= 0 && d.speed <= 200
         && d.timestamp is timestamp && d.timestamp <= request.time
         && d.status in ['active', 'stopped', 'offline', 'completed'] && d.isBroadcasting is bool;
     }
+    function linkedTelemetry(busId) {
+      let d = request.resource.data;
+      let t = getAfter(/databases/$(database)/documents/trips/$(d.tripId)).data;
+      return t.busId == busId && t.driverId == request.auth.uid && (
+        (t.status == 'in_progress' && d.isBroadcasting == true && (
+          t.get('serviceRunId', '') == '' || (
+            getAfter(/databases/$(database)/documents/service_runs/$(t.serviceRunId)).data.status in ['boarding', 'in_progress']
+            && getAfter(/databases/$(database)/documents/service_runs/$(t.serviceRunId)).data.get('handoverPending', false) == false
+            && getAfter(/databases/$(database)/documents/operation_locks/$(request.auth.uid)).data.active == true
+            && getAfter(/databases/$(database)/documents/operation_locks/$(request.auth.uid)).data.tripId == d.tripId)))
+        || (t.status in ['completed', 'cancelled'] && d.isBroadcasting == false && d.status == 'completed'));
+    }
     match /live_locations/{busId} {
       allow read: if true;
-      allow create, update: if assignedOperator(busId) && validTelemetry(busId);
-      allow delete: if assignedOperator(busId) || admin();
+      allow create, update: if activeAccount() && (assignedOperator(busId) && validTelemetry(busId) && linkedTelemetry(busId)
+        && (resource == null || resource.data.isBroadcasting == false || resource.data.tripId == request.resource.data.tripId));
+      allow delete: if activeAccount() && (admin() || (assignedOperator(busId) && resource.data.isBroadcasting == false
+        && get(/databases/$(database)/documents/trips/$(resource.data.tripId)).data.status in ['completed','cancelled']));
     }
-    match /active_buses/{busId} { allow read: if true; allow write: if admin(); }
+    match /active_buses/{busId} { allow read: if true; allow write: if activeAccount() && (admin()); }
     match /trips/{id} {
       allow read: if true;
-      allow create: if assignedOperator(request.resource.data.busId) && request.resource.data.driverId == request.auth.uid
+      allow create: if activeAccount() && (assignedOperator(request.resource.data.busId) && request.resource.data.driverId == request.auth.uid
         && request.resource.data.tripId == id && request.resource.data.createdAt == request.time
-        && request.resource.data.status == 'in_progress';
-      allow update: if assignedOperator(resource.data.busId) && resource.data.driverId == request.auth.uid
+        && request.resource.data.status == 'in_progress' && validDatedTripStart(id));
+      allow update: if activeAccount() && (assignedOperator(resource.data.busId) && resource.data.driverId == request.auth.uid
         && request.resource.data.busId == resource.data.busId && request.resource.data.driverId == resource.data.driverId
         && changesOnly(['status', 'actualDepartureTime', 'stopTimes', 'currentStopIndex'])
-        && request.resource.data.status in ['in_progress', 'completed'];
-      allow delete: if admin();
+        && request.resource.data.status in ['in_progress', 'completed', 'cancelled']
+        && ((resource.data.get('serviceRunId', '') == ''
+          && (resource.data.status == 'in_progress' || request.resource.data.status == resource.data.status)) || validDatedTripUpdate(id)));
+      allow delete: if activeAccount() && (admin());
+    }
+    function validDatedTripStart(id) {
+      let d = request.resource.data;
+      let r = get(/databases/$(database)/documents/service_runs/$(id)).data;
+      let after = getAfter(/databases/$(database)/documents/service_runs/$(id)).data;
+      let lock = getAfter(/databases/$(database)/documents/operation_locks/$(request.auth.uid)).data;
+      let live = getAfter(/databases/$(database)/documents/live_locations/$(d.busId)).data;
+      return d.serviceRunId == id && r.status == 'scheduled' && after.status == 'boarding'
+        && d.busId == r.busId && d.stops == r.stops && d.stopTimes == r.initialStopTimes
+        && d.scheduledDepartureTime == r.plannedDepartureAt && d.actualDepartureTime == null && d.currentStopIndex == 0
+        && request.time >= r.plannedDepartureAt - duration.value(5, 'm') && request.time <= r.latestStartAt
+        && r.latestStartAt == r.plannedDepartureAt + duration.value(30,'m')
+        && lock.active == true && lock.tripId == id && lock.busId == d.busId
+        // Lock writes enforce the prior driver lock; telemetry writes enforce bus
+        // occupancy using their own resource, avoiding duplicate access calls.
+        && live.tripId == id && live.isBroadcasting == true;
+    }
+    function validDatedTripUpdate(id) {
+      let d = request.resource.data;
+      let r = getAfter(/databases/$(database)/documents/service_runs/$(id)).data;
+      let lock = getAfter(/databases/$(database)/documents/operation_locks/$(request.auth.uid)).data;
+      let live = getAfter(/databases/$(database)/documents/live_locations/$(d.busId)).data;
+      return d.currentStopIndex >= resource.data.currentStopIndex && d.currentStopIndex < d.stops.size()
+        && d.currentStopIndex <= resource.data.currentStopIndex + 1 && live.tripId == id && lock.tripId == id
+        && (d.actualDepartureTime == resource.data.actualDepartureTime ||
+          (resource.data.actualDepartureTime == null && d.actualDepartureTime == request.time && r.actualDepartureAt == request.time))
+        && ((d.status == 'in_progress' && lock.active == true && live.isBroadcasting == true && r.status in ['boarding', 'in_progress']
+          && r.get('handoverPending', false) == false
+          && (d.currentStopIndex == 0 || d.actualDepartureTime != null))
+          || (d.status in ['completed','cancelled'] && r.status == d.status && lock.active == false && live.isBroadcasting == false
+            && (d.status == 'cancelled' || d.actualDepartureTime != null)));
+    }
+    match /service_schedules/{id} {
+      allow read: if admin();
+      allow create: if activeAccount() && admin()
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.version == 1
+        && request.resource.data.state == 'published'
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+      allow update: if activeAccount() && admin()
+        && resource.data.state == 'published'
+        && request.resource.data.state == 'retired'
+        && changesOnly(['state','updatedBy','updatedAt'])
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    match /service_runs/{id} {
+      allow read: if true;
+      allow create, delete: if activeAccount() && (admin());
+      allow update: if activeAccount() && (admin() || (assignedOperator(resource.data.busId)
+        && changesOnly(['status','driverId','tripId','startedAt','actualDepartureAt','completedAt'])
+        && request.resource.data.driverId == request.auth.uid && request.resource.data.tripId == id
+        && ((resource.data.status == 'scheduled' && request.resource.data.status == 'boarding'
+          && request.time >= resource.data.plannedDepartureAt - duration.value(5,'m') && request.time <= resource.data.latestStartAt
+          && resource.data.latestStartAt == resource.data.plannedDepartureAt + duration.value(30,'m')
+          && request.resource.data.startedAt == request.time && request.resource.data.actualDepartureAt == null
+          && (request.time <= resource.data.plannedDepartureAt || validLateNote(id))
+          && getAfter(/databases/$(database)/documents/trips/$(id)).data.serviceRunId == id
+          && getAfter(/databases/$(database)/documents/operation_locks/$(request.auth.uid)).data.tripId == id)
+        || (resource.data.status == 'boarding' && request.resource.data.status == 'in_progress'
+          && request.resource.data.actualDepartureAt == request.time
+          && getAfter(/databases/$(database)/documents/trips/$(id)).data.actualDepartureTime == request.time)
+        || (resource.data.status in ['boarding','in_progress','completed','cancelled']
+          && request.resource.data.status in ['completed','cancelled'] && request.resource.data.completedAt == request.time
+          && getAfter(/databases/$(database)/documents/trips/$(id)).data.status == request.resource.data.status
+          && getAfter(/databases/$(database)/documents/operation_locks/$(request.auth.uid)).data.active == false))));
+    }
+    match /operation_locks/{uid} {
+      allow get: if owner(uid) || admin();
+      allow list: if admin();
+      allow delete: if activeAccount() && (admin());
+      allow create, update: if activeAccount() && (admin() || (owner(uid) && assignedOperator(request.resource.data.busId)
+        && request.resource.data.keys().hasOnly(['active','busId','tripId','updatedAt']) && request.resource.data.updatedAt == request.time
+        && ((request.resource.data.active == true
+          && getAfter(/databases/$(database)/documents/trips/$(request.resource.data.tripId)).data.driverId == uid
+          && getAfter(/databases/$(database)/documents/trips/$(request.resource.data.tripId)).data.busId == request.resource.data.busId
+          && getAfter(/databases/$(database)/documents/trips/$(request.resource.data.tripId)).data.serviceRunId == request.resource.data.tripId
+          && getAfter(/databases/$(database)/documents/trips/$(request.resource.data.tripId)).data.status == 'in_progress'
+          && (!exists(/databases/$(database)/documents/operation_locks/$(uid)) || resource.data.active == false || resource.data.tripId == request.resource.data.tripId))
+        || (request.resource.data.active == false && resource.data.tripId == request.resource.data.tripId && resource.data.busId == request.resource.data.busId
+          && getAfter(/databases/$(database)/documents/trips/$(resource.data.tripId)).data.status in ['completed','cancelled']))));
+    }
+    function validLateNote(id) {
+      let note = getAfter(/databases/$(database)/documents/driver_trip_notes/$(id)).data;
+      return note.driverId == request.auth.uid && nonempty(note.reason,2000) && note.reason.size() >= 5;
+    }
+    match /driver_trip_notes/{id} {
+      allow get: if admin() || owner(resource.data.driverId);
+      allow list: if admin();
+      allow update, delete: if activeAccount() && (admin());
+      allow create: if activeAccount() && (assignedOperator(request.resource.data.busId)
+        && request.resource.data.keys().hasOnly(['driverId','busId','reason','createdAt'])
+        && request.resource.data.driverId == request.auth.uid && request.resource.data.createdAt == request.time
+        && nonempty(request.resource.data.reason,2000) && request.resource.data.reason.size() >= 5
+        && getAfter(/databases/$(database)/documents/trips/$(id)).data.serviceRunId == id
+        && getAfter(/databases/$(database)/documents/trips/$(id)).data.driverId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/trips/$(id)).data.busId == request.resource.data.busId);
+    }
+    function cooldownPath(d) {
+      return /databases/$(database)/documents/report_cooldowns/$(d.userId)/$(d.targetType)/$(d.targetId)/issues/$(d.category);
+    }
+    function committedCooldown(d, id) {
+      let guard = getAfter(cooldownPath(d)).data;
+      return guard.reportId == id && guard.lastPublishedAt == request.time;
+    }
+    match /report_cooldowns/{uid}/{type}/{target}/issues/{issue} {
+      allow get: if owner(uid);
+      allow list, delete: if false;
+      allow create, update: if activeAccount() && (owner(uid) && type in ['bus', 'station']
+        && request.resource.data.keys().hasOnly(['reportId', 'lastPublishedAt'])
+        && nonempty(request.resource.data.reportId, 128)
+        && request.resource.data.lastPublishedAt == request.time
+        && (resource == null || resource.data.lastPublishedAt <= request.time - duration.value(300, 's'))
+        && !exists(/databases/$(database)/documents/reports/$(request.resource.data.reportId))
+        && getAfter(/databases/$(database)/documents/reports/$(request.resource.data.reportId)).data.userId == uid
+        && getAfter(/databases/$(database)/documents/reports/$(request.resource.data.reportId)).data.targetType == type
+        && getAfter(/databases/$(database)/documents/reports/$(request.resource.data.reportId)).data.targetId == target
+        && getAfter(/databases/$(database)/documents/reports/$(request.resource.data.reportId)).data.category == issue
+        && getAfter(/databases/$(database)/documents/reports/$(request.resource.data.reportId)).data.createdAt == request.time);
     }
     function validReport(d) {
       return d.targetType in ['bus', 'station'] && nonempty(d.targetId, 128)
@@ -177,39 +424,41 @@ service cloud.firestore {
     }
     match /reports/{id} {
       // All client-created records in this collection are explicitly published.
-      allow read: if true;
-      allow create: if owner(request.resource.data.userId)
+      allow get: if (signedIn() && resource == null) || resource.data.get('policyVersion', 1) != 2 || resource.data.status in ['active', 'resolved'] || owner(resource.data.userId) || admin();
+      allow list: if resource.data.status in ['active', 'resolved'] || owner(resource.data.userId) || admin();
+      allow create: if activeAccount() && (!v2Enabled() && owner(request.resource.data.userId)
         && request.resource.data.keys().hasOnly(['targetType', 'targetId', 'targetName', 'problemType', 'severity', 'category',
           'subCategory', 'condition', 'crowdingLevel', 'publicationState', 'isDemo', 'description', 'photoUrl', 'status',
           'createdAt', 'lastConfirmedAt', 'confirmCount', 'falseCount', 'userId', 'confirmedBy', 'flaggedBy'])
         && validReport(request.resource.data) && validVotes(request.resource.data)
+        && committedCooldown(request.resource.data, id)
         && request.resource.data.createdAt == request.time && request.resource.data.lastConfirmedAt == null
         && request.resource.data.publicationState == 'published' && request.resource.data.isDemo == false
-        && request.resource.data.status == 'active' && request.resource.data.confirmCount == 0 && request.resource.data.falseCount == 0;
-      allow update: if admin() || ownVoteOnly() || ownRecheck(id) || (owner(resource.data.userId)
+        && request.resource.data.status == 'active' && request.resource.data.confirmCount == 0 && request.resource.data.falseCount == 0);
+      allow update: if activeAccount() && (resource.data.get('policyVersion', 1) == 1 && (admin() || ownVoteOnly() || ownRecheck(id) || (owner(resource.data.userId)
         && resource.data.status == 'active' && changesOnly(['status', 'resolvedBy', 'resolvedAt'])
         && request.resource.data.status == 'resolved' && request.resource.data.resolvedBy == request.auth.uid
         && request.resource.data.resolvedAt == request.time
         && existsAfter(/databases/$(database)/documents/report_resolutions/$(id))
         && getAfter(/databases/$(database)/documents/report_resolutions/$(id)).data.resolvedBy == request.auth.uid
-        && getAfter(/databases/$(database)/documents/report_resolutions/$(id)).data.resolvedAt == request.time);
-      allow delete: if admin() || owner(resource.data.userId);
+        && getAfter(/databases/$(database)/documents/report_resolutions/$(id)).data.resolvedAt == request.time)));
+      allow delete: if activeAccount() && (resource.data.get('policyVersion', 1) == 1 && (admin() || owner(resource.data.userId)));
       match /rechecks/{checkId} {
         allow read: if true;
-        allow create: if signedIn()
+        allow create: if activeAccount() && (signedIn()
           && request.resource.data.keys().hasOnly(['reportId', 'userId', 'checkedAt'])
           && request.resource.data.reportId == id && request.resource.data.userId == request.auth.uid
           && request.resource.data.checkedAt == request.time
           && getAfter(/databases/$(database)/documents/reports/$(id)).data.lastRecheckId == checkId
           && getAfter(/databases/$(database)/documents/reports/$(id)).data.lastRecheckedBy == request.auth.uid
           && getAfter(/databases/$(database)/documents/reports/$(id)).data.lastRecheckedAt == request.time
-          && get(/databases/$(database)/documents/reports/$(id)).data.get('lastRecheckId', '') != checkId;
+          && get(/databases/$(database)/documents/reports/$(id)).data.get('lastRecheckId', '') != checkId);
         allow update, delete: if false;
       }
     }
     match /report_resolutions/{id} {
       allow read: if true;
-      allow create: if request.resource.data.keys().hasOnly(['reportId', 'resolvedBy', 'resolvedAt',
+      allow create: if activeAccount() && (request.resource.data.keys().hasOnly(['reportId', 'resolvedBy', 'resolvedAt',
         'targetType', 'targetId', 'problemType', 'category', 'previousStatus', 'status'])
         && owner(get(/databases/$(database)/documents/reports/$(id)).data.userId)
         && get(/databases/$(database)/documents/reports/$(id)).data.status == 'active'
@@ -222,15 +471,23 @@ service cloud.firestore {
         && request.resource.data.category == get(/databases/$(database)/documents/reports/$(id)).data.category
         && getAfter(/databases/$(database)/documents/reports/$(id)).data.status == 'resolved'
         && getAfter(/databases/$(database)/documents/reports/$(id)).data.resolvedBy == request.auth.uid
-        && getAfter(/databases/$(database)/documents/reports/$(id)).data.resolvedAt == request.time;
-      allow update, delete: if admin();
+        && getAfter(/databases/$(database)/documents/reports/$(id)).data.resolvedAt == request.time);
+      allow update, delete: if activeAccount() && (admin());
+    }
+    function assistanceDriver(d) {
+      return d.get('policyVersion', 1) != 2 ? assignedOperator(d.busId) :
+        (signedIn() && d.driverId == request.auth.uid && assignedOperator(d.busId)
+          && get(/databases/$(database)/documents/service_runs/$(d.serviceRunId)).data.status in ['scheduled','boarding','in_progress']
+          && (get(/databases/$(database)/documents/service_runs/$(d.serviceRunId)).data.status == 'scheduled'
+            || get(/databases/$(database)/documents/service_runs/$(d.serviceRunId)).data.driverId == request.auth.uid));
     }
     match /boarding_requests/{id} {
       // A signed-in creator must be able to check a missing ID in a transaction.
       allow get: if (signedIn() && resource == null) || owner(resource.data.riderId)
-        || assignedOperator(resource.data.busId) || admin();
-      allow list: if owner(resource.data.riderId) || assignedOperator(resource.data.busId) || admin();
-      allow create: if owner(request.resource.data.riderId)
+        || assistanceDriver(resource.data) || admin();
+      allow list: if owner(resource.data.riderId) || assistanceDriver(resource.data) || admin();
+      allow create: if activeAccount() && (owner(request.resource.data.riderId)
+        && (!exists(/databases/$(database)/documents/assistance_config/active) || get(/databases/$(database)/documents/assistance_config/active).data.enabled != true)
         && request.resource.data.keys().hasOnly(['riderId', 'riderName', 'busId', 'routeNo', 'stationId', 'stopName',
           'assistanceTypes', 'status', 'createdAt', 'purpose'])
         && realCatalogue('buses', request.resource.data.busId)
@@ -242,75 +499,181 @@ service cloud.firestore {
         && request.resource.data.get('purpose', 'boarding') in ['boarding', 'alighting']
         && request.resource.data.assistanceTypes.hasOnly(request.resource.data.get('purpose', 'boarding') == 'alighting'
           ? ['Deploy Ramp', 'Extra Time', 'Alighting Help'] : ['Deploy Ramp', 'Extra Time', 'Boarding Help'])
-        && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
-      allow update: if admin() || (changesOnly(['status']) && (
+        && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time);
+      allow update: if resource.data.get('policyVersion', 1) != 2 && activeAccount() && (admin() || (changesOnly(['status']) && (
         (owner(resource.data.riderId) && resource.data.status in ['pending', 'acknowledged'] && request.resource.data.status == 'cancelled')
         || (assignedOperator(resource.data.busId) && (
           (resource.data.status == 'pending' && request.resource.data.status in ['acknowledged', 'rejected'])
-          || (resource.data.status == 'acknowledged' && request.resource.data.status == 'completed')))));
-      allow delete: if admin();
+          || (resource.data.status == 'acknowledged' && request.resource.data.status == 'completed'))))));
+      allow delete: if resource.data.get('policyVersion', 1) != 2 && activeAccount() && (admin());
     }
     match /{document=**} { allow read, write: if false; }
     // BEGIN GENERATED SAMPLE TEST POLICY
     // Source: root policy above; regenerate with test/security/generate-sample-rules.mjs.
     match /sample_test/shared {
       function signedIn() { return request.auth != null && exists(/databases/$(database)/documents/sample_test/shared/users/$(request.auth.uid)); }
+      function accessPermitsWrites(state) {
+        return state.get('permanent', false) != true && state.get('communityPermanent', false) != true && state.get('manualSuspended', false) != true
+          && (state.get('communitySuspendedUntil', null) == null || state.communitySuspendedUntil <= request.time)
+          && (state.get('manualSuspendedUntil', null) == null || state.manualSuspendedUntil <= request.time);
+      }
+      function activeAccount() {
+        return signedIn() && (!exists(/databases/$(database)/documents/sample_test/shared/account_access/$(request.auth.uid))
+          || accessPermitsWrites(get(/databases/$(database)/documents/sample_test/shared/account_access/$(request.auth.uid)).data));
+      }
+      function v2Enabled() {
+        return exists(/databases/$(database)/documents/sample_test/shared/moderation_config/active)
+          && get(/databases/$(database)/documents/sample_test/shared/moderation_config/active).data.get('enabled', false) == true;
+      }
+      match /moderation_config/{id} { allow get: if signedIn(); allow list, write: if false; }
+      match /account_access/{uid} { allow get: if owner(uid); allow list, write: if false; }
+      match /contribution_summaries/{uid} { allow get: if owner(uid); allow list, write: if false; }
       function owner(uid) { return signedIn() && request.auth.uid == uid; }
       function admin() { return signedIn() && request.auth.token.get('admin', false) == true; }
+      match /route_geometries/{id} {
+        allow read: if true;
+        allow create, update: if activeAccount() && admin()
+          && request.resource.data.routeId == id && request.resource.data.reviewed is bool
+          && request.resource.data.synthetic is bool && nonempty(request.resource.data.version,128)
+          && request.resource.data.points is list && request.resource.data.points.size() >= 2 && request.resource.data.points.size() <= 5000
+          && request.resource.data.stops is list && request.resource.data.stops.size() >= 2 && request.resource.data.stops.size() <= 300
+          && request.resource.data.stopVertices is list && request.resource.data.stopVertices.size() == request.resource.data.stops.size()
+          && nonempty(request.resource.data.source,2048) && nonempty(request.resource.data.reviewReason,2000)
+          && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+        allow delete: if false;
+      }
+      match /fare_publications/{id} {
+        allow read: if admin() || resource.data.state == 'published';
+        allow create: if activeAccount() && admin()
+          && request.resource.data.schemaVersion == 1 && request.resource.data.state == 'published'
+          && request.resource.data.synthetic is bool && request.resource.data.busIds is list
+          && request.resource.data.busIds.size() > 0 && request.resource.data.busIds.size() <= 30
+          && request.resource.data.table.reviewed == true && request.resource.data.mapping.reviewed == true
+          && request.resource.data.mapping.tariffId == id
+          && request.resource.data.table.routePatternId == request.resource.data.mapping.routePatternId
+          && request.resource.data.table.serviceClass == request.resource.data.mapping.serviceClass
+          && request.resource.data.validFromAt is timestamp && request.resource.data.validUntilAt is timestamp
+          && request.resource.data.validFromAt < request.resource.data.validUntilAt
+          && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time
+          && nonempty(request.resource.data.reviewReason, 2000);
+        allow update: if activeAccount() && admin() && resource.data.state == 'published'
+          && request.resource.data.state == 'archived' && changesOnly(['state','archiveReason','updatedBy','updatedAt'])
+          && nonempty(request.resource.data.archiveReason, 2000)
+          && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+        allow delete: if false;
+      }
+      function validFareSnapshot(d) {
+        let q = d.fareQuote;
+        let p = get(/databases/$(database)/documents/sample_test/shared/fare_publications/$(q.tariffId)).data;
+        return q.keys().hasOnly(['amountMinor','currency','tariffId','tariffVersion','mappingId','mappingVersion','source','serviceDate',
+            'routePatternId','serviceClass','boardingOccurrenceId','alightingOccurrenceId'])
+          && p.state == 'published' && d.busId in p.busIds && q.mappingId == q.tariffId
+          && q.currency == 'LKR' && q.tariffVersion == p.table.version && q.mappingVersion == p.mapping.version
+          && q.source == p.table.source && q.serviceClass == p.table.serviceClass && q.routePatternId == p.table.routePatternId
+          && q.routePatternId == get(/databases/$(database)/documents/sample_test/shared/buses/$(d.busId)).data.routeId
+          && q.boardingOccurrenceId == d.fromStationId && q.alightingOccurrenceId == d.toStationId
+          && d.departureAt >= p.validFromAt && d.departureAt < p.validUntilAt
+          && q.amountMinor is int && q.amountMinor > 0
+          && q.amountMinor == p.table.amounts[p.mapping.stageByOccurrence[d.fromStationId]][p.mapping.stageByOccurrence[d.toStationId]];
+      }
       // Approval is provisioned by the project owner/Admin SDK, never by a profile role.
       function approvedOperator() {
         return signedIn() && exists(/databases/$(database)/documents/sample_test/shared/operator_access/$(request.auth.uid))
           && get(/databases/$(database)/documents/sample_test/shared/operator_access/$(request.auth.uid)).data.approved == true;
       }
       function realCatalogue(kind, id) {
-        return exists(/databases/$(database)/documents/sample_test/shared/$(kind)/$(id))
-          && get(/databases/$(database)/documents/sample_test/shared/$(kind)/$(id)).data.get('isDemo', false) != true
-          && get(/databases/$(database)/documents/sample_test/shared/$(kind)/$(id)).data.get('catalogueSource', '') != 'demo';
+        let d = get(/databases/$(database)/documents/sample_test/shared/$(kind)/$(id)).data;
+        return d != null && d.get('deletionPending', false) != true
+          && d.get('isDemo', false) != true && d.get('catalogueSource', '') != 'demo';
       }
       function assignedOperator(busId) {
         return approvedOperator() && realCatalogue('buses', busId)
+          && allowedOperatorRoute(get(/databases/$(database)/documents/sample_test/shared/buses/$(busId)).data.get('routeId', ''))
           && get(/databases/$(database)/documents/sample_test/shared/buses/$(busId)).data.get('catalogueRecordType', 'vehicle') != 'published_timetable'
           && get(/databases/$(database)/documents/sample_test/shared/buses/$(busId)).data.get('driverId', '') == request.auth.uid;
+      }
+      function allowedOperatorRoute(routeId) {
+        return approvedOperator() && realCatalogue('routes', routeId)
+          && exists(/databases/$(database)/documents/sample_test/shared/driver_route_assignments/$(request.auth.uid))
+          && get(/databases/$(database)/documents/sample_test/shared/driver_route_assignments/$(request.auth.uid)).data.get('active', false) == true
+          && get(/databases/$(database)/documents/sample_test/shared/driver_route_assignments/$(request.auth.uid)).data.get('routeId', '') == routeId;
       }
       function text(value, max) { return value is string && value.size() <= max; }
       function nonempty(value, max) { return text(value, max) && value.size() > 0; }
       function changesOnly(fields) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields); }
+      // A minimal owner-only server timestamp receipt; it grants no role or rewards.
+      match /search_clock/{uid} {
+        allow get: if owner(uid);
+        allow delete: if activeAccount() && (owner(uid));
+        allow list: if false;
+        allow create, update: if activeAccount() && (owner(uid)
+          && request.resource.data.keys().hasOnly(['serverTime'])
+          && request.resource.data.serverTime == request.time);
+      }
       match /operator_access/{uid} {
         allow get: if owner(uid) || admin();
-        allow list, write: if admin();
+        allow list: if admin();
+        allow write: if activeAccount() && (admin());
+      }
+      match /driver_route_assignments/{uid} {
+        allow get: if owner(uid) || admin();
+        allow list: if admin();
+        allow create, delete: if activeAccount() && (admin());
+        allow update: if activeAccount() && (admin() || (owner(uid) && allowedOperatorRoute(resource.data.get('routeId', ''))
+          && changesOnly(['claimRevision', 'lastClaimedBusId'])
+          && request.resource.data.claimRevision is int
+          && request.resource.data.claimRevision == resource.data.get('claimRevision', 0) + 1
+          && realCatalogue('buses', request.resource.data.lastClaimedBusId)
+          && getAfter(/databases/$(database)/documents/sample_test/shared/buses/$(request.resource.data.lastClaimedBusId)).data.get('driverId', '') == uid
+          && getAfter(/databases/$(database)/documents/sample_test/shared/buses/$(request.resource.data.lastClaimedBusId)).data.get('routeId', '') == resource.data.routeId));
+      }
+      function recordedClaim(busId) {
+        let before = get(/databases/$(database)/documents/sample_test/shared/driver_route_assignments/$(request.auth.uid)).data;
+        let after = getAfter(/databases/$(database)/documents/sample_test/shared/driver_route_assignments/$(request.auth.uid)).data;
+        return after.get('lastClaimedBusId', '') == busId && after.get('claimRevision', 0) == before.get('claimRevision', 0) + 1;
+      }
+      match /admin_audit/{id} {
+        allow read: if admin();
+        allow create: if activeAccount() && (admin());
+        allow update, delete: if false;
       }
       match /users/{uid} {
         allow read: if owner(uid) || admin();
-        allow create: if owner(uid) && request.resource.data.keys().hasOnly(
+        allow create: if activeAccount() && (owner(uid) && request.resource.data.keys().hasOnly(
             ['uid', 'name', 'email', 'phone', 'role', 'createdAt', 'points', 'reportsSubmitted', 'verifiedCount'])
           && request.resource.data.uid == uid && nonempty(request.resource.data.name, 100)
           && request.resource.data.email == request.auth.token.email
           && (request.resource.data.phone == null || text(request.resource.data.phone, 40))
-          && request.resource.data.role in ['passenger', 'operator']
+          && request.resource.data.role in ['passenger', 'contributor', 'operator']
           && request.resource.data.createdAt == request.time
           && request.resource.data.points == 0 && request.resource.data.reportsSubmitted == 0
-          && request.resource.data.verifiedCount == 0;
-        allow update: if admin() || (owner(uid) && changesOnly(['name', 'phone', 'email'])
+          && request.resource.data.verifiedCount == 0);
+        allow update: if activeAccount() && (admin() || (owner(uid) && changesOnly(['name', 'phone', 'email'])
           && nonempty(request.resource.data.name, 100) && request.resource.data.email == request.auth.token.email
-          && (request.resource.data.phone == null || text(request.resource.data.phone, 40)));
-        allow delete: if admin();
+          && (request.resource.data.phone == null || text(request.resource.data.phone, 40))));
+        allow delete: if activeAccount() && (admin());
       }
       match /journeys/{id} {
         allow get: if (signedIn() && resource == null) || owner(resource.data.passengerId) || admin();
         allow list: if owner(resource.data.passengerId) || admin();
-        allow create: if owner(request.resource.data.passengerId)
+        allow create: if activeAccount() && (owner(request.resource.data.passengerId)
           && request.resource.data.keys().hasOnly(['journeyId', 'passengerId', 'routeId', 'routeNumber',
             'routeTitle', 'busId', 'origin', 'destination', 'status', 'createdAt', 'fromStationId', 'toStationId',
             'selectedDate', 'selectedTimeMinutes', 'departureAt', 'durationMinutes', 'estimatedFareLkr', 'busNo',
-            'wheelchairAccessRequired', 'stepFreeOnly'])
+            'wheelchairAccessRequired', 'stepFreeOnly', 'serviceRunId','fareQuote'])
           && request.resource.data.journeyId == id && request.resource.data.createdAt == request.time
           && request.resource.data.status in ['confirmed', 'active']
           && realCatalogue('buses', request.resource.data.busId)
           && nonempty(request.resource.data.origin, 200) && nonempty(request.resource.data.destination, 200)
-          && validJourneySelection(request.resource.data);
-        allow update: if admin() || (owner(resource.data.passengerId) && changesOnly(['status'])
-          && resource.data.status in ['confirmed', 'active'] && request.resource.data.status in ['completed', 'cancelled']);
-        allow delete: if owner(resource.data.passengerId) || admin();
+          && validJourneySelection(request.resource.data)
+          && (!request.resource.data.keys().hasAny(['fareQuote']) || validFareSnapshot(request.resource.data))
+          && (!request.resource.data.keys().hasAny(['serviceRunId']) || (
+            request.resource.data.serviceRunId is string
+            && get(/databases/$(database)/documents/sample_test/shared/service_runs/$(request.resource.data.serviceRunId)).data.busId == request.resource.data.busId
+            && get(/databases/$(database)/documents/sample_test/shared/service_runs/$(request.resource.data.serviceRunId)).data.initialStopTimes[request.resource.data.fromStationId].estimatedArrival == request.resource.data.departureAt)));
+        allow update: if activeAccount() && (admin() || (owner(resource.data.passengerId) && changesOnly(['status'])
+          && resource.data.status in ['confirmed', 'active'] && request.resource.data.status in ['completed', 'cancelled']));
+        allow delete: if activeAccount() && (owner(resource.data.passengerId) || admin());
       }
       function validJourneySelection(d) {
         // Older schemas remain readable/creatable; any new selection fields require a complete selection.
@@ -327,52 +690,193 @@ service cloud.firestore {
           && d.wheelchairAccessRequired is bool && d.stepFreeOnly is bool);
       }
       match /reward_ledger/{id} {
-        allow read, write: if admin();
-        match /revisions/{revision} { allow read, write: if admin(); }
+        allow read: if admin();
+        allow write: if activeAccount() && (admin());
+        match /revisions/{revision} { allow read: if admin();
+        allow write: if activeAccount() && (admin()); }
       }
-      match /stations/{id} { allow read: if true; allow write: if admin(); }
-      match /routes/{id} { allow read: if true; allow write: if admin(); }
+      match /stations/{id} { allow read: if true; allow write: if activeAccount() && (admin()); }
+      match /routes/{id} { allow read: if true; allow write: if activeAccount() && (admin()); }
       match /buses/{busId} {
         allow read: if true;
-        allow create, delete: if admin();
-        allow update: if admin() || (approvedOperator()
+        allow create, delete: if activeAccount() && (admin());
+        allow update: if activeAccount() && (admin() || (allowedOperatorRoute(resource.data.get('routeId', ''))
+          && realCatalogue('buses', busId)
           && resource.data.get('catalogueRecordType', 'vehicle') != 'published_timetable'
           && resource.data.get('isDemo', false) != true && resource.data.get('catalogueSource', '') != 'demo'
           && ((resource.data.get('driverId', '') in ['', null]
-            && request.resource.data.driverId == request.auth.uid && changesOnly(['driverId']))
+            && request.resource.data.driverId == request.auth.uid && changesOnly(['driverId']) && recordedClaim(busId))
           || (resource.data.get('driverId', '') == request.auth.uid
             && request.resource.data.driverId == resource.data.driverId
             && changesOnly(['rampOk', 'occupancy', 'rampCheckedAt', 'rampCheckedBy'])
             && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['rampOk', 'rampCheckedAt', 'rampCheckedBy'])
               || (request.resource.data.rampOk is bool && request.resource.data.rampCheckedBy == request.auth.uid
                 && request.resource.data.rampCheckedAt == request.time))
-            && request.resource.data.occupancy in ['low', 'medium', 'high'])));
+            && request.resource.data.occupancy in ['low', 'medium', 'high']))));
       }
       function validTelemetry(busId) {
         let d = request.resource.data;
         return d.busId == busId && d.driverId == request.auth.uid && d.operatorId == request.auth.uid
           && d.latitude is number && d.latitude >= -90 && d.latitude <= 90
           && d.longitude is number && d.longitude >= -180 && d.longitude <= 180
+          && !(d.latitude == 0 && d.longitude == 0)
           && d.speed is number && d.speed >= 0 && d.speed <= 200
           && d.timestamp is timestamp && d.timestamp <= request.time
           && d.status in ['active', 'stopped', 'offline', 'completed'] && d.isBroadcasting is bool;
       }
+      function linkedTelemetry(busId) {
+        let d = request.resource.data;
+        let t = getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(d.tripId)).data;
+        return t.busId == busId && t.driverId == request.auth.uid && (
+          (t.status == 'in_progress' && d.isBroadcasting == true && (
+            t.get('serviceRunId', '') == '' || (
+              getAfter(/databases/$(database)/documents/sample_test/shared/service_runs/$(t.serviceRunId)).data.status in ['boarding', 'in_progress']
+              && getAfter(/databases/$(database)/documents/sample_test/shared/service_runs/$(t.serviceRunId)).data.get('handoverPending', false) == false
+              && getAfter(/databases/$(database)/documents/sample_test/shared/operation_locks/$(request.auth.uid)).data.active == true
+              && getAfter(/databases/$(database)/documents/sample_test/shared/operation_locks/$(request.auth.uid)).data.tripId == d.tripId)))
+          || (t.status in ['completed', 'cancelled'] && d.isBroadcasting == false && d.status == 'completed'));
+      }
       match /live_locations/{busId} {
         allow read: if true;
-        allow create, update: if assignedOperator(busId) && validTelemetry(busId);
-        allow delete: if assignedOperator(busId) || admin();
+        allow create, update: if activeAccount() && (assignedOperator(busId) && validTelemetry(busId) && linkedTelemetry(busId)
+          && (resource == null || resource.data.isBroadcasting == false || resource.data.tripId == request.resource.data.tripId));
+        allow delete: if activeAccount() && (admin() || (assignedOperator(busId) && resource.data.isBroadcasting == false
+          && get(/databases/$(database)/documents/sample_test/shared/trips/$(resource.data.tripId)).data.status in ['completed','cancelled']));
       }
-      match /active_buses/{busId} { allow read: if true; allow write: if admin(); }
+      match /active_buses/{busId} { allow read: if true; allow write: if activeAccount() && (admin()); }
       match /trips/{id} {
         allow read: if true;
-        allow create: if assignedOperator(request.resource.data.busId) && request.resource.data.driverId == request.auth.uid
+        allow create: if activeAccount() && (assignedOperator(request.resource.data.busId) && request.resource.data.driverId == request.auth.uid
           && request.resource.data.tripId == id && request.resource.data.createdAt == request.time
-          && request.resource.data.status == 'in_progress';
-        allow update: if assignedOperator(resource.data.busId) && resource.data.driverId == request.auth.uid
+          && request.resource.data.status == 'in_progress' && validDatedTripStart(id));
+        allow update: if activeAccount() && (assignedOperator(resource.data.busId) && resource.data.driverId == request.auth.uid
           && request.resource.data.busId == resource.data.busId && request.resource.data.driverId == resource.data.driverId
           && changesOnly(['status', 'actualDepartureTime', 'stopTimes', 'currentStopIndex'])
-          && request.resource.data.status in ['in_progress', 'completed'];
-        allow delete: if admin();
+          && request.resource.data.status in ['in_progress', 'completed', 'cancelled']
+          && ((resource.data.get('serviceRunId', '') == ''
+            && (resource.data.status == 'in_progress' || request.resource.data.status == resource.data.status)) || validDatedTripUpdate(id)));
+        allow delete: if activeAccount() && (admin());
+      }
+      function validDatedTripStart(id) {
+        let d = request.resource.data;
+        let r = get(/databases/$(database)/documents/sample_test/shared/service_runs/$(id)).data;
+        let after = getAfter(/databases/$(database)/documents/sample_test/shared/service_runs/$(id)).data;
+        let lock = getAfter(/databases/$(database)/documents/sample_test/shared/operation_locks/$(request.auth.uid)).data;
+        let live = getAfter(/databases/$(database)/documents/sample_test/shared/live_locations/$(d.busId)).data;
+        return d.serviceRunId == id && r.status == 'scheduled' && after.status == 'boarding'
+          && d.busId == r.busId && d.stops == r.stops && d.stopTimes == r.initialStopTimes
+          && d.scheduledDepartureTime == r.plannedDepartureAt && d.actualDepartureTime == null && d.currentStopIndex == 0
+          && request.time >= r.plannedDepartureAt - duration.value(5, 'm') && request.time <= r.latestStartAt
+          && r.latestStartAt == r.plannedDepartureAt + duration.value(30,'m')
+          && lock.active == true && lock.tripId == id && lock.busId == d.busId
+          // Lock writes enforce the prior driver lock; telemetry writes enforce bus
+          // occupancy using their own resource, avoiding duplicate access calls.
+          && live.tripId == id && live.isBroadcasting == true;
+      }
+      function validDatedTripUpdate(id) {
+        let d = request.resource.data;
+        let r = getAfter(/databases/$(database)/documents/sample_test/shared/service_runs/$(id)).data;
+        let lock = getAfter(/databases/$(database)/documents/sample_test/shared/operation_locks/$(request.auth.uid)).data;
+        let live = getAfter(/databases/$(database)/documents/sample_test/shared/live_locations/$(d.busId)).data;
+        return d.currentStopIndex >= resource.data.currentStopIndex && d.currentStopIndex < d.stops.size()
+          && d.currentStopIndex <= resource.data.currentStopIndex + 1 && live.tripId == id && lock.tripId == id
+          && (d.actualDepartureTime == resource.data.actualDepartureTime ||
+            (resource.data.actualDepartureTime == null && d.actualDepartureTime == request.time && r.actualDepartureAt == request.time))
+          && ((d.status == 'in_progress' && lock.active == true && live.isBroadcasting == true && r.status in ['boarding', 'in_progress']
+            && r.get('handoverPending', false) == false
+            && (d.currentStopIndex == 0 || d.actualDepartureTime != null))
+            || (d.status in ['completed','cancelled'] && r.status == d.status && lock.active == false && live.isBroadcasting == false
+              && (d.status == 'cancelled' || d.actualDepartureTime != null)));
+      }
+      match /service_schedules/{id} {
+        allow read: if admin();
+        allow create: if activeAccount() && admin()
+          && request.resource.data.schemaVersion == 1
+          && request.resource.data.version == 1
+          && request.resource.data.state == 'published'
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedAt == request.time;
+        allow update: if activeAccount() && admin()
+          && resource.data.state == 'published'
+          && request.resource.data.state == 'retired'
+          && changesOnly(['state','updatedBy','updatedAt'])
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if false;
+      }
+      match /service_runs/{id} {
+        allow read: if true;
+        allow create, delete: if activeAccount() && (admin());
+        allow update: if activeAccount() && (admin() || (assignedOperator(resource.data.busId)
+          && changesOnly(['status','driverId','tripId','startedAt','actualDepartureAt','completedAt'])
+          && request.resource.data.driverId == request.auth.uid && request.resource.data.tripId == id
+          && ((resource.data.status == 'scheduled' && request.resource.data.status == 'boarding'
+            && request.time >= resource.data.plannedDepartureAt - duration.value(5,'m') && request.time <= resource.data.latestStartAt
+            && resource.data.latestStartAt == resource.data.plannedDepartureAt + duration.value(30,'m')
+            && request.resource.data.startedAt == request.time && request.resource.data.actualDepartureAt == null
+            && (request.time <= resource.data.plannedDepartureAt || validLateNote(id))
+            && getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(id)).data.serviceRunId == id
+            && getAfter(/databases/$(database)/documents/sample_test/shared/operation_locks/$(request.auth.uid)).data.tripId == id)
+          || (resource.data.status == 'boarding' && request.resource.data.status == 'in_progress'
+            && request.resource.data.actualDepartureAt == request.time
+            && getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(id)).data.actualDepartureTime == request.time)
+          || (resource.data.status in ['boarding','in_progress','completed','cancelled']
+            && request.resource.data.status in ['completed','cancelled'] && request.resource.data.completedAt == request.time
+            && getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(id)).data.status == request.resource.data.status
+            && getAfter(/databases/$(database)/documents/sample_test/shared/operation_locks/$(request.auth.uid)).data.active == false))));
+      }
+      match /operation_locks/{uid} {
+        allow get: if owner(uid) || admin();
+        allow list: if admin();
+        allow delete: if activeAccount() && (admin());
+        allow create, update: if activeAccount() && (admin() || (owner(uid) && assignedOperator(request.resource.data.busId)
+          && request.resource.data.keys().hasOnly(['active','busId','tripId','updatedAt']) && request.resource.data.updatedAt == request.time
+          && ((request.resource.data.active == true
+            && getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(request.resource.data.tripId)).data.driverId == uid
+            && getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(request.resource.data.tripId)).data.busId == request.resource.data.busId
+            && getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(request.resource.data.tripId)).data.serviceRunId == request.resource.data.tripId
+            && getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(request.resource.data.tripId)).data.status == 'in_progress'
+            && (!exists(/databases/$(database)/documents/sample_test/shared/operation_locks/$(uid)) || resource.data.active == false || resource.data.tripId == request.resource.data.tripId))
+          || (request.resource.data.active == false && resource.data.tripId == request.resource.data.tripId && resource.data.busId == request.resource.data.busId
+            && getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(resource.data.tripId)).data.status in ['completed','cancelled']))));
+      }
+      function validLateNote(id) {
+        let note = getAfter(/databases/$(database)/documents/sample_test/shared/driver_trip_notes/$(id)).data;
+        return note.driverId == request.auth.uid && nonempty(note.reason,2000) && note.reason.size() >= 5;
+      }
+      match /driver_trip_notes/{id} {
+        allow get: if admin() || owner(resource.data.driverId);
+        allow list: if admin();
+        allow update, delete: if activeAccount() && (admin());
+        allow create: if activeAccount() && (assignedOperator(request.resource.data.busId)
+          && request.resource.data.keys().hasOnly(['driverId','busId','reason','createdAt'])
+          && request.resource.data.driverId == request.auth.uid && request.resource.data.createdAt == request.time
+          && nonempty(request.resource.data.reason,2000) && request.resource.data.reason.size() >= 5
+          && getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(id)).data.serviceRunId == id
+          && getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(id)).data.driverId == request.auth.uid
+          && getAfter(/databases/$(database)/documents/sample_test/shared/trips/$(id)).data.busId == request.resource.data.busId);
+      }
+      function cooldownPath(d) {
+        return /databases/$(database)/documents/sample_test/shared/report_cooldowns/$(d.userId)/$(d.targetType)/$(d.targetId)/issues/$(d.category);
+      }
+      function committedCooldown(d, id) {
+        let guard = getAfter(cooldownPath(d)).data;
+        return guard.reportId == id && guard.lastPublishedAt == request.time;
+      }
+      match /report_cooldowns/{uid}/{type}/{target}/issues/{issue} {
+        allow get: if owner(uid);
+        allow list, delete: if false;
+        allow create, update: if activeAccount() && (owner(uid) && type in ['bus', 'station']
+          && request.resource.data.keys().hasOnly(['reportId', 'lastPublishedAt'])
+          && nonempty(request.resource.data.reportId, 128)
+          && request.resource.data.lastPublishedAt == request.time
+          && (resource == null || resource.data.lastPublishedAt <= request.time - duration.value(300, 's'))
+          && !exists(/databases/$(database)/documents/sample_test/shared/reports/$(request.resource.data.reportId))
+          && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(request.resource.data.reportId)).data.userId == uid
+          && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(request.resource.data.reportId)).data.targetType == type
+          && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(request.resource.data.reportId)).data.targetId == target
+          && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(request.resource.data.reportId)).data.category == issue
+          && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(request.resource.data.reportId)).data.createdAt == request.time);
       }
       function validReport(d) {
         return d.targetType in ['bus', 'station'] && nonempty(d.targetId, 128)
@@ -430,39 +934,41 @@ service cloud.firestore {
       }
       match /reports/{id} {
         // All client-created records in this collection are explicitly published.
-        allow read: if true;
-        allow create: if owner(request.resource.data.userId)
+        allow get: if (signedIn() && resource == null) || resource.data.get('policyVersion', 1) != 2 || resource.data.status in ['active', 'resolved'] || owner(resource.data.userId) || admin();
+        allow list: if resource.data.status in ['active', 'resolved'] || owner(resource.data.userId) || admin();
+        allow create: if activeAccount() && (!v2Enabled() && owner(request.resource.data.userId)
           && request.resource.data.keys().hasOnly(['targetType', 'targetId', 'targetName', 'problemType', 'severity', 'category',
             'subCategory', 'condition', 'crowdingLevel', 'publicationState', 'isDemo', 'description', 'photoUrl', 'status',
             'createdAt', 'lastConfirmedAt', 'confirmCount', 'falseCount', 'userId', 'confirmedBy', 'flaggedBy'])
           && validReport(request.resource.data) && validVotes(request.resource.data)
+          && committedCooldown(request.resource.data, id)
           && request.resource.data.createdAt == request.time && request.resource.data.lastConfirmedAt == null
           && request.resource.data.publicationState == 'published' && request.resource.data.isDemo == false
-          && request.resource.data.status == 'active' && request.resource.data.confirmCount == 0 && request.resource.data.falseCount == 0;
-        allow update: if admin() || ownVoteOnly() || ownRecheck(id) || (owner(resource.data.userId)
+          && request.resource.data.status == 'active' && request.resource.data.confirmCount == 0 && request.resource.data.falseCount == 0);
+        allow update: if activeAccount() && (resource.data.get('policyVersion', 1) == 1 && (admin() || ownVoteOnly() || ownRecheck(id) || (owner(resource.data.userId)
           && resource.data.status == 'active' && changesOnly(['status', 'resolvedBy', 'resolvedAt'])
           && request.resource.data.status == 'resolved' && request.resource.data.resolvedBy == request.auth.uid
           && request.resource.data.resolvedAt == request.time
           && existsAfter(/databases/$(database)/documents/sample_test/shared/report_resolutions/$(id))
           && getAfter(/databases/$(database)/documents/sample_test/shared/report_resolutions/$(id)).data.resolvedBy == request.auth.uid
-          && getAfter(/databases/$(database)/documents/sample_test/shared/report_resolutions/$(id)).data.resolvedAt == request.time);
-        allow delete: if admin() || owner(resource.data.userId);
+          && getAfter(/databases/$(database)/documents/sample_test/shared/report_resolutions/$(id)).data.resolvedAt == request.time)));
+        allow delete: if activeAccount() && (resource.data.get('policyVersion', 1) == 1 && (admin() || owner(resource.data.userId)));
         match /rechecks/{checkId} {
           allow read: if true;
-          allow create: if signedIn()
+          allow create: if activeAccount() && (signedIn()
             && request.resource.data.keys().hasOnly(['reportId', 'userId', 'checkedAt'])
             && request.resource.data.reportId == id && request.resource.data.userId == request.auth.uid
             && request.resource.data.checkedAt == request.time
             && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.lastRecheckId == checkId
             && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.lastRecheckedBy == request.auth.uid
             && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.lastRecheckedAt == request.time
-            && get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.get('lastRecheckId', '') != checkId;
+            && get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.get('lastRecheckId', '') != checkId);
           allow update, delete: if false;
         }
       }
       match /report_resolutions/{id} {
         allow read: if true;
-        allow create: if request.resource.data.keys().hasOnly(['reportId', 'resolvedBy', 'resolvedAt',
+        allow create: if activeAccount() && (request.resource.data.keys().hasOnly(['reportId', 'resolvedBy', 'resolvedAt',
           'targetType', 'targetId', 'problemType', 'category', 'previousStatus', 'status'])
           && owner(get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.userId)
           && get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.status == 'active'
@@ -475,15 +981,23 @@ service cloud.firestore {
           && request.resource.data.category == get(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.category
           && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.status == 'resolved'
           && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.resolvedBy == request.auth.uid
-          && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.resolvedAt == request.time;
-        allow update, delete: if admin();
+          && getAfter(/databases/$(database)/documents/sample_test/shared/reports/$(id)).data.resolvedAt == request.time);
+        allow update, delete: if activeAccount() && (admin());
+      }
+      function assistanceDriver(d) {
+        return d.get('policyVersion', 1) != 2 ? assignedOperator(d.busId) :
+          (signedIn() && d.driverId == request.auth.uid && assignedOperator(d.busId)
+            && get(/databases/$(database)/documents/sample_test/shared/service_runs/$(d.serviceRunId)).data.status in ['scheduled','boarding','in_progress']
+            && (get(/databases/$(database)/documents/sample_test/shared/service_runs/$(d.serviceRunId)).data.status == 'scheduled'
+              || get(/databases/$(database)/documents/sample_test/shared/service_runs/$(d.serviceRunId)).data.driverId == request.auth.uid));
       }
       match /boarding_requests/{id} {
         // A signed-in creator must be able to check a missing ID in a transaction.
         allow get: if (signedIn() && resource == null) || owner(resource.data.riderId)
-          || assignedOperator(resource.data.busId) || admin();
-        allow list: if owner(resource.data.riderId) || assignedOperator(resource.data.busId) || admin();
-        allow create: if owner(request.resource.data.riderId)
+          || assistanceDriver(resource.data) || admin();
+        allow list: if owner(resource.data.riderId) || assistanceDriver(resource.data) || admin();
+        allow create: if activeAccount() && (owner(request.resource.data.riderId)
+          && (!exists(/databases/$(database)/documents/sample_test/shared/assistance_config/active) || get(/databases/$(database)/documents/sample_test/shared/assistance_config/active).data.enabled != true)
           && request.resource.data.keys().hasOnly(['riderId', 'riderName', 'busId', 'routeNo', 'stationId', 'stopName',
             'assistanceTypes', 'status', 'createdAt', 'purpose'])
           && realCatalogue('buses', request.resource.data.busId)
@@ -495,13 +1009,13 @@ service cloud.firestore {
           && request.resource.data.get('purpose', 'boarding') in ['boarding', 'alighting']
           && request.resource.data.assistanceTypes.hasOnly(request.resource.data.get('purpose', 'boarding') == 'alighting'
             ? ['Deploy Ramp', 'Extra Time', 'Alighting Help'] : ['Deploy Ramp', 'Extra Time', 'Boarding Help'])
-          && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
-        allow update: if admin() || (changesOnly(['status']) && (
+          && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time);
+        allow update: if resource.data.get('policyVersion', 1) != 2 && activeAccount() && (admin() || (changesOnly(['status']) && (
           (owner(resource.data.riderId) && resource.data.status in ['pending', 'acknowledged'] && request.resource.data.status == 'cancelled')
           || (assignedOperator(resource.data.busId) && (
             (resource.data.status == 'pending' && request.resource.data.status in ['acknowledged', 'rejected'])
-            || (resource.data.status == 'acknowledged' && request.resource.data.status == 'completed')))));
-        allow delete: if admin();
+            || (resource.data.status == 'acknowledged' && request.resource.data.status == 'completed'))))));
+        allow delete: if resource.data.get('policyVersion', 1) != 2 && activeAccount() && (admin());
       }
       match /{document=**} { allow read, write: if false; }
 

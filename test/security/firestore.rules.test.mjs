@@ -10,6 +10,59 @@ const auth = (uid, claims = {}) => env.authenticatedContext(uid, { email: `${uid
 const guest = () => env.unauthenticatedContext().firestore();
 const ref = (db, path) => doc(db, path);
 const stamp = () => Timestamp.fromMillis(Date.now() - 3600000);
+test('reviewed road geometry is active-admin-owned, scoped and withdrawable without deletion',async()=>{
+  const shape={reviewed:true,routeId:'route1',synthetic:true,version:'shape-v1',source:'https://authority.example/fictional',
+    stops:['s1','s2'],stopVertices:[0,1],points:[{lat:6.9,lng:79.8},{lat:6.91,lng:79.81}],reviewReason:'Fictional road review',updatedBy:'admin',updatedAt:serverTimestamp()};
+  const db=auth('admin',{admin:true});
+  await assertFails(setDoc(ref(auth('alice'),'route_geometries/route1'),shape));
+  await assertFails(setDoc(ref(auth('op'),'route_geometries/route1'),shape));
+  await assertSucceeds(setDoc(ref(db,'route_geometries/route1'),shape));
+  assert.equal((await assertSucceeds(getDoc(ref(guest(),'route_geometries/route1')))).data().version,'shape-v1');
+  await assertFails(setDoc(ref(db,'route_geometries/wrong-id'),shape));
+  await assertFails(deleteDoc(ref(db,'route_geometries/route1')));
+  await assertSucceeds(updateDoc(ref(db,'route_geometries/route1'),{reviewed:false,updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(ref(auth('alice'),'sample_test/shared/route_geometries/route1'),shape));
+  await env.withSecurityRulesDisabled(async c=>setDoc(ref(c.firestore(),'sample_test/shared/users/admin'),{uid:'admin',role:'passenger'}));
+  await assertSucceeds(setDoc(ref(db,'sample_test/shared/route_geometries/route1'),shape));
+  await assertSucceeds(updateDoc(ref(db,'sample_test/shared/route_geometries/route1'),{reviewed:false,updatedAt:serverTimestamp()}));
+  assert.equal((await getDoc(ref(guest(),'route_geometries/route1'))).data().reviewed,false);
+  await env.withSecurityRulesDisabled(async c=>setDoc(ref(c.firestore(),'account_access/admin'),{manualSuspended:true}));
+  await assertFails(updateDoc(ref(db,'route_geometries/route1'),{reviewed:true,updatedAt:serverTimestamp()}));
+});
+const farePublication=()=>({schemaVersion:1,state:'published',synthetic:true,busIds:['bus1'],reviewReason:'FICTIONAL TEST source checked',
+  table:{reviewed:true,currency:'LKR',version:'t1',routePatternId:'route1',serviceClass:'normal',source:'https://authority.example/fixture',amounts:{A:{B:12345}}},
+  mapping:{reviewed:true,version:'m1',tariffId:'fare1',routePatternId:'route1',serviceClass:'normal',occurrences:['s1','s2'],stageByOccurrence:{s1:'A',s2:'B'}},
+  validFromAt:Timestamp.fromMillis(Date.now()-86400000),validUntilAt:Timestamp.fromMillis(Date.now()+86400000),updatedBy:'admin',updatedAt:serverTimestamp()});
+test('fare publications require active admin; versions are immutable and archives leave public queries',async()=>{
+  const data=farePublication(),db=auth('admin',{admin:true});
+  await assertFails(setDoc(ref(auth('alice'),'fare_publications/fare1'),data));
+  await assertFails(setDoc(ref(auth('op'),'fare_publications/fare1'),data));
+  await assertSucceeds(setDoc(ref(db,'fare_publications/fare1'),data));
+  await assertSucceeds(getDoc(ref(guest(),'fare_publications/fare1')));
+  await assertFails(updateDoc(ref(db,'fare_publications/fare1'),{'table.amounts.A.B':1,updatedAt:serverTimestamp()}));
+  await assertFails(deleteDoc(ref(db,'fare_publications/fare1')));
+  await assertSucceeds(updateDoc(ref(db,'fare_publications/fare1'),{state:'archived',archiveReason:'Superseded fictional tariff',updatedBy:'admin',updatedAt:serverTimestamp()}));
+  await assertFails(getDoc(ref(guest(),'fare_publications/fare1')));
+  const visible=await assertSucceeds(getDocs(query(collection(guest(),'fare_publications'),where('state','==','published'))));assert.equal(visible.size,0);
+  await assertFails(updateDoc(ref(db,'fare_publications/fare1'),{state:'published',updatedAt:serverTimestamp()}));
+});
+test('saved tariff snapshots must match published matrix/version/bus/segment and effective instants',async()=>{
+  await setDoc(ref(auth('admin',{admin:true}),'fare_publications/fare1'),farePublication());
+  const data={journeyId:'fare-save',passengerId:'alice',routeId:'route1',routeNumber:'1',routeTitle:'Route 1',busId:'bus1',origin:'Stop 1',destination:'Stop 2',
+    status:'confirmed',createdAt:serverTimestamp(),fromStationId:'s1',toStationId:'s2',selectedDate:Timestamp.now(),departureAt:Timestamp.now(),durationMinutes:10,
+    estimatedFareLkr:0,wheelchairAccessRequired:false,stepFreeOnly:false,
+    fareQuote:{amountMinor:12345,currency:'LKR',tariffId:'fare1',tariffVersion:'t1',mappingId:'fare1',mappingVersion:'m1',source:'https://authority.example/fixture',serviceDate:'2026-10-16',
+      routePatternId:'route1',serviceClass:'normal',boardingOccurrenceId:'s1',alightingOccurrenceId:'s2'}};
+  await assertSucceeds(setDoc(ref(auth('alice'),'journeys/fare-save'),data));
+  for(const change of [{amountMinor:1},{tariffVersion:'forged'},{serviceClass:'luxury'},{source:'https://forged.example'},{boardingOccurrenceId:'s2'}]){
+    await assertFails(setDoc(ref(auth('alice'),'journeys/forged'),{...data,journeyId:'forged',fareQuote:{...data.fareQuote,...change}}));
+  }
+  await assertFails(setDoc(ref(auth('alice'),'journeys/wrong-bus'),{...data,journeyId:'wrong-bus',busId:'bus2'}));
+  await assertFails(setDoc(ref(auth('alice'),'journeys/outdated'),{...data,journeyId:'outdated',departureAt:Timestamp.fromMillis(Date.now()+2*86400000)}));
+  await updateDoc(ref(auth('admin',{admin:true}),'fare_publications/fare1'),{state:'archived',archiveReason:'Retired fixture',updatedBy:'admin',updatedAt:serverTimestamp()});
+  await assertSucceeds(getDoc(ref(auth('alice'),'journeys/fare-save')));
+  await assertFails(setDoc(ref(auth('alice'),'journeys/retired'),{...data,journeyId:'retired'}));
+});
 const profile = (uid = 'alice') => ({ uid, name: 'Rider', email: `${uid}@example.test`, phone: null,
   role: 'passenger', createdAt: serverTimestamp(), points: 0, reportsSubmitted: 0, verifiedCount: 0 });
 const report = (uid = 'alice') => ({ userId: uid, targetType: 'bus', targetId: 'bus1', targetName: 'Bus 1',
@@ -17,10 +70,66 @@ const report = (uid = 'alice') => ({ userId: uid, targetType: 'bus', targetId: '
   condition: 'barrier', crowdingLevel: 'low', description: '', photoUrl: '', publicationState: 'published',
   isDemo: false, status: 'active', createdAt: serverTimestamp(), lastConfirmedAt: null,
   confirmCount: 0, falseCount: 0, confirmedBy: [], flaggedBy: [] });
+const cooldownRef = (db, data, prefix = '') => ref(db, `${prefix}report_cooldowns/${data.userId}/${data.targetType}/${data.targetId}/issues/${data.category}`);
+async function publishReport(db, id, data = report(), prefix = '') {
+  return runTransaction(db, async tx => {
+    const target = ref(db, prefix + 'reports/' + id), guard = cooldownRef(db, data, prefix);
+    const [existing] = await Promise.all([tx.get(target), tx.get(guard)]);
+    if (existing.exists()) return existing.data();
+    tx.set(target, data);
+    tx.set(guard, {reportId:id, lastPublishedAt:serverTimestamp()});
+    return data;
+  });
+}
 const request = (uid = 'alice') => ({ riderId: uid, riderName: 'Rider', busId: 'bus1', routeNo: '1',
   stationId: 's1', stopName: 'Stop 1', assistanceTypes: ['Deploy Ramp'], status: 'pending', createdAt: serverTimestamp() });
 const telemetry = () => ({ busId: 'bus1', driverId: 'op', operatorId: 'op', latitude: 6.9, longitude: 79.8,
-  speed: 12, timestamp: serverTimestamp(), status: 'active', isBroadcasting: true });
+  speed: 12, timestamp: serverTimestamp(), status: 'active', isBroadcasting: true, tripId:'fixture-trip' });
+async function datedRun(id, {busId='bus1', planned=Date.now()+60000, stops=['s1','s2']}={}) {
+  const data={busId,routeId:'route1',routeNo:'1',serviceDate:'2026-10-16',status:'scheduled',
+    plannedDepartureAt:Timestamp.fromMillis(planned),latestStartAt:Timestamp.fromMillis(planned+30*60000),stops,
+    initialStopTimes:Object.fromEntries(stops.map((s,i)=>[s,{estimatedArrival:Timestamp.fromMillis(planned+i*600000),actualArrival:null}]))};
+  await setDoc(ref(auth('admin',{admin:true}),`service_runs/${id}`),data);
+  return data;
+}
+async function startDated(db,id,run,{reason='',spoofDeparture=false}={}) {
+  return runTransaction(db,async tx=>{
+    const t=ref(db,`trips/${id}`),r=ref(db,`service_runs/${id}`),l=ref(db,`live_locations/${run.busId}`),lock=ref(db,'operation_locks/op');
+    await Promise.all([tx.get(t),tx.get(r),tx.get(l),tx.get(lock)]);
+    tx.set(t,{tripId:id,serviceRunId:id,busId:run.busId,driverId:'op',routeNo:'1',stops:run.stops,status:'in_progress',
+      currentStopIndex:0,stopTimes:run.initialStopTimes,createdAt:serverTimestamp(),actualDepartureTime:null,
+      scheduledDepartureTime:spoofDeparture ? Timestamp.fromMillis(Date.now()-60000) : run.plannedDepartureAt});
+    tx.update(r,{status:'boarding',driverId:'op',tripId:id,startedAt:serverTimestamp(),actualDepartureAt:null});
+    if(reason)tx.set(ref(db,`driver_trip_notes/${id}`),{driverId:'op',busId:run.busId,reason,createdAt:serverTimestamp()});
+    tx.set(l,{...telemetry(),busId:run.busId,tripId:id,status:'stopped'});
+    tx.set(lock,{active:true,busId:run.busId,tripId:id,updatedAt:serverTimestamp()});
+  });
+}
+async function departDated(db,id) {
+  const batch=writeBatch(db);
+  batch.update(ref(db,`service_runs/${id}`),{status:'in_progress',actualDepartureAt:serverTimestamp()});
+  batch.update(ref(db,`trips/${id}`),{actualDepartureTime:serverTimestamp()});
+  await batch.commit();
+}
+async function finishDated(db,id,busId,status='completed') {
+  const batch=writeBatch(db);
+  batch.update(ref(db,`service_runs/${id}`),{status,completedAt:serverTimestamp()});
+  batch.update(ref(db,`trips/${id}`),{status});
+  batch.update(ref(db,`live_locations/${busId}`),{status:'completed',isBroadcasting:false});
+  batch.update(ref(db,'operation_locks/op'),{active:false,updatedAt:serverTimestamp()});
+  await batch.commit();
+}
+const claimBus = (uid, busId = 'bus2') => {
+  const db = auth(uid);
+  return runTransaction(db, async tx => {
+    const bus = ref(db, `buses/${busId}`), grant = ref(db, `driver_route_assignments/${uid}`);
+    const [b, g] = await Promise.all([tx.get(bus), tx.get(grant)]);
+    if (b.data().driverId && b.data().driverId !== uid) throw Error('already assigned');
+    if (b.data().driverId === uid) return;
+    tx.update(bus, {driverId: uid});
+    tx.update(grant, {claimRevision: (g.data()?.claimRevision ?? 0) + 1, lastClaimedBusId: busId});
+  });
+};
 
 test('sample scope supports reports, assistance and operator writes without granting real approval', async () => {
   const p='sample_test/shared/';
@@ -31,12 +140,15 @@ test('sample scope supports reports, assistance and operator writes without gran
       setDoc(ref(db,p+'users/op'),{...profile('op'),role:'operator',createdAt:stamp()}),
       setDoc(ref(db,p+'operator_access/op'),{approved:true,sampleScenario:true}),
       setDoc(ref(db,'operator_access/op'),{approved:false}),
-      setDoc(ref(db,p+'buses/bus1'),{driverId:'op',stops:['s1','s2'],occupancy:'low'}),
+      setDoc(ref(db,p+'buses/bus1'),{driverId:'op',routeId:'route1',stops:['s1','s2'],occupancy:'low'}),
+      setDoc(ref(db,p+'routes/route1'),{stops:['s1','s2']}),
+      setDoc(ref(db,p+'driver_route_assignments/op'),{active:true,routeId:'route1'}),
+      setDoc(ref(db,p+'trips/fixture-trip'),{busId:'bus1',driverId:'op',status:'in_progress'}),
       setDoc(ref(db,p+'stations/s1'),{name:'SAMPLE Stop 1'}),
       setDoc(ref(db,p+'stations/s2'),{name:'SAMPLE Stop 2'}),
     ]);
   });
-  await assertSucceeds(setDoc(ref(auth('alice'),p+'reports/check'),report()));
+  await assertSucceeds(publishReport(auth('alice'), 'check', report(), p));
   await assertSucceeds(setDoc(ref(auth('alice'),p+'boarding_requests/request'),request()));
   await assertSucceeds(updateDoc(ref(auth('op'),p+'boarding_requests/request'),{status:'acknowledged'}));
   await assertSucceeds(setDoc(ref(auth('op'),p+'live_locations/bus1'),telemetry()));
@@ -85,12 +197,15 @@ beforeEach(async () => {
     await Promise.all([
       setDoc(ref(db, 'users/alice'), { ...profile(), createdAt: stamp() }),
       setDoc(ref(db, 'users/op'), { ...profile('op'), role: 'operator', createdAt: stamp() }),
-      setDoc(ref(db, 'buses/bus1'), { driverId: 'op', rampOk: true, occupancy: 'low', stops: ['s1', 's2'] }),
-      setDoc(ref(db, 'buses/bus2'), { driverId: null, rampOk: true, occupancy: 'low', stops: ['s1', 's2'] }),
+      setDoc(ref(db, 'buses/bus1'), { driverId: 'op', routeId:'route1', rampOk: true, occupancy: 'low', stops: ['s1', 's2'] }),
+      setDoc(ref(db, 'buses/bus2'), { driverId: null, routeId:'route1', rampOk: true, occupancy: 'low', stops: ['s1', 's2'] }),
       setDoc(ref(db, 'stations/s1'), { name: 'Stop 1' }), setDoc(ref(db, 'stations/s2'), { name: 'Stop 2' }),
       setDoc(ref(db, 'routes/route1'), { stops: ['s1', 's2'] }),
       setDoc(ref(db, 'operator_access/op'), { approved: true }),
       setDoc(ref(db, 'operator_access/otherop'), { approved: true }),
+      setDoc(ref(db, 'driver_route_assignments/op'), { active: true, routeId:'route1', claimRevision:0 }),
+      setDoc(ref(db, 'driver_route_assignments/otherop'), { active: true, routeId:'route1', claimRevision:0 }),
+      setDoc(ref(db,'trips/fixture-trip'),{busId:'bus1',driverId:'op',status:'in_progress'}),
       setDoc(ref(db, 'reports/r1'), { ...report(), createdAt: stamp() }),
       setDoc(ref(db, 'boarding_requests/a1'), { ...request(), createdAt: stamp() }),
       setDoc(ref(db, 'journeys/j1'), { journeyId: 'j1', passengerId: 'alice', busId: 'bus1',
@@ -120,6 +235,18 @@ test('profile creation binds UID/email and initializes untrusted counters to zer
   await assertFails(setDoc(ref(auth('carol'), 'users/carol'), { ...profile('carol'), points: 999 }));
   await assertFails(setDoc(ref(auth('carol'), 'users/carol'), { ...profile('carol'), email: 'other@example.test' }));
 });
+
+test('reporters register without approval but cannot self-promote or operate buses', async () => {
+  const reporter = auth('reporter');
+  await assertSucceeds(setDoc(ref(reporter, 'users/reporter'), { ...profile('reporter'), role: 'contributor' }));
+  await assertSucceeds(publishReport(reporter, 'reporter-observation', report('reporter')));
+  await assertSucceeds(setDoc(ref(reporter, 'boarding_requests/reporter-help'), request('reporter')));
+  await assertFails(updateDoc(ref(reporter, 'users/reporter'), { role: 'admin' }));
+  await assertFails(setDoc(ref(reporter, 'operator_access/reporter'), { approved: true }));
+  await assertFails(updateDoc(ref(reporter, 'buses/bus2'), { driverId: 'reporter' }));
+  await assertFails(setDoc(ref(reporter, 'live_locations/bus1'), { ...telemetry(), driverId: 'reporter', operatorId: 'reporter' }));
+  await assertFails(setDoc(ref(auth('untrusted-admin'), 'users/untrusted-admin'), { ...profile('untrusted-admin'), role: 'admin' }));
+});
 test('profile edits cannot change role, counters, creation time or UID', async () => {
   const alice = auth('alice');
   await assertSucceeds(updateDoc(ref(alice, 'users/alice'), { name: 'New display name', phone: '123' }));
@@ -146,7 +273,7 @@ test('only approved assigned operators can update bus conditions', async () => {
   await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), { stops: ['s2'] }));
 });
 test('approved operators can claim unassigned buses but cannot take over assigned buses', async () => {
-  await assertSucceeds(updateDoc(ref(auth('otherop'), 'buses/bus2'), { driverId: 'otherop' }));
+  await assertSucceeds(claimBus('otherop'));
   await assertFails(updateDoc(ref(auth('otherop'), 'buses/bus1'), { driverId: 'otherop' }));
   await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), { driverId: 'alice' }));
 });
@@ -178,11 +305,14 @@ test('journey creation validates ownership, target and document ID', async () =>
   await assertFails(setDoc(ref(auth('alice'), 'journeys/missing'), { ...journey, journeyId: 'missing', busId: 'absent' }));
 });
 test('published reports require their real author, known target and no fabricated confirmations', async () => {
-  await assertSucceeds(setDoc(ref(auth('alice'), 'reports/new'), report()));
+  await assertSucceeds(publishReport(auth('alice'), 'new'));
   for (const fields of [{ userId: 'bob' }, { targetId: 'missing' }, { confirmCount: 1, confirmedBy: ['bob'] },
     { lastConfirmedAt: serverTimestamp() }, { isDemo: true }, { publicationState: 'pendingUpload' },
     { photoUrl: 'file:///private/photo.jpg' }, { extra: true }])
-    await assertFails(setDoc(ref(auth('alice'), 'reports/bad'), { ...report(), ...fields }));
+    {
+      await env.withSecurityRulesDisabled(async c => { await deleteDoc(cooldownRef(c.firestore(),report())); });
+      await assertFails(publishReport(auth('alice'), 'bad', { ...report(), ...fields }));
+    }
 });
 
 test('saved journey transaction preserves endpoint/date/time selection and retry is read-only', async () => {
@@ -219,6 +349,21 @@ test('new journey selection rejects incomplete target, invalid time and inconsis
     await assertFails(setDoc(ref(auth('alice'), 'journeys/bad'), {...base, journeyId: 'bad', ...fields}));
   }
   await assertFails(getDoc(ref(guest(), 'journeys/missing')));
+});
+test('saved run identity must match the selected physical bus and boarding time', async () => {
+  const planned = Date.now() + 60000;
+  await datedRun('bookmark-run', {planned});
+  const base = {journeyId:'run-bookmark', passengerId:'alice', busId:'bus1', origin:'Stop 1',destination:'Stop 2',
+    fromStationId:'s1',toStationId:'s2', selectedDate:Timestamp.fromMillis(planned), departureAt:Timestamp.fromMillis(planned),
+    durationMinutes:10,estimatedFareLkr:70,wheelchairAccessRequired:false,stepFreeOnly:false,
+    status:'confirmed',createdAt:serverTimestamp(), serviceRunId:'bookmark-run'};
+  await assertSucceeds(setDoc(ref(auth('alice'),'journeys/run-bookmark'),base));
+  await assertFails(setDoc(ref(auth('alice'),'journeys/wrong-run'),{...base,journeyId:'wrong-run',serviceRunId:'missing'}));
+  await assertFails(setDoc(ref(auth('alice'),'journeys/wrong-bus'),{...base,journeyId:'wrong-bus',busId:'bus2'}));
+  await assertFails(setDoc(ref(auth('alice'),'journeys/wrong-time'),{...base,journeyId:'wrong-time',departureAt:Timestamp.fromMillis(planned+60000)}));
+  await assertFails(updateDoc(ref(auth('alice'),'journeys/run-bookmark'),{serviceRunId:'missing'}));
+  await assertFails(deleteDoc(ref(auth('bob'),'journeys/run-bookmark')));
+  await assertSucceeds(deleteDoc(ref(auth('alice'),'journeys/run-bookmark')));
 });
 test('another rider can confirm only their own vote at server time', async () => {
   await assertSucceeds(updateDoc(ref(auth('bob'), 'reports/r1'), { confirmedBy: ['bob'], confirmCount: 1, lastConfirmedAt: serverTimestamp() }));
@@ -379,14 +524,76 @@ test('rider cancellation cannot alter request destination/identity', async () =>
   await assertSucceeds(updateDoc(ref(auth('alice'), 'boarding_requests/a1'), { status: 'cancelled' }));
   await assertFails(updateDoc(ref(auth('alice'), 'boarding_requests/a1'), { busId: 'bus2' }));
 });
-test('trips are created/updated only by their assigned approved operator', async () => {
+test('legacy trips cannot be newly created; existing trips retain owner-only reconciliation', async () => {
   const trip = { tripId: 't1', busId: 'bus1', driverId: 'op', createdAt: serverTimestamp(), status: 'in_progress',
     stops: ['s1', 's2'], stopTimes: {}, currentStopIndex: 0 };
-  await assertSucceeds(setDoc(ref(auth('op'), 'trips/t1'), trip));
+  await assertFails(setDoc(ref(auth('op'), 'trips/t1'), trip));
+  await env.withSecurityRulesDisabled(async c=>setDoc(ref(c.firestore(),'trips/t1'),{...trip,createdAt:stamp()}));
   await assertFails(updateDoc(ref(auth('alice'), 'trips/t1'), { status: 'completed' }));
   await assertFails(updateDoc(ref(auth('otherop'), 'trips/t1'), { status: 'completed' }));
   await assertFails(updateDoc(ref(auth('op'), 'trips/t1'), { driverId: 'bob' }));
   await assertSucceeds(updateDoc(ref(auth('op'), 'trips/t1'), { status: 'completed' }));
+  await assertFails(updateDoc(ref(auth('op'), 'trips/t1'), { status: 'in_progress' }));
+});
+
+test('dated departures are admin-owned and early starts cannot spoof planned time or pre-start GPS', async () => {
+  const db=auth('op'), run=await datedRun('early-run',{planned:Date.now()+6*60000});
+  await assertFails(updateDoc(ref(db,'service_runs/early-run'),{plannedDepartureAt:Timestamp.fromMillis(Date.now())}));
+  await assertFails(setDoc(ref(db,'service_runs/self-created'),run));
+  await assertFails(startDated(db,'early-run',run));
+  await assertFails(startDated(db,'early-run',run,{spoofDeparture:true}));
+  await assertFails(setDoc(ref(db,'live_locations/bus1'),{...telemetry(),tripId:'early-run'}));
+  assert.equal((await getDoc(ref(db,'trips/early-run'))).exists(),false);
+});
+
+test('late starts require a reason and stop after 30 minutes', async () => {
+  const db=auth('op');
+  const expired=await datedRun('expired',{planned:Date.now()-31*60000});
+  await assertFails(startDated(db,'expired',expired,{reason:'Delayed by traffic'}));
+  const late=await datedRun('late',{planned:Date.now()-2*60000});
+  await assertFails(startDated(db,'late',late));
+  await assertSucceeds(startDated(db,'late',late,{reason:'Delayed by traffic'}));
+  await assertSucceeds(getDoc(ref(db,'driver_trip_notes/late')));
+  await assertFails(getDoc(ref(auth('alice'),'driver_trip_notes/late')));
+  await assertFails(updateDoc(ref(db,'driver_trip_notes/late'),{reason:'Rewritten reason'}));
+  assert.equal((await getDoc(ref(db,'service_runs/late'))).data().lateStartReason,undefined);
+  assert.equal((await getDoc(ref(db,'trips/late'))).data().actualDepartureTime,null);
+  await assertFails(startDated(db,'late',late,{reason:'Duplicate retry'}));
+});
+
+test('one driver cannot start two buses; terminal cancellation atomically releases the lock', async () => {
+  const db=auth('op'), admin=auth('admin',{admin:true});
+  await updateDoc(ref(admin,'buses/bus2'),{driverId:'op'});
+  const one=await datedRun('run-one'),two=await datedRun('run-two',{busId:'bus2'});
+  const outcomes=await Promise.allSettled([startDated(db,'run-one',one),startDated(db,'run-two',two)]);
+  assert.equal(outcomes.filter(o=>o.status==='fulfilled').length,1);
+  const lock=(await getDoc(ref(db,'operation_locks/op'))).data();
+  await assertFails(updateDoc(ref(db,'operation_locks/op'),{active:false,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(ref(db,`trips/${lock.tripId}`),{status:'completed'}));
+  await assertSucceeds(finishDated(db,lock.tripId,lock.busId,'cancelled'));
+  assert.equal((await getDoc(ref(db,'operation_locks/op'))).data().active,false);
+  await assertFails(setDoc(ref(db,`live_locations/${lock.busId}`),{...telemetry(),busId:lock.busId,tripId:lock.tripId}));
+  const remaining=lock.tripId==='run-one'?['run-two',two]:['run-one',one];
+  await assertSucceeds(startDated(db,...remaining));
+});
+
+test('an occupied bus cannot switch run IDs even when the driver lock is absent',async()=>{
+  const db=auth('op'),run=await datedRun('occupied-run');
+  await assertSucceeds(setDoc(ref(db,'live_locations/bus1'),telemetry()));
+  await assertFails(startDated(db,'occupied-run',run));
+  assert.equal((await getDoc(ref(db,'service_runs/occupied-run'))).data().status,'scheduled');
+  await assertSucceeds(setDoc(ref(db,'live_locations/bus1'),telemetry()));
+});
+
+test('departure requires a linked server timestamp; completion must close run, GPS and lock', async () => {
+  const db=auth('op'),run=await datedRun('depart-run');
+  await startDated(db,'depart-run',run);
+  await assertFails(updateDoc(ref(db,'trips/depart-run'),{actualDepartureTime:stamp()}));
+  await assertFails(updateDoc(ref(db,'service_runs/depart-run'),{status:'in_progress',actualDepartureAt:serverTimestamp()}));
+  await assertSucceeds(departDated(db,'depart-run'));
+  await assertFails(updateDoc(ref(db,'trips/depart-run'),{actualDepartureTime:serverTimestamp()}));
+  await assertSucceeds(finishDated(db,'depart-run','bus1'));
+  await assertFails(startDated(db,'depart-run',run));
 });
 
 
@@ -396,13 +603,9 @@ for (const stops of [['s1', 's2'], ['s1', 'middle1', 'middle2', 's2']]) {
     const db = auth('op');
     const tripRef = ref(db, 'trips/f17-trip');
     const liveRef = ref(db, 'live_locations/bus1');
-    await assertSucceeds(runTransaction(db, async tx => {
-      await tx.get(tripRef); await tx.get(liveRef);
-      tx.set(tripRef, { tripId: 'f17-trip', busId: 'bus1', driverId: 'op',
-        routeNo: '1', stops, status: 'in_progress',
-        currentStopIndex: 0, stopTimes: {}, createdAt: serverTimestamp() });
-      tx.set(liveRef, { ...telemetry(), tripId: 'f17-trip' });
-    }));
+    const run = await datedRun('f17-trip',{stops});
+    await assertSucceeds(startDated(db,'f17-trip',run));
+    await assertSucceeds(departDated(db,'f17-trip'));
     const arrivals = {};
     for (let index = 1; index < stops.length; index++) {
       const final = index === stops.length - 1;
@@ -414,6 +617,10 @@ for (const stops of [['s1', 's2'], ['s1', 'middle1', 'middle2', 's2']]) {
           currentStopIndex: index, stopTimes: { ...arrivals } });
         tx.update(liveRef, { currentStopIndex: index, nextStop: stops[Math.min(index + 1, stops.length - 1)],
           ...(final ? { status: 'completed', isBroadcasting: false, addedDelayMinutes: 0 } : {}) });
+        if(final){
+          tx.update(ref(db,'service_runs/f17-trip'),{status:'completed',completedAt:serverTimestamp()});
+          tx.update(ref(db,'operation_locks/op'),{active:false,updatedAt:serverTimestamp()});
+        }
       }));
       const trip = (await getDoc(tripRef)).data();
       const live = (await getDoc(liveRef)).data();
@@ -446,26 +653,50 @@ test('claim cannot combine equipment edits or release an assignment', async () =
   await assertFails(updateDoc(ref(auth('otherop'), 'buses/bus2'), { driverId: 'otherop', occupancy: 'high' }));
   await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), { driverId: null }));
   await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), { driverId: '' }));
-  await assertSucceeds(updateDoc(ref(auth('otherop'), 'buses/bus2'), { driverId: 'otherop' }));
+  await assertSucceeds(claimBus('otherop'));
   await assertSucceeds(updateDoc(ref(auth('otherop'), 'buses/bus2'), { rampOk: false, rampCheckedAt: serverTimestamp(), rampCheckedBy: 'otherop' }));
 });
 
 test('concurrent claims have one winner and revoked operators lose write permission', async () => {
-  const claim = (uid) => {
-    const db = auth(uid);
-    return runTransaction(db, async tx => {
-      const bus = ref(db, 'buses/bus2');
-      const snap = await tx.get(bus);
-      if (snap.data().driverId) throw Error('already assigned');
-      tx.update(bus, { driverId: uid });
-    });
-  };
-  const results = await Promise.allSettled([claim('op'), claim('otherop')]);
+  const results = await Promise.allSettled([claimBus('op'), claimBus('otherop')]);
   assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
   const adminDb = auth('admin', { admin: true });
   await updateDoc(ref(adminDb, 'operator_access/op'), { approved: false });
   await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), { rampOk: false }));
   await assertFails(setDoc(ref(auth('op'), 'live_locations/bus1'), telemetry()));
+});
+
+test('route grants are private and only admins can assign/change them', async () => {
+  await assertSucceeds(getDoc(ref(auth('op'), 'driver_route_assignments/op')));
+  await assertFails(getDoc(ref(auth('alice'), 'driver_route_assignments/op')));
+  await assertFails(setDoc(ref(auth('alice'), 'driver_route_assignments/alice'), {active:true,routeId:'route1'}));
+  await assertFails(updateDoc(ref(auth('op'), 'driver_route_assignments/op'), {routeId:'other'}));
+  await assertFails(updateDoc(ref(auth('op'), 'driver_route_assignments/op'), {active:false}));
+  await assertSucceeds(updateDoc(ref(auth('admin',{admin:true}), 'driver_route_assignments/op'), {active:false}));
+  await assertFails(setDoc(ref(auth('op'), 'live_locations/bus1'), telemetry()));
+});
+
+test('route scope rejects direct claims, conditions, telemetry, trips and assistance actions on another route', async () => {
+  const admin = auth('admin',{admin:true});
+  await setDoc(ref(admin,'routes/route2'),{stops:['s1','s2']});
+  await updateDoc(ref(admin,'driver_route_assignments/op'),{routeId:'route2'});
+  await assertFails(claimBus('op'));
+  await assertFails(updateDoc(ref(auth('op'),'buses/bus1'),{occupancy:'high'}));
+  await assertFails(setDoc(ref(auth('op'),'live_locations/bus1'),telemetry()));
+  await assertFails(setDoc(ref(auth('op'),'trips/wrong-route'),{tripId:'wrong-route',busId:'bus1',driverId:'op',createdAt:serverTimestamp(),status:'in_progress'}));
+  await assertFails(updateDoc(ref(auth('op'),'boarding_requests/a1'),{status:'acknowledged',acknowledgedAt:serverTimestamp(),operatorId:'op'}));
+});
+
+test('missing, inactive and withdrawn route grants block operations; a claim must update its grant atomically', async () => {
+  const admin = auth('admin',{admin:true});
+  await assertFails(updateDoc(ref(auth('otherop'),'buses/bus2'),{driverId:'otherop'}));
+  await deleteDoc(ref(admin,'driver_route_assignments/otherop'));
+  await assertFails(updateDoc(ref(auth('otherop'),'buses/bus2'),{driverId:'otherop'}));
+  await updateDoc(ref(admin,'driver_route_assignments/op'),{active:false});
+  await assertFails(setDoc(ref(auth('op'),'live_locations/bus1'),telemetry()));
+  await updateDoc(ref(admin,'driver_route_assignments/op'),{active:true});
+  await updateDoc(ref(admin,'routes/route1'),{deletionPending:true});
+  await assertFails(setDoc(ref(auth('op'),'live_locations/bus1'),telemetry()));
 });
 
 
@@ -524,7 +755,7 @@ test('reward dry-run, duplicate retries and simultaneous reports/workers preserv
   assert.equal((await getDoc(ref(db, 'users/alice'))).data().points, 10);
   assert.equal((await getDoc(ref(db, 'users/bob'))).data().points, 5);
   assert.equal((await getDocs(collection(db, 'reward_ledger/r1/revisions'))).size, 1);
-  await setDoc(ref(auth('alice'), 'reports/r2'), report());
+  await publishReport(auth('alice'), 'r2');
   await Promise.all(['r1', 'r2'].map(id => reconcileReport(db, id, { apply: true })));
   assert.equal((await getDoc(ref(db, 'users/alice'))).data().points, 20);
   assert.equal((await getDoc(ref(db, 'users/alice'))).data().reportsSubmitted, 2);
@@ -680,4 +911,137 @@ test('rechecking does not earn another reward contribution or ledger revision', 
   assert.equal(after.points, before.points);
   assert.equal(after.verifiedCount, before.verifiedCount);
   assert.equal((await getDocs(collection(admin, 'reward_ledger/r1/revisions'))).size, 1);
+});
+
+test('admin console requires custom claim, supports catalogue/user control and immutable private activity', async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    await setDoc(ref(c.firestore(), 'sample_test/shared/users/manager'), { ...profile('manager'), createdAt: stamp() });
+  });
+  const admin = auth('manager', { admin: true });
+  await assertSucceeds(getDocs(collection(admin, 'users')));
+  await assertSucceeds(getDocs(collection(admin, 'operator_access')));
+  for (const path of ['stations/new', 'routes/new', 'buses/new']) {
+    await assertFails(setDoc(ref(auth('alice'), path), { name: 'Unauthorized' }));
+    await assertFails(setDoc(ref(auth('op'), path), { name: 'Unauthorized' }));
+    await assertSucceeds(setDoc(ref(admin, path), { name: 'Managed record' }));
+    await assertSucceeds(updateDoc(ref(admin, path), { name: 'Updated' }));
+    await assertSucceeds(deleteDoc(ref(admin, path)));
+  }
+  await assertFails(getDocs(collection(auth('alice'), 'users')));
+  await assertFails(setDoc(ref(auth('alice'), 'operator_access/alice'), { approved: true }));
+  await assertSucceeds(setDoc(ref(admin, 'operator_access/op'), { approved: false, status: 'revoked' }));
+  await assertFails(updateDoc(ref(auth('op'), 'buses/bus1'), { occupancy: 'high' }));
+  for (const prefix of ['', 'sample_test/shared/']) {
+    const path = prefix + 'admin_audit/event';
+    await assertSucceeds(setDoc(ref(admin, path), { actorId: 'manager', action: 'update_bus', createdAt: serverTimestamp() }));
+    await assertSucceeds(getDoc(ref(admin, path)));
+    await assertFails(getDoc(ref(auth('alice'), path)));
+    await assertFails(setDoc(ref(auth('alice'), prefix + 'admin_audit/forged'), { action: 'approve' }));
+    await assertFails(updateDoc(ref(admin, path), { action: 'changed' }));
+    await assertFails(deleteDoc(ref(admin, path)));
+  }
+  await assertSucceeds(updateDoc(ref(admin, 'users/alice'), { role: 'admin' }));
+  await assertFails(getDocs(collection(auth('alice'), 'users')));
+});
+
+test('pending catalogue deletion rejects new passenger, report and operator references', async () => {
+  await env.withSecurityRulesDisabled(async c => { await updateDoc(ref(c.firestore(), 'buses/bus1'), { deletionPending: true }); });
+  await assertFails(setDoc(ref(auth('alice'), 'journeys/deleting'), {
+    journeyId: 'deleting', passengerId: 'alice', busId: 'bus1', origin: 'Stop 1', destination: 'Stop 2', status: 'confirmed', createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(ref(auth('alice'), 'reports/deleting'), report()));
+  await assertFails(setDoc(ref(auth('alice'), 'boarding_requests/deleting'), request()));
+  await assertFails(setDoc(ref(auth('op'), 'live_locations/bus1'), telemetry()));
+});
+
+test('search clock receipts require owner and server time in normal and sample scopes', async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    await setDoc(ref(c.firestore(), 'sample_test/shared/users/alice'), {...profile(), createdAt:stamp()});
+  });
+  for (const prefix of ['', 'sample_test/shared/']) {
+    const path = prefix + 'search_clock/alice';
+    const db = auth('alice');
+    await assertFails(setDoc(ref(db, path), {serverTime:stamp()}));
+    await assertFails(setDoc(ref(db, path), {serverTime:serverTimestamp(), admin:true}));
+    await assertFails(setDoc(ref(guest(), path), {serverTime:serverTimestamp()}));
+    await assertFails(setDoc(ref(auth('op'), path), {serverTime:serverTimestamp()}));
+    await assertSucceeds(setDoc(ref(db, path), {serverTime:serverTimestamp()}));
+    const first = (await assertSucceeds(getDoc(ref(db, path)))).data().serverTime;
+    assert.ok(first instanceof Timestamp);
+    await assertSucceeds(updateDoc(ref(db, path), {serverTime:serverTimestamp()}));
+    await assertFails(updateDoc(ref(db, path), {serverTime:stamp()}));
+    await assertFails(getDoc(ref(auth('op'), path)));
+    await assertFails(getDoc(ref(guest(), path)));
+    await assertFails(getDocs(collection(db, prefix + 'search_clock')));
+    await assertFails(deleteDoc(ref(auth('op'), path)));
+    await assertSucceeds(deleteDoc(ref(db, path)));
+  }
+});
+
+test('report cooldown is atomic, category-scoped and survives report deletion', async () => {
+  const db = auth('alice'), data = report(), guard = cooldownRef(db,data);
+  await assertFails(setDoc(ref(db,'reports/bypass'),data));
+  await assertSucceeds(publishReport(db,'first'));
+  await assertSucceeds(publishReport(db,'first'));
+  await assertFails(publishReport(db,'second'));
+  await assertFails(publishReport(db,'wording',{...data,problemType:'Different wording',condition:'positive',severity:'minor'}));
+  await assertSucceeds(publishReport(db,'different-category',{...data,category:'crowding'}));
+  await assertSucceeds(publishReport(db,'different-target',{...data,targetId:'bus2'}));
+  await assertFails(deleteDoc(guard));
+  await assertFails(updateDoc(guard,{lastPublishedAt:stamp()}));
+  await assertFails(getDoc(cooldownRef(auth('bob'),data)));
+  await assertSucceeds(deleteDoc(ref(db,'reports/first')));
+  await assertFails(publishReport(db,'first'));
+  await env.withSecurityRulesDisabled(async c => {
+    await updateDoc(cooldownRef(c.firestore(),data),{lastPublishedAt:Timestamp.fromMillis(Date.now()-299000)});
+  });
+  await assertFails(publishReport(db,'before-boundary'));
+  await env.withSecurityRulesDisabled(async c => {
+    await updateDoc(cooldownRef(c.firestore(),data),{lastPublishedAt:Timestamp.fromMillis(Date.now()-300000)});
+  });
+  await assertSucceeds(publishReport(db,'after-boundary'));
+});
+
+test('concurrent publications have one winner and orphan cooldowns cannot lock an issue', async () => {
+  const db = auth('alice');
+  await assertFails(setDoc(cooldownRef(db,report()),{reportId:'missing',lastPublishedAt:serverTimestamp()}));
+  const results = await Promise.allSettled([publishReport(db,'race1'),publishReport(db,'race2')]);
+  assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+  assert.equal(results.filter(r=>r.status==='rejected').length,1);
+});
+
+test('sample cooldown is enforced independently from the normal issue guard', async () => {
+  const p='sample_test/shared/', db=auth('alice');
+  await env.withSecurityRulesDisabled(async c => {
+    await setDoc(ref(c.firestore(),p+'users/alice'),{...profile(),createdAt:stamp()});
+    await setDoc(ref(c.firestore(),p+'buses/bus1'),{routeId:'route1',stops:['s1','s2']});
+  });
+  await assertSucceeds(publishReport(db,'normal'));
+  await assertSucceeds(publishReport(db,'sample',report(),p));
+  await assertFails(publishReport(db,'sample-again',report(),p));
+  await assertFails(setDoc(ref(db,p+'reports/old-client'),report()));
+});
+
+
+test('recurring calendars are private active-admin immutable publications in both scopes', async()=>{
+  const db=auth('admin',{admin:true});
+  await env.withSecurityRulesDisabled(async c=>setDoc(ref(c.firestore(),'sample_test/shared/users/admin'),{uid:'admin',role:'passenger'}));
+  for(const prefix of ['', 'sample_test/shared/']) {
+    const path=prefix+'service_schedules/calendar-test';
+    const data={schemaVersion:1,version:1,state:'published',busId:'bus1',routeId:'route1',
+      from:Timestamp.now(),until:Timestamp.now(),weekdays:[1,3],departureMinutes:480,
+      updatedBy:'admin',updatedAt:serverTimestamp()};
+    await assertFails(setDoc(ref(auth('alice'),path),data));
+    await assertFails(setDoc(ref(auth('op'),path),data));
+    await assertSucceeds(setDoc(ref(db,path),data));
+    await assertFails(getDoc(ref(guest(),path)));
+    await assertFails(getDoc(ref(auth('alice'),path)));
+    await assertSucceeds(getDoc(ref(db,path)));
+    await assertFails(updateDoc(ref(db,path),{departureMinutes:500,updatedAt:serverTimestamp()}));
+    await assertFails(deleteDoc(ref(db,path)));
+    await assertSucceeds(updateDoc(ref(db,path),{state:'retired',updatedBy:'admin',updatedAt:serverTimestamp()}));
+    await assertFails(updateDoc(ref(db,path),{state:'published',updatedAt:serverTimestamp()}));
+  }
+  await env.withSecurityRulesDisabled(async c=>setDoc(ref(c.firestore(),'account_access/admin'),{manualSuspended:true}));
+  await assertFails(setDoc(ref(db,'service_schedules/blocked'),{schemaVersion:1,version:1,state:'published',updatedBy:'admin',updatedAt:serverTimestamp()}));
 });

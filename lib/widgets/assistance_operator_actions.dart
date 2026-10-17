@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../models/boarding_request.dart';
 import '../services/firestore_service.dart';
+import '../l10n/localization_context.dart';
+import 'assistance_labels.dart';
 
 /// Acknowledged transition feedback; failed writes keep the previous status.
 class AssistanceOperatorActions extends StatefulWidget {
@@ -48,7 +50,9 @@ class _AssistanceOperatorActionsState extends State<AssistanceOperatorActions> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => error = 'Status update was not confirmed. Check your connection, operator approval and bus assignment, then retry.',
+          () => error = request.policyVersion == 2
+              ? context.l10n.assistanceUnavailable
+              : 'Status update was not confirmed. Check your connection, operator approval and bus assignment, then retry.',
         );
       }
     } finally {
@@ -60,7 +64,7 @@ class _AssistanceOperatorActionsState extends State<AssistanceOperatorActions> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.end,
     children: [
-      Text(request.driverStatusLabel),
+      Text(assistanceStatus(context, request)),
       if (error != null) Text(error!),
       Wrap(
         spacing: 8,
@@ -71,11 +75,19 @@ class _AssistanceOperatorActionsState extends State<AssistanceOperatorActions> {
               style: OutlinedButton.styleFrom(
                 minimumSize: Size(0, context.minTapHeight),
               ),
-              child: const Text('Acknowledge'),
+              child: Text(
+                request.policyVersion == 2
+                    ? context.l10n.assistanceAcknowledge
+                    : 'Acknowledge',
+              ),
             ),
             TextButton(
               onPressed: saving ? null : () => change('rejected'),
-              child: const Text('Decline'),
+              child: Text(
+                request.policyVersion == 2
+                    ? context.l10n.assistanceDecline
+                    : 'Decline',
+              ),
             ),
           ],
           if (request.status == 'acknowledged')
@@ -84,7 +96,11 @@ class _AssistanceOperatorActionsState extends State<AssistanceOperatorActions> {
               style: FilledButton.styleFrom(
                 minimumSize: Size(0, context.minTapHeight),
               ),
-              child: const Text('Complete'),
+              child: Text(
+                request.policyVersion == 2
+                    ? context.l10n.assistanceComplete
+                    : 'Complete',
+              ),
             ),
         ],
       ),

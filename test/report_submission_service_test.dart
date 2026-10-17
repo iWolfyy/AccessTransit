@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:access_transit/data/seed_data.dart';
+import 'package:access_transit/logic/report_cooldown.dart';
 import 'package:access_transit/logic/status_logic.dart';
 import 'package:access_transit/models/enums/report_publication_state.dart';
 import 'package:access_transit/models/report.dart';
@@ -25,6 +26,25 @@ void main() {
     userId: 'owner',
   );
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  test('cooldown denial preserves draft identity and deadline until a successful retry', () async {
+    final deadline = DateTime.utc(2026, 10, 16, 12);
+    var denied = true;
+    final service = ReportSubmissionService(
+      publisher: (_) async {
+        if (denied) throw ReportCooldownException(deadline);
+      },
+    );
+    final result = await service.submit(report());
+    expect(result.report.publicationState, ReportPublicationState.failed);
+    expect(result.error, contains('2026-10-16T12:00:00.000Z'));
+    expect(result.report.isPublic, isFalse);
+    denied = false;
+    final retried = await service.retry(result.report.id);
+    expect(retried.report.id, result.report.id);
+    expect(retried.report.publicationState, ReportPublicationState.published);
+    service.dispose();
+  });
 
   test(
     'Cloudinary rate limits keep photos pending; invalid preset fails',

@@ -1,3 +1,4 @@
+import 'support/fixture_search_backend.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -391,7 +392,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             theme: AppTheme.highContrastTheme,
-            home: const RouteResultsScreen(
+            home: RouteResultsScreen(searchBackend: FixtureSearchBackend(), 
               fromStationId: 'st_fort',
               toStationId: 'st_kottawa',
               origin: 'Colombo Fort Station',

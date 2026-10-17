@@ -18,9 +18,24 @@ class BoardingRequest {
     required this.status,
     required this.createdAt,
     this.purpose = 'boarding',
+    this.serviceRunId,
+    this.boardingStationId,
+    this.alightingStationId,
+    this.driverId,
+    this.expiresAt,
+    this.endReason,
+    this.policyVersion = 1,
+    this.assignmentVersion = 0,
   });
 
   final String id;
+  final String? serviceRunId,
+      boardingStationId,
+      alightingStationId,
+      driverId,
+      endReason;
+  final DateTime? expiresAt;
+  final int policyVersion, assignmentVersion;
   final String riderId;
   final String riderName;
   final String busId;
@@ -36,6 +51,7 @@ class BoardingRequest {
     'completed' => 'Driver marked completed',
     'rejected' => 'Driver declined',
     'cancelled' => 'Cancelled',
+    'expired' => 'Request expired',
     _ => 'Driver status unknown',
   };
   final DateTime createdAt;
@@ -51,6 +67,15 @@ class BoardingRequest {
     final parsedTypes = rawTypes.map((e) => e.toString()).toList();
 
     return BoardingRequest(
+      serviceRunId: map['serviceRunId'] as String?,
+      boardingStationId: map['boardingStationId'] as String?,
+      alightingStationId: map['alightingStationId'] as String?,
+      driverId: map['driverId'] as String?,
+      expiresAt: _parseTimestamp(map['expiresAt'])?.toUtc(),
+      endReason:
+          map['endReason'] as String? ?? map['cancellationReason'] as String?,
+      policyVersion: map['policyVersion'] as int? ?? 1,
+      assignmentVersion: map['assignmentVersion'] as int? ?? 0,
       purpose: map['purpose']?.toString() ?? 'boarding',
       id: id ?? map['id']?.toString() ?? '',
       riderId:
@@ -99,6 +124,14 @@ class BoardingRequest {
   /// Converts this request into a Firestore map representation.
   Map<String, dynamic> toMap({bool isServerTimestamp = false}) {
     return {
+      if (serviceRunId != null) 'serviceRunId': serviceRunId,
+      if (boardingStationId != null) 'boardingStationId': boardingStationId,
+      if (alightingStationId != null) 'alightingStationId': alightingStationId,
+      if (driverId != null) 'driverId': driverId,
+      if (expiresAt != null) 'expiresAt': Timestamp.fromDate(expiresAt!),
+      if (endReason != null) 'endReason': endReason,
+      if (policyVersion != 1) 'policyVersion': policyVersion,
+      if (assignmentVersion != 0) 'assignmentVersion': assignmentVersion,
       'purpose': purpose,
       FirestoreConstants.fieldRiderId: riderId,
       FirestoreConstants.fieldRiderName: riderName,
@@ -129,6 +162,14 @@ class BoardingRequest {
     String? purpose,
   }) {
     return BoardingRequest(
+      serviceRunId: serviceRunId,
+      boardingStationId: boardingStationId,
+      alightingStationId: alightingStationId,
+      driverId: driverId,
+      expiresAt: expiresAt,
+      endReason: endReason,
+      policyVersion: policyVersion,
+      assignmentVersion: assignmentVersion,
       purpose: purpose ?? this.purpose,
       id: id ?? this.id,
       riderId: riderId ?? this.riderId,

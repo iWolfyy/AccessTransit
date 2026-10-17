@@ -1,0 +1,333 @@
+{
+  "busDetails": "බස් රථ විස්තර",
+  "communityReports": "ප්‍රජා වාර්තා",
+  "saveTrip": "ගමන සුරකින්න",
+  "removeSavedTrip": "සුරැකි ගමන ඉවත් කරන්න",
+  "savedTrip": "සුරැකි ගමන",
+  "noRecentReports": "මෑත වාර්තා නැත",
+  "loadingReports": "වාර්තා පූරණය වෙමින්…",
+  "requestBoardingAssistance": "ගොඩවීමේ සහාය ඉල්ලන්න",
+  "reportCondition": "තත්ත්වය වාර්තා කරන්න",
+  "searchWindowInvalid": "ඉදිරි පැය 24 තුළ බස් රථයට ගොඩවන වේලාවක් තෝරන්න.",
+  "searchSelectionExpired": "මෙම තේරීම කල් ඉකුත් වී ඇත. වත්මන් ප්‍රතිඵල නැවත බලන්න.",
+  "searchAccountChanged": "ගිණුම වෙනස් වී ඇත. නව සෙවීමක් සඳහා සෙවුම් පිටුවට ආපසු යන්න.",
+  "searchWindowNotice": "ඉදිරි පැය 24 තුළ ගොඩවිය හැකි සේවා. කාලසටහනෙන් බස් රථය ධාවනය වන බව තහවුරු නොවේ.",
+  "@@locale": "si",
+  "language": "භාෂාව",
+  "languageSaveFailed": "භාෂාව සුරැකීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
+  "welcomeBack": "නැවත සාදරයෙන් පිළිගනිමු",
+  "signIn": "පිවිසෙන්න",
+  "email": "ඊමේල් ලිපිනය",
+  "emailHint": "ඔබගේ ඊමේල් ලිපිනය ඇතුළත් කරන්න",
+  "passenger": "මගියා",
+  "passengerDescription": "ප්‍රවේශ පහසුකම් සහිත ගමන් සැලසුම් කරන්න",
+  "reporter": "වාර්තාකරු",
+  "reporterDescription": "බස් සහ නැවතුම්පොළ තත්ත්වයන් වාර්තා කරන්න",
+  "driver": "බස් රියදුරු",
+  "driverDescription": "පරිපාලක අනුමැතිය අවශ්‍යයි",
+  "operatorApprovalRequired": "ගිණුම සාදන ලදී. රියදුරු ප්‍රවේශය සඳහා පරිපාලක අනුමැතිය අවශ්‍යයි.",
+  "accountReady": "ආයුබෝවන් {name}! ඔබගේ ගිණුම සූදානම්.",
+  "verifyingSearchTime": "සෙවුම් වේලාව තහවුරු කරමින්…",
+  "searchTimeUnavailable": "සෙවුම් වේලාව ලබාගත නොහැක. සම්බන්ධ වී නැවත උත්සාහ කරන්න.",
+  "retrySearchTime": "වේලාව නැවත තහවුරු කරන්න",
+  "retrySearch": "නැවත සොයන්න",
+  "verifyingDatedSearch": "සෙවුම් වේලාව සහ දින නියමිත ගමන් තහවුරු කරමින්…",
+  "datedSearchUnavailable": "දින නියමිත ගමන් ලබාගත නොහැක. සම්බන්ධ වී නැවත උත්සාහ කරන්න.",
+  "nearbyStopsTitle": "ළඟ ඇති නැගීමේ නැවතුම්",
+  "nearbyStopsExplanation": "නැගීමට අවශ්‍ය නැවතුම තෝරන්න. දුර ආසන්න සරල රේඛීය දුරකි; ඇවිදින මාර්ගය හෝ ගමන් කාලය නොවේ. නැවතුමේ දිශාව සහ පාරේ පැත්ත බලන්න.",
+  "nearbyLocating": "ඔබගේ පිහිටීම සොයමින්...",
+  "nearbyLocationDisabled": "උපාංගයේ Location සක්‍රිය කර නැවත උත්සාහ කරන්න.",
+  "nearbyLocationDenied": "පිහිටීම ලබාගැනීමට අවසර නොලැබුණි. නැවතුමක් අතින් තෝරාගත හැක.",
+  "nearbyLocationBlocked": "App settings තුළ Location අවසර ලබාදී නැවත උත්සාහ කරන්න.",
+  "nearbyLocationUnavailable": "භාවිත කළ හැකි පිහිටීමක් නොලැබුණි. නැවත උත්සාහ කරන්න හෝ නැවතුමක් අතින් තෝරන්න.",
+  "nearbyOpenSettings": "Settings විවෘත කරන්න",
+  "nearbyRetry": "පිහිටීම නැවත සොයන්න",
+  "nearbyChooseManually": "නැවතුමක් අතින් තෝරන්න",
+  "nearbyStopsEmpty": "නිවැරදි ඛණ්ඩාංක සහිත නැවතුම් නොමැත.",
+  "nearbyDistance": "කි.මී. {km} පමණ දුරින්",
+  "@nearbyDistance": {
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "reportCooldownNotice": "දිනකට වාර්තා සීමාවක් නැත. එකම බස් රථයේ හෝ නැවතුමේ එකම ගැටලු කාණ්ඩය නැවත වාර්තා කිරීමට විනාඩි 5ක් රැඳී සිටින්න.",
+  "falseVoteReason": "මෙම වාර්තාව වැරදි ඇයි?",
+  "falseVoteReasonMinimum": "අවම වශයෙන් අක්ෂර 5ක් ඇතුළත් කරන්න.",
+  "voteCancel": "අවලංගු කරන්න",
+  "voteSubmit": "මතය යවන්න",
+  "voteAcknowledged": "ඔබගේ මතය සටහන් විය.",
+  "voteUnavailable": "මතය තහවුරු නොවීය. සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "voteSignIn": "මතයක් දැක්වීමට පිවිසෙන්න.",
+  "authorVoteDisabled": "ඔබගේ වාර්තාවට ඔබටම මතයක් දැක්විය නොහැක.",
+  "voteRetry": "මතයේ තත්ත්වය නැවත බලන්න",
+  "votingClosed": "මත දැක්වීම අවසන්ය.",
+  "voteNoPoints": "මත දැක්වීමට ලකුණු නොලැබේ. වැරදියි මත 5කින් වාර්තාව සඟවයි.",
+  "voteTrue": "නිවැරදියි",
+  "voteFalse": "වැරදියි",
+  "accountStatusChecking": "ගිණුම් ප්‍රවේශය පරීක්ෂා කරමින්...",
+  "accountStatusUnavailable": "ගිණුම් ප්‍රවේශය තහවුරු කළ නොහැක. සම්බන්ධ වී නැවත උත්සාහ කරන්න.",
+  "accountSuspended": "ගිණුම අත්හිටුවා ඇත. පරිපාලක සමාලෝචනය අවශ්‍යයි.",
+  "accountTemporaryUntil": "ගිණුම {until} (UTC) දක්වා තාවකාලිකව අත්හිටුවා ඇත.",
+  "accountStatusRetry": "ගිණුම් තත්ත්වය නැවත බලන්න",
+  "accountSignOut": "ඉවත් වන්න",
+  "v2PointsNotice": "ප්‍රකාශිත වාර්තාවකට ලකුණු 10යි; මත සඳහා ලකුණු නැත. වැරදියි මත 5කදී ලැබුණු ලකුණු මෙන් දෙගුණයක් අඩු වේ. ලකුණුවලට මුදල් වටිනාකමක් නැත.",
+  "refreshV2Points": "v2 ලකුණු නැවත බලන්න",
+  "@accountTemporaryUntil": {
+    "placeholders": {
+      "until": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewsTitle": "මගේ වාර්තා සමාලෝචන",
+  "reviewsAdminTitle": "වාර්තා සමාලෝචනය",
+  "reviewsError": "සමාලෝචන තහවුරු කළ නොහැක. සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "reviewsReasonRequired": "අක්ෂර 5ත් 2,000ත් අතර හේතුවක් ඇතුළත් කරන්න.",
+  "reviewsPending": "අභියාචනය සමාලෝචනයට යොමු කර ඇත",
+  "reviewsUpheld": "තීරණය තහවුරු කර ඇත",
+  "reviewsOverturned": "තීරණය අවලංගු කර අඩු කළ ලකුණු ආපසු ලබා දී ඇත",
+  "reviewsUnreviewed": "සමාලෝචනය බලාපොරොත්තුවෙන්",
+  "reviewsEmpty": "ප්‍රජාව විසින් විවාදිත වාර්තා නැත.",
+  "reviewsMore": "තවත් පෙන්වන්න",
+  "reviewsPenalty": "අඩු කළ ලකුණු: {points}. ගණන් කළ වැරදි වාර්තා: {strikes}.",
+  "reviewsHiddenReason": "වෙනත් පරිශීලකයන් {count} දෙනෙකු මෙම වාර්තාව වැරදි ලෙස සලකුණු කළ නිසා එය ස්වයංක්‍රීයව සඟවා ඇත.",
+  "reviewsAppealLabel": "ඔබගේ අභියාචනය",
+  "reviewsDecisionReason": "පරිපාලක තීරණයට හේතුව",
+  "reviewsVotes": "ප්‍රජා ඡන්ද සාක්ෂි",
+  "reviewsReason": "හේතුව",
+  "reviewsDecisionExplanation": "තීරණය අවලංගු කළ විට අඩු කළ ලකුණු සහ මෙම වැරදි වාර්තා ගණනය එක් වරක් ආපසු සකස් වේ. වෙනත් ගිණුම් සීමා පවතී.",
+  "reviewsUphold": "තීරණය තහවුරු කරන්න",
+  "reviewsOverturn": "තීරණය අවලංගු කරන්න",
+  "reviewsSubmit": "අභියාචනය යවන්න",
+  "reviewsAcknowledged": "වෙනස සේවාදායකය තහවුරු කළා.",
+  "reviewsPhoto": "වාර්තා ඡායාරූපය",
+  "reviewsPhotoUnavailable": "වාර්තා ඡායාරූපය ලබාගත නොහැක.",
+  "bansTitle": "ස්ථිර තහනම් සමාලෝචන",
+  "bansApproved": "ස්ථිර තහනම අනුමත කර ඇත",
+  "bansRejected": "ස්ථිර තහනම ප්‍රතික්ෂේප කර ඇත",
+  "bansWithdrawn": "සමාලෝචනය ඉවත් කර ඇත",
+  "bansPending": "පරිපාලක සමාලෝචනය බලාපොරොත්තුවෙන්",
+  "bansEmpty": "ස්ථිර තහනම් සමාලෝචන නැත.",
+  "bansStrikes": "දැනට ගණන් වන වැරදි වාර්තා: {count}",
+  "bansAppealsPending": "ස්ථිර තහනම අනුමත කිරීමට පෙර ඉතිරි වාර්තා අභියාචන විසඳන්න.",
+  "bansStale": "සාක්ෂි වෙනස් වී ඇත. තීරණයට පෙර සමාලෝචනය නැවත ලබාගන්න.",
+  "bansAdminProtected": "මෙම ක්‍රියාවලියෙන් පරිපාලක ගිණුම් තහනම් කළ නොහැක.",
+  "bansEvidence": "අදාළ වාර්තා සහ අභියාචන",
+  "bansCounted": "වැරදි වාර්තාව ගණන් වේ",
+  "bansRemoved": "වැරදි වාර්තා ගණනය ඉවත් කර ඇත",
+  "bansExplanation": "වැරදි වාර්තා දහයකින් සමාලෝචනයක් විවෘත වේ. ස්ථිර තහනමක් පැනවෙන්නේ පැහැදිලි අනුමැතියෙන් පමණි. ප්‍රතික්ෂේප කිරීමෙන් තාවකාලික තහනම දිගු නොවේ.",
+  "bansReject": "ස්ථිර තහනම ප්‍රතික්ෂේප කරන්න",
+  "bansApprove": "ස්ථිර තහනම අනුමත කරන්න",
+  "assistanceInbox": "මෙම ගමනේ සහාය ඉල්ලීම්",
+  "assistanceChooseRun": "Bus Details වෙතින් රියදුරෙකු පවරා ඇති දින සහිත ගමනක් තෝරන්න.",
+  "assistanceUnavailable": "සහාය ලබාගත නොහැක. ගමන, රියදුරු පැවරුම සහ සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "assistanceEmpty": "මෙම ගමනට සහාය ඉල්ලීම් නැත.",
+  "assistanceRetargeted": "රියදුරු වෙනස් වී ඇත. නව රියදුරුගේ පිළිගැනීම බලාපොරොත්තුවෙන්.",
+  "assistancePending": "රියදුරුගේ පිළිගැනීම බලාපොරොත්තුවෙන්",
+  "assistanceAccepted": "රියදුරු පිළිගෙන ඇත",
+  "assistanceDeclined": "රියදුරු ප්‍රතික්ෂේප කළා",
+  "assistanceCompleted": "රියදුරු සහාය අවසන් බව සලකුණු කළා",
+  "assistanceCancelled": "අවලංගු කර ඇත",
+  "assistanceExpired": "ඉල්ලීම කල් ඉකුත් වී ඇත",
+  "assistanceAcknowledge": "පිළිගන්න",
+  "assistanceDecline": "ප්‍රතික්ෂේප කරන්න",
+  "assistanceComplete": "අවසන් කරන්න",
+  "assistanceInAppOnly": "යෙදුමේ ඉල්ලීම් ලැයිස්තුවට යවා ඇත. Local පරීක්ෂණයේ background push දැනුම්දීම් සක්‍රීය නැත.",
+  "assistanceExpiry": "ඉල්ලීම කල් ඉකුත් වන වේලාව (UTC): {time}",
+  "assistanceRunEnded": "මෙම ගමන අවසන් වී හෝ අවලංගු කර ඇත.",
+  "assistanceStopPassed": "බසය ඉල්ලා සිටි නැගීමේ අවස්ථාව පසු කර ඇත.",
+  "assistanceDriverUnavailable": "පවරා ඇති රියදුරු දැන් ලබාගත නොහැක.",
+  "assistanceRamp": "බෑවුම යොදන්න",
+  "assistanceExtraTime": "අමතර කාලය",
+  "assistanceBoardingHelp": "බසයට නැගීමට සහාය",
+  "assistanceAlightingHelp": "බසයෙන් බැසීමට සහාය",
+  "operationsTitle": "ක්‍රියාත්මක ගමන්",
+  "operationsRefresh": "සේවාදායකයෙන් යාවත්කාලීන කරන්න",
+  "operationsEmpty": "ක්‍රියාත්මක දින නියමිත ගමන් නැත.",
+  "operationsMore": "තවත් පෙන්වන්න",
+  "operationsExplanation": "එම මාර්ගයට අනුමත වෙනත් රියදුරෙකුට ගමන පවරන්න. ගමන් ප්‍රගතිය හා සටහන් කළ වෙලාවන් රැඳේ. නව රියදුරු අලුත් ස්ථාන දත්ත සමඟ භාරගන්නා තෙක් GPS නවතී. සහාය ඉල්ලීම් නව රියදුරු නැවත පිළිගත යුතුය.",
+  "operationsDone": "පැවරීම තහවුරු විය. නව රියදුරු භාරගන්නා තෙක් GPS නවතා ඇත. සහාය ඉල්ලීම් පසුබිමේ නැවත යොමු වේ; කලින් පිළිගැනීම බල නොපැවැත්වේ.",
+  "operationsNoDrivers": "මෙම පිටුවේ සුදුසු රියදුරෙකු නැත. පළමුව ලබාගත හැකි රියදුරෙකු අනුමත කර මෙම මාර්ගයට පවරන්න.",
+  "operationsReason": "පැවරීමේ හේතුව (අක්ෂර 5–2000)",
+  "operationsTransfer": "ගමන පවරන්න",
+  "operationsSaving": "පවරමින්…",
+  "operationsError": "මෙම ක්‍රියාව තහවුරු කළ නොහැක. එම ඉල්ලීම නැවත උත්සාහ කරන්න හෝ වත්මන් තත්ත්වය යාවත්කාලීන කර බලන්න.",
+  "operationsStale": "ගමන හෝ රියදුරුගේ සුදුසුකම වෙනස් වී ඇත. පැවරීමට පෙර යාවත්කාලීන කරන්න.",
+  "operationsResume": "භාරගෙන GPS අරඹන්න",
+  "operationsGpsError": "මීටර් 100ක් ඇතුළත නිරවද්‍යතාවක් ඇති අලුත් GPS ස්ථානයක් ලැබෙන තෙක් රැඳී සිට නැවත භාරගන්න.",
+  "pushTitle": "සහාය ඉල්ලීම් දැනුම්දීම්",
+  "pushChannelDescription": "මගී සහාය ඉල්ලීම් පිළිබඳ දැනුම්දීම්",
+  "pushOff": "දැනුම්දීම් අක්‍රියයි. රියදුරුගේ ඉල්ලීම් ලැයිස්තුව භාවිත කළ හැකියි.",
+  "pushConnecting": "දැනුම්දීම් සම්බන්ධ කරමින්…",
+  "pushDenied": "දැනුම්දීම් අවසරය ලබා දී නැත. Android යෙදුම් සැකසුම් වලින් අවසර ලබා දිය හැකියි.",
+  "pushReady": "මෙම උපාංගය ලියාපදිංචියි. දැනුම්දීමක් ලැබීම සහාය ඉල්ලීම පිළිගත් බවක් නොවේ.",
+  "pushUnavailable": "දැනුම්දීම් සැකසුම තහවුරු කළ නොහැක. නැවත උත්සාහ කරන්න හෝ ඉල්ලීම් ලැයිස්තුව භාවිත කරන්න.",
+  "pushEnable": "දැනුම්දීම් සක්‍රිය කරන්න",
+  "pushDisable": "අක්‍රිය කරන්න",
+  "pushOpenUnavailable": "මෙම ඉල්ලීම ලබාගත නොහැක හෝ තවදුරටත් ඔබට පවරා නැත.",
+  "pushForeground": "මගියෙකු සහාය ඉල්ලා ඇත.",
+  "pushReview": "ඉල්ලීම බලන්න",
+  "fareUnavailable": "ගාස්තුව ලබාගත නොහැක",
+  "fareUnavailableDisclosure": "මෙම ගමන සඳහා සමාලෝචිත ගාස්තු වගුවක් හා ගාස්තු අදියර සම්බන්ධතාවක් නැත. රියදුරු හෝ කොන්දොස්තර සමඟ ගාස්තුව තහවුරු කරන්න.",
+  "fareSampleDisclosure": "Sample/Test අනුමානයක් පමණි. ගමන් කාලය හා නැවතුම් මත ඇති මෙම ගණනය නිල ගාස්තුවක් නොවේ. සැබෑ ගාස්තුව කොන්දොස්තර සමඟ තහවුරු කරන්න.",
+  "fareSampleAmount": "Sample අනුමාන ගාස්තුව LKR {amount}",
+  "@fareSampleAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      }
+    }
+  },
+  "fareReviewedSource": "සමාලෝචිත මූලාශ්‍රය: {source}. ගාස්තු වගුව {tariff}; සම්බන්ධතාව {mapping}.",
+  "fareReviewedAmount": "LKR {amount}",
+  "fareSampleReviewed": "Sample ගාස්තුව LKR {amount}",
+  "fareChanged": "ගාස්තු අනුවාදය වෙනස් වී ඇත හෝ ලබාගත නොහැක. සුරැකි තේරීම පවතී; ගමනට පෙර වත්මන් ගාස්තුව පරීක්ෂා කරන්න.",
+  "fareAdminTitle": "ගාස්තු ප්‍රකාශන",
+  "fareImportHelp": "සමාලෝචිත ගාස්තු වගුව, පිළිවෙළට ඇති නැවතුම්-අදියර සම්බන්ධතාව හා bus IDs ඇතුළත් කරන්න. LKR 1 = සුළු ඒකක 100කි. ප්‍රකාශ කිරීමට පෙර අගයන්, මූලාශ්‍රය, පන්තිය හා දින පරීක්ෂා කරන්න. ප්‍රකාශිත අනුවාද වෙනස් කළ නොහැක; archive කර අලුත් ID එකක් සාදන්න.",
+  "farePublicationId": "නව ප්‍රකාශන ID",
+  "fareImportJson": "සමාලෝචිත import JSON",
+  "farePreview": "පරීක්ෂා කර පෙරදසුන බලන්න",
+  "fareReviewCheck": "මූලාශ්‍රය, වාහන පන්තිය, දිශාව, නැවතුම්-අදියර සම්බන්ධතාව හා දින පරීක්ෂා කළෙමි.",
+  "fareReviewReason": "සමාලෝචන/archive හේතුව (අක්ෂර 10–2000)",
+  "farePublish": "සමාලෝචිත අනුවාදය ප්‍රකාශ කරන්න",
+  "fareArchive": "අනුවාදය archive කරන්න",
+  "fareCancel": "අවලංගු කරන්න",
+  "fareInvalidImport": "ඇතුළත් දත්ත වලංගු නැත. ලේඛනගත ආකෘතිය, IDs, පූර්ණ සංඛ්‍යා අගයන්, මූලාශ්‍රය හා දින/සම්බන්ධතා පරීක්ෂා කරන්න.",
+  "fareAdminError": "ක්‍රියාව තහවුරු කළ නොහැක. සම්බන්ධතාව, admin අවසරය, හේතුව හා වත්මන් bus/route දත්ත පරීක්ෂා කරන්න. වෙනස් වූ ප්‍රකාශනයක් නැවත load කරන්න.",
+  "fareNoPublications": "ගාස්තු ප්‍රකාශන නැත. නොමැති ගාස්තු ලබාගත නොහැකි ලෙස පෙන්වයි.",
+  "@fareReviewedSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      },
+      "tariff": {
+        "type": "String"
+      },
+      "mapping": {
+        "type": "String"
+      }
+    }
+  },
+  "@fareReviewedAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@fareSampleReviewed": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "geometryTitle": "මාර්ගයේ භූගෝලීය දත්ත",
+  "geometryHelp": "සමාලෝචිත මාර්ග හැඩය සහ පිළිවෙළින් නැවතුම් ලක්ෂ්‍ය ඇතුළත් කරන්න. වත්මන් මාර්ගය හා නැවතුම් ඛණ්ඩාංක ගැළපිය යුතුයි. නිවැරදි කිරීම් සඳහා නව අනුවාදයක් භාවිත කරන්න. මෙය සජීවී රථවාහන දත්ත ලබා නොදෙයි.",
+  "geometryReview": "මාර්ග හැඩය, දිශාව, නැවතුම් ලක්ෂ්‍ය හා මූලාශ්‍රය සමාලෝචනය කළෙමි.",
+  "geometryInvalid": "දත්ත වලංගු නැත. JSON, route ID, ඛණ්ඩාංක, මූලාශ්‍රය හා නැවතුම් පිළිවෙළ පරීක්ෂා කරන්න.",
+  "geometrySaved": "සමාලෝචිත මාර්ග දත්ත ප්‍රකාශයට පත් කළා.",
+  "geometryWithdraw": "වත්මන් මාර්ග දත්ත ඉවත් කරන්න",
+  "geometryMap": "සමාලෝචිත මාර්ග හැඩය · තෝරාගත් කොටස",
+  "geometryEta": "{target}: ඇස්තමේන්තුව {start}–{end} · මාර්ග ප්‍රගතිය සහ කාලසටහන අනුව; අඩු විශ්වාසයක් සහිතයි.",
+  "@geometryEta": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "geometryWithdrawn": "මාර්ග දත්ත ඉවත් කළා.",
+  "etaDiagnostics": "Local ETA පරීක්ෂණ",
+  "etaDiagnosticsUnavailable": "Local Test පරීක්ෂණ සඳහා පිවිසි ගිණුම load විය යුතුයි.",
+  "etaDiagnosticsHelp": "LOCAL TEST ONLY. Bus Details විවෘතව ඇති විට ඇස්තමේන්තු සටහන් කිරීමට සක්‍රීය කරන්න. පැමිණීම් driver තහවුරු කළ timestamps වන අතර ස්වාධීන GPS මිනුම් නොවේ. සැබෑ accuracy claim එකක් නැත. දත්ත මේ device/account එකේ පමණයි (උපරිම 500; capture කිරීමේදී දින 7ක සීමාව යෙදේ). ඛණ්ඩාංක, emails හෝ driver IDs සුරැකෙන්නේ නැත.",
+  "etaCapture": "Local ඇස්තමේන්තු සටහන් කරන්න",
+  "etaCounts": "සටහන්: {captured} · බලාපොරොත්තු: {pending} · ඉවත් කළ: {excluded}",
+  "etaMetrics": "ගැළපුණු samples: {count} · මධ්‍යස්ථ දෝෂය: {median}s · P90 දෝෂය: {p90}s",
+  "etaStorageError": "Local දත්ත save/read තහවුරු නැත. Export එකේ save නොවූ records තිබිය හැක; නැවත උත්සාහ කරන්න.",
+  "etaNoMatchedSamples": "තවම ගැළපුණු පැමිණීම් නැත. Pending/excluded forecasts දෝෂය බිංදුව ලෙස ගණන් නොගනී.",
+  "etaSmallSample": "කුඩා synthetic sample එකක්; මෙයින් සැබෑ accuracy තහවුරු නොවේ.",
+  "etaCopied": "Local diagnostic JSON copy කළා.",
+  "etaExport": "Diagnostic JSON copy කරන්න",
+  "etaClear": "මෙම ගිණුමේ local මිනුම් මකන්න",
+  "@etaCounts": {
+    "placeholders": {
+      "captured": {
+        "type": "int"
+      },
+      "pending": {
+        "type": "int"
+      },
+      "excluded": {
+        "type": "int"
+      }
+    }
+  },
+  "@etaMetrics": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "median": {
+        "type": "String"
+      },
+      "p90": {
+        "type": "String"
+      }
+    }
+  },
+  "savedTripsTitle": "සුරැකි ගමන්",
+  "savedTripsViewAll": "සුරැකි සියලු ගමන් බලන්න",
+  "savedTripsHelp": "පසුගිය records ඇතුළු ඔබේ සුරැකි තේරීම්. Save කිරීම seat booking හෝ tracking ආරම්භ කිරීමක් නොවේ. තෝරාගත් ගමනේ වත්මන් තත්ත්වය බැලීමට විස්තර විවෘත කරන්න.",
+  "savedTripsRefresh": "සුරැකි ගමන් නැවත ලබාගන්න",
+  "savedTripsAccountChanged": "ගිණුම වෙනස් වී ඇත. Home වෙත ගොස් සුරැකි ගමන් නැවත විවෘත කරන්න.",
+  "savedTripsRemoveError": "ඉවත් කිරීම තහවුරු නැත. සුරැකි record එක තවම ඇත; සම්බන්ධ වී නැවත උත්සාහ කරන්න.",
+  "savedTripsOpenError": "සුරැකි විස්තර තහවුරු කළ නොහැක. සම්බන්ධ වී නැවත උත්සාහ කරන්න.",
+  "savedTripsLoadError": "සුරැකි ගමන් ලබාගත නොහැක. සම්බන්ධතාව හා ගිණුමේ අවසර පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+  "savedTripsRetry": "නැවත උත්සාහ කරන්න",
+  "savedTripsEmpty": "තවම සුරැකි ගමන් නැත. Bus Details වෙතින් ගමනක් සුරකින්න.",
+  "savedTripsEmptyPage": "මෙම පිටුවේ සුරැකි records නැත. නැවත ලබාගන්න හෝ පෙර පිටුවට යන්න.",
+  "savedTripsCompletedRecord": "සම්පූර්ණ කළ සුරැකි record එක",
+  "savedTripsCancelledRecord": "අවලංගු කළ සුරැකි record එක",
+  "savedTripsOpen": "බස් විස්තර බලන්න",
+  "savedTripsPrevious": "පෙර පිටුව",
+  "savedTripsNext": "ඊළඟ පිටුව",
+  "savedTripsVehicleUnavailable": "සුරැකි බස් රථය ලබාගත නොහැක. සුරැකි record එක බලන්න හෝ නැවත search කරන්න.",
+  "segmentReportsPreview": "සීමිත වාර්තා පෙරදසුනකි; තවත් සාක්ෂි සඳහා අදාළ පිටු විවෘත කරන්න. වාර්තා නොමැති වීමෙන් ප්‍රවේශ පහසුකම් තහවුරු නොවේ.",
+  "segmentReportsHelp": "මෙම බස් රථය හෝ තෝරාගත් කොටසේ නැවතුමක් තෝරන්න. පිටු නිරීක්ෂණ වේලාවට නොව ස්ථාවර record පිළිවෙළට ඇත. කල් ඉකුත්/සැඟවූ වාර්තා ඉවත් වේ; හිස් පිටුවක් යනු පැරණි අදාළ වාර්තා නැත යන්න නොවේ.",
+  "segmentReportsUnavailable": "වාර්තා ලබාගත නොහැක. සම්බන්ධ වී නැවත ලබාගන්න.",
+  "segmentReportsEmptyPage": "මෙම පිටුවේ වත්මන් දෘශ්‍ය වාර්තා නැත. තිබේ නම් ඊළඟ පිටුව බලන්න.",
+  "segmentReportsEmptyPreview": "මෙම පෙරදසුනේ වත්මන් වාර්තා නැත.",
+  "segmentReportsViewAll": "අදාළ සියලු වාර්තා බලන්න",
+  "calendarTitle": "???? ??? ??????",
+  "calendarHelp": "???????? ???? ???, ???? ??????? ????? ?? ????? ??? 31?? ?????? ?????. ?????? ????????? ??????. ????? ???? ????? ????. ??? ?????? ???????? ?????????? ????? ???? ?????? ????.",
+  "calendarDates": "???? ??? ??????",
+  "calendarTime": "???? ??????? ????? ??????",
+  "calendarPublish": "??? ?????? ??????? ?????",
+  "calendarGenerate": "??? ???? ????????? ??????",
+  "calendarRetire": "??? ?????? ???????? ???????",
+  "calendarFailed": "???? ?? ???? ???????? ?????? ?????. ??????? ?? ???? ????? ?????. ??????? ????? ??? ?? ????? ??? 31?? ????? ?????. ????? ?? ????????? ?? ??? ???????? ????????.",
+  "calendarConfirmed": "??? ????? ???? ?????? ???.",
+  "calendarGenerated": "????????? {created}?? ??????; ????? {preserved}?? ??????.",
+  "calendarPublished": "????????? ??? ??????",
+  "calendarRetired": "???????? ?????? ??? ??????",
+  "calendarEmpty": "??? ??? ???? ??? ????? ?????.",
+  "@calendarGenerated": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "preserved": {
+        "type": "int"
+      }
+    }
+  }
+}

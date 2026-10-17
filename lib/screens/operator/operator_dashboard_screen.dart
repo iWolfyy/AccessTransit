@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 
 import '../../logic/delay_eta_logic.dart';
+import '../../l10n/localization_context.dart';
 import '../../models/bus_route.dart';
 import '../../models/boarding_request.dart';
 import '../../models/bus.dart';
@@ -17,13 +18,19 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/live_bus_service.dart';
 import '../../services/location_service.dart';
+import '../../services/moderation_client.dart';
 import '../../services/trip_service.dart';
 import '../../models/trip_model.dart';
 import '../../models/station.dart';
 import '../../widgets/add_station_dialog.dart';
 import '../../widgets/logout_confirmation_dialog.dart';
 import '../../widgets/assistance_operator_actions.dart';
+import '../../widgets/run_assistance_inbox.dart';
 import '../../widgets/operator_access_gate.dart';
+import '../../widgets/driver_route_gate.dart';
+import '../../services/driver_route_service.dart';
+import '../../services/service_run_service.dart';
+import '../../models/service_run.dart';
 import '../auth/login_screen.dart';
 
 /// Screen for Bus Operators to start/stop trips and broadcast real-time GPS telemetry to Firestore.
@@ -32,12 +39,16 @@ class OperatorDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => OperatorAccessGate(
-    builder: (_) => const _ApprovedOperatorDashboardScreen(),
+    builder: (_) => DriverRouteGate(
+      builder: (_, routeId) =>
+          _ApprovedOperatorDashboardScreen(routeId: routeId),
+    ),
   );
 }
 
 class _ApprovedOperatorDashboardScreen extends StatefulWidget {
-  const _ApprovedOperatorDashboardScreen();
+  const _ApprovedOperatorDashboardScreen({required this.routeId});
+  final String routeId;
 
   @override
   State<_ApprovedOperatorDashboardScreen> createState() =>
@@ -55,6 +66,12 @@ class _OperatorDashboardScreenState
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<List<Bus>>? _busesSubscription;
   StreamSubscription<Bus?>? _busDocSubscription;
+  StreamSubscription<List<ServiceRun>>? _runsSubscription;
+  List<ServiceRun> _runs = [];
+  String? _selectedRunId, _runsBusId, _runError;
+  Timer? _startClock;
+  ServiceRun? get _selectedRun =>
+      _runs.where((r) => r.id == _selectedRunId).firstOrNull;
 
   Timer? _tripTimer;
   Duration _tripDuration = Duration.zero;
@@ -73,11 +90,11 @@ class _OperatorDashboardScreenState
   Bus? _currentBus;
   Map<String, BusRoute> _routesMap = {};
 
-  String _selectedBusId = 'bus_138_nd4521';
-  String _selectedRouteId = 'route_138_pettah_homagama';
-  String _selectedRouteNumber = '138';
-  String _selectedRouteName = 'Route 138: Pettah → Kottawa';
-  String _nextStop = 'Kottawa Highway Bus Station';
+  String _selectedBusId = '';
+  String _selectedRouteId = '';
+  String _selectedRouteNumber = '';
+  String _selectedRouteName = '';
+  String _nextStop = '';
 
   bool? _rampOperational;
   final bool _elevatorWorking = true;
@@ -205,10 +222,25 @@ class _OperatorDashboardScreenState
     _busesSubscription = _firestoreService.streamBuses().listen((buses) {
       if (!mounted) return;
       final currentUserId = _authService.currentUser?.uid;
-      final list = buses;
+      final list = DriverRouteService.eligibleBuses(buses, widget.routeId);
 
       setState(() {
         _availableBuses = list;
+        if (!list.any((b) => b.id == _selectedBusId)) {
+          ++_operationEpoch;
+          _positionSubscription?.cancel();
+          _tripTimer?.cancel();
+          _busDocSubscription?.cancel();
+          _isTripActive = false;
+          _isInitializing = false;
+          _tripId = null;
+          _publicationStatus =
+              'Selected bus unavailable; broadcasting stopped locally';
+          _selectedBusId = list.isEmpty
+              ? ''
+              : _autoSelectNearestUpcomingBus(list, currentUserId);
+          _currentBus = null;
+        }
         if (!_userManuallySelectedBus &&
             !_isTripActive &&
             !_isInitializing &&
@@ -217,20 +249,76 @@ class _OperatorDashboardScreenState
           _selectedBusId = _autoSelectNearestUpcomingBus(list, currentUserId);
         }
       });
-      _listenToSelectedBus(_selectedBusId);
+      if (_selectedBusId.isNotEmpty) _listenToSelectedBus(_selectedBusId);
     });
   }
 
   void _listenToSelectedBus(String busId) {
+    if (_runsBusId != busId) {
+      _runsBusId = busId;
+      _runsSubscription?.cancel();
+      _selectedRunId = null;
+      _runs = [];
+      _runError = null;
+      _runsSubscription = ServiceRunService()
+          .watchRuns(busId)
+          .listen(
+            (runs) {
+              if (!mounted || _runsBusId != busId) return;
+              setState(() {
+                _runs = runs
+                    .where(
+                      (r) => [
+                        'scheduled',
+                        'boarding',
+                        'in_progress',
+                      ].contains(r.status),
+                    )
+                    .toList();
+                _runError = null;
+                if (!_runs.any((r) => r.id == _selectedRunId)) {
+                  _selectedRunId =
+                      _runs
+                          .where(
+                            (r) =>
+                                ['boarding', 'in_progress'].contains(r.status),
+                          )
+                          .firstOrNull
+                          ?.id ??
+                      _runs
+                          .where(
+                            (r) => !r.latestStartAt.isBefore(
+                              DateTime.now().toUtc(),
+                            ),
+                          )
+                          .firstOrNull
+                          ?.id;
+                }
+              });
+              _refreshStartBoundary();
+            },
+            onError: (Object _) {
+              if (mounted && _runsBusId == busId) {
+                setState(
+                  () => _runError = 'Connect to verify dated departures.',
+                );
+              }
+            },
+          );
+    }
     _busDocSubscription?.cancel();
     _busDocSubscription = _firestoreService.streamBusById(busId).listen((bus) {
       if (!mounted || busId != _selectedBusId) return;
       if (bus == null ||
+          bus.routeId != widget.routeId ||
+          bus.isPublishedTimetable ||
           (_isTripActive && bus.driverId != _authService.currentUser?.uid)) {
+        _operationEpoch++;
+        _tripId = null;
         _positionSubscription?.cancel();
         _tripTimer?.cancel();
         setState(() {
-          _currentBus = bus;
+          _currentBus = null;
           _isTripActive = false;
           _publicationStatus =
               'Bus assignment unavailable; broadcasting stopped locally';
@@ -250,7 +338,7 @@ class _OperatorDashboardScreenState
         }
 
         _selectedRouteNumber = bus.routeNo;
-        _selectedRouteId = 'route_${bus.routeNo}';
+        _selectedRouteId = widget.routeId;
         _selectedRouteName = 'Route ${bus.routeNo}';
         if (bus.stops.isNotEmpty) {
           final targetIndex = bus.stops.length > 1 ? 1 : 0;
@@ -364,6 +452,8 @@ class _OperatorDashboardScreenState
 
   @override
   void dispose() {
+    _runsSubscription?.cancel();
+    _startClock?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _busesSubscription?.cancel();
     _busDocSubscription?.cancel();
@@ -381,6 +471,55 @@ class _OperatorDashboardScreenState
     if (uid == null || _currentBus?.driverId != uid) {
       _showSnack('Claim this bus before starting a trip.', isError: true);
       return;
+    }
+    final run = _selectedRun;
+    if (run == null || _runError != null) {
+      _showSnack(
+        'Select an administrator-published dated departure.',
+        isError: true,
+      );
+      return;
+    }
+    String lateReason = '';
+    if (run.status == 'scheduled' &&
+        DateTime.now().toUtc().isAfter(run.plannedDepartureAt)) {
+      final reason = TextEditingController();
+      final answer = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Late start reason'),
+          content: TextField(
+            controller: reason,
+            maxLength: 2000,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              helperText: 'At least 5 characters. Latest start is 30 minutes after departure.',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, reason.text.trim()),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      reason.dispose();
+      if (!mounted || answer == null) return;
+      if (answer.length < 5) {
+        _showSnack(
+          'Enter a late-start reason of at least 5 characters.',
+          isError: true,
+        );
+        return;
+      }
+      lateReason = answer;
     }
 
     final operationEpoch = _operationEpoch;
@@ -427,8 +566,8 @@ class _OperatorDashboardScreenState
       });
 
       final initialNextStop =
-          (_currentBus != null && _currentBus!.stops.length > 1)
-          ? _resolveStopName(_currentBus!.stops[1])
+          (_currentBus != null && _currentBus!.stops.isNotEmpty)
+          ? _resolveStopName(_currentBus!.stops.first)
           : _nextStop;
       _nextStop = initialNextStop;
 
@@ -444,6 +583,7 @@ class _OperatorDashboardScreenState
         longitude: lng,
         speed: speedKmH,
         heading: headingDeg,
+        timestamp: initialPosition.timestamp,
         status: BusStatus.active,
         nextStop: initialNextStop,
         currentStopIndex: 0,
@@ -452,10 +592,8 @@ class _OperatorDashboardScreenState
         isBroadcasting: true,
       );
 
-      // Create new trip document in trips/{tripId} with actualDepartureTime = now
-      final stops = _currentBus?.stops.isNotEmpty == true
-          ? _currentBus!.stops
-          : <String>[];
+      // The dated run owns the planned itinerary; starting records boarding,
+      // not an invented actual departure at the first stop.
 
       if (_tripId == null) {
         final prior = await TripService().getActiveTrip(_selectedBusId);
@@ -467,18 +605,16 @@ class _OperatorDashboardScreenState
           _tripId = prior.tripId;
         }
       }
-      _tripId ??=
-          'trip_${_selectedBusId}_${DateTime.now().microsecondsSinceEpoch}';
-      final savedTrip = await TripService().startTrip(
-        busId: _selectedBusId,
-        routeNo: _selectedRouteNumber,
-        stops: stops,
+      if (_tripId != null && _tripId != run.id) {
+        throw StateError('Resume the existing active dated run first.');
+      }
+      _tripId = run.id;
+      final savedTrip = await ServiceRunService().startRun(
+        runId: run.id,
         driverId: driverId,
-        scheduleTimes: _currentBus?.scheduleTimes,
-        scheduledDeparture: _currentBus?.scheduledDeparture,
-        departureTime: now,
-        requestedTripId: _tripId,
-        initialTelemetry: initialBusModel,
+        gps: initialBusModel,
+        gpsAccuracy: initialPosition.accuracy,
+        lateReason: lateReason,
       );
       if (!mounted || operationEpoch != _operationEpoch) return;
       if (!savedTrip.isInProgress) {
@@ -532,7 +668,9 @@ class _OperatorDashboardScreenState
       });
 
       _showSnack(
-        'Trip Started! Broadcasting live GPS & per-stop timeline for Bus $_selectedRouteNumber',
+        savedTrip.isBoarding
+            ? 'Boarding session started. Record actual departure when leaving.'
+            : 'Active dated trip resumed. GPS broadcasting acknowledged.',
       );
     } catch (e) {
       if (!mounted || operationEpoch != _operationEpoch) return;
@@ -540,7 +678,11 @@ class _OperatorDashboardScreenState
         _isInitializing = false;
       });
       _showSnack(
-        'Could not start trip: ${e.toString().replaceAll('Exception: ', '')}',
+        e is ModerationException
+            ? e.code == 'gps-unavailable'
+                  ? context.l10n.operationsGpsError
+                  : context.l10n.operationsError
+            : 'Could not start trip: ${e.toString().replaceAll('Exception: ', '')}',
         isError: true,
       );
     }
@@ -633,9 +775,15 @@ class _OperatorDashboardScreenState
       setState(() {
         _isTripActive = false;
         _tripId = null;
-        _publicationStatus = 'Shared trip completion acknowledged';
+        _publicationStatus = completed.status == 'cancelled'
+            ? 'Boarding cancelled; broadcast ended'
+            : 'Shared trip completion acknowledged';
       });
-      _showSnack('Trip completion saved. Broadcasting ended.');
+      _showSnack(
+        completed.status == 'cancelled'
+            ? 'Boarding cancelled. Broadcasting ended.'
+            : 'Trip completion saved. Broadcasting ended.',
+      );
     } catch (e) {
       if (mounted) {
         setState(
@@ -785,22 +933,146 @@ class _OperatorDashboardScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildTripControlCard(),
-            const SizedBox(height: 16),
-            _buildTripProgressCard(),
-            const SizedBox(height: 16),
-            _buildRouteSelectorCard(),
-            const SizedBox(height: 16),
-            _buildLiveTelemetryCard(),
-            const SizedBox(height: 16),
-            _buildAccessibilityControlsCard(),
-            const SizedBox(height: 16),
-            _buildBoardingRequestsCard(),
+            if (_availableBuses.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: Text(
+                  'No physical buses are available on your assigned route. Ask the administrator to add or review a bus.',
+                ),
+              ),
+            if (_availableBuses.isNotEmpty) ...[
+              _buildDatedRunCard(),
+              const SizedBox(height: 16),
+              _buildTripControlCard(),
+              const SizedBox(height: 16),
+              _buildTripProgressCard(),
+              const SizedBox(height: 16),
+              _buildRouteSelectorCard(),
+              const SizedBox(height: 16),
+              _buildLiveTelemetryCard(),
+              const SizedBox(height: 16),
+              _buildAccessibilityControlsCard(),
+              const SizedBox(height: 16),
+              _buildBoardingRequestsCard(),
+            ],
           ],
         ),
       ),
     );
   }
+
+  void _refreshStartBoundary() {
+    _startClock?.cancel();
+    final run = _selectedRun;
+    if (run == null || run.status != 'scheduled') return;
+    final now = DateTime.now().toUtc();
+    final next = [
+      run.earliestStartAt,
+      run.latestStartAt.add(const Duration(milliseconds: 1)),
+    ].where((t) => t.isAfter(now)).firstOrNull;
+    if (next != null) {
+      _startClock = Timer(next.difference(now), () {
+        if (mounted) {
+          setState(() {});
+          _refreshStartBoundary();
+        }
+      });
+    }
+  }
+
+  String _colomboRunTime(DateTime time) {
+    final c = ServiceRun.colomboClock(time);
+    return '${c.year}-${c.month.toString().padLeft(2, '0')}-${c.day.toString().padLeft(2, '0')} ${c.hour.toString().padLeft(2, '0')}:${c.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildDatedRunCard() => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Dated departure',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 12),
+          if (_runError != null)
+            Text(_runError!)
+          else if (_runs.isEmpty)
+            const Text(
+              'No dated departures published. Ask the administrator to schedule this bus.',
+            )
+          else
+            DropdownButtonFormField<String>(
+              key: ValueKey('run-$_selectedBusId-$_selectedRunId'),
+              initialValue: _selectedRunId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Colombo service departure',
+              ),
+              items: [
+                for (final run in _runs)
+                  DropdownMenuItem(
+                    value: run.id,
+                    child: Text(
+                      '${_colomboRunTime(run.plannedDepartureAt)} · ${run.status}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: _isTripActive || _isInitializing
+                  ? null
+                  : (v) {
+                      setState(() => _selectedRunId = v);
+                      _refreshStartBoundary();
+                    },
+            ),
+          if (_selectedRun != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Start window: ${_colomboRunTime(_selectedRun!.earliestStartAt)} to ${_colomboRunTime(_selectedRun!.latestStartAt)}',
+            ),
+            const Text(
+              'Starting opens boarding. Record actual departure separately; late starts require a reason.',
+            ),
+          ],
+          if (_isTripActive && _tripId != null)
+            StreamBuilder<TripModel?>(
+              stream: TripService().watchActiveTripForBus(_selectedBusId),
+              builder: (context, snapshot) => snapshot.data?.isBoarding == true
+                  ? FilledButton(
+                      onPressed: _operatorWriteBusy
+                          ? null
+                          : () async {
+                              setState(() => _operatorWriteBusy = true);
+                              try {
+                                await ServiceRunService().recordDeparture(
+                                  _tripId!,
+                                  _authService.currentUser!.uid,
+                                );
+                                _showSnack(
+                                  'Actual departure confirmed by the server.',
+                                );
+                              } catch (_) {
+                                _showSnack(
+                                  'Departure was not confirmed. Refresh and retry.',
+                                  isError: true,
+                                );
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _operatorWriteBusy = false);
+                                }
+                              }
+                            },
+                      child: const Text('Record actual departure'),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+        ],
+      ),
+    ),
+  );
 
   Widget _buildTripControlCard() {
     return Card(
@@ -869,7 +1141,16 @@ class _OperatorDashboardScreenState
               child: _isInitializing
                   ? const Center(child: CircularProgressIndicator())
                   : FilledButton.icon(
-                      onPressed: _operatorWriteBusy || _isInitializing
+                      onPressed:
+                          _operatorWriteBusy ||
+                              _isInitializing ||
+                              (!_isTripActive &&
+                                  (_runError != null ||
+                                      _selectedRun == null ||
+                                      (_selectedRun!.status == 'scheduled' &&
+                                          !_selectedRun!.canStartAt(
+                                            DateTime.now().toUtc(),
+                                          ))))
                           ? null
                           : (_isTripActive ? _stopTrip : _startTrip),
                       style: FilledButton.styleFrom(
@@ -888,7 +1169,11 @@ class _OperatorDashboardScreenState
                         size: 26,
                       ),
                       label: Text(
-                        _isTripActive ? 'Stop Trip' : 'Start Trip',
+                        _isTripActive
+                            ? 'Stop Trip'
+                            : _selectedRun?.handoverPending == true
+                            ? context.l10n.operationsResume
+                            : 'Start Trip',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -946,7 +1231,9 @@ class _OperatorDashboardScreenState
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        isInProgress ? 'In Progress' : 'No Active Trip',
+                        isInProgress
+                            ? (trip.isBoarding ? 'Boarding' : 'In Progress')
+                            : 'No Active Trip',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -961,7 +1248,7 @@ class _OperatorDashboardScreenState
                 const SizedBox(height: 12),
                 if (!isInProgress) ...[
                   const Text(
-                    'No active trip run. Tap Start Trip above to record actual departure time and activate the rider per-stop timeline.',
+                    'No active run. Select a dated departure and start boarding above; record actual departure separately when leaving.',
                     style: TextStyle(
                       fontSize: 13,
                       color: AppColors.onSurfaceVariant,
@@ -1259,10 +1546,10 @@ class _OperatorDashboardScreenState
           const SizedBox(height: 12),
 
           Text(
-            'Planned departure: ${trip.scheduledDepartureTime == null ? 'Unknown' : '${TimeUtils.formatDateString(trip.scheduledDepartureTime!)} ${TimeUtils.formatTimeString(trip.scheduledDepartureTime!)}'}',
+            'Planned departure (Colombo): ${trip.scheduledDepartureTime == null ? 'Unknown' : _colomboRunTime(trip.scheduledDepartureTime!)}',
           ),
           Text(
-            'Actual departure: ${trip.actualDepartureTime == null ? 'Unknown' : '${TimeUtils.formatDateString(trip.actualDepartureTime!)} ${TimeUtils.formatTimeString(trip.actualDepartureTime!)}'}',
+            'Actual departure (Colombo): ${trip.actualDepartureTime == null ? 'Not recorded' : _colomboRunTime(trip.actualDepartureTime!)}',
           ),
           const Text(
             'ETAs follow actual departure and recorded arrivals. Missing timetable intervals use a 6-minute estimate; confirm timing with the operator.',
@@ -2574,6 +2861,12 @@ class _OperatorDashboardScreenState
   }
 
   Widget _buildBoardingRequestsCard() {
+    if (_firestoreService.runAssistanceEnabled) {
+      return RunAssistanceInbox(
+        runId: _selectedRunId,
+        repository: _firestoreService,
+      );
+    }
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

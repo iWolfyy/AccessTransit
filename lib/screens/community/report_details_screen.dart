@@ -1,8 +1,14 @@
+import '../../widgets/report_v2_votes.dart';
 import '../../widgets/evidence_refresh.dart';
 
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+
+import '../../services/moderation_mode.dart';
+import '../../l10n/localization_context.dart';
+import 'report_reviews_screen.dart';
+
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -204,6 +210,10 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         initialData: widget.report,
         builder: (context, snapshot) {
           _readUnavailable = snapshot.hasError;
+          if (snapshot.hasError &&
+              (_latestReport?.isV2 == true || widget.report?.isV2 == true)) {
+            _latestReport = null;
+          }
           if (!snapshot.hasError &&
               snapshot.connectionState != ConnectionState.waiting) {
             _latestReport = snapshot.data;
@@ -363,16 +373,32 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                 ],
 
                 // 6. Action Panel (Confirm, Resolve, Flag)
-                if (report != null && !isHidden) ...[
-                  _buildActionPanel(
-                    report: report,
-                    isReportActive: isReportActive,
-                    isResolved: isResolved,
-                    hasConfirmed: hasConfirmed,
-                    now: now,
-                    hasFlagged: hasFlagged,
-                    isAuthor: isAuthor,
+                if (ModerationMode.enabled &&
+                    report?.isV2 == true &&
+                    isAuthor &&
+                    isHidden)
+                  TextButton.icon(
+                    icon: const Icon(Icons.rate_review_outlined),
+                    label: Text(context.l10n.reviewsTitle),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ReportReviewsScreen(),
+                      ),
+                    ),
                   ),
+                if (report != null && !isHidden) ...[
+                  if (report.isV2)
+                    ReportV2Votes(report: report, service: _repository)
+                  else
+                    _buildActionPanel(
+                      report: report,
+                      isReportActive: isReportActive,
+                      isResolved: isResolved,
+                      hasConfirmed: hasConfirmed,
+                      now: now,
+                      hasFlagged: hasFlagged,
+                      isAuthor: isAuthor,
+                    ),
                 ] else if (isHidden) ...[
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -1104,7 +1130,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Inaccuracy flags: ${report.falseCount} / 3 (Report hidden at 3 independent flags)',
+                  'Inaccuracy flags: ${report.falseCount} / ${report.flagThreshold} (Report hidden at ${report.flagThreshold} independent flags)',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1325,8 +1351,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     ),
                     label: Text(
                       hasFlagged
-                          ? 'False (${report.falseCount}/3)'
-                          : 'False Flag (${report.falseCount}/3)',
+                          ? 'False (${report.falseCount}/${report.flagThreshold})'
+                          : 'False Flag (${report.falseCount}/${report.flagThreshold})',
                       style: TextStyle(
                         fontSize: context.hasLargeTargets ? 14 : 13,
                         fontWeight: FontWeight.w700,

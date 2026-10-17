@@ -27,6 +27,9 @@ export async function reconcileReport(db, id, { apply = false } = {}) {
       tx.get(doc(db, 'reports', id)), tx.get(ledgerRef),
     ]);
     const report = reportSnap.data();
+    if (report?.policyVersion === 2 || report?.rewardPolicyVersion === 2) {
+      throw Error('Policy v2 reports require the trusted moderation service; v1 reconciliation is forbidden');
+    }
     let target;
     if (report && ['bus', 'station'].includes(report.targetType) && validUid(report.targetId)) {
       target = (await tx.get(doc(db, report.targetType === 'bus' ? 'buses' : 'stations', report.targetId))).data();

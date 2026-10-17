@@ -1,6 +1,7 @@
+import 'support/fixture_search_backend.dart';
 import 'package:access_transit/models/bus.dart';
 import 'package:access_transit/screens/journey/route_results_screen.dart';
-import 'package:access_transit/screens/journey/route_details_screen.dart';
+import 'package:access_transit/screens/journey/bus_details_screen.dart';
 import 'package:access_transit/services/transit_catalogue.dart';
 import 'package:access_transit/services/accessibility_preferences_service.dart';
 import 'package:flutter/material.dart';
@@ -36,14 +37,14 @@ void main() {
   }) async {
     await tester.pumpWidget(
       MaterialApp(
-        home: RouteResultsScreen(
+        home: RouteResultsScreen(searchBackend: FixtureSearchBackend(), 
           fromStationId: 'a',
           toStationId: 'b',
           origin: 'A',
           destination: 'B',
           wheelchairAccessRequired: wheelchair,
           stepFreeOnly: stepFree,
-          selectedDate: DateTime.now().add(const Duration(days: 7)),
+          selectedDate: null,
         ),
       ),
     );
@@ -73,8 +74,8 @@ void main() {
       expect(find.text('WP TEST-23'), findsOneWidget);
       await tap(tester, 'WP TEST-23');
       final route = tester
-          .widget<RouteDetailsScreen>(find.byType(RouteDetailsScreen))
-          .route!;
+          .widget<BusDetailsScreen>(find.byType(BusDetailsScreen))
+          .route;
       expect(route.wheelchairAccessRequired, isFalse);
       expect(route.stepFreeOnly, isFalse);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -140,8 +141,8 @@ void main() {
       expect(find.text('WP TEST-23'), findsOneWidget);
       await tap(tester, 'WP TEST-23');
       final route = tester
-          .widget<RouteDetailsScreen>(find.byType(RouteDetailsScreen))
-          .route!;
+          .widget<BusDetailsScreen>(find.byType(BusDetailsScreen))
+          .route;
       expect(route.stepFreeOnly, isTrue);
       expect(route.wheelchairAccessRequired, isFalse);
       expect(AccessibilityPreferencesService.instance.isStepFree, isTrue);
@@ -164,8 +165,8 @@ void main() {
       await tap(tester, 'WP TEST-23');
       expect(
         tester
-            .widget<RouteDetailsScreen>(find.byType(RouteDetailsScreen))
-            .route!
+            .widget<BusDetailsScreen>(find.byType(BusDetailsScreen))
+            .route
             .wheelchairAccessRequired,
         isFalse,
       );
@@ -198,8 +199,8 @@ void main() {
       await tap(tester, 'WP TEST-23');
       expect(
         tester
-            .widget<RouteDetailsScreen>(find.byType(RouteDetailsScreen))
-            .route!
+            .widget<BusDetailsScreen>(find.byType(BusDetailsScreen))
+            .route
             .stepFreeOnly,
         isFalse,
       );

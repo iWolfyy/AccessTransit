@@ -332,10 +332,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Working reported'), findsNWidgets(2));
       expect(find.text('Unknown'), findsOneWidget);
-      expect(
-        find.textContaining('Reported by: Account reporter'),
-        findsNWidgets(2),
-      );
+      expect(find.text('View observation details'), findsOneWidget);
       updates.add([
         report(problem: 'Ramp Broken', condition: ReportCondition.barrier),
       ]);

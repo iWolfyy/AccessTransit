@@ -1,4 +1,6 @@
 import 'transit_catalogue.dart';
+import '../logic/report_cooldown.dart';
+import 'moderation_client.dart';
 import 'sample_test_mode.dart';
 
 import 'dart:async';
@@ -402,6 +404,10 @@ class ReportSubmissionService extends ChangeNotifier {
         savedAt: entry.savedAt,
         error: entry.report.createdAt == null
             ? 'Observation time unknown. Create a new report before uploading.'
+            : error is ReportCooldownException
+            ? error.toString()
+            : error is ModerationException && error.code == 'report-cooldown'
+            ? 'Same-issue cooldown. Retry after ${error.retryAt?.toUtc().toIso8601String() ?? '5 minutes'} (UTC). Your draft is saved.'
             : transient
             ? 'Waiting for a connection. This report is not confirmed as published.'
             : 'Upload failed. Check your sign-in, photo and service access, then retry.',

@@ -1,15 +1,18 @@
+import 'support/fixture_search_backend.dart';
+
 import 'package:access_transit/logic/journey_selection.dart';
 import 'package:access_transit/logic/journey_fare.dart';
 import 'package:access_transit/models/bus.dart';
 import 'package:access_transit/models/journey_model.dart';
 import 'package:access_transit/screens/journey/route_results_screen.dart';
 import 'package:access_transit/screens/journey/route_details_screen.dart';
-import 'package:access_transit/screens/journey/journey_confirmation_screen.dart';
+import 'package:access_transit/screens/journey/bus_details_screen.dart';
 import 'package:access_transit/screens/journey/live_journey_screen.dart';
 import 'package:access_transit/services/transit_catalogue.dart';
 import 'package:access_transit/services/accessibility_preferences_service.dart';
 import 'package:access_transit/widgets/fare_estimate_text.dart';
 import 'package:flutter/material.dart';
+import 'package:access_transit/l10n/app_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,6 +27,54 @@ const bus = Bus(
   occupancy: 'low',
 );
 void main() {
+  test('prototype calculation and legacy numeric display require an explicit synthetic build', () {
+    expect(
+      JourneyFare.estimate(durationMinutes: 15, intermediateStops: 0),
+      JourneyFare.prototypeEnabled ? 70 : 0,
+    );
+    expect(
+      JourneyFare.label(70),
+      JourneyFare.prototypeEnabled ? 'Sample est. LKR 70' : 'Fare unavailable',
+    );
+    expect(JourneyFare.estimate(durationMinutes: -1, intermediateStops: 1), 0);
+  });
+  for (final locale in ['en', 'si', 'ta']) {
+    testWidgets('fare wording $locale wraps at 320dp and 200 percent text', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: Locale(locale),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          builder: (_, child) => MediaQuery(
+            data: const MediaQueryData(
+              size: Size(320, 760),
+              textScaler: TextScaler.linear(2),
+            ),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: ListView(
+              children: const [
+                FareEstimateText(amount: 70),
+                FareDisclosureText(),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      if (!JourneyFare.prototypeEnabled) {
+        expect(find.textContaining('70'), findsNothing);
+      }
+    });
+  }
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await AccessibilityPreferencesService.instance.init();
@@ -36,7 +87,7 @@ void main() {
     });
   });
   void expectDisclosure() {
-    expect(find.text('Est. LKR 70'), findsOneWidget);
+    expect(find.text(JourneyFare.label(70)), findsOneWidget);
     expect(find.text(JourneyFare.disclosure), findsOneWidget);
     expect(find.text('LKR 70'), findsNothing);
     expect(find.text('Rs. 250'), findsNothing);
@@ -49,12 +100,13 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: RouteResultsScreen(
+            searchBackend: FixtureSearchBackend(),
             fromStationId: 'b',
             toStationId: 'c',
             origin: 'B',
             destination: 'C',
             wheelchairAccessRequired: false,
-            selectedDate: DateTime.now().add(const Duration(days: 7)),
+            selectedDate: null,
           ),
         ),
       );
@@ -63,25 +115,17 @@ void main() {
       await tester.tap(find.text('WP FARE-24'));
       await tester.pumpAndSettle();
       final route = tester
-          .widget<RouteDetailsScreen>(find.byType(RouteDetailsScreen))
-          .route!;
+          .widget<BusDetailsScreen>(find.byType(BusDetailsScreen))
+          .route;
       expect(route.durationMinutes, 15);
-      expect(route.estimatedPriceLkr, 70);
+      expect(route.estimatedPriceLkr, JourneyFare.prototypeEnabled ? 70 : 0);
       await tester.scrollUntilVisible(
         find.byType(FareEstimateText).hitTestable(),
         300,
         scrollable: find.byType(Scrollable).first,
       );
       expectDisclosure();
-      await tester.scrollUntilVisible(
-        find.text('Review and confirm journey').hitTestable(),
-        300,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(find.text('Review and confirm journey'));
-      await tester.pumpAndSettle();
-      expect(find.byType(JourneyConfirmationScreen), findsOneWidget);
-      expectDisclosure();
+      expect(find.text('Review and confirm journey'), findsNothing);
       final saved = JourneySelection.create(
         route,
         id: 'saved',
@@ -92,7 +136,7 @@ void main() {
         bus,
         {},
       );
-      expect(restored.estimatedPriceLkr, 70);
+      expect(restored.estimatedPriceLkr, JourneyFare.prototypeEnabled ? 70 : 0);
       await tester.pumpWidget(
         MaterialApp(
           home: LiveJourneyScreen(
@@ -124,7 +168,7 @@ void main() {
             scrollable: find.byType(Scrollable).first,
           );
         }
-        expect(find.text('Fare unknown'), findsOneWidget);
+        expect(find.text('Fare unavailable'), findsOneWidget);
         expect(find.text('Est. LKR 80'), findsNothing);
         expect(find.text('Rs. 0'), findsNothing);
         await tester.pumpWidget(const SizedBox.shrink());
@@ -161,8 +205,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Fare unknown'), findsOneWidget);
-    expect(find.text('Est. LKR 70'), findsNothing);
+    expect(find.text('Fare unavailable'), findsOneWidget);
+    if (JourneyFare.prototypeEnabled) {
+      expect(find.text(JourneyFare.label(70)), findsNothing);
+    }
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets('fare semantics identify the estimate and its prototype source', (
@@ -170,10 +216,12 @@ void main() {
   ) async {
     final semantics = tester.ensureSemantics();
     await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: FareEstimateText(amount: 70))),
+      MaterialApp(home: Scaffold(body: FareEstimateText(amount: 70))),
     );
     expect(
-      find.bySemanticsLabel('Est. LKR 70. ${JourneyFare.disclosure}'),
+      find.bySemanticsLabel(
+        '${JourneyFare.label(70)}. ${JourneyFare.disclosure}',
+      ),
       findsOneWidget,
     );
     semantics.dispose();

@@ -2,10 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Information regarding estimated and actual arrival times for a specific stop in a trip.
 class StopTimingInfo {
-  const StopTimingInfo({
-    required this.estimatedArrival,
-    this.actualArrival,
-  });
+  const StopTimingInfo({required this.estimatedArrival, this.actualArrival});
 
   final DateTime estimatedArrival;
   final DateTime? actualArrival;
@@ -13,7 +10,9 @@ class StopTimingInfo {
   Map<String, dynamic> toMap() {
     return {
       'estimatedArrival': Timestamp.fromDate(estimatedArrival),
-      'actualArrival': actualArrival != null ? Timestamp.fromDate(actualArrival!) : null,
+      'actualArrival': actualArrival != null
+          ? Timestamp.fromDate(actualArrival!)
+          : null,
     };
   }
 
@@ -29,10 +28,7 @@ class StopTimingInfo {
     final actRaw = map['actualArrival'];
     final act = actRaw != null ? parseTime(actRaw) : null;
 
-    return StopTimingInfo(
-      estimatedArrival: est,
-      actualArrival: act,
-    );
+    return StopTimingInfo(estimatedArrival: est, actualArrival: act);
   }
 
   StopTimingInfo copyWith({
@@ -62,9 +58,11 @@ class TripModel {
     this.currentStopIndex = 0,
     required this.driverId,
     required this.createdAt,
+    this.serviceRunId,
   });
 
   final String tripId;
+  final String? serviceRunId;
   final String busId;
   final String routeNo;
   final List<String> stops;
@@ -79,6 +77,8 @@ class TripModel {
   bool get isInProgress => status == 'in_progress';
   bool get isCompleted => status == 'completed';
   bool get isNotStarted => status == 'not_started';
+  bool get isBoarding =>
+      isInProgress && serviceRunId != null && actualDepartureTime == null;
 
   factory TripModel.fromMap(Map<String, dynamic> map, {String? documentId}) {
     DateTime? parseNullableTime(dynamic val) {
@@ -103,6 +103,7 @@ class TripModel {
 
     return TripModel(
       tripId: documentId ?? map['tripId']?.toString() ?? '',
+      serviceRunId: map['serviceRunId'] as String?,
       busId: map['busId']?.toString() ?? '',
       routeNo: map['routeNo']?.toString() ?? '',
       stops: parsedStops,
@@ -116,7 +117,9 @@ class TripModel {
     );
   }
 
-  factory TripModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+  factory TripModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> snapshot,
+  ) {
     final data = snapshot.data() ?? {};
     return TripModel.fromMap(data, documentId: snapshot.id);
   }
@@ -129,6 +132,7 @@ class TripModel {
 
     return {
       'tripId': tripId,
+      if (serviceRunId != null) 'serviceRunId': serviceRunId,
       'busId': busId,
       'routeNo': routeNo,
       'stops': stops,
@@ -142,7 +146,9 @@ class TripModel {
       'stopTimes': convertedStopTimes,
       'currentStopIndex': currentStopIndex,
       'driverId': driverId,
-      'createdAt': isServerTimestamp ? FieldValue.serverTimestamp() : Timestamp.fromDate(createdAt),
+      'createdAt': isServerTimestamp
+          ? FieldValue.serverTimestamp()
+          : Timestamp.fromDate(createdAt),
     };
   }
 
@@ -161,11 +167,13 @@ class TripModel {
   }) {
     return TripModel(
       tripId: tripId ?? this.tripId,
+      serviceRunId: serviceRunId,
       busId: busId ?? this.busId,
       routeNo: routeNo ?? this.routeNo,
       stops: stops ?? List.from(this.stops),
       status: status ?? this.status,
-      scheduledDepartureTime: scheduledDepartureTime ?? this.scheduledDepartureTime,
+      scheduledDepartureTime:
+          scheduledDepartureTime ?? this.scheduledDepartureTime,
       actualDepartureTime: actualDepartureTime ?? this.actualDepartureTime,
       stopTimes: stopTimes ?? Map.from(this.stopTimes),
       currentStopIndex: currentStopIndex ?? this.currentStopIndex,

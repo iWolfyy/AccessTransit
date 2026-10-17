@@ -12,6 +12,10 @@
         android:usesCleartextTraffic="${localHttp}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Explicit opt-in; local/demo builds never register with FCM. -->
+        <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
+        <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="assistance_requests" />
         <!-- Background location service for Geolocator plugin (Android 14+ compatible) -->
         <service
             android:name="com.baseflow.geolocator.location.LocationService"

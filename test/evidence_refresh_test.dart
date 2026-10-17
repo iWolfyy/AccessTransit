@@ -1,3 +1,4 @@
+import 'support/fixture_search_backend.dart';
 import 'dart:async';
 
 import 'package:access_transit/data/seed_data.dart';
@@ -8,6 +9,8 @@ import 'package:access_transit/screens/community/community_screen.dart';
 import 'package:access_transit/screens/community/report_details_screen.dart';
 import 'package:access_transit/screens/journey/route_results_screen.dart';
 import 'package:access_transit/services/firestore_service.dart';
+import 'package:access_transit/services/accessibility_preferences_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:access_transit/services/transit_catalogue.dart';
 import 'package:access_transit/widgets/accessibility_evidence_card.dart';
 import 'package:access_transit/widgets/evidence_refresh.dart';
@@ -18,7 +21,11 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final start = DateTime(2026, 10, 15, 10);
   late DateTime now;
-  setUp(() => now = start);
+  setUp(() async {
+    now = start;
+    SharedPreferences.setMockInitialValues({});
+    await AccessibilityPreferencesService.instance.init();
+  });
   tearDown(FirestoreService.installCatalogueFixtures);
 
   Report report({bool broken = false, bool crowding = false}) => Report(
@@ -61,14 +68,14 @@ void main() {
         destination: 'b',
       ),
     );
-    expect(find.textContaining('Positive reported'), findsOneWidget);
+    expect(find.text('Positive observation - view details'), findsOneWidget);
     now = start.add(const Duration(seconds: 1));
     await tester.pump(const Duration(seconds: 1));
     // Existing policy includes the exact end instant.
-    expect(find.textContaining('Positive reported'), findsOneWidget);
+    expect(find.text('Positive observation - view details'), findsOneWidget);
     now = now.add(const Duration(microseconds: 1));
     await tester.pump(const Duration(microseconds: 1));
-    expect(find.textContaining('latest observation expired'), findsOneWidget);
+    expect(find.text('Unknown - no current observation'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -170,7 +177,7 @@ void main() {
         MaterialApp(
           home: EvidenceClock(
             now: () => now,
-            child: const RouteResultsScreen(
+            child: RouteResultsScreen(searchBackend: FixtureSearchBackend(now: () => now), 
               fromStationId: 'st_pettah',
               wheelchairAccessRequired: true,
               stepFreeOnly: false,

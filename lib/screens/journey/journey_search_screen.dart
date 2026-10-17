@@ -6,6 +6,12 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_utils.dart';
 
 import '../../models/station.dart';
+import '../../services/nearby_stop_service.dart';
+import '../../widgets/nearby_stops_sheet.dart';
+import '../../logic/search_session.dart';
+import '../../logic/transit_time.dart';
+import '../../services/transit_search_backend.dart';
+import '../../l10n/localization_context.dart';
 import '../../services/accessibility_preferences_service.dart';
 import '../../services/firestore_service.dart';
 import 'route_results_screen.dart';
@@ -14,14 +20,22 @@ import 'route_results_screen.dart';
 /// streamlined travel time, accessibility-first filters, and popular corridors.
 /// Phase 1: High accessibility UX enhancement inspired by LMT Go.
 class JourneySearchScreen extends StatefulWidget {
-  const JourneySearchScreen({super.key, this.service});
+  const JourneySearchScreen({
+    super.key,
+    this.service,
+    this.searchBackend,
+    this.nearbyStopService,
+  });
   final FirestoreService? service;
+  final TransitSearchBackend? searchBackend;
+  final NearbyStopService? nearbyStopService;
 
   @override
   State<JourneySearchScreen> createState() => _JourneySearchScreenState();
 }
 
-class _JourneySearchScreenState extends State<JourneySearchScreen> {
+class _JourneySearchScreenState extends State<JourneySearchScreen>
+    with WidgetsBindingObserver {
   static const double _desktopBreakpoint = 768;
   late final FirestoreService _firestoreService =
       widget.service ?? FirestoreService();
@@ -29,43 +43,90 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   List<Station> _stations = [];
   Station? _selectedFromStation;
   Station? _selectedToStation;
-  DateTime _selectedDate = DateTime.now();
+  DateTime _selectedDate = TransitTime.civil(DateTime.now());
   TimeOfDay? _selectedTime;
   bool _isLoadingStations = true;
 
   // Accessibility requirements loaded from user preferences
-  late bool _wheelchairAccess;
-  late bool _stepFreeOnly;
-  late bool _minimizeWalking;
+  late final SearchNeedsDraft _needs;
+  int _accountRevision = 0;
+  bool get _wheelchairAccess => _needs.wheelchair;
+  set _wheelchairAccess(bool value) => _needs.setWheelchair(value);
+  bool get _stepFreeOnly => _needs.stepFree;
+  set _stepFreeOnly(bool value) => _needs.setStepFree(value);
+  bool _minimizeWalking = false;
+  late final _backend = widget.searchBackend ?? TransitSearchBackend();
+  SearchTimeAnchor? _clock;
+  bool _dateEdited = false;
+  int _clockRevision = 0;
+  String? _clockError;
+  DateTime get _now => TransitTime.civil(_clock?.now ?? DateTime.now());
 
   @override
   void initState() {
     super.initState();
-    _applyUserPreferences();
-    AccessibilityPreferencesService.instance.addListener(_onPreferencesChanged);
+    WidgetsBinding.instance.addObserver(this);
+    _needs = SearchNeedsDraft(AccessibilityPreferencesService.instance);
+    _needs.addListener(_onPreferencesChanged);
     _loadStations();
+    _synchronizeClock();
   }
 
-  void _applyUserPreferences() {
-    final prefs = AccessibilityPreferencesService.instance;
-    _wheelchairAccess = prefs.isWheelchairOnly;
-    _stepFreeOnly = prefs.isStepFree;
-    _minimizeWalking = prefs.minimizeWalking;
+  Future<void> _synchronizeClock({bool force = false}) async {
+    final revision = ++_clockRevision;
+    final account = _needs.accountRevision;
+    if (force) _backend.invalidateTime();
+    setState(() {
+      _clock = null;
+      _clockError = null;
+    });
+    try {
+      final receipt = await _backend.synchronizeTime();
+      if (!mounted ||
+          revision != _clockRevision ||
+          account != _needs.accountRevision) {
+        return;
+      }
+      setState(() {
+        _clock = receipt;
+        if (!_dateEdited) _selectedDate = TransitTime.civil(receipt.now);
+      });
+    } catch (_) {
+      if (mounted &&
+          revision == _clockRevision &&
+          account == _needs.accountRevision) {
+        setState(() => _clockError = 'Connect to verify search time.');
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _synchronizeClock(force: true);
   }
 
   void _onPreferencesChanged() {
     if (mounted) {
       setState(() {
-        _applyUserPreferences();
+        if (_accountRevision != _needs.accountRevision) {
+          _accountRevision = _needs.accountRevision;
+          _selectedDate = _now;
+          _selectedTime = null;
+          _selectedFromStation = null;
+          _selectedToStation = null;
+          _dateEdited = false;
+          _synchronizeClock(force: true);
+        }
       });
     }
   }
 
   @override
   void dispose() {
-    AccessibilityPreferencesService.instance.removeListener(
-      _onPreferencesChanged,
-    );
+    _clockRevision++;
+    WidgetsBinding.instance.removeObserver(this);
+    _needs.removeListener(_onPreferencesChanged);
+    _needs.dispose();
     super.dispose();
   }
 
@@ -135,14 +196,23 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
       );
   }
 
-  void _useMyLocation() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Automatic nearest-stop detection is unavailable. Choose your boarding stop.',
-        ),
+  Future<void> _useMyLocation() async {
+    final account = _needs.accountRevision;
+    final chosen = await showModalBottomSheet<Station>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .85,
+      ),
+      builder: (_) => NearbyStopsSheet(
+        stations: List.of(_stations),
+        service: widget.nearbyStopService ?? NearbyStopService(),
       ),
     );
+    if (!mounted || account != _needs.accountRevision || chosen == null) return;
+    final current = _stations.where((s) => s.id == chosen.id).firstOrNull;
+    if (current != null) setState(() => _selectedFromStation = current);
   }
 
   void _showStationPicker(BuildContext context, bool isFrom) {
@@ -283,10 +353,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                       color: isHighContrast
                           ? Colors.black
                           : (_selectedTime == null &&
-                                    DateUtils.isSameDay(
-                                      _selectedDate,
-                                      DateTime.now(),
-                                    )
+                                    DateUtils.isSameDay(_selectedDate, _now)
                                 ? AppColors.primary
                                 : AppColors.outlineVariant),
                       width: isHighContrast ? 2.0 : 1.5,
@@ -294,17 +361,11 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                   ),
                   tileColor: isHighContrast
                       ? (_selectedTime == null &&
-                                DateUtils.isSameDay(
-                                  _selectedDate,
-                                  DateTime.now(),
-                                )
+                                DateUtils.isSameDay(_selectedDate, _now)
                             ? const Color(0xFF001F3F).withValues(alpha: 0.12)
                             : Colors.white)
                       : (_selectedTime == null &&
-                                DateUtils.isSameDay(
-                                  _selectedDate,
-                                  DateTime.now(),
-                                )
+                                DateUtils.isSameDay(_selectedDate, _now)
                             ? AppColors.primaryFixed.withValues(alpha: 0.3)
                             : AppColors.surfaceContainerLowest),
                   leading: CircleAvatar(
@@ -323,7 +384,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                     ),
                   ),
                   subtitle: Text(
-                    'Get the very next arriving buses in real-time',
+                    context.l10n.searchWindowNotice,
                     style: TextStyle(
                       fontSize: 14,
                       color: isHighContrast ? const Color(0xFF1A1A1A) : null,
@@ -334,7 +395,7 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                   ),
                   trailing:
                       _selectedTime == null &&
-                          DateUtils.isSameDay(_selectedDate, DateTime.now())
+                          DateUtils.isSameDay(_selectedDate, _now)
                       ? Icon(
                           Icons.check_circle,
                           color: isHighContrast
@@ -346,7 +407,8 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                   onTap: () {
                     Navigator.of(context).pop();
                     setState(() {
-                      _selectedDate = DateTime.now();
+                      _selectedDate = _now;
+                      _dateEdited = false;
                       _selectedTime = null;
                     });
                   },
@@ -653,11 +715,8 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                             ),
                             onPressed: () {
                               setSheetState(() {
-                                final prefs =
-                                    AccessibilityPreferencesService.instance;
-                                _wheelchairAccess = prefs.isWheelchairOnly;
-                                _stepFreeOnly = prefs.isStepFree;
-                                _minimizeWalking = prefs.minimizeWalking;
+                                _needs.reset();
+                                _minimizeWalking = false;
                               });
                               setState(() {});
                             },
@@ -741,28 +800,104 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
   }
 
   Future<void> _pickDate() async {
+    final accountRevision = _needs.accountRevision;
+    if (_clock?.isFresh != true) {
+      await _synchronizeClock();
+    }
+    if (!mounted ||
+        accountRevision != _needs.accountRevision ||
+        _clock?.isFresh != true) {
+      return;
+    }
+    final now = _now;
+    final last = TransitTime.civil(_clock!.windowEnd);
+    final firstDate = DateUtils.dateOnly(now);
+    final lastDate = DateUtils.dateOnly(last);
+    final selected = DateUtils.dateOnly(_selectedDate);
+    final initial = selected.isBefore(firstDate)
+        ? firstDate
+        : selected.isAfter(lastDate)
+        ? lastDate
+        : selected;
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateUtils.dateOnly(DateTime.now()),
-      lastDate: DateTime(2030),
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: lastDate,
     );
+    if (!mounted || accountRevision != _needs.accountRevision) return;
     if (picked != null && picked != _selectedDate) {
-      setState(() => _selectedDate = picked);
+      setState(() {
+        _selectedDate = picked;
+        _dateEdited = true;
+      });
     }
   }
 
   Future<void> _pickTime() async {
+    final accountRevision = _needs.accountRevision;
+    if (_clock?.isFresh != true) {
+      await _synchronizeClock();
+    }
+    if (!mounted ||
+        accountRevision != _needs.accountRevision ||
+        _clock?.isFresh != true) {
+      return;
+    }
     final picked = await showTimePicker(
       context: context,
-      initialTime: _selectedTime ?? TimeOfDay.now(),
+      initialTime:
+          _selectedTime ?? TimeOfDay(hour: _now.hour, minute: _now.minute),
     );
     if (picked != null) {
+      if (!mounted ||
+          accountRevision != _needs.accountRevision ||
+          _clock?.isFresh != true) {
+        return;
+      }
+      if (BoardingSearchWindow.colombo(
+            _clock!.now,
+            end: _clock!.windowEnd,
+          ).lowerBound(
+            date: _selectedDate,
+            minutes: picked.hour * 60 + picked.minute,
+          ) ==
+          null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.searchWindowInvalid)),
+        );
+        return;
+      }
       setState(() => _selectedTime = picked);
     }
   }
 
-  void _searchRoutes() {
+  Future<void> _searchRoutes() async {
+    final accountRevision = _needs.accountRevision;
+    if (!_needs.isReady) return;
+    if (_clock?.isFresh != true) await _synchronizeClock();
+    if (!mounted ||
+        accountRevision != _needs.accountRevision ||
+        !_needs.isReady ||
+        _clock?.isFresh != true) {
+      return;
+    }
+    final window = BoardingSearchWindow.colombo(
+      _clock!.now,
+      end: _clock!.windowEnd,
+    );
+    if (window.lowerBound(
+          date: _selectedDate,
+          minutes: _selectedTime == null
+              ? null
+              : _selectedTime!.hour * 60 + _selectedTime!.minute,
+        ) ==
+        null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.searchWindowInvalid)));
+      return;
+    }
     if (_selectedFromStation == null || _selectedToStation == null) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -795,8 +930,12 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
           toStationId: _selectedToStation!.id,
           origin: _selectedFromStation!.name,
           destination: _selectedToStation!.name,
-          selectedDate: _selectedDate,
+          selectedDate: !_dateEdited && _selectedTime == null
+              ? null
+              : _selectedDate,
           selectedTime: _selectedTime,
+          needsDraft: _needs,
+          searchBackend: _backend,
           wheelchairAccessRequired: _wheelchairAccess,
           stepFreeOnly: _stepFreeOnly,
           minimizeWalking: _minimizeWalking,
@@ -851,12 +990,26 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                         // Travel Time Row (Clean, single row, defaults to Depart Now)
                         _TravelTimeCard(
                           selectedDate: _selectedDate,
+                          currentTime: _now,
                           selectedTime: _selectedTime,
                           onTap: _showTravelTimeOptions,
                         ),
                         const SizedBox(height: 14),
 
                         // Single Accessibility Filter Chip / Row (Phase 1 clean design)
+                        if (_clock == null) ...[
+                          Text(
+                            _clockError == null
+                                ? context.l10n.verifyingSearchTime
+                                : context.l10n.searchTimeUnavailable,
+                          ),
+                          if (_clockError != null)
+                            TextButton(
+                              onPressed: () => _synchronizeClock(force: true),
+                              child: Text(context.l10n.retrySearchTime),
+                            ),
+                          const SizedBox(height: 8),
+                        ],
                         _AccessibilityFilterRow(
                           activeFilters: activeFilters,
                           onTap: _showAccessibilityFilterSheet,
@@ -878,7 +1031,9 @@ class _JourneySearchScreenState extends State<JourneySearchScreen> {
                         SizedBox(
                           height: context.hasLargeTargets ? 64 : 56,
                           child: FilledButton(
-                            onPressed: _searchRoutes,
+                            onPressed: _needs.isReady && _clock != null
+                                ? _searchRoutes
+                                : null,
                             style: FilledButton.styleFrom(
                               backgroundColor: isHighContrast
                                   ? const Color(0xFF001F3F)
@@ -1390,16 +1545,21 @@ class _TravelTimeCard extends StatelessWidget {
     required this.selectedDate,
     required this.onTap,
     this.selectedTime,
+    this.currentTime,
   });
 
   final DateTime selectedDate;
   final TimeOfDay? selectedTime;
+  final DateTime? currentTime;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final isHighContrast = context.isHighContrast;
-    final isToday = DateUtils.isSameDay(selectedDate, DateTime.now());
+    final isToday = DateUtils.isSameDay(
+      selectedDate,
+      currentTime ?? TransitTime.civil(DateTime.now()),
+    );
     final String timeLabel;
     final bool isDepartNow = selectedTime == null && isToday;
 

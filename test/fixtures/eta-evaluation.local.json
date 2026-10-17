@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "counts": {"droppedAtCapacity": 0},
+  "records": [
+    {
+      "id": "fictional-timetable", "runId": "LOCAL-RUN", "busId": "LOCAL-BUS", "routeId": "LOCAL-ROUTE",
+      "stopId": "LOCAL-STOP", "serviceDate": "2026-10-16", "source": "timetable", "algorithmVersion": "dated-timetable-v1",
+      "geometryVersion": null, "observedAt": "2026-10-16T04:20:00.000Z", "predictedArrival": "2026-10-16T04:30:00.000Z",
+      "actualArrival": "2026-10-16T04:32:00.000Z", "earliest": null, "latest": null, "synthetic": true,
+      "reference": "acknowledged-driver-reported-arrival"
+    },
+    {
+      "id": "fictional-geometry", "runId": "LOCAL-RUN", "busId": "LOCAL-BUS", "routeId": "LOCAL-ROUTE",
+      "stopId": "LOCAL-STOP", "serviceDate": "2026-10-16", "source": "geometry-timetable", "algorithmVersion": "road-timetable-v1",
+      "geometryVersion": "FICTIONAL-shape-v1", "observedAt": "2026-10-16T04:20:00.000Z", "predictedArrival": "2026-10-16T04:31:15.000Z",
+      "actualArrival": "2026-10-16T04:32:00.000Z", "earliest": "2026-10-16T04:27:52.000Z", "latest": "2026-10-16T04:34:38.000Z", "synthetic": true,
+      "reference": "acknowledged-driver-reported-arrival"
+    }
+  ]
+}

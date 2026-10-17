@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../constants/firestore_constants.dart';
+import '../logic/tariff_fare.dart';
 
 /// Status of a passenger journey/booking.
 enum JourneyStatus {
@@ -50,7 +51,9 @@ class JourneyModel {
     this.departureAt,
     this.durationMinutes,
     this.estimatedFareLkr,
+    this.fareQuote,
     this.busNo,
+    this.serviceRunId,
     this.wheelchairAccessRequired = false,
     this.stepFreeOnly = false,
   });
@@ -83,7 +86,9 @@ class JourneyModel {
   final DateTime? departureAt;
   final int? durationMinutes;
   final int? estimatedFareLkr;
+  final TariffFareQuote? fareQuote;
   final String? busNo;
+  final String? serviceRunId;
   final bool wheelchairAccessRequired;
   final bool stepFreeOnly;
   bool get isOpen =>
@@ -113,7 +118,11 @@ class JourneyModel {
       departureAt: _parseTimestamp(map['departureAt']),
       durationMinutes: (map['durationMinutes'] as num?)?.toInt(),
       estimatedFareLkr: (map['estimatedFareLkr'] as num?)?.toInt(),
+      fareQuote: map['fareQuote'] is Map
+          ? _readFare(Map<String, dynamic>.from(map['fareQuote']))
+          : null,
       busNo: map['busNo'] as String?,
+      serviceRunId: map['serviceRunId'] as String?,
       wheelchairAccessRequired: map['wheelchairAccessRequired'] == true,
       stepFreeOnly: map['stepFreeOnly'] == true,
     );
@@ -144,7 +153,9 @@ class JourneyModel {
       if (departureAt != null) 'departureAt': Timestamp.fromDate(departureAt!),
       if (durationMinutes != null) 'durationMinutes': durationMinutes,
       if (estimatedFareLkr != null) 'estimatedFareLkr': estimatedFareLkr,
+      if (fareQuote != null) 'fareQuote': fareQuote!.toMap(),
       if (busNo != null) 'busNo': busNo,
+      if (serviceRunId != null) 'serviceRunId': serviceRunId,
       'wheelchairAccessRequired': wheelchairAccessRequired,
       'stepFreeOnly': stepFreeOnly,
     };
@@ -180,7 +191,9 @@ class JourneyModel {
       departureAt: departureAt,
       durationMinutes: durationMinutes,
       estimatedFareLkr: estimatedFareLkr,
+      fareQuote: fareQuote,
       busNo: busNo,
+      serviceRunId: serviceRunId,
       wheelchairAccessRequired: wheelchairAccessRequired,
       stepFreeOnly: stepFreeOnly,
     );
@@ -192,5 +205,13 @@ class JourneyModel {
     if (value is DateTime) return value;
     if (value is String) return DateTime.tryParse(value);
     return null;
+  }
+
+  static TariffFareQuote? _readFare(Map<String, dynamic> value) {
+    try {
+      return TariffFareQuote.fromMap(value);
+    } catch (_) {
+      return null;
+    }
   }
 }

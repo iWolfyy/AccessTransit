@@ -15,6 +15,7 @@ class ReportRecheck {
   }
 
   static bool canRecheck(Report report, String actor, DateTime now) =>
+      !report.isV2 &&
       report.isPublic &&
       report.status == 'active' &&
       report.falseCount < 3 &&
@@ -48,6 +49,9 @@ class ReportMutationPlan {
     DateTime now, {
     String? recheckId,
   }) {
+    if (report.isV2) {
+      throw StateError('Policy v2 requires the trusted moderation service.');
+    }
     if (report.createdAt == null) {
       throw StateError(
         'Observation time unknown. Submit a new dated observation.',

@@ -73,7 +73,7 @@ void main() {
       );
     });
 
-    test('checkRateLimit returns true when user submitted report within 15 minutes', () async {
+    test('checkRateLimit returns true when user submitted report within 5 minutes (legacy advisory)', () async {
       final userId = 'user_rate_limit_${DateTime.now().millisecondsSinceEpoch}';
       final targetId = 'st_ Pettah';
 

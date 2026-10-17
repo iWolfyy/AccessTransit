@@ -20,6 +20,7 @@ class AccessibilityEvidenceCard extends StatelessWidget {
     required this.destination,
     this.currentTime,
     this.strictStopIds = false,
+    this.initiallyExpanded = false,
   });
 
   final List<Report> reports;
@@ -28,6 +29,7 @@ class AccessibilityEvidenceCard extends StatelessWidget {
   final String destination;
   final DateTime? currentTime;
   final bool strictStopIds;
+  final bool initiallyExpanded;
 
   bool _atStop(Report report, String stop) =>
       stop.trim().isNotEmpty &&
@@ -38,10 +40,53 @@ class AccessibilityEvidenceCard extends StatelessWidget {
               report.targetName.trim().toLowerCase() ==
                   stop.trim().toLowerCase()));
 
-  String _time(DateTime? time) => time == null
-      ? 'Unknown'
-      : '${time.year}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} '
-            '${TimeUtils.formatTimeString(time)}';
+  String _time(DateTime? time) {
+    if (time == null) return 'Unknown';
+    final local = time.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')} ${TimeUtils.formatTimeString(local)}';
+  }
+
+  /// An older unresolved barrier must remain visible beside newer positive checks.
+  (String, IconData, bool) _summary(List<Report> observations, DateTime now) {
+    if (observations.any(
+      (r) => StatusLogic.needsRecheck(r, currentTime: now),
+    )) {
+      return (
+        'Unresolved barrier - needs recheck',
+        Icons.warning_amber_rounded,
+        true,
+      );
+    }
+    if (observations.any(
+      (r) =>
+          StatusLogic.isReportActive(r, currentTime: now) &&
+          StatusLogic.planningCondition(r, currentTime: now) ==
+              ReportCondition.barrier,
+    )) {
+      return (
+        'Barrier reported - review before travel',
+        Icons.warning_amber_rounded,
+        true,
+      );
+    }
+    if (observations.any(
+      (r) =>
+          StatusLogic.isReportActive(r, currentTime: now) &&
+          StatusLogic.planningCondition(r, currentTime: now) ==
+              ReportCondition.positive,
+    )) {
+      return (
+        'Positive observation - view details',
+        Icons.info_outline_rounded,
+        false,
+      );
+    }
+    return (
+      'Unknown - no current observation',
+      Icons.help_outline_rounded,
+      false,
+    );
+  }
 
   Widget _observation(BuildContext context, Report report, DateTime now) {
     final accounts = report.confirmedBy
@@ -102,7 +147,7 @@ class AccessibilityEvidenceCard extends StatelessWidget {
           _AccountAttribution(reporter: report.userId, confirmers: accounts),
           if (report.lastRecheckedAt != null)
             Text(
-              'Last recheck: ${_time(report.lastRecheckedAt!.isAfter(now) ? null : report.lastRecheckedAt)} by ${report.lastRecheckedBy ?? 'Unknown'}. Unique confirmations unchanged.',
+              'Last recheck: ${_time(report.lastRecheckedAt!.isAfter(now) ? null : report.lastRecheckedAt)} by ${report.lastRecheckedBy?.trim().isNotEmpty == true ? 'Community member' : 'Unknown'}. Unique confirmations unchanged.',
               style: TextStyle(color: context.subtextColor),
             ),
           Text(
@@ -140,8 +185,7 @@ class AccessibilityEvidenceCard extends StatelessWidget {
               (r) =>
                   r.isPublic &&
                   r.status.toLowerCase() == 'active' &&
-                  r.falseCount < 3 &&
-                  r.flaggedBy.length < 3 &&
+                  !r.isDisputed &&
                   (r.createdAt == null || !r.createdAt!.isAfter(now)),
             )
             .toList()
@@ -177,49 +221,132 @@ class AccessibilityEvidenceCard extends StatelessWidget {
       ),
     ];
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: context.cardColor,
+    return Material(
+      color: context.cardColor,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
+        side: BorderSide(
           color: context.isHighContrast
               ? Colors.black
-              : AppColors.outlineVariant,
+              : AppColors.outlineVariant.withValues(alpha: 0.6),
+          width: context.isHighContrast ? 2 : 1,
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Accessibility evidence',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: context.textColor,
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    'Accessibility evidence',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: context.textColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Community observations describe specific conditions; they do not verify the entire journey.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: context.subtextColor,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Community observations describe specific conditions; they do not verify the entire journey.',
-            style: TextStyle(color: context.subtextColor),
           ),
           for (final section in sections) ...[
-            const Divider(height: 24),
-            Text(
-              section.$1,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: context.textColor,
-              ),
-            ),
+            const Divider(height: 1),
             if (section.$2.isEmpty)
-              Text(
-                'Unknown — no observation available',
-                style: TextStyle(color: context.subtextColor),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      section.$1,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: context.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Unknown — no observation available',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: context.subtextColor,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Builder(
+                builder: (context) {
+                  final summary = _summary(section.$2, now);
+                  final color = context.isHighContrast
+                      ? Colors.black
+                      : summary.$3
+                      ? AppColors.error
+                      : context.subtextColor;
+                  return ExpansionTile(
+                    key: PageStorageKey(
+                      'evidence-$busId-$origin-$destination-${section.$1}',
+                    ),
+                    initiallyExpanded: initiallyExpanded,
+                    shape: const Border(),
+                    collapsedShape: const Border(),
+                    tilePadding: const EdgeInsets.all(16),
+                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+                    title: Text(
+                      section.$1,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: context.textColor,
+                      ),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(summary.$2, size: 18, color: color),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              summary.$1,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.4,
+                                color: color,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    children: [
+                      for (var i = 0; i < section.$2.length; i++) ...[
+                        if (i > 0) const Divider(height: 24),
+                        _observation(context, section.$2[i], now),
+                      ],
+                    ],
+                  );
+                },
               ),
-            for (final report in section.$2) _observation(context, report, now),
           ],
         ],
       ),
@@ -242,19 +369,11 @@ class _AccountAttributionState extends State<_AccountAttribution> {
       '${value.reporter}|${value.confirmers.join('|')}';
 
   Future<Map<String, String>> _loadNames() async {
-    final ids = {widget.reporter.trim(), ...widget.confirmers}..remove('');
-    final service = UserService();
-    final entries = await Future.wait(
-      ids.map((id) async {
-        final profile = await service.getUser(id);
-        final name = profile?.name.trim();
-        return MapEntry(
-          id,
-          name != null && name.isNotEmpty ? name : 'Account $id',
-        );
-      }),
-    );
-    return Map.fromEntries(entries);
+    final id = widget.reporter.trim();
+    if (id.isEmpty) return {};
+    final profile = await UserService().getUser(id);
+    final name = profile?.name.trim();
+    return {id: name != null && name.isNotEmpty ? name : 'Community member'};
   }
 
   @override
@@ -277,7 +396,7 @@ class _AccountAttributionState extends State<_AccountAttribution> {
     builder: (context, snapshot) {
       final names = snapshot.data ?? const <String, String>{};
       String name(String id) =>
-          id.trim().isEmpty ? 'Unknown' : names[id] ?? 'Account $id';
+          id.trim().isEmpty ? 'Unknown' : names[id] ?? 'Community member';
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -287,7 +406,7 @@ class _AccountAttributionState extends State<_AccountAttribution> {
           ),
           if (widget.confirmers.isNotEmpty)
             Text(
-              'Confirmed by: ${widget.confirmers.map(name).join(', ')}',
+              'Confirmed by: ${widget.confirmers.length} community member${widget.confirmers.length == 1 ? '' : 's'}',
               style: TextStyle(color: context.subtextColor),
             ),
         ],

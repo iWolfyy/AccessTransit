@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../l10n/localization_context.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/validators.dart';
@@ -129,8 +131,8 @@ class _RegisterScreenState extends State<RegisterScreen>
 
       _showMessage(
         user.role == UserRole.operator
-            ? 'Account created. Administrator approval is required for operator access.'
-            : 'Welcome aboard, ${user.name}! Your account is ready.',
+            ? context.l10n.operatorApprovalRequired
+            : context.l10n.accountReady(user.name),
       );
       if (user.role == UserRole.operator) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -554,8 +556,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           children: [
             Expanded(
               child: _RoleCard(
-                title: 'Passenger',
-                subtitle: 'Plan accessible journeys',
+                title: context.l10n.passenger,
+                subtitle: context.l10n.passengerDescription,
                 icon: Icons.directions_transit_rounded,
                 isSelected: _selectedRole == UserRole.passenger,
                 isHC: isHC,
@@ -567,8 +569,8 @@ class _RegisterScreenState extends State<RegisterScreen>
             const SizedBox(width: 8),
             Expanded(
               child: _RoleCard(
-                title: 'Contributor',
-                subtitle: 'Report conditions',
+                title: context.l10n.reporter,
+                subtitle: context.l10n.reporterDescription,
                 icon: Icons.report_outlined,
                 isSelected: _selectedRole == UserRole.contributor,
                 isHC: isHC,
@@ -581,8 +583,8 @@ class _RegisterScreenState extends State<RegisterScreen>
             const SizedBox(width: 8),
             Expanded(
               child: _RoleCard(
-                title: 'Bus Operator',
-                subtitle: 'Broadcast live GPS',
+                title: context.l10n.driver,
+                subtitle: context.l10n.driverDescription,
                 icon: Icons.directions_bus,
                 isSelected: _selectedRole == UserRole.operator,
                 isHC: isHC,

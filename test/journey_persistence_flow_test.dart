@@ -1,3 +1,5 @@
+import 'support/fixture_search_backend.dart';
+
 import 'package:access_transit/services/transit_catalogue.dart';
 import 'package:access_transit/widgets/live_accessibility_panel.dart';
 
@@ -12,7 +14,7 @@ import 'package:access_transit/models/station.dart';
 import 'package:access_transit/screens/journey/journey_confirmation_screen.dart';
 import 'package:access_transit/screens/journey/journey_resume_screen.dart';
 import 'package:access_transit/screens/journey/live_journey_screen.dart';
-import 'package:access_transit/screens/journey/route_details_screen.dart';
+import 'package:access_transit/screens/journey/bus_details_screen.dart';
 import 'package:access_transit/screens/journey/route_results_screen.dart';
 import 'package:access_transit/services/accessibility_preferences_service.dart';
 import 'package:access_transit/services/firestore_service.dart';
@@ -136,7 +138,7 @@ void main() {
     expect(route.busId, vehicle.id);
     expect(route.fromStationId, 'b');
     expect(route.toStationId, 'c');
-    expect(route.selectedDate, DateTime(2026, 10, 21));
+    expect(route.selectedDate, DateTime.utc(2026, 10, 21));
     expect(route.selectedTimeMinutes, 540);
     expect(route.nextDepartureDateTime, DateTime(2026, 10, 21, 9, 15));
     expect(route.durationMinutes, 12);
@@ -234,6 +236,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Confirm and save journey'));
+    await tester.pumpAndSettle();
   }
 
   testWidgets(
@@ -251,7 +254,7 @@ void main() {
         },
       );
       await confirmScreen(tester, service, completed.add);
-      expect(find.textContaining('Selected time: 09:00'), findsOneWidget);
+      expect(find.text('09:00'), findsOneWidget);
       expect(find.textContaining('Verified'), findsNothing);
       await tester.tap(find.text('Confirm and save journey'));
       await tester.pumpAndSettle();
@@ -453,32 +456,37 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
-      final screen = tester.widget<LiveJourneyScreen>(
-        find.byType(LiveJourneyScreen),
+      final screen = tester.widget<BusDetailsScreen>(
+        find.byType(BusDetailsScreen),
       );
       expect(watchedId, 'saved_id');
-      expect(screen.busId, vehicle.id);
-      expect(screen.route!.fromStationId, 'b');
-      expect(screen.route!.toStationId, 'c');
+      expect(screen.route.busId, vehicle.id);
+      expect(screen.route.fromStationId, 'b');
+      expect(screen.route.toStationId, 'c');
       expect(
-        screen.route!.nextDepartureDateTime,
+        screen.route.nextDepartureDateTime,
         selection().nextDepartureDateTime,
       );
-      expect(screen.route!.selectedTimeMinutes, 540);
+      expect(screen.route.selectedTimeMinutes, 540);
       await tester.pumpWidget(const SizedBox());
     },
   );
   testWidgets(
-    'normal result selection opens evidence then explicit confirmation',
+    'normal result selection opens details without confirmation or automatic saving',
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          // Colombo 23:30: tomorrow's fixture is inside the rolling horizon,
+          // independent of the host clock/calendar at midnight.
           home: RouteResultsScreen(
+            searchBackend: FixtureSearchBackend(
+              now: () => DateTime.utc(2026, 10, 17, 18),
+            ),
             fromStationId: 'st_maharagama',
             toStationId: 'st_kottawa',
             origin: 'Maharagama',
             destination: 'Kottawa',
-            selectedDate: DateTime.now().add(const Duration(days: 7)),
+            selectedDate: DateTime(2026, 10, 18),
             selectedTime: const TimeOfDay(hour: 0, minute: 0),
           ),
         ),
@@ -486,27 +494,15 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('138').first);
       await tester.pumpAndSettle();
-      expect(find.byType(RouteDetailsScreen), findsOneWidget);
+      expect(find.byType(BusDetailsScreen), findsOneWidget);
+      expect(find.byType(JourneyConfirmationScreen), findsNothing);
       expect(find.byType(LiveJourneyScreen), findsNothing);
-      await tester.scrollUntilVisible(
-        find.text('Review and confirm journey'),
-        450,
-        scrollable: find.byType(Scrollable).first,
+      final details = tester.widget<BusDetailsScreen>(
+        find.byType(BusDetailsScreen),
       );
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.widgetWithText(FilledButton, 'Review and confirm journey'),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Review and confirm journey'));
-      await tester.pumpAndSettle();
-      expect(find.byType(JourneyConfirmationScreen), findsOneWidget);
-      final confirm = tester.widget<JourneyConfirmationScreen>(
-        find.byType(JourneyConfirmationScreen),
-      );
-      expect(confirm.route.fromStationId, 'st_maharagama');
-      expect(confirm.route.toStationId, 'st_kottawa');
-      expect(confirm.route.selectedTimeMinutes, 0);
+      expect(details.route.fromStationId, 'st_maharagama');
+      expect(details.route.toStationId, 'st_kottawa');
+      expect(details.route.selectedTimeMinutes, 0);
       await tester.pumpWidget(const SizedBox());
     },
   );
@@ -530,7 +526,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
-    expect(find.byType(LiveJourneyScreen), findsOneWidget);
+    expect(find.byType(BusDetailsScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
@@ -559,23 +555,13 @@ void main() {
       expect(panel.busId, vehicle.id);
       expect(panel.originId, 'b');
       expect(panel.destinationId, 'c');
-      expect(
-        find.text(
-          'Ramp operational condition: Unknown - a new check is required',
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Unknown - a new check is required'), findsOneWidget);
       expect(find.textContaining('Working observed'), findsNothing);
       expect(find.textContaining('Verified active'), findsNothing);
       await tester.tap(find.text('Confirm and save journey'));
       await tester.pumpAndSettle();
       expect(savedCount, 1);
-      expect(
-        find.text(
-          'Ramp operational condition: Unknown - a new check is required',
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Unknown - a new check is required'), findsOneWidget);
       expect(find.textContaining('Working observed'), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
     },

@@ -7,6 +7,7 @@ import 'enums/bus_status.dart';
 class BusLocationModel {
   BusLocationModel({
     required this.busId,
+    this.tripId,
     String? routeId,
     String? routeNumber,
     this.routeName = '',
@@ -43,6 +44,7 @@ class BusLocationModel {
            isBroadcasting ?? (status == null || status != BusStatus.offline);
 
   final String busId;
+  final String? tripId;
   final String routeId;
   final String routeNumber;
   final String routeName;
@@ -111,6 +113,7 @@ class BusLocationModel {
 
     return BusLocationModel(
       busId: parsedBusId,
+      tripId: map['tripId'] as String?,
       routeId: parsedRouteId,
       routeNumber: parsedRouteNumber,
       routeName: map[FirestoreConstants.fieldRouteName]?.toString() ?? '',
@@ -168,6 +171,7 @@ class BusLocationModel {
 
     return {
       FirestoreConstants.fieldBusId: busId,
+      if (tripId != null) 'tripId': tripId,
       FirestoreConstants.fieldRouteId: routeId,
       FirestoreConstants.fieldRouteNumber: routeNumber,
       FirestoreConstants.fieldRouteName: routeName,
@@ -200,6 +204,7 @@ class BusLocationModel {
 
   BusLocationModel copyWith({
     String? busId,
+    String? tripId,
     String? routeId,
     String? routeNumber,
     String? routeName,
@@ -227,6 +232,7 @@ class BusLocationModel {
   }) {
     return BusLocationModel(
       busId: busId ?? this.busId,
+      tripId: tripId ?? this.tripId,
       routeId: routeId ?? this.routeId,
       routeNumber: routeNumber ?? this.routeNumber,
       routeName: routeName ?? this.routeName,

@@ -95,7 +95,7 @@ void main() {
     );
 
     test(
-      'FirestoreService checkRateLimit enforces 15-minute window for target',
+      'FirestoreService checkRateLimit provides legacy target-level advice within 5 minutes',
       () async {
         final userId =
             'rate_limit_user_${DateTime.now().millisecondsSinceEpoch}';

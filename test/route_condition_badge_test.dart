@@ -1,3 +1,4 @@
+import 'support/fixture_search_backend.dart';
 import 'package:access_transit/models/enums/report_condition.dart';
 import 'package:access_transit/models/report.dart';
 import 'package:access_transit/screens/journey/route_results_screen.dart';
@@ -27,13 +28,13 @@ void main() {
       await service.createReport(positive);
       await tester.pumpWidget(
         MaterialApp(
-          home: RouteResultsScreen(
+          home: RouteResultsScreen(searchBackend: FixtureSearchBackend(), 
             fromStationId: 'st_maharagama',
             toStationId: 'st_kottawa',
             origin: 'Maharagama',
             destination: 'Kottawa',
             wheelchairAccessRequired: false,
-            selectedDate: DateTime.now().add(const Duration(days: 7)),
+            selectedDate: null,
           ),
         ),
       );

@@ -1,3 +1,4 @@
+import 'support/fixture_search_backend.dart';
 import 'ramp_test_observations.dart';
 
 import 'package:access_transit/models/enums/report_condition.dart';
@@ -20,12 +21,12 @@ void main() {
   Future<void> show(WidgetTester tester, {bool wheelchair = false}) async {
     await tester.pumpWidget(
       MaterialApp(
-        home: RouteResultsScreen(
+        home: RouteResultsScreen(searchBackend: FixtureSearchBackend(), 
           fromStationId: 'st_maharagama',
           toStationId: 'st_kottawa',
           origin: 'Maharagama',
           destination: 'Kottawa',
-          selectedDate: DateTime.now().add(const Duration(days: 7)),
+          selectedDate: null,
           wheelchairAccessRequired: wheelchair,
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/report.dart';
 import '../../models/enums/report_publication_state.dart';
 import '../../services/report_submission_service.dart';
@@ -50,140 +51,199 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
             current?.publicationState ?? ReportPublicationState.pendingUpload;
         final published = state == ReportPublicationState.published;
         final busy = current != null && service.isUploading(current.id);
+
         return Scaffold(
-          appBar: AppBar(title: const Text('Report delivery')),
-          body: SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    Icon(
-                      published
-                          ? Icons.cloud_done
-                          : state == ReportPublicationState.failed
-                          ? Icons.error_outline
-                          : Icons.cloud_upload_outlined,
-                      size: 64,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      removed ? 'Draft unavailable' : state.label,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      published
-                          ? 'Your report is available to other commuters.'
-                          : removed
-                          ? 'This draft was removed, expired or belongs to another account. Publication has not been confirmed.'
-                          : entry?.error ?? 'Saved on this device. Publication has not been confirmed.',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      removed ? 'Local draft unavailable' : widget.targetName,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    if (!removed && current != null) Text(current.problemType),
-                    if (!removed &&
-                        current != null &&
-                        current.photoUrl.startsWith('https://')) ...[
-                      const SizedBox(height: 12),
-                      Image.network(
-                        current.photoUrl,
-                        height: 160,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            const Text('Photo preview unavailable'),
-                      ),
-                    ],
-                    if (!published && entry != null) ...[
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        height: context.buttonHeight,
-                        child: FilledButton(
-                          onPressed: busy
-                              ? null
-                              : () async {
-                                  try {
-                                    final receipt = await service.retry(
-                                      entry.report.id,
-                                    );
-                                    if (mounted) {
-                                      setState(() => _receipt = receipt.report);
-                                    }
-                                  } catch (_) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Could not save the upload status. Please retry.',
-                                              ),
-                                            ),
-                                          );
-                                    }
-                                  }
-                                },
-                          child: Text(busy ? 'Uploading…' : 'Retry upload'),
+          backgroundColor: context.surfaceColor,
+          appBar: AppBar(
+            backgroundColor: context.surfaceColor,
+            centerTitle: true,
+            elevation: context.isHighContrast ? 0 : 1,
+            toolbarHeight: MediaQuery.textScalerOf(context).scale(22) > 33
+                ? 96
+                : 56,
+            leading: IconButton(
+              tooltip: 'Back',
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: Icon(
+                Icons.arrow_back_rounded,
+                color: context.primaryColor,
+                size: 28,
+              ),
+            ),
+            title: Text(
+              'Report delivery',
+              maxLines: 2,
+              softWrap: true,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: context.textColor,
+              ),
+            ),
+          ),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _card(
+                        Semantics(
+                          liveRegion: true,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _heading('Publication status'),
+                              const SizedBox(height: 16),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    removed
+                                        ? Icons.help_outline_rounded
+                                        : published
+                                        ? Icons.cloud_done_outlined
+                                        : state == ReportPublicationState.failed
+                                        ? Icons.error_outline_rounded
+                                        : Icons.cloud_upload_outlined,
+                                    size: 32,
+                                    color: _statusColor(
+                                      published,
+                                      state == ReportPublicationState.failed &&
+                                          !removed,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      removed
+                                          ? 'Draft unavailable'
+                                          : state.label,
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        height: 1.3,
+                                        fontWeight: FontWeight.w700,
+                                        color: _statusColor(
+                                          published,
+                                          state ==
+                                                  ReportPublicationState
+                                                      .failed &&
+                                              !removed,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                published
+                                    ? 'Your report is available to other commuters.'
+                                    : removed
+                                    ? 'This draft was removed, expired or belongs to another account. Publication has not been confirmed.'
+                                    : entry?.error ?? 'Saved on this device. Publication has not been confirmed.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  height: 1.4,
+                                  color: context.subtextColor,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('Remove draft from this device'),
-                        onPressed: () async {
-                          final remove = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Remove local draft?'),
-                              content: const Text(
-                                'Stops future retries and removes the local note/photo. A request already sent may still complete. This does not delete a public report or an uploaded photo.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('Keep draft'),
-                                ),
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('Remove draft'),
+                      const SizedBox(height: 16),
+                      _card(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _heading(
+                              removed
+                                  ? 'Local draft unavailable'
+                                  : 'Your observation',
+                            ),
+                            if (!removed) ...[
+                              const SizedBox(height: 16),
+                              _detail('Location / Vehicle', widget.targetName),
+                              if (current != null) ...[
+                                const SizedBox(height: 16),
+                                _detail(
+                                  'Condition reported',
+                                  current.problemType,
                                 ),
                               ],
-                            ),
-                          );
-                          if (remove != true) return;
-                          try {
-                            await service.remove(
-                              entry.report.id,
-                              userId: entry.report.userId,
-                            );
-                          } catch (_) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Local removal could not be saved. Please retry.',
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (!removed &&
+                          current != null &&
+                          current.photoUrl.startsWith('https://')) ...[
+                        const SizedBox(height: 16),
+                        _card(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _heading('Attached photo'),
+                              const SizedBox(height: 12),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  current.photoUrl,
+                                  height: 160,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => const Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Text('Photo preview unavailable'),
                                   ),
                                 ),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                      const Text(
-                        'Drafts expire after 7 days and are removed on sign-out/account change.',
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: context.buttonHeight,
-                      child: FilledButton(
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (!published && entry != null) ...[
+                        const SizedBox(height: 20),
+                        FilledButton(
+                          onPressed: busy
+                              ? null
+                              : () => _retry(service, entry.report.id),
+                          style: _filledStyle(),
+                          child: Text(
+                            busy ? 'Uploading…' : 'Retry upload',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Remove draft from this device'),
+                          onPressed: () => _remove(service, entry.report),
+                        ),
+                        const SizedBox(height: 12),
+                        _card(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _heading('About local drafts'),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Drafts expire after 7 days and are removed on sign-out/account change.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  height: 1.4,
+                                  color: context.subtextColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      FilledButton(
                         onPressed: published
                             ? () => Navigator.of(context).pushAndRemoveUntil(
                                 MaterialPageRoute(
@@ -193,26 +253,147 @@ class _ReportSubmittedScreenState extends State<ReportSubmittedScreen> {
                                 (route) => false,
                               )
                             : null,
-                        child: const Text('View in Community Feed'),
+                        style: _filledStyle(),
+                        child: const Text(
+                          'View in Community Feed',
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: context.buttonHeight,
-                      child: OutlinedButton(
+                      const SizedBox(height: 12),
+                      OutlinedButton(
                         onPressed: () =>
                             Navigator.of(context)
                                 .popUntil((route) => route.isFirst),
-                        child: const Text('Back to Home'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: context.primaryColor,
+                          minimumSize: Size(48, context.buttonHeight),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          'Back to Home',
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         );
       },
     );
   }
+
+  Future<void> _retry(ReportSubmissionService service, String id) async {
+    try {
+      final receipt = await service.retry(id);
+      if (mounted) setState(() => _receipt = receipt.report);
+    } catch (_) {
+      if (mounted) _snack('Could not save the upload status. Please retry.');
+    }
+  }
+
+  Future<void> _remove(ReportSubmissionService service, Report report) async {
+    final remove = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove local draft?'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'Stops future retries and removes the local note/photo. A request already sent may still complete. This does not delete a public report or an uploaded photo.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep draft'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove draft'),
+          ),
+        ],
+      ),
+    );
+    if (remove != true) return;
+    try {
+      await service.remove(report.id, userId: report.userId);
+    } catch (_) {
+      if (mounted) _snack('Local removal could not be saved. Please retry.');
+    }
+  }
+
+  void _snack(String value) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(value)));
+
+  Color _statusColor(bool published, bool failed) => context.isHighContrast
+      ? Colors.black
+      : published
+      ? AppColors.secondary
+      : failed
+      ? AppColors.error
+      : context.primaryColor;
+
+  ButtonStyle _filledStyle() => FilledButton.styleFrom(
+    backgroundColor: context.primaryColor,
+    foregroundColor: Colors.white,
+    minimumSize: Size(48, context.buttonHeight),
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    textStyle: Theme.of(context).textTheme.labelLarge
+        ?.copyWith(fontSize: 16, fontWeight: FontWeight.w700, height: 1.25),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  );
+
+  Widget _heading(String title) => Semantics(
+    header: true,
+    child: Text(
+      title,
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: context.textColor,
+      ),
+    ),
+  );
+
+  Widget _detail(String label, String value) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: TextStyle(fontSize: 12, color: context.subtextColor)),
+      const SizedBox(height: 4),
+      Text(
+        value,
+        style: TextStyle(
+          fontSize: 16,
+          height: 1.4,
+          fontWeight: FontWeight.w600,
+          color: context.textColor,
+        ),
+      ),
+    ],
+  );
+
+  Widget _card(Widget child) => Material(
+    color: context.cardColor,
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: BorderSide(
+        color: context.isHighContrast
+            ? Colors.black
+            : AppColors.outlineVariant.withValues(alpha: .6),
+        width: context.isHighContrast ? 2 : 1,
+      ),
+    ),
+    child: Padding(padding: const EdgeInsets.all(16), child: child),
+  );
 }

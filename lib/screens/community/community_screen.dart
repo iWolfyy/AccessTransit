@@ -1,3 +1,4 @@
+import '../../widgets/report_v2_votes.dart';
 import '../../logic/report_mutation.dart';
 import '../../widgets/evidence_refresh.dart';
 
@@ -923,7 +924,7 @@ class _ModernReportCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 5),
                         Text(
-                          'False: ${report.falseCount}/3',
+                          'False: ${report.falseCount}/${report.flagThreshold}',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -990,127 +991,134 @@ class _ModernReportCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
 
-              if (hasConfirmed)
+              if (hasConfirmed && !report.isV2)
                 const Text(
                   'Recheck the same observed condition after 30 minutes since the latest check. No extra votes or points. Report changed conditions separately.',
                 ),
               // Interactive True & False Quick Action Buttons
-              Row(
-                children: [
-                  // True Flag Button
-                  Expanded(
-                    child: SizedBox(
-                      height: 38,
-                      child: OutlinedButton.icon(
-                        onPressed:
-                            isSaving ||
-                                (hasConfirmed &&
-                                    !ReportRecheck.canRecheck(
-                                      report,
-                                      userId,
-                                      currentTime,
-                                    )) ||
-                                isResolved ||
-                                userId.isEmpty ||
-                                report.userId == userId
-                            ? null
-                            : onConfirm,
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: hasConfirmed
-                              ? (isHC
-                                    ? const Color(0xFF003833)
-                                    : AppColors.success.withValues(alpha: 0.15))
-                              : (isHC ? Colors.white : null),
-                          foregroundColor: isHC
-                              ? (hasConfirmed
-                                    ? Colors.white
-                                    : const Color(0xFF003833))
-                              : AppColors.success,
-                          side: BorderSide(
-                            color: isHC
-                                ? const Color(0xFF003833)
+              if (report.isV2)
+                ReportV2Votes(report: report)
+              else
+                Row(
+                  children: [
+                    // True Flag Button
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: OutlinedButton.icon(
+                          onPressed:
+                              isSaving ||
+                                  (hasConfirmed &&
+                                      !ReportRecheck.canRecheck(
+                                        report,
+                                        userId,
+                                        currentTime,
+                                      )) ||
+                                  isResolved ||
+                                  userId.isEmpty ||
+                                  report.userId == userId
+                              ? null
+                              : onConfirm,
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: hasConfirmed
+                                ? (isHC
+                                      ? const Color(0xFF003833)
+                                      : AppColors.success.withValues(
+                                          alpha: 0.15,
+                                        ))
+                                : (isHC ? Colors.white : null),
+                            foregroundColor: isHC
+                                ? (hasConfirmed
+                                      ? Colors.white
+                                      : const Color(0xFF003833))
                                 : AppColors.success,
-                            width: isHC ? 1.5 : 1,
+                            side: BorderSide(
+                              color: isHC
+                                  ? const Color(0xFF003833)
+                                  : AppColors.success,
+                              width: isHC ? 1.5 : 1,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                          icon: Icon(
+                            hasConfirmed
+                                ? Icons.check_circle_rounded
+                                : Icons.thumb_up_outlined,
+                            size: 15,
                           ),
-                        ),
-                        icon: Icon(
-                          hasConfirmed
-                              ? Icons.check_circle_rounded
-                              : Icons.thumb_up_outlined,
-                          size: 15,
-                        ),
-                        label: Text(
-                          hasConfirmed
-                              ? 'Recheck condition'
-                              : 'True Flag (${report.confirmCount})',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                          label: Text(
+                            hasConfirmed
+                                ? 'Recheck condition'
+                                : 'True Flag (${report.confirmCount})',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
 
-                  const SizedBox(width: 10),
+                    const SizedBox(width: 10),
 
-                  // False Flag Button
-                  Expanded(
-                    child: SizedBox(
-                      height: 38,
-                      child: OutlinedButton.icon(
-                        onPressed:
-                            isSaving ||
-                                hasFlagged ||
-                                isResolved ||
-                                userId.isEmpty ||
-                                report.userId == userId
-                            ? null
-                            : onFlag,
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: hasFlagged
-                              ? (isHC
-                                    ? const Color(0xFF8B0000)
-                                    : AppColors.error.withValues(alpha: 0.15))
-                              : (isHC ? Colors.white : null),
-                          foregroundColor: isHC
-                              ? (hasFlagged
-                                    ? Colors.white
-                                    : const Color(0xFF8B0000))
-                              : AppColors.error,
-                          side: BorderSide(
-                            color: isHC
-                                ? const Color(0xFF8B0000)
+                    // False Flag Button
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: OutlinedButton.icon(
+                          onPressed:
+                              isSaving ||
+                                  hasFlagged ||
+                                  isResolved ||
+                                  userId.isEmpty ||
+                                  report.userId == userId
+                              ? null
+                              : onFlag,
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: hasFlagged
+                                ? (isHC
+                                      ? const Color(0xFF8B0000)
+                                      : AppColors.error.withValues(alpha: 0.15))
+                                : (isHC ? Colors.white : null),
+                            foregroundColor: isHC
+                                ? (hasFlagged
+                                      ? Colors.white
+                                      : const Color(0xFF8B0000))
                                 : AppColors.error,
-                            width: isHC ? 1.5 : 1,
+                            side: BorderSide(
+                              color: isHC
+                                  ? const Color(0xFF8B0000)
+                                  : AppColors.error,
+                              width: isHC ? 1.5 : 1,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                          icon: Icon(
+                            hasFlagged
+                                ? Icons.flag_rounded
+                                : Icons.flag_outlined,
+                            size: 15,
                           ),
-                        ),
-                        icon: Icon(
-                          hasFlagged ? Icons.flag_rounded : Icons.flag_outlined,
-                          size: 15,
-                        ),
-                        label: Text(
-                          hasFlagged
-                              ? 'False (${report.falseCount}/3)'
-                              : 'False Flag (${report.falseCount}/3)',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                          label: Text(
+                            hasFlagged
+                                ? 'False (${report.falseCount}/${report.flagThreshold})'
+                                : 'False Flag (${report.falseCount}/${report.flagThreshold})',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
             ],
           ),
         ),

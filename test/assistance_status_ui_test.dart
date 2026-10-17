@@ -140,6 +140,8 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.ensureVisible(find.text('Cancel request'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel request'));
     await tester.pumpAndSettle();
     expect(

@@ -1,0 +1,14 @@
+{
+  "reviewed": true,
+  "synthetic": true,
+  "routeId": "REPLACE_LOCAL_ROUTE_ID",
+  "version": "FICTIONAL-shape-v1",
+  "source": "https://authority.example/FICTIONAL-NOT-A-REAL-ROAD",
+  "stops": ["REPLACE_FIRST_STOP_ID", "REPLACE_SECOND_STOP_ID"],
+  "stopVertices": [0, 2],
+  "points": [
+    {"lat": 6.90, "lng": 79.80},
+    {"lat": 6.91, "lng": 79.80},
+    {"lat": 6.91, "lng": 79.81}
+  ]
+}

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/boarding_request.dart';
 import '../services/assistance_submission_service.dart';
 import '../services/firestore_service.dart';
+import 'assistance_labels.dart';
 import '../screens/journey/assistance_request_status_screen.dart';
 
 /// Own request history and durable uploads remain reachable after leaving the form.
@@ -67,7 +68,7 @@ class _AssistanceRequestsPanelState extends State<AssistanceRequestsPanel> {
           }
           for (final r in snapshot.data ?? <BoardingRequest>[]) {
             if (r.riderId == widget.userId) {
-              rows[r.id] = (r, r.driverStatusLabel);
+              rows[r.id] = (r, assistanceStatus(context, r));
             }
           }
           if (rows.isEmpty && !snapshot.hasError && service.loadError == null) {

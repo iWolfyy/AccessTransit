@@ -4,13 +4,13 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-
 import '../../core/theme/app_colors.dart';
 import '../../models/enums/user_role.dart';
 import '../../services/auth_service.dart';
 import '../main_shell.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../operator/operator_dashboard_screen.dart';
+import '../admin/admin_dashboard_screen.dart';
 
 /// Branded launch screen shown while the app settles and auth state is resolved.
 class SplashScreen extends StatefulWidget {
@@ -88,30 +88,26 @@ class _SplashScreenState extends State<SplashScreen>
         curve: const Interval(0.28, 0.72, curve: Curves.easeOut),
       ),
     );
-    _titleSlide = Tween<Offset>(
-      begin: const Offset(0, 0.28),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.28, 0.72, curve: Curves.easeOutCubic),
-      ),
-    );
+    _titleSlide = Tween<Offset>(begin: const Offset(0, 0.28), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _entranceController,
+            curve: const Interval(0.28, 0.72, curve: Curves.easeOutCubic),
+          ),
+        );
     _taglineOpacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _entranceController,
         curve: const Interval(0.42, 0.88, curve: Curves.easeOut),
       ),
     );
-    _taglineSlide = Tween<Offset>(
-      begin: const Offset(0, 0.32),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.42, 0.88, curve: Curves.easeOutCubic),
-      ),
-    );
+    _taglineSlide =
+        Tween<Offset>(begin: const Offset(0, 0.32), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _entranceController,
+            curve: const Interval(0.42, 0.88, curve: Curves.easeOutCubic),
+          ),
+        );
     _dotsOpacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _entranceController,
@@ -154,8 +150,11 @@ class _SplashScreenState extends State<SplashScreen>
     Widget next;
     if (_authService.currentUser != null) {
       final profile = await _authService.getCurrentUserProfile();
+      final isAdmin = await _authService.hasAdminAccess();
       if (!mounted) return;
-      if (profile?.role == UserRole.operator) {
+      if (isAdmin) {
+        next = const AdminDashboardScreen();
+      } else if (profile?.role == UserRole.operator) {
         next = const OperatorDashboardScreen();
       } else {
         next = const MainShell();
@@ -209,8 +208,7 @@ class _SplashScreenState extends State<SplashScreen>
             _AmbientOrbs(controller: _orbController),
             SafeArea(
               child: Semantics(
-                label:
-                    'Access Transit. Your journey to inclusive travel begins here. Loading.',
+                label: 'Access Transit. Your journey to inclusive travel begins here. Loading.',
                 child: Column(
                   children: [
                     Expanded(child: Center(child: _buildBrandBlock())),
@@ -334,10 +332,7 @@ class _SplashScreenState extends State<SplashScreen>
             },
             child: const Hero(
               tag: 'access-transit-logo',
-              child: Material(
-                color: Colors.transparent,
-                child: _GlassLogo(),
-              ),
+              child: Material(color: Colors.transparent, child: _GlassLogo()),
             ),
           ),
         ),
@@ -374,10 +369,7 @@ class _SplashBackdrop extends StatelessWidget {
             gradient: RadialGradient(
               center: Alignment(0, -0.12),
               radius: 0.85,
-              colors: [
-                Color(0x332B6CB0),
-                Colors.transparent,
-              ],
+              colors: [Color(0x332B6CB0), Colors.transparent],
             ),
           ),
         ),
@@ -456,9 +448,7 @@ class _GlassLogo extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white.withValues(alpha: 0.10),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.22),
-              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
             ),
             child: const Center(
               child: Icon(
@@ -566,8 +556,16 @@ class _TransitPathPainter extends CustomPainter {
     canvas.drawPath(pathB, paint);
 
     final nodePaint = Paint()..color = Colors.white.withValues(alpha: 0.14);
-    canvas.drawCircle(Offset(size.width * 0.22, size.height * 0.18), 3.5, nodePaint);
-    canvas.drawCircle(Offset(size.width * 0.78, size.height * 0.76), 3.5, nodePaint);
+    canvas.drawCircle(
+      Offset(size.width * 0.22, size.height * 0.18),
+      3.5,
+      nodePaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.78, size.height * 0.76),
+      3.5,
+      nodePaint,
+    );
   }
 
   @override
@@ -575,10 +573,7 @@ class _TransitPathPainter extends CustomPainter {
 }
 
 class _LoadingDots extends StatelessWidget {
-  const _LoadingDots({
-    required this.controller,
-    required this.animate,
-  });
+  const _LoadingDots({required this.controller, required this.animate});
 
   final AnimationController controller;
   final bool animate;
@@ -591,12 +586,18 @@ class _LoadingDots extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(3, (index) {
           final delay = (2 - index) * 0.16;
-          final alpha = index == 0 ? 1.0 : index == 1 ? 0.5 : 0.3;
+          final alpha = index == 0
+              ? 1.0
+              : index == 1
+              ? 0.5
+              : 0.3;
 
           return AnimatedBuilder(
             animation: controller,
             builder: (context, child) {
-              final scale = animate ? _dotScale((controller.value + delay) % 1.0) : 1.0;
+              final scale = animate
+                  ? _dotScale((controller.value + delay) % 1.0)
+                  : 1.0;
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Transform.scale(scale: scale, child: child),

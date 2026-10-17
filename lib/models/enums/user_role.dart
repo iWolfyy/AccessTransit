@@ -9,6 +9,12 @@ enum UserRole {
 
   final String value;
 
+  /// Public registration records intent; operator approval is server-owned.
+  bool get canSelfRegister => this != UserRole.admin;
+
+  bool get usesPassengerDashboard =>
+      this == UserRole.passenger || this == UserRole.contributor;
+
   static UserRole fromString(String? value) {
     return UserRole.values.firstWhere(
       (role) => role.value == value,

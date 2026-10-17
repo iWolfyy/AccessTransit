@@ -23,7 +23,7 @@ async function list(path){const records=[];let page;do{const u=new URL(`${base}/
 const decode=v=>'nullValue'in v?null:'stringValue'in v?v.stringValue:'booleanValue'in v?v.booleanValue:'integerValue'in v?Number(v.integerValue):'doubleValue'in v?v.doubleValue:'timestampValue'in v?new Date(v.timestampValue):'arrayValue'in v?(v.arrayValue.values??[]).map(decode):Object.fromEntries(Object.entries(v.mapValue?.fields??{}).map(([k,x])=>[k,decode(x)]));
 const encode=v=>v===null?{nullValue:'NULL_VALUE'}:v instanceof Date?{timestampValue:v.toISOString()}:typeof v==='string'?{stringValue:v}:typeof v==='boolean'?{booleanValue:v}:typeof v==='number'?Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}:Array.isArray(v)?{arrayValue:{values:v.map(encode)}}:{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,encode(x)]))}};
 const plain=d=>Object.fromEntries(Object.entries(d.fields??{}).map(([k,v])=>[k,decode(v)]));
-const rootCollections=['stations','routes','buses','users','operator_access','reports','trips','live_locations','journeys','boarding_requests'];
+const rootCollections=['stations','routes','buses','users','operator_access','driver_route_assignments','service_runs','operation_locks','reports','trips','live_locations','journeys','boarding_requests'];
 const before=(await Promise.all(rootCollections.map(list))).flat();
 const find=(collection,id)=>{const d=before.find(d=>d.name===`${rootName}/${collection}/${id}`);if(!d)throw new Error(`Missing source ${collection}/${id}`);return plain(d);};
 for(const a of plan.accounts){const p=find('users',a.uid);if(p.role!==a.role||p.email!==a.email)throw new Error('Existing profile mismatch.');}
@@ -41,6 +41,9 @@ for(const d of before.filter(d=>d.name.startsWith(`${rootName}/stations/`))){con
 for(const d of before.filter(d=>d.name.startsWith(`${rootName}/routes/`))){const id=d.name.split('/').at(-1);const data=plain(d);add(`routes/${id}`,{...data,routeName:`SAMPLE - ${data.routeName}`});}
 for(const d of before.filter(d=>d.name.startsWith(`${rootName}/buses/`)))add(`buses/${d.name.split('/').at(-1)}`,plain(d));
 const routeIds=['ncg_panadura_kandy','ncg_kandy_panadura','ncg_makumbura_badulla','ncg_badulla_makumbura'];
+for(const [i,a] of operators.entries())add(`driver_route_assignments/${a.uid}`,{
+  driverId:a.uid,routeId:routeIds[i],active:true,claimRevision:0,assignmentNote:'Isolated fictional route fixture only',
+});
 function routeOffsets(routeId){
   const template=before.filter(d=>d.name.startsWith(`${rootName}/buses/`)).map(plain).find(b=>b.routeId===routeId);
   if(!template)throw new Error('No sourced timing template for sample route.');
@@ -62,6 +65,11 @@ for(let i=0;i<16;i++){
     catalogueRecordType:'vehicle',hasRamp:true,lowFloor:true,rampOk,rampCheckedAt:rampOk===null?null:ago(2),rampCheckedBy:rampOk===null?null:driver.uid,
     occupancy:['low','medium','high','low'][Math.floor(i/4)],sourceUrl:null};
   vehicles.push({id,data});add(`buses/${id}`,data);
+  add(`service_runs/sample_run_${String(i+1).padStart(2,'0')}`,{
+    busId:id,routeId,routeNo:route.routeNo,serviceDate:new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Colombo'}).format(dep),
+    status:'scheduled',plannedDepartureAt:dep,latestStartAt:new Date(+dep+30*60000),stops:route.stops,
+    initialStopTimes:Object.fromEntries(route.stops.map((stop,s)=>[stop,{estimatedArrival:new Date(+dep+offsets[s]*60000),actualArrival:null}])),
+  });
 }
 const observations=[
   ['rampAccess','Ramp working','positive','low'],['rampAccess','Ramp broken','barrier','medium'],
@@ -106,15 +114,20 @@ for(let i=0;i<8;i++){
 }
 for(let i=0;i<4;i++){
   const bus=vehicles[i];const tripId=`sample_trip_${i+1}`;
-  add(`trips/${tripId}`,{tripId,busId:bus.id,driverId:bus.data.driverId,routeNo:bus.data.routeNo,stops:bus.data.stops,
+  add(`trips/${tripId}`,{tripId,serviceRunId:tripId,busId:bus.id,driverId:bus.data.driverId,routeNo:bus.data.routeNo,stops:bus.data.stops,
     status:i<2?'in_progress':'completed',currentStopIndex:i<2?0:bus.data.stops.length-1,
     scheduledDepartureTime:ago(5),actualDepartureTime:ago(5),createdAt:ago(6),
     stopTimes:Object.fromEntries(bus.data.stops.map((id,s)=>[id,{estimatedArrival:later(routeOffsets(bus.data.routeId)[s]),actualArrival:s===0?ago(5):i<2?null:ago(1)}]))});
   const [latitude,longitude]=[[6.713,79.908],[7.293,80.638],[6.839,79.967],[6.993,81.055]][i];
+  add(`service_runs/${tripId}`,{busId:bus.id,routeId:bus.data.routeId,routeNo:bus.data.routeNo,tripId,driverId:bus.data.driverId,
+    serviceDate:new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Colombo'}).format(ago(5)),
+    status:i<2?'in_progress':'completed',plannedDepartureAt:ago(5),latestStartAt:later(25),stops:bus.data.stops,actualDepartureAt:ago(5),
+    initialStopTimes:Object.fromEntries(bus.data.stops.map((id,s)=>[id,{estimatedArrival:new Date(+ago(5)+routeOffsets(bus.data.routeId)[s]*60000),actualArrival:null}]))});
+  add(`operation_locks/${bus.data.driverId}`,{active:i<2,busId:bus.id,tripId,updatedAt:now});
   add(`live_locations/${bus.id}`,{busId:bus.id,routeId:bus.data.routeId,routeNumber:bus.data.routeNo,routeName:'SAMPLE GPS SNAPSHOT',
     driverId:bus.data.driverId,operatorId:bus.data.driverId,operatorName:'SAMPLE OPERATOR',latitude,longitude,
     speed:0,heading:0,timestamp:i===1?ago(30):now,lastUpdated:i===1?ago(30):now,status:i<2?'active':'offline',
-    isBroadcasting:i<2,currentStopIndex:0,nextStop:`SAMPLE - ${find('stations',bus.data.stops[1]).name}`,etaMinutes:15,
+    isBroadcasting:i<2,tripId,currentStopIndex:0,nextStop:`SAMPLE - ${find('stations',bus.data.stops[1]).name}`,etaMinutes:15,
     rampOperational:bus.data.rampOk,elevatorWorking:null,occupancyLevel:bus.data.occupancy});
 }
 const existing=(await Promise.all([...new Set(records.map(r=>r.path.split('/')[0]))].map(c=>list(`sample_test/shared/${c}`)))).flat();

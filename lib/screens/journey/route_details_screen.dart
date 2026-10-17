@@ -1,4 +1,3 @@
-import '../../logic/journey_fare.dart';
 import '../../widgets/fare_estimate_text.dart';
 import '../../widgets/published_timetable_notice.dart';
 import '../../widgets/evidence_refresh.dart';
@@ -182,7 +181,7 @@ class RouteDetailsScreen extends StatelessWidget {
                                     _TicketPriceCard(
                                       priceRs: route?.estimatedPriceLkr ?? 0,
                                     ),
-                                    const Text(JourneyFare.disclosure),
+                                    FareDisclosureText(),
                                     const SizedBox(height: 20),
 
                                     // SECTION 4: Safety & Crowd Status

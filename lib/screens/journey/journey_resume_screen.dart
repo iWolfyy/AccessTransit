@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../l10n/localization_context.dart';
+import '../../services/accessibility_preferences_service.dart';
+
 import '../../logic/journey_selection.dart';
 import '../../models/journey_model.dart';
 import '../../services/firestore_service.dart';
 import '../../services/journey_service.dart';
-import 'live_journey_screen.dart';
+import 'bus_details_screen.dart';
 import 'route_results_screen.dart';
 
 class JourneyResumeScreen extends StatefulWidget {
@@ -30,13 +37,52 @@ class _JourneyResumeScreenState extends State<JourneyResumeScreen> {
   bool loading = true;
   String? error;
   RouteResultItem? route;
+  int revision = 0;
+  bool invalidated = false;
+  StreamSubscription<User?>? auth;
+  late final savedUpdates = service.watchJourney(widget.journey.journeyId);
   @override
   void initState() {
     super.initState();
+    AccessibilityPreferencesService.instance.addListener(accountChanged);
+    try {
+      auth = FirebaseAuth.instance.authStateChanges().listen((u) {
+        if (u?.uid != widget.journey.passengerId) invalidate();
+      });
+    } catch (_) {}
     load();
   }
 
+  void accountChanged() {
+    if (service.signedInPassenger != widget.journey.passengerId ||
+        AccessibilityPreferencesService.instance.userId !=
+            widget.journey.passengerId) {
+      invalidate();
+    }
+  }
+
+  void invalidate() {
+    if (!mounted || invalidated) return;
+    revision++;
+    setState(() {
+      invalidated = true;
+      route = null;
+      loading = false;
+      error = 'account';
+    });
+  }
+
+  @override
+  void dispose() {
+    revision++;
+    auth?.cancel();
+    AccessibilityPreferencesService.instance.removeListener(accountChanged);
+    super.dispose();
+  }
+
   Future<void> load() async {
+    if (invalidated) return;
+    final generation = ++revision;
     setState(() {
       loading = true;
       error = null;
@@ -49,55 +95,86 @@ class _JourneyResumeScreenState extends State<JourneyResumeScreen> {
       final bus = await repository.getBusById(widget.journey.busId);
       final stops = await repository.getStations();
       if (bus == null) {
-        throw StateError('Saved vehicle unavailable. Replan your journey.');
+        throw StateError('vehicle');
       }
       final restored = JourneySelection.restore(widget.journey, bus, {
         for (final s in stops) s.id: s,
       });
-      if (!mounted) return;
+      if (!mounted || generation != revision || invalidated) return;
       if (service.signedInPassenger != widget.journey.passengerId) {
         throw StateError('The signed-in account changed.');
       }
       if (widget.onReady != null) widget.onReady!(restored);
       setState(() => route = restored);
     } catch (e) {
-      if (mounted) {
+      if (mounted && generation == revision && !invalidated) {
         setState(
-          () => error = e is StateError
-              ? e.message.toString()
-              : 'Saved journey unavailable. Check your connection and retry.',
+          () => error = e is StateError && e.message == 'vehicle'
+              ? 'vehicle'
+              : 'load',
         );
       }
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted && generation == revision) setState(() => loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (invalidated ||
+        service.signedInPassenger != widget.journey.passengerId) {
+      return Scaffold(
+        appBar: AppBar(title: Text(context.l10n.savedTripsTitle)),
+        body: Center(child: Text(context.l10n.savedTripsAccountChanged)),
+      );
+    }
     if (route != null &&
         service.signedInPassenger == widget.journey.passengerId) {
-      return LiveJourneyScreen(
-        busId: widget.journey.busId,
-        passengerId: widget.journey.passengerId,
-        journeyId: widget.journey.journeyId,
-        savedJourney: widget.journey,
-        origin: widget.journey.origin,
-        destination: widget.journey.destination,
-        route: route,
-        journeyService: service,
+      return StreamBuilder<JourneyModel?>(
+        stream: savedUpdates,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasError ||
+              snapshot.data == null ||
+              snapshot.data!.passengerId != service.signedInPassenger) {
+            return Scaffold(
+              appBar: AppBar(title: Text(context.l10n.busDetails)),
+              body: Center(child: Text(context.l10n.savedTripsOpenError)),
+            );
+          }
+          return BusDetailsScreen(
+            savedJourney: widget.journey,
+            origin: widget.journey.origin,
+            destination: widget.journey.destination,
+            route: route!,
+            bus: route!.rawBus,
+            journeyService: service,
+          );
+        },
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Resume saved journey')),
+      appBar: AppBar(title: Text(context.l10n.busDetails)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             if (loading) const CircularProgressIndicator(),
-            if (error != null) Text(error!),
+            if (error != null)
+              Text(
+                error == 'vehicle'
+                    ? context.l10n.savedTripsVehicleUnavailable
+                    : context.l10n.savedTripsOpenError,
+              ),
             if (!loading)
-              FilledButton(onPressed: load, child: const Text('Retry')),
+              FilledButton(
+                onPressed: load,
+                child: Text(context.l10n.savedTripsRetry),
+              ),
           ],
         ),
       ),

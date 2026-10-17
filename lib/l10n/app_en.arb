@@ -1,0 +1,371 @@
+{
+  "busDetails": "Bus Details",
+  "communityReports": "Community reports",
+  "saveTrip": "Save Trip",
+  "removeSavedTrip": "Remove saved trip",
+  "savedTrip": "Saved trip",
+  "noRecentReports": "No recent reports",
+  "loadingReports": "Loading reports…",
+  "requestBoardingAssistance": "Request boarding assistance",
+  "reportCondition": "Report a condition",
+  "@@locale": "en",
+  "language": "Language",
+  "languageSaveFailed": "Could not save the language. Please try again.",
+  "searchWindowInvalid": "Choose a boarding time within the next 24 hours.",
+  "searchSelectionExpired": "This selection has expired. Review the current results.",
+  "searchAccountChanged": "Account changed. Return to Search to start a new search.",
+  "searchWindowNotice": "Boarding within the next 24 hours. Timetable times do not confirm a running bus.",
+  "welcomeBack": "Welcome back",
+  "signIn": "Sign In",
+  "email": "Email",
+  "emailHint": "Enter your email address",
+  "passenger": "Passenger",
+  "passengerDescription": "Plan accessible journeys",
+  "reporter": "Reporter",
+  "reporterDescription": "Report bus and stop conditions",
+  "driver": "Bus Driver",
+  "driverDescription": "Administrator approval required",
+  "operatorApprovalRequired": "Account created. Administrator approval is required for driver access.",
+  "accountReady": "Welcome, {name}! Your account is ready.",
+  "@accountReady": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "verifyingSearchTime": "Verifying search time...",
+  "searchTimeUnavailable": "Search time unavailable. Connect and retry.",
+  "retrySearchTime": "Retry search time",
+  "retrySearch": "Retry search",
+  "verifyingDatedSearch": "Verifying search time and dated departures...",
+  "datedSearchUnavailable": "Dated departures unavailable. Connect and retry.",
+  "nearbyStopsTitle": "Nearby boarding stops",
+  "nearbyStopsExplanation": "Choose your boarding stop. Distances are approximate straight-line distances, not walking routes or travel times. Check the stop's direction and side of the road.",
+  "nearbyLocating": "Finding your location...",
+  "nearbyLocationDisabled": "Turn on device location, then retry.",
+  "nearbyLocationDenied": "Location permission was denied. You can choose a stop manually.",
+  "nearbyLocationBlocked": "Allow location access in app settings, then retry.",
+  "nearbyLocationUnavailable": "Could not get a usable location. Retry or choose a stop manually.",
+  "nearbyOpenSettings": "Open settings",
+  "nearbyRetry": "Retry location",
+  "nearbyChooseManually": "Choose a stop manually",
+  "nearbyStopsEmpty": "No stops with valid coordinates are available.",
+  "nearbyDistance": "About {km} km away",
+  "@nearbyDistance": {
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "reportCooldownNotice": "You can report different issues without a daily limit. Wait 5 minutes before reporting the same issue category on the same bus or stop again.",
+  "falseVoteReason": "Why is this report inaccurate?",
+  "falseVoteReasonMinimum": "Enter at least 5 characters.",
+  "voteCancel": "Cancel",
+  "voteSubmit": "Submit vote",
+  "voteAcknowledged": "Vote acknowledged.",
+  "voteUnavailable": "Vote was not confirmed. Check your connection and retry.",
+  "voteSignIn": "Sign in to vote.",
+  "authorVoteDisabled": "You cannot vote on your own report.",
+  "voteRetry": "Retry vote status",
+  "votingClosed": "Voting is closed.",
+  "voteNoPoints": "Votes earn no points. Five False votes hide the report.",
+  "voteTrue": "True",
+  "voteFalse": "False",
+  "accountStatusChecking": "Checking account access...",
+  "accountStatusUnavailable": "Account access could not be verified. Connect and retry.",
+  "accountSuspended": "Account suspended. Administrator review is required.",
+  "accountTemporaryUntil": "Account temporarily suspended until {until} (UTC).",
+  "accountStatusRetry": "Retry account status",
+  "accountSignOut": "Sign out",
+  "v2PointsNotice": "Published report: 10 points; votes earn no points. Five False votes deduct twice the award. Points have no cash value.",
+  "refreshV2Points": "Refresh v2 points",
+  "@accountTemporaryUntil": {
+    "placeholders": {
+      "until": {
+        "type": "String"
+      }
+    }
+  },
+  "reviewsTitle": "My report reviews",
+  "reviewsAdminTitle": "Report moderation",
+  "reviewsError": "Unable to verify reviews. Check your connection and retry.",
+  "reviewsReasonRequired": "Enter a reason between 5 and 2,000 characters.",
+  "reviewsPending": "Appeal pending",
+  "reviewsUpheld": "Decision upheld",
+  "reviewsOverturned": "Decision overturned; penalty restored",
+  "reviewsUnreviewed": "Awaiting review",
+  "reviewsEmpty": "No community-disputed reports.",
+  "reviewsMore": "Load more",
+  "reviewsPenalty": "Penalty: {points} points. Counted strikes: {strikes}.",
+  "reviewsHiddenReason": "{count} other users marked this report False. It was hidden automatically.",
+  "reviewsAppealLabel": "Your appeal",
+  "reviewsDecisionReason": "Admin decision reason",
+  "reviewsVotes": "Community vote evidence",
+  "reviewsReason": "Reason",
+  "reviewsDecisionExplanation": "Overturn restores the deducted points and removes this strike once. Other account restrictions remain.",
+  "reviewsUphold": "Uphold decision",
+  "reviewsOverturn": "Overturn decision",
+  "reviewsSubmit": "Submit appeal",
+  "reviewsAcknowledged": "Change confirmed by the server.",
+  "reviewsPhoto": "Report photo",
+  "reviewsPhotoUnavailable": "Report photo unavailable.",
+  "@reviewsPenalty": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      },
+      "strikes": {
+        "type": "int"
+      }
+    }
+  },
+  "@reviewsHiddenReason": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bansTitle": "Permanent-ban reviews",
+  "bansApproved": "Permanent ban approved",
+  "bansRejected": "Permanent ban rejected",
+  "bansWithdrawn": "Review withdrawn",
+  "bansPending": "Admin review pending",
+  "bansEmpty": "No permanent-ban review cases.",
+  "bansStrikes": "Current strikes: {count}",
+  "bansAppealsPending": "Resolve pending report appeals before approving a permanent ban.",
+  "bansStale": "Evidence changed. Refresh this case before deciding.",
+  "bansAdminProtected": "Administrator accounts are protected from this workflow.",
+  "bansEvidence": "Contributing reports and appeals",
+  "bansCounted": "Strike counted",
+  "bansRemoved": "Strike removed",
+  "bansExplanation": "Ten strikes request a review. Only an explicit approval imposes a permanent restriction. Rejection does not extend a temporary ban.",
+  "bansReject": "Reject permanent ban",
+  "bansApprove": "Approve permanent ban",
+  "@bansStrikes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "assistanceInbox": "Run assistance requests",
+  "assistanceChooseRun": "Choose a dated trip with an assigned driver from Bus Details.",
+  "assistanceUnavailable": "Assistance is unavailable. Check the trip, assignment and connection, then retry.",
+  "assistanceEmpty": "No assistance requests for this run.",
+  "assistanceRetargeted": "Driver changed. Awaiting the current driver acknowledgement.",
+  "assistancePending": "Awaiting driver acknowledgement",
+  "assistanceAccepted": "Driver acknowledged",
+  "assistanceDeclined": "Driver declined",
+  "assistanceCompleted": "Driver marked completed",
+  "assistanceCancelled": "Cancelled",
+  "assistanceExpired": "Request expired",
+  "assistanceAcknowledge": "Acknowledge",
+  "assistanceDecline": "Decline",
+  "assistanceComplete": "Complete",
+  "assistanceInAppOnly": "Available in the assigned driver's in-app inbox. Background push notifications are not enabled in local testing.",
+  "assistanceExpiry": "Request expiry (UTC): {time}",
+  "@assistanceExpiry": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "assistanceRunEnded": "This trip has ended or was cancelled.",
+  "assistanceStopPassed": "The bus has already passed the requested boarding opportunity.",
+  "assistanceDriverUnavailable": "The assigned driver is no longer available.",
+  "assistanceRamp": "Deploy ramp",
+  "assistanceExtraTime": "Extra time",
+  "assistanceBoardingHelp": "Boarding help",
+  "assistanceAlightingHelp": "Alighting help",
+  "operationsTitle": "Active trips",
+  "operationsRefresh": "Refresh from server",
+  "operationsEmpty": "No active dated trips.",
+  "operationsMore": "Load more",
+  "operationsExplanation": "Transfer this trip to an approved driver assigned to the same route. Progress and recorded times stay unchanged. GPS pauses until the new driver resumes with a fresh location. Assistance requests require the new driver’s acceptance.",
+  "operationsDone": "Transfer acknowledged. GPS is paused until the new driver resumes. Assistance reassignment continues in the background; previous acceptance does not carry over.",
+  "operationsNoDrivers": "No eligible driver on this page. Approve and assign an available driver to this route first.",
+  "operationsReason": "Transfer reason (5–2000 characters)",
+  "operationsTransfer": "Transfer trip",
+  "operationsSaving": "Transferring…",
+  "operationsError": "Unable to confirm this operation. Retry the same request or refresh to inspect its current state.",
+  "operationsStale": "The trip or driver eligibility changed. Refresh before transferring.",
+  "operationsResume": "Accept and resume GPS",
+  "operationsGpsError": "Wait for a fresh GPS fix with accuracy within 100 metres, then accept and resume again.",
+  "pushTitle": "Assistance notifications",
+  "pushChannelDescription": "Notifications about passenger assistance requests",
+  "pushOff": "Notifications are off. The driver inbox remains available.",
+  "pushConnecting": "Connecting notifications…",
+  "pushDenied": "Notification permission is denied. You can allow it in Android app settings.",
+  "pushReady": "This device is registered. A notification does not confirm that assistance was accepted.",
+  "pushUnavailable": "Notification setup was not confirmed. Retry or use the driver inbox.",
+  "pushEnable": "Enable notifications",
+  "pushDisable": "Turn off",
+  "pushOpenUnavailable": "This request is unavailable or no longer assigned to your account.",
+  "pushForeground": "A passenger has requested assistance.",
+  "pushReview": "Review request",
+  "fareUnavailable": "Fare unavailable",
+  "fareUnavailableDisclosure": "A reviewed tariff and fare-stage mapping are not available for this selection. Confirm the fare with the operator.",
+  "fareSampleDisclosure": "Sample/Test estimate only. This duration/stop model is not an official fare. Confirm the actual fare with the operator.",
+  "fareSampleAmount": "Sample est. LKR {amount}",
+  "@fareSampleAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      }
+    }
+  },
+  "fareReviewedSource": "Reviewed source: {source}. Tariff {tariff}; mapping {mapping}.",
+  "fareReviewedAmount": "LKR {amount}",
+  "fareSampleReviewed": "Sample tariff LKR {amount}",
+  "fareChanged": "The fare version changed or is unavailable. The saved selection is preserved; review the current fare before travelling.",
+  "fareAdminTitle": "Fare publications",
+  "fareImportHelp": "Import a reviewed fare table, ordered stop-stage mapping and explicit bus IDs. Amounts use minor units (LKR 1 = 100). Preview every cell, source, class and effective date before publishing. Published versions are immutable; archive and create a new ID to replace one.",
+  "farePublicationId": "New publication ID",
+  "fareImportJson": "Reviewed import JSON",
+  "farePreview": "Validate and preview",
+  "fareReviewCheck": "I reviewed the source, vehicle class, direction, stop-stage mapping and dates.",
+  "fareReviewReason": "Review/archive reason (10–2000 characters)",
+  "farePublish": "Publish reviewed version",
+  "fareArchive": "Archive version",
+  "fareCancel": "Cancel",
+  "fareInvalidImport": "Invalid import. Check the documented schema, IDs, integer amounts, source and date/mapping applicability.",
+  "fareAdminError": "Operation unconfirmed. Check connection, admin access, review reason and current bus/route data. Reload before retrying a changed publication.",
+  "fareNoPublications": "No fare publications. Missing fares remain unavailable.",
+  "@fareReviewedSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      },
+      "tariff": {
+        "type": "String"
+      },
+      "mapping": {
+        "type": "String"
+      }
+    }
+  },
+  "@fareReviewedAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@fareSampleReviewed": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "geometryTitle": "Route geometry",
+  "geometryHelp": "Import a reviewed directed road path and ordered stop vertices. Match the current route and stop coordinates; use a new version for corrections. This does not supply real-time traffic.",
+  "geometryReview": "I reviewed the road path, direction, stop vertices and source.",
+  "geometryInvalid": "Invalid geometry. Check the JSON, route ID, coordinates, source and ordered stop vertices.",
+  "geometrySaved": "Reviewed route geometry published.",
+  "geometryWithdraw": "Withdraw current geometry",
+  "geometryMap": "Reviewed road path · selected segment",
+  "geometryEta": "{target}: estimated {start}–{end} · road progress + timetable, low confidence.",
+  "@geometryEta": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "geometryWithdrawn": "Route geometry withdrawn.",
+  "etaDiagnostics": "Local ETA diagnostics",
+  "etaDiagnosticsUnavailable": "Local Test diagnostics requires a loaded signed-in account.",
+  "etaDiagnosticsHelp": "LOCAL TEST ONLY. Opt in to capture forecasts while Bus Details is open. Arrivals are acknowledged driver-reported timestamps, not independent GPS ground truth. No production accuracy claim. Records stay on this device/account (500 maximum, seven-day retention applied during capture). No coordinates, emails or driver IDs are stored.",
+  "etaCapture": "Capture local forecasts",
+  "etaCounts": "Captured: {captured} · pending: {pending} · excluded: {excluded}",
+  "etaMetrics": "Matched samples: {count} · median error: {median}s · P90 error: {p90}s",
+  "etaStorageError": "Local save/read unconfirmed. Export may contain unsaved diagnostic records; retry your action.",
+  "etaNoMatchedSamples": "No matched arrivals yet. Pending/excluded forecasts are not counted as zero error.",
+  "etaSmallSample": "Small synthetic sample; this does not establish real-world accuracy.",
+  "etaCopied": "Local diagnostic JSON copied.",
+  "etaExport": "Copy diagnostic JSON",
+  "etaClear": "Clear this account’s local measurements",
+  "@etaCounts": {
+    "placeholders": {
+      "captured": {
+        "type": "int"
+      },
+      "pending": {
+        "type": "int"
+      },
+      "excluded": {
+        "type": "int"
+      }
+    }
+  },
+  "@etaMetrics": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "median": {
+        "type": "String"
+      },
+      "p90": {
+        "type": "String"
+      }
+    }
+  },
+  "savedTripsTitle": "Saved trips",
+  "savedTripsViewAll": "View all saved trips",
+  "savedTripsHelp": "Your saved selections, including past records. Saving does not book a seat or start tracking. Open details to refresh the selected run’s current status.",
+  "savedTripsRefresh": "Refresh saved trips",
+  "savedTripsAccountChanged": "Account changed. Return Home and open your saved trips again.",
+  "savedTripsRemoveError": "Removal is not confirmed. The saved record is retained; reconnect and retry.",
+  "savedTripsOpenError": "Saved details could not be verified. Reconnect and retry.",
+  "savedTripsLoadError": "Saved trips unavailable. Check your connection and account access, then retry.",
+  "savedTripsRetry": "Retry",
+  "savedTripsEmpty": "No saved trips yet. Save a trip from Bus Details.",
+  "savedTripsEmptyPage": "No saved records on this page. Refresh or return to the previous page.",
+  "savedTripsCompletedRecord": "Completed saved record",
+  "savedTripsCancelledRecord": "Cancelled saved record",
+  "savedTripsOpen": "Open bus details",
+  "savedTripsPrevious": "Previous page",
+  "savedTripsNext": "Next page",
+  "savedTripsVehicleUnavailable": "Saved vehicle unavailable. Review the saved record or search again.",
+  "segmentReportsPreview": "Limited report preview; open scoped pages for more evidence. Missing reports do not establish accessibility.",
+  "segmentReportsHelp": "Choose this bus or a stop in your selected segment. Pages use stable record order, not observation time. Expired/hidden reports are excluded; an empty page does not mean there are no older relevant reports.",
+  "segmentReportsUnavailable": "Reports unavailable. Reconnect and refresh.",
+  "segmentReportsEmptyPage": "No current visible reports on this page. Check the next page when available.",
+  "segmentReportsEmptyPreview": "No current reports in this preview.",
+  "segmentReportsViewAll": "View all relevant reports",
+  "calendarTitle": "Service calendar",
+  "calendarHelp": "Publish reviewed weekdays, Colombo departure time and up to 31 service dates. Then generate departures explicitly. Existing runs are preserved. Retiring a calendar stops generation; cancel future runs separately.",
+  "calendarDates": "Choose service dates",
+  "calendarTime": "Choose Colombo departure time",
+  "calendarPublish": "Publish calendar",
+  "calendarGenerate": "Generate dated departures",
+  "calendarRetire": "Retire calendar",
+  "calendarFailed": "Change or load not confirmed. Reconnect and reload. Use selected weekdays and at most 31 days; changed timetables need a replacement calendar.",
+  "calendarConfirmed": "Calendar change confirmed.",
+  "calendarGenerated": "Created {created}; preserved {preserved} existing departures.",
+  "calendarPublished": "Published calendar",
+  "calendarRetired": "Retired calendar",
+  "calendarEmpty": "No calendars for this bus.",
+  "@calendarGenerated": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "preserved": {
+        "type": "int"
+      }
+    }
+  }
+}

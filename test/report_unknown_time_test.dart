@@ -172,6 +172,7 @@ void main() {
           home: Scaffold(
             body: SingleChildScrollView(
               child: AccessibilityEvidenceCard(
+                initiallyExpanded: true,
                 reports: [parse()],
                 busId: 'bus',
                 origin: 'a',

@@ -167,11 +167,11 @@ void main() {
         ),
       );
       expect(find.text('Ramp capability: Equipped'), findsOneWidget);
-      expect(
-        find.textContaining('operational condition: Unknown'),
-        findsOneWidget,
-      );
+      expect(find.text('Unknown - a new check is required'), findsOneWidget);
       expect(find.text('Ramp last checked: Unknown'), findsOneWidget);
+      expect(find.text('Ramp observation source: Unknown'), findsNothing);
+      await tester.tap(find.text('Vehicle ramp'));
+      await tester.pumpAndSettle();
       expect(find.text('Ramp observation source: Unknown'), findsOneWidget);
       await tester.pumpWidget(
         MaterialApp(
@@ -186,10 +186,7 @@ void main() {
         ),
       );
       expect(find.text('Ramp last checked: Unknown'), findsOneWidget);
-      expect(
-        find.textContaining('operational condition: Unknown'),
-        findsOneWidget,
-      );
+      expect(find.text('Unknown - a new check is required'), findsOneWidget);
     },
   );
   testWidgets('working observation displays actual source and check age', (
@@ -202,7 +199,18 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Ramp observation source: operator'), findsOneWidget);
+    expect(
+      find.text('Ramp observation source: Operator observation'),
+      findsNothing,
+    );
+    await tester.tap(find.text('Vehicle ramp'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Ramp observation source: Operator observation'),
+      findsOneWidget,
+    );
+    expect(find.text('Check recorded: 2026-10-15 12:00 PM'), findsOneWidget);
+    expect(find.text('Ramp observation source: operator'), findsNothing);
     expect(find.text('Ramp last checked: Just now'), findsOneWidget);
     expect(find.textContaining('Working observed'), findsOneWidget);
   });
